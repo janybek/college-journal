@@ -69,5 +69,6 @@ export function storeContract(name, makeStore) {
     assert.deepEqual(s.list('rooms').map(r => r.name), ['B']);
     assert.deepEqual(s.updateMany('rooms', []), []);
     s.removeMany('rooms', []);
+    assert.throws(() => s.removeMany('nope', []), e => e.code === 'bad_request');
   });
 }

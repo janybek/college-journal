@@ -7,7 +7,7 @@ function analyse(data, store) {
   const { table, cells } = data;
   if (typeof table !== 'string' || !Object.prototype.hasOwnProperty.call(IMPORT_SPECS, table)) throw new AppError('bad_request');
   if (!Array.isArray(cells) || cells.some((row) => !Array.isArray(row))) throw new AppError('bad_request');
-  const db = loadDb(store);
+  const db = loadDb(store, table, table === 'topics' ? ['groups', 'pairs'] : []);
   const parsed = parseSheet(table, cells, db);
   const badRows = new Set(parsed.errors.map((e) => e.row)).size;
   return { table, db, parsed, badRows };

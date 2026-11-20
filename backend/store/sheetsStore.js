@@ -95,6 +95,9 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
     return out;
   };
 
+  // A cell that is not being changed goes back as it reads (a Date in a text column as 'YYYY-MM-DD'); other types stay raw.
+  const untouched = (type, raw) => (type === 'string' && isDate(raw) ? localDate(raw.getTime()) : raw);
+
   const find = (loaded, id) => loaded.entries.find((e) => e.row.id === id);
 
   // One read, then one setValues per changed schema column (first to last changed row of that column).
@@ -126,8 +129,9 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
         const first = Math.min(...rowsChanged);
         const last = Math.max(...rowsChanged);
         const col = cols[title];
+        const type = def.columns.find((c) => c.title === title).type;
         const block = [];
-        for (let r = first; r <= last; r++) block.push([cells.has(r) ? cells.get(r) : values[r - 1][col]]);
+        for (let r = first; r <= last; r++) block.push([cells.has(r) ? cells.get(r) : untouched(type, values[r - 1][col])]);
         sheet.getRange(first, col + 1, block.length, 1).setValues(block);
       }
       return results;
@@ -137,8 +141,8 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
   function removeRows(table, ids) {
     withLock(() => {
       const unique = [...new Set(ids)];
-      if (unique.length === 0) return;
       const loaded = load(table);
+      if (unique.length === 0) return;
       const positions = unique.map((id) => {
         const hit = find(loaded, id);
         if (!hit) throw new AppError('not_found');

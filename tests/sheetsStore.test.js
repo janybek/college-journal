@@ -157,6 +157,25 @@ test('fakeSpreadsheet: an ISO date typed into a plain column becomes Bishkek mid
   assert.equal(ss.dump('T')[0][0].getTime(), new Date('2026-08-31T18:00:00Z').getTime());
 });
 
+test('sheetsStore: updateMany writes untouched rows of the range back as shaped text', () => {
+  const ss = createFakeSpreadsheet({});
+  ensureSheets(SCHEMA, ss);
+  const s = createSheetsStore(SCHEMA, platform, ss);
+  const [a, b, c] = s.insertMany('groups', [{ name: 'A', course: 1 }, { name: 'B', course: 1 }, { name: 'C', course: 1 }]);
+  // An admin typed a date into the middle row (the sheet turned it into a Date).
+  ss.getSheetByName('Группы').getRange(3, 2, 1, 1).setValues([[new Date('2026-08-31T18:00:00Z')]]);
+  s.updateMany('groups', [{ id: a.id, patch: { name: 'A2' } }, { id: c.id, patch: { name: 'C2' } }]);
+  assert.equal(ss.dump('Группы')[2][1], '2026-09-01');
+  assert.equal(s.get('groups', b.id).name, '2026-09-01');
+  assert.deepEqual(s.list('groups').map(r => r.name), ['A2', '2026-09-01', 'C2']);
+});
+
+test('sheetsStore: removeMany of nothing still checks the table', () => {
+  const s = createSheetsStore(SCHEMA, platform, groupsSheet());
+  assert.throws(() => s.removeMany('nope', []), e => e.code === 'bad_request');
+  s.removeMany('groups', []);
+});
+
 test('sheetsStore: updateMany keeps foreign columns and writes once per column', () => {
   const ss = groupsSheet();
   const s = createSheetsStore(SCHEMA, platform, ss);
