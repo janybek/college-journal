@@ -2,7 +2,7 @@ import { call } from '../api.js';
 import { t } from '../i18n.js';
 import {
   el, errorKey, fieldErrorKey, field, focusById, focusFirstInvalid, markBusy, refresh,
-  badge, emptyState, iconButton, note, pageHeader,
+  badge, emptyState, iconButton, note, pageHeader, unmarkField,
 } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
@@ -120,7 +120,7 @@ function semesterPanel(editable) {
     const input = field({
       id, label: t(labelKey), type: 'date', value: state.values[name], hint: dateHint(state.values[name]),
       error: error ? error.key : null,
-      onInput: (value) => { state.values[name] = value; forgetError(name); syncAll(); },
+      onInput: (value) => { state.values[name] = value; forgetDateErrors(name); syncAll(); },
       attrs: { readonly: !editable, required: true },
     });
     live.dateHints.push({ name, hint: input.querySelector('.field__hint') });
@@ -167,7 +167,7 @@ function holidayAdder() {
   const input = el('input', {
     id: 'settings-holiday-new', name: 'settings-holiday-new', type: 'date', class: 'field__input', value: state.newHoliday,
     'aria-invalid': state.holidayErrorKey ? 'true' : null, 'aria-describedby': state.holidayErrorKey ? errorId : null,
-    oninput: () => { state.newHoliday = input.value; },
+    oninput: () => { state.newHoliday = input.value; forgetHolidayError(); },
     onkeydown: (event) => { if (event.key === 'Enter') { event.preventDefault(); addHoliday(); } },
   });
   return el('div', { class: 'field adder' },
@@ -293,15 +293,22 @@ function forgetError(name) {
   delete state.errors[name];
   const bells = name === 'bells';
   if (bells) state.badBells = [];
-  const errorId = bells ? 'settings-bells-error' : INPUT_IDS[name] + '-error';
-  document.getElementById(errorId)?.remove();
-  const inputs = bells ? [...document.querySelectorAll('.bell__input')] : [document.getElementById(INPUT_IDS[name])];
-  for (const input of inputs.filter(Boolean)) {
-    input.removeAttribute('aria-invalid');
-    const rest = (input.getAttribute('aria-describedby') ?? '').split(' ').filter((ref) => ref && ref !== errorId);
-    if (rest.length > 0) input.setAttribute('aria-describedby', rest.join(' '));
-    else input.removeAttribute('aria-describedby');
-  }
+  if (bells) unmarkField('settings-bells-error', ...document.querySelectorAll('.bell__input'));
+  else unmarkField(INPUT_IDS[name] + '-error', document.getElementById(INPUT_IDS[name]));
+}
+
+// A date the person changes loses its mark. The order of the dates is marked on the end of the semester, so a
+// change of either date takes that mark off too.
+function forgetDateErrors(name) {
+  forgetError(name);
+  if (state.errors.semesterEnd?.range) forgetError('semesterEnd');
+}
+
+// Typing another day off takes the mark off the field for a new day off.
+function forgetHolidayError() {
+  if (!state.holidayErrorKey) return;
+  state.holidayErrorKey = null;
+  unmarkField('settings-holiday-new-error', document.getElementById('settings-holiday-new'));
 }
 
 // The bell times checked the way the server checks them, with a reason and the fields to mark.
@@ -455,6 +462,10 @@ function showSaveError(owner, error) {
   const fields = error.code === 'invalid' && Array.isArray(error.fields) ? error.fields : [];
   const shown = fields.filter(({ field: name }) => FIELD_NAMES.includes(name));
   for (const { field: name, code } of shown) owner.errors[name] = { key: fieldErrorKey('settings', name, code, 'settings') };
+  // When the start is fine, bad_value and too_long on the end are about the two dates together: the end before
+  // the start, or a semester that is too long.
+  const end = shown.find(({ field: name }) => name === 'semesterEnd');
+  if (end && !owner.errors.semesterStart && ['bad_value', 'too_long'].includes(end.code)) owner.errors.semesterEnd.range = true;
   if (shown.length === 0) owner.messageKey = fields.length > 0 ? fieldErrorKey('settings', fields[0].field, fields[0].code, 'settings') : errorKey(error.code);
   if (owner.errors.bells) owner.badBells = owner.values.bells.map((time, i) => i);
 }

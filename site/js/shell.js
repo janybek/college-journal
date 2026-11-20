@@ -48,6 +48,9 @@ export function navFor(permissionList, role) {
   if (list.includes('dir.list:weekTemplate')) {
     schedule.push({ name: 'weekTemplate', href: '#/template', textKey: 'template.title', icon: 'grid', hintKey: 'template.hint' });
   }
+  if (list.includes('dir.list:topics')) {
+    schedule.push({ name: 'topics', href: '#/topics', textKey: 'topics.title', icon: 'clipboard', hintKey: 'topics.hint' });
+  }
   if (list.includes('settings.get')) {
     schedule.push({ name: 'settings', href: '#/settings', textKey: 'settings.title', icon: 'settings', hintKey: 'settings.hint' });
   }
@@ -227,6 +230,7 @@ function crumbs(groups, view, params, current) {
     else if (view === 'import') [groupKey, pageKey] = ['nav.data', 'import.title'];
     else if (view === 'settings') [groupKey, pageKey] = ['nav.schedule', 'settings.title'];
     else if (view === 'weekTemplate') [groupKey, pageKey] = ['nav.schedule', 'template.title'];
+    else if (view === 'topics') [groupKey, pageKey] = ['nav.schedule', 'topics.title'];
     else pageKey = 'nav.home';
   }
   return el('p', { class: 'crumbs' },

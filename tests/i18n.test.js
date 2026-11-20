@@ -5,7 +5,7 @@ import ru from '../site/js/i18n/ru.js';
 import ky from '../site/js/i18n/ky.js';
 import en from '../site/js/i18n/en.js';
 import { IMPORT_SPECS } from '../core/import.js';
-import { IMPORT_COLUMNS } from '../site/js/views/directoryConfig.js';
+import { IMPORT_COLUMNS, IMPORT_TABLES, FIELDS } from '../site/js/views/directoryConfig.js';
 
 test('template column titles in the dictionaries equal IMPORT_SPECS', () => {
   for (const [table, spec] of Object.entries(IMPORT_SPECS)) for (const col of spec.columns)
@@ -17,6 +17,19 @@ test('the site lists the same template columns as IMPORT_SPECS', () => {
   const fromSpecs = Object.fromEntries(Object.entries(IMPORT_SPECS)
     .map(([table, spec]) => [table, spec.columns.map(({ key, required }) => ({ key, required }))]));
   assert.deepEqual(IMPORT_COLUMNS, fromSpecs);
+});
+
+test('topics can be imported: last in the order, with a field for every column and the texts of the screen', () => {
+  assert.equal(IMPORT_TABLES[IMPORT_TABLES.length - 1], 'topics');
+  for (const { key } of IMPORT_COLUMNS.topics) assert.ok(FIELDS[key], key);
+  // The template formats every column but the numbers as Text.
+  assert.deepEqual(IMPORT_COLUMNS.topics.filter(({ key }) => FIELDS[key].kind === 'number').map(({ key }) => key), ['unit', 'order']);
+  for (const key of ['dir.topics', 'import.matchBy.topics', 'import.error.name.held', 'import.error.subjectId.bad_ref']) assert.ok(ru[key], key);
+  for (const table of IMPORT_TABLES) assert.ok(ru['import.matchBy.' + table], table);
+});
+
+test('every directory that can be in use elsewhere explains why it cannot be removed', () => {
+  for (const table of ['groups', 'staff', 'subjects', 'rooms']) assert.ok(ru['dir.inUse.' + table], table);
 });
 
 test('tCount picks the plural form of the current language', () => {

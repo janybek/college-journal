@@ -283,6 +283,20 @@ export function focusFirstInvalid() {
   if (target) target.focus();
 }
 
+// Takes the mistake mark off in place, without a redraw (a redraw would throw the caret out of a date or time
+// field): the error line `errorId` goes, and each of `inputs` (elements; null is skipped) loses aria-invalid and
+// its reference to that line.
+export function unmarkField(errorId, ...inputs) {
+  document.getElementById(errorId)?.remove();
+  for (const input of inputs) {
+    if (!input) continue;
+    input.removeAttribute('aria-invalid');
+    const rest = (input.getAttribute('aria-describedby') ?? '').split(' ').filter((ref) => ref && ref !== errorId);
+    if (rest.length > 0) input.setAttribute('aria-describedby', rest.join(' '));
+    else input.removeAttribute('aria-describedby');
+  }
+}
+
 // Shows that a request is running. The button stays focusable; the screen ignores repeated submits itself.
 export function markBusy(button, busyKey) {
   button.setAttribute('aria-disabled', 'true');

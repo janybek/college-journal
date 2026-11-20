@@ -30,6 +30,13 @@ test('resolveRoute: the week template needs dir.list:weekTemplate', () => {
   assert.equal(resolveRoute('#/template', { mustChangePassword: false, permissions: ['settings.get'] }).view, 'home');
 });
 
+test('resolveRoute: the topics screen needs dir.list:topics', () => {
+  const office = { mustChangePassword: false, permissions: ['settings.get', 'dir.list:groups', 'dir.list:topics', 'dir.list:weekTemplate'] };
+  assert.equal(resolveRoute('#/topics', office).view, 'topics');
+  assert.deepEqual(resolveRoute('#/topics', office).params, {});
+  assert.equal(resolveRoute('#/topics', { mustChangePassword: false, permissions: ['dir.list:weekTemplate'] }).view, 'home');
+});
+
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {
   assert.deepEqual(resolveRoute('', dean), { view: 'home', params: {} });
   assert.equal(resolveRoute('#/dir/groups', { mustChangePassword: false }).view, 'home');

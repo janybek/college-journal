@@ -1183,6 +1183,140 @@ button.lesson:hover { box-shadow: inset 0 0 0 1px var(--lesson); }
   to { box-shadow: 0 0 0 3px transparent; }
 }
 
+/* Screens: topics — the topic plan of a subject; each topic carries the calendar page of the pair it landed on */
+
+.topics-notes,
+.topics-warnings {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.topics-card { overflow: hidden; }
+
+.topics-toolbar { border-bottom: 1px solid var(--border); }
+
+.topics-toolbar > .field { flex: 0 1 20rem; }
+
+/* Who teaches the subject, next to the subject itself. */
+.topics-teacher {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.topics-teacher__text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.topics-teacher__caption {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+.topics-teacher__name { font-weight: 500; }
+
+.topics-wait { padding: var(--space-4); }
+
+.topics-table { min-width: 46rem; }
+
+.topics-table .table__num { width: 3.5rem; }
+
+.topics-table .topics__unit { width: 4.5rem; }
+
+/* A unit opens with a stronger line and its number; the topics after it in the same unit keep the number for
+   screen readers only. */
+.topics-table tbody tr.is-unit-start:not(:first-child) td { border-top: 1px solid var(--border-strong); }
+
+.unit {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.75rem;
+  height: 1.5rem;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* The pair a topic stands on: a page of a tear-off calendar in the accent colour (days off are red ones). */
+.when {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 10rem;
+}
+
+.when__leaf {
+  display: grid;
+  flex: none;
+  width: 2.5rem;
+  min-height: 2.625rem;
+  overflow: hidden;
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-inner);
+  background: var(--surface-raised);
+  text-align: center;
+}
+
+.when__weekday {
+  padding: 0.0625rem 0;
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.when__day {
+  padding: 0.0625rem 0 0.125rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+/* No pair for this topic: an empty page, dashed. */
+.when__leaf--empty {
+  border: 1px dashed var(--border-strong);
+  background: transparent;
+}
+
+.when__text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.when__date { font-weight: 500; }
+
+.when__slot {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.topics-table tr.is-unplaced .table__label { color: var(--text-muted); }
+
+/* №, unit: two short numbers side by side in the topic dialog. Their hints differ in length, so the two fields
+   share the rows of label, hint, input and error line, and the inputs stay level (a browser without subgrid
+   simply stacks each field from the top). */
+.topics-numbers {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: var(--space-4);
+}
+
+.topics-numbers > .field {
+  grid-row: span 4;
+  grid-template-rows: subgrid;
+  row-gap: var(--space-2);
+}
+
 /* Print: black on white in either theme. The passwords of an import print alone, as strips to cut apart
    along the dashed lines; any other screen prints without the sidebar and the bars. */
 

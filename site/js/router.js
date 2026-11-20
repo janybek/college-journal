@@ -12,6 +12,7 @@ export function resolveRoute(hash, user) {
   if (dir && DIR_TABLES.includes(dir[1]) && permissions.includes('dir.list:' + dir[1])) return { view: 'directory', params: { table: dir[1] } };
   if (path === '/import' && permissions.some((p) => p.startsWith('import.apply:'))) return { view: 'import', params: {} };
   if (path === '/template' && permissions.includes('dir.list:weekTemplate')) return { view: 'weekTemplate', params: {} };
+  if (path === '/topics' && permissions.includes('dir.list:topics')) return { view: 'topics', params: {} };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   return { view: 'home', params: {} };
 }

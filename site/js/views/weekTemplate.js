@@ -2,7 +2,7 @@ import { call } from '../api.js';
 import { t, tCount, getLang } from '../i18n.js';
 import {
   el, errorKey, fieldErrorKey, selectField, modal, showModal, focusById, focusFirstInvalid, markBusy, refresh,
-  emptyState, note, pageHeader, AVATAR_TONES,
+  emptyState, note, pageHeader, unmarkField, AVATAR_TONES,
 } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
@@ -458,18 +458,8 @@ function edited(d, name, value) {
   }
   if (!d.fieldErrors[name]) return;
   delete d.fieldErrors[name];
-  unmark(FIELD_IDS[name]);
-}
-
-function unmark(id) {
-  const errorId = id + '-error';
-  document.getElementById(errorId)?.remove();
-  const input = document.getElementById(id);
-  if (!input) return;
-  input.removeAttribute('aria-invalid');
-  const rest = (input.getAttribute('aria-describedby') ?? '').split(' ').filter((ref) => ref && ref !== errorId);
-  if (rest.length > 0) input.setAttribute('aria-describedby', rest.join(' '));
-  else input.removeAttribute('aria-describedby');
+  const id = FIELD_IDS[name];
+  unmarkField(id + '-error', document.getElementById(id));
 }
 
 async function saveCell(d) {
