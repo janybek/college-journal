@@ -144,6 +144,7 @@ test('hashes made inside the Apps Script bundle verify with the Node platform', 
     return hashPassword(node, password, salt, Number(rounds)) === storedHash();
   };
 
+  assert.match(storedHash(), /^v1\$20\$/);
   assert.equal(sameHash(adminTempPassword), true);
 
   const session = call('auth.login', { login: 'admin', password: adminTempPassword });

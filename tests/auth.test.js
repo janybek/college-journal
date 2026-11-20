@@ -2,24 +2,32 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import {
-  HASH_ROUNDS, MIN_PASSWORD, TOKEN_TTL_MS, hashPassword, verifyPassword, passwordVersion,
+  HASH_ROUNDS, TEMP_HASH_ROUNDS, MIN_PASSWORD, TOKEN_TTL_MS, hashPassword, verifyPassword, passwordVersion,
   passwordProblem, generateTempPassword, issueToken, readToken,
 } from '../core/auth.js';
 
 const p = createNodePlatform({ now: () => 1000, secret: 's' });
 
 test('constants', () => {
-  assert.equal(HASH_ROUNDS, 500);
+  assert.equal(HASH_ROUNDS, 100);
+  assert.equal(TEMP_HASH_ROUNDS, 20);
   assert.equal(MIN_PASSWORD, 6);
   assert.deepEqual(TOKEN_TTL_MS, { staff: 7 * 86400000, student: 30 * 86400000 });
 });
 
 test('hashPassword is repeatable and has the v1 format', () => {
   const h = hashPassword(p, 'secret12', 'aabbccdd11223344');
-  assert.match(h, /^v1\$500\$aabbccdd11223344\$[0-9a-f]{64}$/);
+  assert.match(h, /^v1\$100\$aabbccdd11223344\$[0-9a-f]{64}$/);
   assert.equal(hashPassword(p, 'secret12', 'aabbccdd11223344'), h);
   assert.equal(hashPassword(p, 'a', 'ab', 1), 'v1$1$ab$' + p.sha256Hex('ab:a'));
-  assert.match(hashPassword(p, 'secret12'), /^v1\$500\$[0-9a-f]{16}\$[0-9a-f]{64}$/);
+  assert.match(hashPassword(p, 'secret12'), /^v1\$100\$[0-9a-f]{16}\$[0-9a-f]{64}$/);
+});
+
+test('a hash stored with 500 rounds (older passwords) still verifies', () => {
+  const old = hashPassword(p, 'secret12', 'aabbccdd11223344', 500);
+  assert.match(old, /^v1\$500\$/);
+  assert.equal(verifyPassword(p, 'secret12', old), true);
+  assert.equal(verifyPassword(p, 'wrong-pass', old), false);
 });
 
 test('hashPassword chains rounds as specified', () => {

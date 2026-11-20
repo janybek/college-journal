@@ -1,6 +1,8 @@
 // Password hashing and session tokens. Pure: all time, randomness and hashing come from `platform`.
 
-export const HASH_ROUNDS = 500;
+export const HASH_ROUNDS = 100;
+// Temporary passwords (random, must be changed at first login) are hashed lighter.
+export const TEMP_HASH_ROUNDS = 20;
 export const MIN_PASSWORD = 6;
 export const TOKEN_TTL_MS = { staff: 7 * 86400000, student: 30 * 86400000 };
 

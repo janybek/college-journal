@@ -1,6 +1,6 @@
 import { AppError } from '../../core/errors.js';
 import { normalizeRow, validateRow } from '../../core/validate.js';
-import { generateTempPassword, hashPassword } from '../../core/auth.js';
+import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { USER_TABLES } from '../users.js';
 
 const DIR_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms'];
@@ -30,7 +30,7 @@ export function loadDb(store) {
 // Fresh temporary password: the plain text (shown once) and the fields to store.
 export function issueTempPassword(platform) {
   const tempPassword = generateTempPassword(platform);
-  return { tempPassword, stored: { passwordHash: hashPassword(platform, tempPassword), mustChangePassword: true } };
+  return { tempPassword, stored: { passwordHash: hashPassword(platform, tempPassword, undefined, TEMP_HASH_ROUNDS), mustChangePassword: true } };
 }
 
 const isActiveAdmin = (row) => row.active === true

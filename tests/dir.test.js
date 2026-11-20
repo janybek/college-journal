@@ -94,6 +94,16 @@ test('resetPassword by admin for staff', () => {
   assert.deepEqual(call('dir.resetPassword', { table: 'rooms', id: 'x' }, admin).error, { code: 'forbidden' });
 });
 
+test('temporary passwords are stored with 20 rounds, a changed password with 100', () => {
+  const { call, store, admin, teacherRow } = setup();
+  const reset = call('dir.resetPassword', { table: 'staff', id: teacherRow.id }, admin).data;
+  assert.match(store.get('staff', teacherRow.id).passwordHash, /^v1\$20\$/);
+  const token = call('auth.login', { login: 'teacher', password: reset.tempPassword }).data.token;
+  const changed = call('auth.changePassword', { oldPassword: reset.tempPassword, newPassword: 'new-secret-1' }, token);
+  assert.equal(changed.ok, true);
+  assert.match(store.get('staff', teacherRow.id).passwordHash, /^v1\$100\$/);
+});
+
 test('list never exposes passwordHash', () => {
   const { call, teacher, admin } = setup();
   const rows = call('dir.list', { table: 'staff' }, admin).data.rows;

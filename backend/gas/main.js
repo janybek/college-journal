@@ -1,5 +1,5 @@
 import { SCHEMA } from '../../core/schema.js';
-import { hashPassword, generateTempPassword } from '../../core/auth.js';
+import { hashPassword, generateTempPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { normalizeRow } from '../../core/validate.js';
 import { handleRequest } from '../api.js';
 import { createSheetsStore, ensureSheets } from '../store/sheetsStore.js';
@@ -87,7 +87,7 @@ export function setup() {
     store.insert('staff', normalizeRow('staff', {
       fullName: 'Администратор',
       login: 'admin',
-      passwordHash: hashPassword(platform, adminTempPassword),
+      passwordHash: hashPassword(platform, adminTempPassword, undefined, TEMP_HASH_ROUNDS),
       roles: 'admin',
       lang: 'ru',
       mustChangePassword: true,
