@@ -1,7 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupByDay, pairFlags, canEditPair, canRestorePair } from '../site/js/pairs.js';
+import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch } from '../site/js/pairs.js';
 import { pairLock } from '../core/schedule.js';
+import { SCHEMA } from '../core/schema.js';
+import { createNodePlatform } from '../backend/platform/nodePlatform.js';
+import { createMemoryStore } from '../backend/store/memoryStore.js';
+import { scheduleHandlers } from '../backend/handlers/schedule.js';
 
 const p = (id, date, slot, extra = {}) => ({ id, date, slot, status: 'planned', substitution: false, moved: false, ...extra });
 
@@ -30,6 +34,38 @@ test('canRestorePair: a cancelled pair of today or later', () => {
 
 test('canEditPair is the copy of pairLock(pair, today) === null from core', () => {
   for (const [pair, today] of [[p('a', '2026-09-08', 1), '2026-09-08'], [p('a', '2026-09-08', 1), '2026-09-09'],
-    [p('a', '2026-09-08', 1, { status: 'closed' }), '2026-09-01'], [p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-01']])
+    [p('a', '2026-09-08', 1, { status: 'closed' }), '2026-09-01'], [p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-01'],
+    [p('a', '2026-09-08', 1, { status: 'running' }), '2026-09-08']])
     assert.equal(canEditPair(pair, today), pairLock(pair, today) === null);
+});
+
+// Whether schedule.restorePair gets past its own check of the pair (status and day) on `today`, noon in Bishkek.
+// What it checks after that (the place may be taken) is not the site's to know.
+function serverMayRestore(pair, today) {
+  const platform = createNodePlatform({ now: () => Date.parse(today + 'T12:00:00+06:00'), secret: 'test' });
+  const store = createMemoryStore(SCHEMA, platform, { pairs: [{ ...pair }] });
+  try {
+    scheduleHandlers['schedule.restorePair']({ id: pair.id }, { store, platform });
+    return true;
+  } catch (error) {
+    return !['pair_locked', 'in_past'].includes(error.code);
+  }
+}
+
+test('canRestorePair is the copy of the check in schedule.restorePair', () => {
+  for (const [pair, today] of [[p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-08'], [p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-01'],
+    [p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-09'], [p('a', '2026-09-08', 1), '2026-09-01'],
+    [p('a', '2026-09-08', 1, { status: 'closed' }), '2026-09-01'], [p('a', '2026-09-08', 1, { status: 'running' }), '2026-09-08']])
+    assert.equal(canRestorePair(pair, today), serverMayRestore(pair, today), `${pair.status} ${pair.date} on ${today}`);
+});
+
+test('pairPatch: only what differs from the pair, the note trimmed', () => {
+  const pair = { teacherId: 'st_1', date: '2026-09-08', slot: 2, roomId: null, note: 'Ремонт' };
+  const values = { teacherId: 'st_1', date: '2026-09-08', slot: '2', roomId: '', note: 'Ремонт' };
+  assert.deepEqual(pairPatch(values, pair), {});
+  assert.deepEqual(pairPatch({ ...values, note: '  Ремонт  ' }, pair), {});
+  assert.deepEqual(pairPatch({ ...values, note: '   ' }, { ...pair, note: '' }), {});
+  assert.deepEqual(pairPatch(values, { ...pair, roomId: null }), {});
+  assert.deepEqual(pairPatch({ ...values, slot: '3' }, pair), { slot: 3 });
+  assert.deepEqual(pairPatch({ ...values, roomId: 'rm_1', note: ' Новая ' }, pair), { roomId: 'rm_1', note: 'Новая' });
 });

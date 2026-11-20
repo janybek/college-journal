@@ -105,3 +105,10 @@ test('navFor: the teacher role sees its subjects; nothing is shown without permi
   assert.deepEqual(outline(navFor([], 'dean')), [[null, ['home']]]);
   assert.deepEqual(outline(navFor(undefined, undefined)), [[null, ['home']]]);
 });
+
+test('navFor: a teacher with schedule.mine gets «Моё расписание» after «Мои предметы»', () => {
+  assert.deepEqual(outline(navFor([...DEAN, 'schedule.mine'], 'teacher')), [['nav.teaching', ['home', 'mySchedule']]]);
+  assert.deepEqual(outline(navFor(DEAN, 'teacher')), [['nav.teaching', ['home']]]);
+  assert.deepEqual(navFor([...DEAN, 'schedule.mine'], 'teacher')[0].items[1],
+    { name: 'mySchedule', href: '#/my', textKey: 'my.title', icon: 'calendar' });
+});

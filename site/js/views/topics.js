@@ -233,8 +233,9 @@ function topicRow(topic, unitStart, actions) {
 
 const typeBadge = (type) => (LESSON_TYPES.includes(type) ? badge(t('lessonType.' + type), TYPE_TONES[type]) : badge(String(type ?? '')));
 
-// The pair a topic stands on, as a page of a tear-off calendar with the date and the pair beside it.
-function pairCell(pair) {
+// The pair a topic stands on, as a page of a tear-off calendar with the date and the pair beside it. Also on the
+// read-only plan of a subject (plan.js).
+export function pairCell(pair) {
   if (pair === null) {
     return el('span', { class: 'when' },
       el('span', { class: 'when__leaf when__leaf--empty', 'aria-hidden': 'true' }),

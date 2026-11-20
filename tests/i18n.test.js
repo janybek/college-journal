@@ -64,6 +64,10 @@ test('tCount picks the plural form of the current language', () => {
   }
 });
 
+test('the «Сегодня» placeholder of the student home is gone: the home shows the pairs of today', () => {
+  for (const dict of [ru, ky, en]) assert.equal('home.todaySoon' in dict, false);
+});
+
 test('dictionaries have identical key sets', () => {
   assert.deepEqual(Object.keys(ky).sort(), Object.keys(ru).sort());
   assert.deepEqual(Object.keys(en).sort(), Object.keys(ru).sort());

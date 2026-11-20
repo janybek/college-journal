@@ -29,3 +29,15 @@ export function canEditPair(pair, today) {
 export function canRestorePair(pair, today) {
   return pair.status === 'cancelled' && pair.date >= today;
 }
+
+// What the pair dialog changes: only the fields that differ from the pair as it is (values are the dialog's
+// strings: slot as text, no room as ''), the note trimmed. Nothing changed: {}.
+export function pairPatch(values, pair) {
+  const patch = {};
+  if (values.teacherId !== pair.teacherId) patch.teacherId = values.teacherId;
+  if (values.date !== pair.date) patch.date = values.date;
+  if (Number(values.slot) !== pair.slot) patch.slot = Number(values.slot);
+  if (values.roomId !== (pair.roomId ?? '')) patch.roomId = values.roomId;
+  if (values.note.trim() !== (pair.note ?? '')) patch.note = values.note.trim();
+  return patch;
+}

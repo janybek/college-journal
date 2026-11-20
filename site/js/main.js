@@ -14,10 +14,12 @@ import * as settings from './views/settings.js';
 import * as weekTemplate from './views/weekTemplate.js';
 import * as topics from './views/topics.js';
 import * as schedule from './views/schedule.js';
+import * as mySchedule from './views/mySchedule.js';
+import * as plan from './views/plan.js';
 
 // Puts the screen chosen by the router into its frame (shell.js: sign-in card, student bar or staff sidebar).
 // A screen may export leave(): it is called when another screen replaces it, to drop what it held.
-const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, topics, schedule };
+const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, topics, schedule, mySchedule, plan };
 const page = document.getElementById('page');
 let shownView = null;
 let shownHash = location.hash;

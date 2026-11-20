@@ -15,5 +15,8 @@ export function resolveRoute(hash, user) {
   if (path === '/template' && permissions.includes('dir.list:weekTemplate')) return { view: 'weekTemplate', params: {} };
   if (path === '/topics' && permissions.includes('dir.list:topics')) return { view: 'topics', params: {} };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
+  if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
+  const plan = /^\/plan\/([^/]+)$/.exec(path);
+  if (plan && permissions.includes('topics.plan')) return { view: 'plan', params: { subjectId: plan[1] } };
   return { view: 'home', params: {} };
 }

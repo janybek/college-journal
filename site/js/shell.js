@@ -39,7 +39,9 @@ export function navFor(permissionList, role) {
   const list = Array.isArray(permissionList) ? permissionList : [];
   const parts = menuParts(role);
   if (parts.includes('subjects') && list.includes('teacher.mySubjects')) {
-    return [{ titleKey: 'nav.teaching', items: [{ ...HOME, textKey: 'home.mySubjects', icon: 'book' }] }];
+    const items = [{ ...HOME, textKey: 'home.mySubjects', icon: 'book' }];
+    if (list.includes('schedule.mine')) items.push({ name: 'mySchedule', href: '#/my', textKey: 'my.title', icon: 'calendar' });
+    return [{ titleKey: 'nav.teaching', items }];
   }
   const groups = [{ titleKey: null, items: [HOME] }];
   if (!parts.includes('office')) return groups;
@@ -234,8 +236,12 @@ function crumbs(groups, view, params, current) {
     else if (view === 'settings') [groupKey, pageKey] = ['nav.schedule', 'settings.title'];
     else if (view === 'weekTemplate') [groupKey, pageKey] = ['nav.schedule', 'template.title'];
     else if (view === 'topics') [groupKey, pageKey] = ['nav.schedule', 'topics.title'];
+    else if (view === 'mySchedule') [groupKey, pageKey] = ['nav.teaching', 'my.title'];
+    else if (view === 'plan') [groupKey, pageKey] = ['home.mySubjects', 'plan.title'];
     else pageKey = 'nav.home';
   }
+  // «Расписание › Расписание»: a page named like its group is one crumb.
+  if (groupKey && t(groupKey) === t(pageKey)) groupKey = null;
   return el('p', { class: 'crumbs' },
     groupKey ? [el('span', { class: 'crumbs__group' }, t(groupKey)), icon('chevron', 'crumbs__sep')] : null,
     el('span', { class: 'crumbs__page' }, t(pageKey)));

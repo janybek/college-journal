@@ -43,6 +43,14 @@ test('resolveRoute: the deanery schedule needs schedule.list', () => {
   assert.equal(resolveRoute('#/schedule', { mustChangePassword: false, permissions: ['schedule.mine'] }).view, 'home');
 });
 
+test('resolveRoute: my own schedule needs schedule.mine; the topic plan of a subject needs topics.plan', () => {
+  const student = { mustChangePassword: false, permissions: ['schedule.mine'] };
+  assert.equal(resolveRoute('#/my', student).view, 'mySchedule');
+  assert.equal(resolveRoute('#/my', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'home');
+  assert.deepEqual(resolveRoute('#/plan/sb_12ab34cd', { mustChangePassword: false, permissions: ['topics.plan'] }), { view: 'plan', params: { subjectId: 'sb_12ab34cd' } });
+  assert.equal(resolveRoute('#/plan/sb_12ab34cd', student).view, 'home');
+});
+
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {
   assert.deepEqual(resolveRoute('', dean), { view: 'home', params: {} });
   assert.equal(resolveRoute('#/dir/groups', { mustChangePassword: false }).view, 'home');

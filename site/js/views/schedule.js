@@ -7,7 +7,7 @@ import {
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { addDays, addMinutes, isDate, isTime, mondayOf } from '../dates.js';
-import { groupByDay, pairFlags, canEditPair, canRestorePair } from '../pairs.js';
+import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch } from '../pairs.js';
 import { weekNav, dayList, pairCardId, pairTime, weekdayDate, typeBadge, flagBadge } from './pairParts.js';
 
 // The deanery's schedule (#/schedule): the week of a group or of a teacher, or one day across all groups. A pair
@@ -443,19 +443,8 @@ function slotOptions(pair) {
   });
 }
 
-// What differs from the pair as it is: only that is sent. Without a difference «Save» stays off.
-function patchOf(d) {
-  const { values: v, pair: p } = d;
-  const patch = {};
-  if (v.teacherId !== p.teacherId) patch.teacherId = v.teacherId;
-  if (v.date !== p.date) patch.date = v.date;
-  if (Number(v.slot) !== p.slot) patch.slot = Number(v.slot);
-  if (v.roomId !== (p.roomId ?? '')) patch.roomId = v.roomId;
-  if (v.note.trim() !== (p.note ?? '')) patch.note = v.note.trim();
-  return patch;
-}
-
-const dirty = (d) => Object.keys(patchOf(d)).length > 0;
+// Only what differs from the pair as it is is sent; without a difference «Save» stays off.
+const dirty = (d) => Object.keys(pairPatch(d.values, d.pair)).length > 0;
 
 // A field the person changes loses its error mark, and the message about the whole pair goes, in place
 // (a redraw would throw the caret out of the date field).
@@ -481,7 +470,7 @@ function edited(d, name, value) {
 
 async function savePair(d) {
   if (d.busy || d.blocked || state.dialog !== d) return;
-  const patch = patchOf(d);
+  const patch = pairPatch(d.values, d.pair);
   if (Object.keys(patch).length === 0) return;
   d.messageKey = null;
   d.fieldErrors = {};

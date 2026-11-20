@@ -117,6 +117,83 @@
 
 .soon__text { color: var(--text-muted); }
 
+/* «Сегодня»: the one live section of the student's home, so it carries the accent the placeholders do not. */
+.today {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  border-top: 3px solid var(--primary-fill);
+}
+
+.today__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+}
+
+.today__icon {
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+}
+
+.today__title {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.today__date { color: var(--text-muted); }
+
+.today__date::first-letter { text-transform: uppercase; }
+
+.today__date:empty { display: none; }
+
+.today__pairs {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.today__pairs > li { display: grid; }
+
+.today__none {
+  padding: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-inner);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.today__failed {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-3);
+}
+
+.today__week { justify-content: center; }
+
+/* The student's way back from a screen of their own: the bar has no menu. */
+.back-link {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  justify-self: start;
+  min-height: 2.75rem;
+  margin-left: calc(-1 * var(--space-2));
+  padding: 0 var(--space-2);
+  border-radius: var(--radius-control);
+  color: var(--primary-ink);
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.back-link:hover { background: var(--secondary); }
+
+.back-link .icon {
+  width: 1.125rem;
+  height: 1.125rem;
+  transform: scaleX(-1);
+}
+
 /* Screens: the staff home */
 
 .tiles {
@@ -1738,6 +1815,59 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   gap: var(--space-4);
   align-items: start;
 }
+
+/* «Моё расписание»: today's day is scrolled to under the sticky bar, not behind it. */
+.my-week .day { scroll-margin-top: calc(var(--topbar-h) + var(--space-3)); }
+
+/* On the student's phone nothing is smaller than 16 px: the small print of a pair and the calendar page grow. */
+.student .pair__slot,
+.student .pair__from { font-size: 1rem; }
+
+.student .day__leaf { width: 3.25rem; }
+
+.student .day__weekday {
+  font-size: 1rem;
+  letter-spacing: 0.02em;
+}
+
+.student .day__number { font-size: 1.25rem; }
+
+/* An empty today has the «Сегодня» badge in its head: «Пар нет» goes under it instead of beside. */
+.student .day.is-today.is-empty { grid-template-columns: minmax(0, 1fr); }
+
+.student .day.is-today.is-empty .day__none { justify-self: start; }
+
+/* The week switcher on a phone: arrows at the edges, the week between them, «Эта неделя» on its own line. */
+.student .week-nav {
+  flex: 1 1 100%;
+  margin-left: 0;
+}
+
+.student .week-nav__label {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: normal;
+}
+
+.student .week-nav__this {
+  flex: 1 1 100%;
+  margin-left: 0;
+}
+
+@media (min-width: 36rem) {
+  .student .week-nav__this { flex: none; }
+}
+
+/* The read-only topic plan of a subject. */
+.plan-toolbar { border-bottom: 1px solid var(--border); }
+
+.plan-subject {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.subject__plan { flex: none; }
 
 @media (max-width: 36rem) {
   .week-nav { margin-left: 0; }
