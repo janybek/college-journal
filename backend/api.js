@@ -3,6 +3,7 @@ import { readToken, passwordVersion } from '../core/auth.js';
 import { actionKind, can } from '../core/permissions.js';
 import { USER_TABLES, isUsable, rolesOf } from './users.js';
 import { authHandlers } from './handlers/auth.js';
+import { dirHandlers } from './handlers/dir.js';
 
 // Single entry point of the server. No Node-only APIs: this file is bundled for Apps Script.
 export { publicUser } from './users.js';
@@ -14,6 +15,7 @@ export function registerHandlers(map) {
   Object.assign(handlers, map);
 }
 registerHandlers(authHandlers);
+registerHandlers(dirHandlers);
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 

@@ -124,7 +124,7 @@ test('role check uses data.table; missing handler is bad_request after the check
   const d = call('auth.login', { login: 'dean', password: 'secret12' }).data;
   assert.deepEqual(call('dir.save', { table: 'staff' }, d.token).error, { code: 'forbidden' });
   assert.deepEqual(call('dir.save', null, d.token).error, { code: 'forbidden' });
-  assert.deepEqual(call('dir.resetPassword', { table: 'students' }, d.token).error, { code: 'bad_request' });
+  assert.deepEqual(call('import.preview', { table: 'students' }, d.token).error, { code: 'bad_request' });
 });
 
 test('handlers: AppError passes through, other errors become internal', () => {
