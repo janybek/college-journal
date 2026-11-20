@@ -1,0 +1,111 @@
+# SDD ledger — plan: aidlc-docs/construction/unit-2-raspisanie/plan.md
+
+- Spec: aidlc-docs/inception/design-v1.md (+ ТЗ.md). Owner approved the plan 21.11.2026 with all 5 defaults (aidlc-state.md decisions).
+- Contracts: copied from unit 1 workspace, Global constraints replaced by this plan's Global Constraints.
+- Preflight scan: dispatched (journal-reviewer/opus) → preflight.md. Ruling: delegated to keep the controller's long context small — costs one reviewer seat.
+- Preflight scan: returned — 20 findings (2 high, 3 medium, 12 low, 3 info); table in preflight.md. Rulings (all applied to plan.md by one amendment pass before Task 1):
+  - Ruling F1: T3 may edit tests/import.test.js to expect 'topics' in IMPORT_SPECS keys — plan's "no edits" is wrong — none.
+  - Ruling F2: T2 Files gain tests/api.test.js; publicUser teacher permissions expect ['schedule.mine','teacher.mySubjects','topics.plan'] — otherwise T2 cannot pass — none.
+  - Ruling F3: generation busy check vs manually changed pairs covers teacherId and non-empty roomId (rule 5 and toUpdate) + 2 tests — Review Focus 5 / owner decision «нет общих лекций» — costs a slightly stricter generate.
+  - Ruling F4: relayout/pairViews take optional already-read rows; one read per sheet per request stays the rule — owner-measured Google latency — none.
+  - Ruling F5: schedule.list `from` optional, defaults to mondayOf(server today), with a test — site must not trust device clock — none.
+  - Ruling F6/F7/F8/F9/F10/F11/F13/F15: apply as suggested (file lists, cancelPair keeps trimmed note, {pair: PairView}, loadDb(store,'subjects',['weekTemplate','pairs']) + exact list-call expectation, JSON.stringify check, removeMany under withLock with de-dup + contract check, extra sync/dictionary assertions) — plan precision — none.
+  - Ruling F12: add canRestorePair (site) with a test — button condition must be defined — none.
+  - Ruling F14: pair end must be ≤ '23:59' (bells validated so start+90 ≤ 23:59); range limit is daysBetween > 30; one test per boundary — undefined edge — none.
+  - Ruling F16: T5 calls loadDb(store,'topics',['groups','pairs']) right away — avoid a broken intermediate import — none.
+  - Ruling F17: topics import.apply writes with one updateMany — Google speed rule — none.
+  - Ruling F18: one sentence in T3: resolve the group first, suppress subjectId bad_ref when the group is unknown — clarity — none.
+  - Ruling F19: shared busy-check function lives in core (introduced in T3, reused by T4, T5, T7; teacher_busy in T5 goes through it). Site copies (site/js/dates.js, canEditPair) stay — only site/ is published, so core cannot be imported by the site — guarded by sync tests. group_busy shows as a form-level message in T9 — costs duplicated date code on the site.
+  - Ruling F20: fix T2's note (sheet count lives in tests/sheetsStore.test.js:88, 6→9; nothing in gasBundle); T7's '@' format test is a regression guard, mark RED-not-expected; #/dir/topics before T8 accepted.
+- Plan amendment: dispatched (general-purpose/opus) — edits plan.md only.
+- Plan amendment: applied F1–F20 (commit 0375bde).
+- Task 1: dispatched (BASE 0375bde, journal-server/sonnet)
+- Task 1: implementer DONE_WITH_CONCERNS, commit 6f7ae4d, 149/149. Concerns: no RED run recorded (implementation before tests); update/remove now wrap updateMany/removeMany (one lock). Review dispatched (journal-reviewer/sonnet).
+- Task 1: review — spec ✅, Approved, 0 Critical/Important. ⚠️ TDD order (no RED) accepted — tests are meaningful per reviewer; fileStore partial-row read covered via shared memoryStore code.
+- Task 1: complete (commits 0375bde..6f7ae4d, review clean)
+- Task 1: minor (→ fold into Task 5 dispatch): sheetsStore.updateMany writes unchanged rows back from the raw snapshot — a hand-entered Date in a text column could be rewritten as text, formulas become values. Ruling: Task 5 (server zone) writes unchanged rows back with shaped values (strings via shapeValue/localDate) and adds a test with a Date cell in a string column of an untouched row — Review Focus 4 — costs one small change.
+- Task 1: minor (→ fold into Task 5 dispatch): sheetsStore.removeMany(badTable, []) returns before the table check (memory/file throw bad_request); add contract line assert.throws(() => s.removeMany('nope', [])).
+- Task 1: minor (deferred): no fileStore test for old files with partial rows; memoryStore.removeMany replaces the array instead of mutating it.
+- Task 2: dispatched (BASE 6f7ae4d, journal-logic/sonnet)
+- Task 2: implementer DONE, commit c604fc6, 156/156 (RED recorded). Notes: dir.save/remove admin covers 7 tables; import.* allows only topics as new table; addMinutes has no midnight guard (validateSettings enforces bells). Review dispatched (journal-reviewer/sonnet).
+- Task 2: review — spec ✅, Approved, 0 Critical/Important.
+  - ⚠️ resolved: readSettings gets strings — Task 1 shapes every store row (string columns read a Date cell via localDate, columns are text-formatted '@'). A hand-typed time-only cell would read as 1899-12-30 → falls back to defaults; carried to Task 13 live check.
+- Task 2: complete (commits 6f7ae4d..c604fc6, review clean)
+- Task 2: minor (deferred): readSettings returns the shared DEFAULT_BELLS array (copy it); no test for one bad holiday → []; settingsToRows writes undefined for a missing key; addMinutes has no midnight guard (callers must stay within the day)
+- Task 3: dispatched (BASE c604fc6, journal-logic/sonnet)
+- Task 3: implementer DONE, commit c6d9d6c, 168/168 (RED: 8 of 29 failed first). Extras: a few extra tests; held-topic check compares exact trimmed strings (case-sensitive). Review dispatched (journal-reviewer/sonnet).
+- Task 3: review — spec ✅, Approved, 0 Critical/Important.
+- Task 3: complete (commits c604fc6..c6d9d6c, review clean)
+- Task 3: minor (deferred): duplicate-in-file wins over held in error priority; held name compare is case-sensitive (safe direction); LESSON_WORDS plain-object lookup (constructor) caught by validateRow today — same as ROLE_WORDS/LANG_WORDS
+- Task 4: dispatched (BASE c6d9d6c, journal-logic/sonnet)
+- Task 4: implementer DONE, commit 83177f9, 175/175 (RED recorded). Choices where brief silent: replaceable pair on a fixed pair's key removed like a duplicate; needed pair on a fixed pair's key skipped without a conflict; checkPairChange skips busy check when date/slot invalid; non-string note → bad_value. Review dispatched (journal-reviewer/sonnet).
+- Task 4: review — spec ❌ (plan-mandated), Needs fixes. Important I1: planGeneration restart:true removes ALL pairs incl. past and held ones.
+  - Ruling (I1, plan-mandated): the restart semantics stand — plan line 74 (owner-approved «Начать заново» only while no pair was held) and Task 6 guards it in generateSchedule (in_use when any pair is not planned/cancelled). Defence in depth in core: planGeneration with restart and any pair whose status is not 'planned'/'cancelled' throws AppError('in_use') (same code T6 uses), with a test; restart on a fresh semester still removes all — costs one extra check duplicated with T6.
+  - Fix round 1 also takes minors M1 (tests pinning the two silent skips: replaceable pair on a fixed pair's key → toRemove; needed pair on a fixed pair's key → not inserted, conflicts unchanged), M2 (patch.roomId null → normalised to '' ), M3 (from missing or not a date → AppError('bad_request')) — cheap, same file, pins behaviour T5/T6 rely on.
+- Task 4: fix round 1 dispatched (resume implementer, FIX_BASE 83177f9)
+- Task 4: fix round 1/5 (4 addressed, 0 open — restart guard in_use, silent skips pinned, roomId null → '', from bad_request; commits 83177f9..5ee951a)
+- Task 4: complete (commits c6d9d6c..5ee951a, review clean after 1 fix round)
+- Task 4: minor (deferred): pairSlots field names / weekday() 1..7 checked only indirectly by tests
+- Task 5: dispatched (BASE 5ee951a, journal-server/sonnet) + folded Task 1 minors (sheetsStore.updateMany writes untouched rows back shaped; removeMany unknown table → bad_request)
+- Task 5: implementer DONE, commit 550c72a, 185/185 (RED via stash). Notes: loadDb('weekTemplate') also reads settings (slotCount); updateMany untouched rows shaped only for string columns, formulas still become values; extra test: unchanged settings key not rewritten. Review dispatched (journal-reviewer/sonnet).
+- Task 5: review — spec ✅, Approved, 0 Critical/Important. ⚠️ permissions/validate coverage for weekTemplate/topics implied by passing forbidden tests (Task 2/3 reviewed them).
+- Task 5: complete (commits 5ee951a..550c72a, review clean)
+- Task 5: minor (deferred): read-count test asserts no-duplicate reads only for dir.remove (subjects save compared as sorted list — still catches duplicates); formulas in untouched rows still become values (getValues)
+- Task 6: dispatched (BASE 550c72a, journal-server/sonnet)
+- Task 6: implementer DONE, commit f7b4576, 193/193 (RED recorded). Notes: dir.save topics reads pairs via loadDb; dir.remove caches sheets; importApi tests' spies moved update→updateMany (import.apply batches updates). Review dispatched (journal-reviewer/sonnet).
+- Task 6: review — spec ✅, Approved, 0 Critical/Important.
+  - ⚠️ resolved by controller: sheetsStore.insertMany returns full rows with id (insertRows → readBack, sheetsStore.js:61-87).
+- Task 6: complete (commits 550c72a..f7b4576, review clean)
+- Task 6: minor (deferred): import spy caps total updateMany at 2 instead of per-table topics ≤ 1; dir.save/dir.remove cases don't assert no update/remove loops; relayout failing after topic save → internal with stale pairs (next pass fixes)
+- Task 7: dispatched (BASE f7b4576, journal-server/sonnet)
+- Task 7: implementer DONE_WITH_CONCERNS, commit 179129f, 197/197, build:gas ok. Concerns: port 5273 held by the controller's acceptance stand (stopped by controller now) — implementer checked in-process on a free port; pairsApi test re-logs the dean (staff token 7 days); changePair with an empty patch marks changed:true. Review dispatched (journal-reviewer/sonnet).
+- Task 7: review — spec ✅, Approved, 0 Critical/Important. Reviewer probed edge cases in a scratch script: all correct.
+  - ⚠️ resolved: Step 5 (stand check) — controller stopped its own old stand on 5273; implementer verified schedule.mine in-process (teacher1 3 pairs, S1001 3 pairs); screen tasks 8–12 run the real stand with dev:reset.
+- Task 7: complete (commits f7b4576..179129f, review clean)
+- Task 7: minor (deferred, final review should consider fixing): changePair with an empty/no-op patch still writes and sets changed:true — freezes the pair against later regeneration; no test for restorePair conflict (cancel → move another pair onto the slot → restore → invalid); note not read back via schedule.mine in tests
+- Task 8: dispatched (BASE 179129f, journal-screens/opus)
+- Task 8: implementer DONE_WITH_CONCERNS, commit f71a548, 205/205 (RED 6). Concerns: Kyrgyz wording (Жадыбал, {n}-сабак, 21-ноябрь) — native check; after-save hint names Task 9 screen words (Аптанын үлгүсү / Жадыбал түзүү) — Task 9 must reuse; extras: dates.js isTime/minutesOf with sync tests, key date.weekdayDate, hintKey on menu items. Review dispatched (journal-reviewer/sonnet).
+- Task 8: review — spec ✅, Approved, 0 Critical/Important. Controller viewed screenshots (dark ru, light ky): matches the look.
+  - ⚠️ resolved: browser claims are the implementer's + controller saw 2 screenshots; view has no Node tests by design (brief lists none).
+- Task 8: complete (commits 179129f..f71a548, review clean)
+- Task 8: minor (→ folded into Task 9 dispatch): settings.js stale field errors/messageKey/badBells after editing (clear on input); removeBell focus lost when last remove button disabled (fallback to add); dead class holiday__leaf--weekend
+- Task 8: minor (deferred): holiday limit 60 not checked on client; MAX_BELLS=8 not tied to core MAX_SLOTS by a test
+- Kyrgyz terms for native proofreading (owner): «Жадыбал» (расписание), «{n}-сабак» (N пара) vs «Сабактар» (предметы) — same word for pair and subject may confuse; «Аптанын үлгүсү», «Жадыбал түзүү» must be reused by Task 9.
+- Task 9: dispatched (BASE f71a548, journal-screens/opus) + Task 8 minors
+- Task 9: implementer DONE_WITH_CONCERNS, commit 81e641a (incl. Task 8 settings fixes), 207/207 (RED 2). Concerns: in_use and group_busy only checked with stubs; '#/schedule' link opens home until Task 11; ky «сабак» = subject and pair; small deviations (full stops, empty dry run → Close only). Review dispatched (journal-reviewer/sonnet).
+- Task 9: review — spec ✅, Approved, 0 Critical/Important. Controller viewed screenshots (generate preview dark ru, grid light ky): fine.
+- Task 9: complete (commits f71a548..81e641a, review clean)
+- Task 9: minor (→ folded into Task 10 dispatch): "unmark field" logic duplicated in weekTemplate.js and settings.js → one ui.js helper; settings: editing either semester date clears the date-range error on semesterEnd; typing in the new-holiday input clears holidayErrorKey
+- Task 9: minor (deferred): no Node tests for weekTemplate.js error mapping; group_busy general message leaves focus nowhere
+- Task 10: dispatched (BASE 81e641a, journal-screens/opus) + Task 9 minors
+- Task 10: implementer DONE_WITH_CONCERNS, commit 0e09f1c (incl. Task 9 clean-ups), 211/211 (RED 4). Concerns: template download click and held-topic deletion not exercised; ky «сабак»; identical re-import shows «Изменится 2» (server preview by design, plan T10 step 5); en label for «рубежный» = «Exam». Review dispatched (journal-reviewer/sonnet).
+- Task 10: review — spec ❌ (en wording), Needs fixes. I1: en «Exam» for «рубежный» (checkpoint, not final exam); I2: failed topics.plan re-read after save/delete is swallowed — stale dates with a green «saved» note.
+- Task 10: minor (deferred): ky «айлантса» vs «айландырса» (native check); no DOM tests for unmarkField/forgetDateErrors/forgetHolidayError (Node-only test setup, accepted gap)
+- Task 10: fix round 1 dispatched (resume implementer, FIX_BASE 0e09f1c)
+- Task 10: fix round 1 returned DONE, commit 8b3fd1f, 212/212; scoped re-review dispatched
+- Task 10: fix round 1/5 (2 addressed, 0 open — en «Checkpoint test»/«control», stale plan warning with retry; commits 0e09f1c..8b3fd1f)
+- Task 10: complete (commits 81e641a..8b3fd1f, review clean after 1 fix round)
+- Task 10: minor (deferred): no automated test for the stale warning (no DOM harness)
+- Task 11: dispatched (BASE 8b3fd1f, journal-screens/opus)
+- Task 11: implementer DONE_WITH_CONCERNS, commit 591b31e, 219/219 (RED 3/17). Browser steps all passed (today on stand = Saturday; day mode checked on other days). Concerns: ky flags for native check; server: restore keeps the cancel note, teacher_busy text says «в другой группе» even for same group; breadcrumbs «Расписание › Расписание»; small deviations (dayList canOpen, extra helpers, «Закрыть» label). Review dispatched (journal-reviewer/sonnet).
+- Task 11: minor (deferred, server — for final review): restorePair keeps the cancellation note; teacher_busy wording «в другой группе» wrong when same group
+- Task 11: review — spec ✅, Approved, 0 Critical/Important. Controller viewed screenshots (week dark with move/substitute flags, dialog errors light): fine. Implementer left line-ending-only modifications (empty git diff) in pairParts.js/schedule.js — controller restored them.
+- Task 11: complete (commits 8b3fd1f..591b31e, review clean)
+- Task 11: minor (→ folded into Task 12 dispatch): extract pure pairPatch(values, pair) into site/js/pairs.js with tests (no change → {}, note whitespace → {}, roomId '' vs null → {}, slot change → {slot:N}); canRestorePair sync test vs restorePair condition, and 'running' in the pairLock sync cases; breadcrumbs «Расписание › Расписание»
+- Task 11: minor (deferred): restore dialog with unexpected invalid fields falls back to generic error texts; schedule.js ~600 lines
+- Task 12: dispatched (BASE 591b31e, journal-screens/opus) + Task 11 minors
+- Task 12: implementer DONE_WITH_CONCERNS, commit bce7758 (incl. Task 11 follow-ups), 224/224 (RED 4). Concerns: pairCell exported from topics.js (outside file list) to reuse the table; teacher week at 1280 px uses narrow 6 columns (same as deanery); student 'today with pairs' checked by overriding today in the tab (stand today = Saturday); ky «сабак». Review dispatched (journal-reviewer/sonnet).
+- Task 12: review — spec ✅, Approved, 0 Critical/Important. Controller viewed student screenshots at 360 px (home dark, week light): fine.
+- Task 12: complete (commits 591b31e..bce7758, review clean)
+- Task 12: minor (deferred): home.js loadToday throws unhandled when data.pairs missing (stuck on «Загрузка…», inherited pattern); plan breadcrumbs always «Мои предметы» even for dean via URL; plan lead text shown above error states; pairPatch assumes string note; no tests for today-selection logic; ky «Менин сабактарым» vs «сабак» as pair, ky plan.lead mixes Russian «Предметтин»
+- All tasks 1–12 complete. Final review: dispatched (fable) over 0375bde..bce7758.
+- Final review: returned (fable) — Yes after fixes; 0 Critical, 3 Important (I1 moved pair with passed planDate invisible to generation busy check; I2 subjects import skips template teacher_busy; I3 pairs before a later semester start never removed), 8 Minor. npm test 224/224. Speed table: no sheet read twice per handler (staff read twice = token + handler, known). Report file not written (reviewer rules); actionable items saved in final-fix-brief.md.
+  - Deferred minors triage: fix now T7 changed:true on no-op/note-only (M4), T7 restore-conflict test, T11 restore keeps note (M2); all others leave.
+  - Ruling: fix wave = I1, I2, I3, M1, M2, M3, M4+M5 (reviewer's fix-now list); M6 (hint to regenerate after subject teacher change), M7, M8 leave — M6 carried to unit 3 list.
+  - Carry to unit 3: student home schedule.mine reads 7 sheets per load → cache before the attendance window; first mid-semester generation lays topics from semester start over past planned pairs — when unit 3 marks them missed, topics shift; decide with the owner before the pilot.
+  - Ruling: one fixer journal-server/sonnet with cross-zone allowance (core/schedule.js, core/validate.js, backend, i18n dictionaries) — single fix wave per skill; no other agent active — none.
+- Final fix wave: dispatched (FIX_BASE bce7758, journal-server/sonnet)
+- Final fix wave: implementer DONE, commit 73116fa, 234/234, build:gas ok. Notes: empty-change core test now expects changed:false (M4); restore-conflict test checks slot group_busy only; ky/en texts for error.subjects.groupId.in_use are the agent's wording. Scoped re-review dispatched (journal-reviewer/sonnet).
+- Final fix wave: re-review — all 7 ADDRESSED, no new breakage; reviewer ran npm test 234/234.
+  - minor (deferred): changePair compares pair[key] ?? '' (extra write of changed:false if undefined); subjects import rows swapping teachers checked against stored template, not each other
+- Final review: complete (0375bde..73116fa). Unit 2 ready for owner acceptance on the stand (Task 13).
