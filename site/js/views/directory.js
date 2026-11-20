@@ -2,12 +2,15 @@ import { call } from '../api.js';
 import { getUser } from '../session.js';
 import { t, getLang, LANGS, DEFAULT_LANG } from '../i18n.js';
 import {
-  el, errorKey, fieldErrorKey, hasText, field, selectField, switchField, checkGroup,
+  el, errorKey, fieldErrorKey, hasText, field, selectField, searchField, switchField, checkGroup,
   modal, showModal, focusById, focusFirstInvalid, markBusy, refresh,
+  avatar, badge, emptyState, iconButton, note, pageHeader,
 } from '../ui.js';
-import { DIR_TABLES, DIRECTORIES, FIELDS, STAFF_ROLES } from './directoryConfig.js';
+import { icon } from '../icons.js';
+import { permissions } from '../shell.js';
+import { DIRECTORIES, FIELDS, STAFF_ROLES } from './directoryConfig.js';
 
-// One directory (#/dir/<table>): a ruled table with search, and dialogs to add, edit, delete and issue a new
+// One directory (#/dir/<table>): a table with search, and dialogs to add, edit, delete and issue a new
 // password. Drawn from `state`, so a redraw (language switch, texts from the sheet) keeps typed values and an
 // open dialog. Leaving the screen drops everything, including a temporary password that is still on screen.
 
@@ -27,23 +30,7 @@ let state = blank(null);
 // Failures worth trying again; any other answer would not change on a retry.
 const RETRYABLE_ERRORS = ['network', 'internal'];
 
-export function permissions() {
-  const user = getUser();
-  return user && Array.isArray(user.permissions) ? user.permissions : [];
-}
-
 const can = (action, table) => permissions().includes(`${action}:${table}`);
-
-// Index tabs of the office part: the directories this person may open, and the import screen.
-export function officeNav(current) {
-  const list = permissions();
-  const links = DIR_TABLES.filter((table) => list.includes('dir.list:' + table))
-    .map((table) => ({ name: table, href: '#/dir/' + table, text: t('dir.' + table) }));
-  if (list.some((p) => p.startsWith('import.apply:'))) links.push({ name: 'import', href: '#/import', text: t('import.title') });
-  return el('nav', { class: 'tabs', 'aria-label': t('home.directories') }, links.map((link) => el('a', {
-    class: 'tabs__link', href: link.href, 'aria-current': link.name === current ? 'page' : null,
-  }, link.text)));
-}
 
 export function leave() {
   state = blank(null);
@@ -55,12 +42,11 @@ export function render(root, params) {
     load(state);
   }
   const { table } = state;
+  const add = state.rows !== null && can('dir.save', table)
+    ? el('button', { type: 'button', id: 'dir-add', class: 'button button--primary', onclick: () => openEdit(null) }, icon('plus'), t(`dir.${table}.add`))
+    : null;
   root.append(
-    el('section', { class: 'sheet sheet--label', 'aria-labelledby': 'dir-title' },
-      el('p', { class: 'eyebrow' }, t('home.directories')),
-      el('h1', { class: 'sheet__title', id: 'dir-title' }, t('dir.' + table)),
-      el('p', { class: 'sheet__lead' }, t(`dir.${table}.hint`))),
-    officeNav(table),
+    pageHeader({ id: 'dir-title', title: t('dir.' + table), lead: t(`dir.${table}.hint`), actions: add }),
     state.rows === null ? loadingBody() : listing());
   if (state.dialog) showModal(root, dialogFor(state.dialog));
 }
@@ -89,9 +75,11 @@ function retry() {
 
 function loadingBody() {
   if (!state.loadErrorKey) return el('p', { class: 'loading' }, t('common.loading'));
-  return el('div', { class: 'empty', role: 'alert' },
+  const body = emptyState('alert',
     el('p', {}, t(state.loadErrorKey)),
-    el('button', { type: 'button', class: 'button button--quiet', onclick: retry }, t('common.retry')));
+    el('button', { type: 'button', class: 'button button--secondary', onclick: retry }, t('common.retry')));
+  body.setAttribute('role', 'alert');
+  return body;
 }
 
 // Helpers over the loaded rows
@@ -133,19 +121,37 @@ function display(key, row) {
   const missing = () => el('span', { class: 'muted' }, value ? String(value) : '—');
   if (key === 'groupId') {
     const group = findRef('groups', value);
-    return group ? el('span', { class: 'chip' }, group.name) : missing();
+    return group ? badge(group.name, 'primary') : missing();
   }
   if (key === 'teacherId') {
     const person = findRef('staff', value);
     return person ? person.fullName : missing();
   }
   if (key === 'lang') return LANGS.includes(value) ? t('lang.name.' + value) : String(value ?? '');
-  if (key === 'roles') return rolesOf(value).map((role) => (STAFF_ROLES.includes(role) ? t('role.' + role) : role)).join(', ');
-  if (FIELDS[key].id) return el('span', { class: 'mono' }, String(value ?? ''));
+  if (key === 'roles') {
+    return el('span', { class: 'badges' }, rolesOf(value).map((role) => badge(STAFF_ROLES.includes(role) ? t('role.' + role) : role)));
+  }
   return String(value ?? '');
 }
 
-const cellClass = (key) => (FIELDS[key].kind === 'number' ? 'register__number' : null);
+const cellClass = (key) => (FIELDS[key].kind === 'number' ? 'num' : null);
+
+// A person: initials, the name, and under it the login or student ID they sign in with.
+function personCell(row, nameId, loginKey) {
+  const name = nameOf(row);
+  return el('span', { class: 'person' },
+    avatar(name),
+    el('span', { class: 'person__text' },
+      el('span', { class: 'person__name', id: nameId }, name),
+      el('span', { class: 'person__sub' }, String(row[loginKey] ?? ''))));
+}
+
+// Whether a person can sign in, and whether they still have a temporary password.
+function statusCell(row) {
+  return el('span', { class: 'badges' },
+    row.active === true ? badge(t('field.active'), 'success', true) : badge(t('dir.inactive'), 'neutral', true),
+    row.active === true && row.mustChangePassword === true ? badge(t('dir.mustChange'), 'warning') : null);
+}
 
 // The table
 
@@ -160,10 +166,11 @@ function listing() {
   };
   const withActions = rights.save || rights.remove || rights.reset;
   const isSelf = (row) => table === 'staff' && user.kind === 'staff' && row.id === user.id;
+  const columns = shownColumns();
 
   const lines = sortedRows().map((row) => line(row, { ...rights, remove: rights.remove && !isSelf(row) }, withActions));
-  const columnCount = config.columns.length + (withActions ? 2 : 1);
-  const nothing = el('tr', { hidden: true }, el('td', { class: 'register__nothing', colspan: columnCount }, t('dir.nothingFound')));
+  const columnCount = columns.length + (isPerson(table) ? 1 : 0) + (withActions ? 2 : 1);
+  const nothing = el('tr', { hidden: true }, el('td', { class: 'table__nothing', colspan: columnCount }, t('dir.nothingFound')));
   const count = el('p', { class: 'toolbar__count', 'aria-live': 'polite' });
 
   // Search and the group filter only hide rows; nothing is redrawn while typing.
@@ -181,67 +188,70 @@ function listing() {
       : t('dir.shown', { shown, count: lines.length });
   };
 
-  const add = rights.save
-    ? el('button', { type: 'button', id: 'dir-add', class: 'button button--primary toolbar__add', onclick: () => openEdit(null) }, t(`dir.${table}.add`))
-    : null;
-  const notes = [
-    state.loadErrorKey ? el('p', { class: 'message', role: 'alert' }, t(state.loadErrorKey)) : null,
-    el('p', { class: 'status', role: 'status' }, state.status ? t(state.status.key, state.status.params) : ''),
-  ];
+  const notes = el('div', { class: 'notes', role: 'status' },
+    state.status ? note('success', t(state.status.key, state.status.params)) : null);
 
   if (lines.length === 0) {
-    return el('div', { class: 'stack stack--tight' },
-      add ? el('div', { class: 'toolbar' }, add) : null,
+    return el('div', { class: 'stack' },
       notes,
-      el('div', { class: 'empty' },
-        el('p', {}, t('dir.empty')),
+      emptyState('sheet',
+        el('p', { class: 'empty__title' }, t('dir.empty')),
         rights.save ? el('p', {}, t('dir.emptyHint')) : null,
-        can('import.apply', table) ? el('a', { class: 'button button--quiet', href: '#/import' }, t('import.title')) : null));
+        can('import.apply', table) ? el('a', { class: 'button button--secondary', href: '#/import' }, icon('sheetUp'), t('import.title')) : null));
   }
 
   const toolbar = el('div', { class: 'toolbar' },
-    field({
-      id: 'dir-search', type: 'search', label: t('dir.search'), value: state.query,
-      onInput: (value) => { state.query = value; applyFilter(); },
-      attrs: { autocomplete: 'off', spellcheck: 'false', class: 'field__input toolbar__search' },
-    }),
+    searchField({ id: 'dir-search', label: t('dir.search'), value: state.query, onInput: (value) => { state.query = value; applyFilter(); } }),
     config.groupFilter ? selectField({
-      id: 'dir-group', label: t('field.groupId'), value: state.groupFilter, placeholder: t('dir.allGroups'),
+      id: 'dir-group', label: t('field.groupId'), value: state.groupFilter, placeholder: t('dir.allGroups'), hideLabel: true,
       options: groupOptions(), onChange: (value) => { state.groupFilter = value; applyFilter(); },
     }) : null,
-    add);
+    count);
 
   const head = el('tr', {},
-    el('th', { scope: 'col', class: 'register__num' }, t('dir.number')),
-    config.columns.map((key) => el('th', { scope: 'col', class: cellClass(key) }, t('field.' + key))),
-    withActions ? el('th', { scope: 'col', class: 'register__actions' }, el('span', { class: 'visually-hidden' }, t('dir.actions'))) : null);
-  const tableEl = el('div', { class: 'register' },
-    el('table', { class: 'register__table', 'aria-labelledby': 'dir-title' },
+    el('th', { scope: 'col', class: 'table__num' }, t('dir.number')),
+    columns.map((key) => el('th', { scope: 'col', class: cellClass(key) }, t('field.' + key))),
+    isPerson(table) ? el('th', { scope: 'col' }, t('dir.status')) : null,
+    withActions ? el('th', { scope: 'col', class: 'table__actions' }, el('span', { class: 'visually-hidden' }, t('dir.actions'))) : null);
+  const tableEl = el('div', { class: 'table-scroll' },
+    el('table', { class: 'table', 'aria-labelledby': 'dir-title' },
       el('thead', {}, head),
       el('tbody', {}, lines.map((item) => item.tr), nothing)));
 
   applyFilter();
-  return el('div', { class: 'stack stack--tight' }, toolbar, count, notes, tableEl);
+  return el('div', { class: 'stack' }, notes, el('section', { class: 'card table-card' }, toolbar, tableEl));
+}
+
+// Columns of the table. A person's login or student ID is shown under their name, not in a column of its own.
+function shownColumns() {
+  const config = DIRECTORIES[state.table];
+  return config.columns.filter((key) => key !== config.login);
 }
 
 function line(row, rights, withActions) {
   const config = DIRECTORIES[state.table];
-  const inactive = isPerson(state.table) && row.active !== true;
+  const person = isPerson(state.table);
   const nameId = 'dir-name-' + row.id;
-  const cells = config.columns.map((key) => el('td', { class: cellClass(key), id: key === config.label ? nameId : null },
-    display(key, row),
-    key === config.label && inactive ? el('span', { class: 'tag' }, t('dir.inactive')) : null));
-  const action = (kind, textKey, onClick, extra = '') => el('button', {
-    type: 'button', id: `dir-${kind}-${row.id}`, class: 'row-action' + extra, 'aria-describedby': nameId, onclick: onClick,
-  }, t(textKey));
-  const actions = withActions ? el('td', { class: 'register__actions' },
-    rights.save ? action('edit', 'common.edit', () => openEdit(row)) : null,
-    rights.reset ? action('reset', 'dir.resetPassword', () => openConfirm('reset', row)) : null,
-    rights.remove ? action('remove', 'common.remove', () => openConfirm('remove', row), ' row-action--danger') : null) : null;
-  const number = el('td', { class: 'register__num' });
-  const classes = ['register__row', inactive ? 'is-inactive' : '', row.id === state.freshId ? 'is-fresh' : ''];
-  const tr = el('tr', { class: classes.filter(Boolean).join(' ') }, number, cells, actions);
-  return { tr, number, groupId: row.groupId ?? '', text: cells.map((cell) => cell.textContent).join(' ').toLowerCase() };
+  const keys = shownColumns();
+  const cells = keys.map((key) => el('td', { class: cellClass(key) },
+    key !== config.label ? display(key, row)
+      : person ? personCell(row, nameId, config.login)
+        : el('span', { class: 'table__label', id: nameId }, display(key, row))));
+  const status = person ? el('td', {}, statusCell(row)) : null;
+  const action = (kind, iconName, textKey, onClick, extra = '') => iconButton({
+    id: `dir-${kind}-${row.id}`, iconName, label: t(textKey), onClick, className: 'row-action' + extra, attrs: { 'aria-describedby': nameId },
+  });
+  const actions = withActions ? el('td', { class: 'table__actions' },
+    rights.save ? action('edit', 'pencil', 'common.edit', () => openEdit(row)) : null,
+    rights.reset ? action('reset', 'key', 'dir.resetPassword', () => openConfirm('reset', row)) : null,
+    rights.remove ? action('remove', 'trash', 'common.remove', () => openConfirm('remove', row), ' row-action--danger') : null) : null;
+  const number = el('td', { class: 'table__num' });
+  const classes = [person && row.active !== true ? 'is-inactive' : '', row.id === state.freshId ? 'is-fresh' : ''];
+  const tr = el('tr', { class: classes.filter(Boolean).join(' ') || null }, number, cells, status, actions);
+  // Searchable text: what the cells say, without the initials of the avatar.
+  const words = keys.map((key, i) => (key === config.label ? nameOf(row) : cells[i].textContent));
+  if (person) words.push(String(row[config.login] ?? ''), status.textContent);
+  return { tr, number, groupId: row.groupId ?? '', text: words.join(' ').toLowerCase() };
 }
 
 // Dialogs
@@ -291,13 +301,13 @@ function editDialog(d) {
   const submit = el('button', { type: 'submit', id: 'dir-save', class: 'button button--primary' }, t('common.save'));
   if (d.busy) markBusy(submit, 'common.saving');
   const dialog = modal({ id: 'dir-dialog', labelledBy: 'dir-dialog-title', onClose: closeDialog, canCancel: () => !d.busy },
-    el('p', { class: 'eyebrow' }, isNew ? t('dir.' + table) : t('dir.editing')),
+    el('p', { class: 'dialog__kicker' }, isNew ? t('dir.' + table) : t('dir.editing')),
     el('h2', { class: 'dialog__title', id: 'dir-dialog-title' }, isNew ? t(`dir.${table}.new`) : nameOf(d.row)),
     el('form', { class: 'form', novalidate: true, onsubmit: (event) => { event.preventDefault(); save(d); } },
       formKeys(d).map((key) => formField(key, d)),
-      d.messageKey ? el('p', { class: 'message', role: 'alert' }, t(d.messageKey)) : null,
+      d.messageKey ? note('error', t(d.messageKey), { role: 'alert' }) : null,
       el('div', { class: 'dialog__actions' },
-        el('button', { type: 'button', class: 'button button--quiet', onclick: () => { if (!d.busy) dialog.close(); } }, t('common.cancel')),
+        el('button', { type: 'button', class: 'button button--secondary', onclick: () => { if (!d.busy) dialog.close(); } }, t('common.cancel')),
         submit)));
   return dialog;
 }
@@ -422,9 +432,9 @@ function confirmDialog(d) {
     el('h2', { class: 'dialog__title', id: 'dir-dialog-title' }, t(remove ? 'dir.removeTitle' : 'dir.resetTitle')),
     el('p', {}, t(remove ? 'dir.removeText' : 'dir.resetText', { name })),
     remove && isPerson(state.table) && !d.blocked ? el('p', { class: 'dialog__note' }, t('dir.removeInactive')) : null,
-    d.messageKey ? el('p', { class: 'message', role: 'alert' }, t(d.messageKey)) : null,
+    d.messageKey ? note('error', t(d.messageKey), { role: 'alert' }) : null,
     el('div', { class: 'dialog__actions' },
-      el('button', { type: 'button', class: 'button button--quiet', onclick: () => { if (!d.busy) dialog.close(); } },
+      el('button', { type: 'button', class: 'button button--secondary', onclick: () => { if (!d.busy) dialog.close(); } },
         t(d.blocked ? 'common.close' : 'common.cancel')),
       d.blocked ? null : confirmButton));
   return dialog;
@@ -487,12 +497,12 @@ async function resetPassword(d) {
   }
 }
 
-// The one-time password, like a tear-off slip. It lives only in this dialog's state and is gone when it closes.
+// The one-time password. It lives only in this dialog's state and is gone when it closes.
 function passwordDialog(d) {
   const secret = el('span', { class: 'slip__secret', id: 'slip-secret' }, d.tempPassword);
-  const note = el('p', { class: 'slip__status', 'aria-live': 'polite' }, d.copied ? t(d.copied) : '');
+  const copied = el('p', { class: 'slip__status', 'aria-live': 'polite' }, d.copied ? t(d.copied) : '');
   const dialog = modal({ id: 'dir-dialog', labelledBy: 'dir-dialog-title', className: 'dialog--slip', onClose: closeDialog },
-    el('p', { class: 'eyebrow' }, t('slip.eyebrow')),
+    el('p', { class: 'dialog__kicker' }, t('slip.eyebrow')),
     el('h2', { class: 'dialog__title', id: 'dir-dialog-title' }, d.name),
     el('dl', { class: 'slip' },
       el('div', { class: 'slip__row' },
@@ -501,16 +511,17 @@ function passwordDialog(d) {
       el('div', { class: 'slip__row' },
         el('dt', { class: 'slip__label' }, t('login.password')),
         el('dd', { class: 'slip__value' }, secret,
-          el('button', { type: 'button', id: 'slip-copy', class: 'button button--quiet', onclick: () => copyPassword(d, secret, note) }, t('slip.copy'))))),
-    note,
-    el('p', { class: 'notice' }, t('slip.once')),
+          el('button', { type: 'button', id: 'slip-copy', class: 'button button--secondary', onclick: () => copyPassword(d, secret, copied) },
+            icon('copy'), t('slip.copy'))))),
+    copied,
+    note('warning', t('slip.once')),
     el('p', { class: 'dialog__note' }, t('slip.change')),
     el('div', { class: 'dialog__actions' },
       el('button', { type: 'button', class: 'button button--primary', onclick: () => dialog.close() }, t('common.close'))));
   return dialog;
 }
 
-async function copyPassword(d, secret, note) {
+async function copyPassword(d, secret, status) {
   try {
     await navigator.clipboard.writeText(d.tempPassword);
     d.copied = 'slip.copied';
@@ -519,5 +530,5 @@ async function copyPassword(d, secret, note) {
     window.getSelection().selectAllChildren(secret);
     d.copied = 'slip.selected';
   }
-  note.textContent = t(d.copied);
+  status.textContent = t(d.copied);
 }

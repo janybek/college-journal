@@ -1,0 +1,222 @@
+import { t, getLang, LANGS } from './i18n.js';
+import { getUser, getPref, setPref } from './session.js';
+import { el, avatar, iconButton, refresh } from './ui.js';
+import { icon } from './icons.js';
+import { currentTheme, toggleTheme } from './theme.js';
+import { DIR_TABLES } from './views/directoryConfig.js';
+
+// The frame around the screens: sign-in pages (a centred card), the student's phone bar, and the staff layout
+// with a sidebar (a drawer on narrow screens) and a top bar. The server checks every right itself; the
+// navigation only leaves out what the person's `permissions` do not allow.
+
+const DIR_ICONS = { groups: 'layers', students: 'cap', staff: 'briefcase', subjects: 'book', rooms: 'door' };
+// Menu parts each staff role works with; inside a part only what `permissions` allow is shown.
+const MENU_BY_ROLE = new Map([['admin', ['office']], ['dean', ['office']], ['prorector', ['office']], ['teacher', ['subjects']]]);
+const HOME = { name: 'home', href: '#/', textKey: 'nav.home', icon: 'home' };
+// Keep in step with the breakpoint in app.css where the sidebar becomes a drawer.
+const WIDE = '(min-width: 900px)';
+
+export function permissions() {
+  const user = getUser();
+  return user && Array.isArray(user.permissions) ? user.permissions : [];
+}
+
+export function menuParts(role) {
+  return MENU_BY_ROLE.get(role) ?? [];
+}
+
+// The role whose menu is shown: the one chosen on this device if the person still has it, else the first.
+export function activeRole(user) {
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  const saved = getPref('role');
+  return roles.includes(saved) ? saved : roles[0];
+}
+
+// Navigation groups for a role: [{ titleKey, items: [{ name, href, textKey, icon }] }]. Pure, for tests.
+// The teacher's home is the list of their subjects, so their first item is named after it.
+export function navFor(permissionList, role) {
+  const list = Array.isArray(permissionList) ? permissionList : [];
+  const parts = menuParts(role);
+  if (parts.includes('subjects') && list.includes('teacher.mySubjects')) {
+    return [{ titleKey: 'nav.teaching', items: [{ ...HOME, textKey: 'home.mySubjects', icon: 'book' }] }];
+  }
+  const groups = [{ titleKey: null, items: [HOME] }];
+  if (!parts.includes('office')) return groups;
+  const directories = DIR_TABLES.filter((table) => list.includes('dir.list:' + table))
+    .map((table) => ({ name: table, href: '#/dir/' + table, textKey: 'dir.' + table, icon: DIR_ICONS[table] }));
+  if (directories.length > 0) groups.push({ titleKey: 'home.directories', items: directories });
+  if (list.some((p) => p.startsWith('import.apply:'))) {
+    groups.push({ titleKey: 'nav.data', items: [{ name: 'import', href: '#/import', textKey: 'import.title', icon: 'sheetUp' }] });
+  }
+  return groups;
+}
+
+// Drawer (narrow screens). Its state outlives a redraw, so a role switch inside it keeps it open; any change of
+// address closes it.
+
+let drawerOpen = false;
+let drawerHash = null;
+let listening = false;
+
+function setDrawer(open, returnFocus) {
+  drawerOpen = open;
+  const shell = document.querySelector('.shell');
+  if (!shell) return;
+  shell.classList.toggle('is-drawer-open', open);
+  shell.querySelector('.shell__body').inert = open;
+  const menuButton = document.getElementById('menu-open');
+  menuButton.setAttribute('aria-expanded', String(open));
+  if (open) (shell.querySelector('.nav-link[aria-current="page"]') ?? shell.querySelector('.nav-link')).focus();
+  else if (returnFocus) menuButton.focus();
+}
+
+const closeDrawer = () => { if (drawerOpen) setDrawer(false, true); };
+
+function listen() {
+  if (listening) return;
+  listening = true;
+  document.addEventListener('keydown', (event) => {
+    if (event.key === 'Escape' && drawerOpen && !document.querySelector('dialog[open]')) closeDrawer();
+  });
+  // Widening the window turns the drawer back into a sidebar: nothing may stay inert.
+  const wide = window.matchMedia(WIDE);
+  wide.addEventListener('change', () => { if (wide.matches && drawerOpen) setDrawer(false, false); });
+}
+
+// Builds the frame for this screen into `host` and returns the <main> element the screen draws into.
+// handlers: { onLang(lang), onLogout() }.
+export function renderShell(host, { user, view, params }, handlers) {
+  listen();
+  if (location.hash !== drawerHash) {
+    drawerOpen = false;
+    drawerHash = location.hash;
+  }
+  const main = el('main', { id: 'app', class: 'content', tabindex: '-1' });
+  let frame;
+  if (view === 'login' || view === 'changePassword') frame = authFrame(user, main, handlers);
+  else if (user.kind === 'student') frame = studentFrame(main, handlers);
+  else frame = staffFrame(user, view, params, main, handlers);
+  host.replaceChildren(frame);
+  return main;
+}
+
+// Pieces shared by every frame
+
+function brand(href) {
+  const parts = [el('span', { class: 'brand__mark' }, icon('journal')), el('span', { class: 'brand__name' }, t('app.name'))];
+  return href ? el('a', { class: 'brand', href, onclick: closeDrawer }, parts) : el('p', { class: 'brand' }, parts);
+}
+
+function langSwitch(onLang) {
+  return el('div', { class: 'segmented langs', role: 'group', 'aria-label': t('lang.label') }, LANGS.map((lang) => el('button', {
+    type: 'button', id: 'lang-' + lang, class: 'segmented__button', lang,
+    title: t('lang.name.' + lang), 'aria-pressed': String(lang === getLang()),
+    onclick: () => onLang(lang),
+  }, t('lang.short.' + lang))));
+}
+
+function themeToggle() {
+  const dark = currentTheme() === 'dark';
+  return iconButton({
+    id: 'theme-toggle', iconName: dark ? 'sun' : 'moon', label: t(dark ? 'theme.toLight' : 'theme.toDark'),
+    className: 'icon-button--outline', onClick: () => { toggleTheme(); refresh(); },
+  });
+}
+
+const logoutButton = (onLogout, className) => iconButton({ id: 'logout', iconName: 'logout', label: t('common.logout'), className, onClick: onLogout });
+
+// Sign-in and password change: a centred card under the name of the journal.
+function authFrame(user, main, { onLang, onLogout }) {
+  return el('div', { class: 'auth' },
+    el('div', { class: 'auth__tools' }, langSwitch(onLang), themeToggle(), user ? logoutButton(onLogout, 'icon-button--outline') : null),
+    el('div', { class: 'auth__center' }, brand(null), main));
+}
+
+// The student's phone: one compact bar, no sidebar.
+function studentFrame(main, { onLang, onLogout }) {
+  return el('div', { class: 'student' },
+    el('header', { class: 'topbar topbar--student' },
+      brand('#/'),
+      el('div', { class: 'topbar__tools' }, langSwitch(onLang), themeToggle(), logoutButton(onLogout, 'icon-button--outline'))),
+    main);
+}
+
+// Staff
+
+const currentName = (view, params) => (view === 'directory' ? params.table : view);
+
+function staffFrame(user, view, params, main, { onLang, onLogout }) {
+  const role = activeRole(user);
+  const groups = navFor(user.permissions, role);
+  const current = currentName(view, params);
+  const body = el('div', { class: 'shell__body' }, topbar(groups, view, params, current, onLang), main);
+  body.inert = drawerOpen;
+  return el('div', { class: 'shell' + (drawerOpen ? ' is-drawer-open' : '') },
+    el('a', { class: 'skip-link', href: '#app', onclick: (event) => { event.preventDefault(); main.focus(); } }, t('nav.skip')),
+    el('aside', { class: 'sidebar', id: 'sidebar' },
+      el('div', { class: 'sidebar__head' },
+        brand('#/'),
+        iconButton({ id: 'menu-close', iconName: 'close', label: t('nav.close'), className: 'sidebar__close', onClick: closeDrawer })),
+      el('nav', { class: 'sidebar__nav', 'aria-label': t('nav.label') }, groups.map((group, i) => navGroup(group, i, current))),
+      el('div', { class: 'sidebar__foot' }, roleSwitch(user, role), userBlock(user, role, onLogout))),
+    el('div', { class: 'shell__backdrop', 'aria-hidden': 'true', onclick: closeDrawer }),
+    body);
+}
+
+function navGroup(group, index, current) {
+  const titleId = 'nav-group-' + index;
+  return el('div', { class: 'nav-group' },
+    group.titleKey ? el('p', { class: 'nav-group__title', id: titleId }, t(group.titleKey)) : null,
+    el('ul', { class: 'nav-group__list', 'aria-labelledby': group.titleKey ? titleId : null }, group.items.map((item) => el('li', {},
+      el('a', { class: 'nav-link', href: item.href, 'aria-current': item.name === current ? 'page' : null, onclick: closeDrawer },
+        icon(item.icon), el('span', {}, t(item.textKey)))))));
+}
+
+// Several roles: a switcher that changes which menu is shown (and what the home screen offers).
+function roleSwitch(user, active) {
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  if (roles.length < 2) return null;
+  return el('div', { class: 'role-switch' },
+    el('p', { class: 'role-switch__caption', id: 'role-caption' }, t('home.role')),
+    el('div', { class: 'segmented segmented--wrap', role: 'group', 'aria-labelledby': 'role-caption' }, roles.map((role) => el('button', {
+      type: 'button', id: 'role-' + role, class: 'segmented__button', 'aria-pressed': String(role === active),
+      onclick: () => { setPref('role', role); refresh(); },
+    }, t('role.' + role)))));
+}
+
+function userBlock(user, role, onLogout) {
+  return el('div', { class: 'user' },
+    avatar(user.fullName),
+    el('div', { class: 'user__text' },
+      el('p', { class: 'user__name' }, user.fullName),
+      role ? el('p', { class: 'user__role' }, t('role.' + role)) : null),
+    logoutButton(onLogout, 'user__logout'));
+}
+
+function topbar(groups, view, params, current, onLang) {
+  return el('header', { class: 'topbar' },
+    iconButton({
+      id: 'menu-open', iconName: 'menu', label: t('nav.menu'), className: 'topbar__menu',
+      onClick: () => setDrawer(true, false), attrs: { 'aria-controls': 'sidebar', 'aria-expanded': String(drawerOpen) },
+    }),
+    crumbs(groups, view, params, current),
+    el('div', { class: 'topbar__tools' }, langSwitch(onLang), themeToggle()));
+}
+
+// Where the person is: the menu group and the page. A page opened by its address may be outside this role's menu.
+function crumbs(groups, view, params, current) {
+  let groupKey = null;
+  let pageKey = null;
+  for (const group of groups) {
+    const item = group.items.find((candidate) => candidate.name === current);
+    if (item) [groupKey, pageKey] = [group.titleKey, item.textKey];
+  }
+  if (!pageKey) {
+    if (view === 'directory') [groupKey, pageKey] = ['home.directories', 'dir.' + params.table];
+    else if (view === 'import') [groupKey, pageKey] = ['nav.data', 'import.title'];
+    else pageKey = 'nav.home';
+  }
+  return el('p', { class: 'crumbs' },
+    groupKey ? [el('span', { class: 'crumbs__group' }, t(groupKey)), icon('chevron', 'crumbs__sep')] : null,
+    el('span', { class: 'crumbs__page' }, t(pageKey)));
+}

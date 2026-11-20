@@ -1,17 +1,16 @@
 import { call } from '../api.js';
-import { getUser, getPref, setPref } from '../session.js';
+import { getUser } from '../session.js';
 import { t } from '../i18n.js';
-import { el, errorKey } from '../ui.js';
+import { el, errorKey, avatar, badge, emptyState, pageHeader } from '../ui.js';
+import { icon } from '../icons.js';
+import { activeRole, menuParts, navFor } from '../shell.js';
 
-const DIR_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms'];
-// Menu parts each staff role works with; inside a part only what `permissions` allow is shown.
-const MENU_BY_ROLE = new Map([['admin', ['office']], ['dean', ['office']], ['prorector', ['office']], ['teacher', ['subjects']]]);
 // Sections later units fill in; for now the student sees what is coming.
 const STUDENT_SECTIONS = [
-  ['home.today', 'home.todaySoon'],
-  ['home.grades', 'home.gradesSoon'],
-  ['home.homework', 'home.homeworkSoon'],
-  ['home.news', 'home.newsSoon'],
+  ['home.today', 'home.todaySoon', 'calendar'],
+  ['home.grades', 'home.gradesSoon', 'chart'],
+  ['home.homework', 'home.homeworkSoon', 'clipboard'],
+  ['home.news', 'home.newsSoon', 'bell'],
 ];
 
 // Last known subjects of the signed-in teacher: shown at once, refreshed in the background on every visit.
@@ -25,81 +24,50 @@ export function render(root) {
 
 function renderStudent(root, user) {
   root.append(
-    el('section', { class: 'sheet sheet--label', 'aria-labelledby': 'home-name' },
-      el('p', { class: 'eyebrow' }, t('role.student')),
-      el('h1', { class: 'identity__name', id: 'home-name' }, user.fullName),
-      el('p', { class: 'identity__line' },
-        el('span', { class: 'identity__caption' }, t('home.group')),
-        user.groupName
-          ? el('span', { class: 'blank' }, user.groupName)
-          : el('span', { class: 'blank blank--empty' }, t('home.noGroup')))),
-    el('ul', { class: 'ledger' }, STUDENT_SECTIONS.map(([title, text]) => el('li', { class: 'ledger__row soon' },
-      el('h2', { class: 'soon__title' }, t(title)),
-      el('p', { class: 'soon__text' }, t(text))))));
+    el('section', { class: 'card profile', 'aria-labelledby': 'home-name' },
+      avatar(user.fullName, 'lg'),
+      el('div', { class: 'profile__text' },
+        el('h1', { class: 'profile__name', id: 'home-name' }, user.fullName),
+        el('p', { class: 'profile__role' }, t('role.student')),
+        el('p', { class: 'profile__group' },
+          el('span', { class: 'muted' }, t('home.group')),
+          user.groupName ? badge(user.groupName, 'primary') : el('span', { class: 'muted' }, t('home.noGroup'))))),
+    el('ul', { class: 'soon-list' }, STUDENT_SECTIONS.map(([title, text, iconName]) => el('li', { class: 'card soon' },
+      el('span', { class: 'soon__icon' }, icon(iconName)),
+      el('div', { class: 'soon__body' },
+        el('h2', { class: 'soon__title' }, t(title)),
+        el('p', { class: 'soon__text' }, t(text)))))));
 }
 
+// Staff: an overview of what the active role works with. The role is switched in the sidebar.
 function renderStaff(root, user) {
-  const roles = Array.isArray(user.roles) ? user.roles : [];
-  const saved = getPref('role');
-  const active = roles.includes(saved) ? saved : roles[0];
-  const menu = el('div', { class: 'stack' });
-  const drawMenu = (role) => menu.replaceChildren(...menuFor(user, role));
-  root.append(
-    el('section', { class: 'sheet sheet--label', 'aria-labelledby': 'home-name' },
-      el('h1', { class: 'identity__name', id: 'home-name' }, user.fullName),
-      roles.length > 0 ? roleLine(roles, active, drawMenu) : null),
-    menu);
-  drawMenu(active);
-}
-
-// One role: a plain line. Several roles: a switcher that only changes which menu is shown.
-function roleLine(roles, active, onPick) {
-  const caption = el('span', { class: 'identity__caption', id: 'role-caption' }, t('home.role'));
-  if (roles.length === 1) {
-    return el('p', { class: 'identity__line' }, caption, el('span', { class: 'identity__value' }, t('role.' + active)));
-  }
-  const buttons = roles.map((role) => el('button', {
-    type: 'button', id: 'role-' + role, class: 'segmented__button', 'aria-pressed': String(role === active),
-    onclick: () => {
-      setPref('role', role);
-      for (const button of buttons) button.setAttribute('aria-pressed', String(button.id === 'role-' + role));
-      onPick(role);
-    },
-  }, t('role.' + role)));
-  return el('div', { class: 'identity__line' }, caption,
-    el('div', { class: 'segmented', role: 'group', 'aria-labelledby': 'role-caption' }, buttons));
-}
-
-function menuFor(user, role) {
+  const role = activeRole(user);
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
-  const parts = MENU_BY_ROLE.get(role) ?? [];
+  const parts = menuParts(role);
   const sections = [];
   if (parts.includes('office')) {
-    const office = officeSection(permissions);
-    if (office) sections.push(office);
+    for (const group of navFor(permissions, role).filter((candidate) => candidate.titleKey)) {
+      sections.push(section('home-' + group.items[0].name, t(group.titleKey), el('ul', { class: 'tiles' }, group.items.map(tile))));
+    }
   }
   if (parts.includes('subjects') && permissions.includes('teacher.mySubjects')) sections.push(subjectsSection(user));
-  return sections.length > 0 ? sections : [el('p', { class: 'empty' }, t('home.nothing'))];
+  root.append(
+    pageHeader({ id: 'home-name', title: user.fullName, lead: role ? t('role.' + role) : null }),
+    ...(sections.length > 0 ? sections : [emptyState('info', el('p', {}, t('home.nothing')))]));
 }
 
 function section(id, title, body) {
   return el('section', { class: 'section', 'aria-labelledby': id }, el('h2', { class: 'section__title', id }, title), body);
 }
 
-function tile(href, title, hint, modifier = '') {
-  return el('li', {}, el('a', { class: 'tile' + modifier, href },
-    el('span', { class: 'tile__title' }, title),
-    el('span', { class: 'tile__hint' }, hint)));
-}
-
-function officeSection(permissions) {
-  const tiles = DIR_TABLES
-    .filter((table) => permissions.includes('dir.list:' + table))
-    .map((table) => tile('#/dir/' + table, t('dir.' + table), t('dir.' + table + '.hint')));
-  if (permissions.some((p) => p.startsWith('import.apply:'))) {
-    tiles.push(tile('#/import', t('import.title'), t('import.hint'), ' tile--action'));
-  }
-  return tiles.length > 0 ? section('home-directories', t('home.directories'), el('ul', { class: 'tiles' }, tiles)) : null;
+function tile(item) {
+  const hintKey = item.name === 'import' ? 'import.hint' : `dir.${item.name}.hint`;
+  return el('li', {}, el('a', { class: 'card tile' + (item.name === 'import' ? ' tile--accent' : ''), href: item.href },
+    el('span', { class: 'tile__icon' }, icon(item.icon)),
+    el('span', { class: 'tile__text' },
+      el('span', { class: 'tile__title' }, t(item.textKey)),
+      el('span', { class: 'tile__hint' }, t(hintKey))),
+    icon('chevron', 'tile__go')));
 }
 
 function subjectsSection(user) {
@@ -112,17 +80,18 @@ function subjectsSection(user) {
 
 function subjectsBody(user, redraw) {
   if (subjects.list) {
-    if (subjects.list.length === 0) return el('p', { class: 'empty' }, t('home.noSubjects'));
-    return el('ul', { class: 'ledger' }, subjects.list.map((subject) => el('li', { class: 'ledger__row subject' },
+    if (subjects.list.length === 0) return emptyState('book', el('p', {}, t('home.noSubjects')));
+    return el('ul', { class: 'card list' }, subjects.list.map((subject) => el('li', { class: 'list__row subject' },
+      el('span', { class: 'list__icon' }, icon('book')),
       el('span', { class: 'subject__name' }, subject.name),
-      subject.groupName ? el('span', { class: 'chip' }, subject.groupName) : null,
+      subject.groupName ? badge(subject.groupName, 'primary') : null,
       el('span', { class: 'subject__count' }, t('home.studentCount', { count: subject.studentCount })))));
   }
   if (subjects.errorKey && !subjects.pending) {
-    return el('div', { class: 'empty' },
+    return emptyState('alert',
       el('p', {}, t(subjects.errorKey)),
       el('button', {
-        type: 'button', class: 'button button--quiet',
+        type: 'button', class: 'button button--secondary',
         onclick: () => { loadSubjects(user).then(redraw); redraw(); },
       }, t('common.retry')));
   }

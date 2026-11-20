@@ -44,6 +44,24 @@ test('missing columns, other header languages', () => {
   assert.deepEqual(parseSheet('students', [['Аты-жөнү', 'Тайпа', 'Student ID'], ['А', '01-1', 7]], db).errors, []);
 });
 
+test('group column: the Kyrgyz title «Топ» and the old «Тайпа» are both recognised', () => {
+  const db = makeDb();
+  assert.equal(IMPORT_SPECS.students.columns.find((c) => c.key === 'groupId').titles.ky, 'Топ');
+  assert.equal(IMPORT_SPECS.subjects.columns.find((c) => c.key === 'groupId').titles.ky, 'Топ');
+  for (const title of ['Топ', 'Тайпа', '  ТАЙПА ', 'топ']) {
+    const students = parseSheet('students', [['Аты-жөнү', title, 'Студенттик билеттин №'], ['А', '01-1', 7]], db);
+    assert.deepEqual(students.missingColumns, [], title);
+    assert.deepEqual(students.unknownColumns, [], title);
+    assert.equal(students.records[0].groupId, 'g_1', title);
+    const subjects = parseSheet('subjects', [['Аталышы', 'Окутуучу', title], ['Физика', 'ivanov', '01-1']], db);
+    assert.deepEqual(subjects.missingColumns, [], title);
+    assert.deepEqual(subjects.unknownColumns, [], title);
+    assert.equal(subjects.records[0].groupId, 'g_1', title);
+  }
+  // An alias is the same column: a second group column under the other name is reported as unknown.
+  assert.deepEqual(parseSheet('students', [['ФИО', 'Топ', 'Тайпа', '№ студ. билета'], ['А', '01-1', '01-1', 8]], db).unknownColumns, ['Тайпа']);
+});
+
 test('staff: roles and lang words', () => {
   const db = makeDb();
   assert.deepEqual(parseSheet('staff', [['ФИО', 'Логин', 'Роли'], ['А', 'aaa', 'Преподаватель, деканат'], ['Б', 'bbb', 'директор']], db).errors,

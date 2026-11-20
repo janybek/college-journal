@@ -1,8 +1,12 @@
 import { call } from '../api.js';
 import { t, tCount } from '../i18n.js';
-import { el, errorKey, fieldErrorKey, hasText, dataTable, holdOnLeave, markBusy, modal, showModal, focusById, refresh } from '../ui.js';
+import {
+  el, errorKey, fieldErrorKey, hasText, dataTable, holdOnLeave, markBusy, modal, showModal, focusById, refresh,
+  note, pageHeader,
+} from '../ui.js';
+import { icon } from '../icons.js';
+import { permissions } from '../shell.js';
 import { IMPORT_TABLES, IMPORT_COLUMNS } from './directoryConfig.js';
-import { officeNav, permissions } from './directory.js';
 
 // Excel import (#/import): five numbered steps on one page — directory, template, file, check, import.
 // SheetJS is loaded only from this screen. Drawn from `state`; the one-time passwords of an import live only
@@ -37,17 +41,19 @@ let state = blank();
 let xlsxLoading = null;
 
 // SheetJS (about 1 MB) is fetched once, only when this screen needs it — never on the sign-in or student screens.
+// A failed load (network error, or a script that did not define XLSX) is forgotten, so the next need tries again.
 function loadXlsx() {
   if (window.XLSX) return Promise.resolve(window.XLSX);
   if (!xlsxLoading) {
     xlsxLoading = new Promise((resolve, reject) => {
       const script = el('script', { src: XLSX_SRC });
-      script.addEventListener('load', () => (window.XLSX ? resolve(window.XLSX) : reject(new Error('xlsx'))));
-      script.addEventListener('error', () => {
+      const fail = () => {
         script.remove();
         xlsxLoading = null;
         reject(new Error('xlsx'));
-      });
+      };
+      script.addEventListener('load', () => (window.XLSX ? resolve(window.XLSX) : fail()));
+      script.addEventListener('error', fail);
       document.head.append(script);
     });
   }
@@ -85,13 +91,13 @@ export function render(root) {
   }
   const passwords = passwordsSection();
   root.append(
-    el('section', { class: 'sheet sheet--label', 'aria-labelledby': 'import-title' },
-      el('p', { class: 'eyebrow' }, t('home.directories')),
-      el('h1', { class: 'sheet__title', id: 'import-title' }, t('import.title')),
-      el('p', { class: 'sheet__lead' }, t('import.lead'))),
-    officeNav('import'),
-    el('ol', { class: 'steps' }, stepTable(tables), stepTemplate(), stepFile(), stepCheck(), stepApply()));
-  if (passwords) root.append(passwords);
+    pageHeader({ id: 'import-title', title: t('import.title'), lead: t('import.lead') }),
+    el('ol', { class: 'card steps' }, stepTable(tables), stepTemplate(), stepFile(), stepCheck(), stepApply()));
+  if (passwords) {
+    root.append(passwords);
+    // Printing this screen prints only the passwords (see the print rules in app.css).
+    root.classList.add('has-printable');
+  }
   if (state.ask) showModal(root, questionDialog(state.ask));
 }
 
@@ -130,8 +136,9 @@ function stepTemplate() {
       el('dt', { class: 'col-hints__name' }, columnTitle(key)),
       el('dd', {}, t(`import.colHint.${table}.${key}`))))) : null,
     el('p', { class: 'step__hint' }, t('import.matchBy.' + table)),
-    el('button', { type: 'button', id: 'import-template', class: 'button button--quiet', onclick: downloadTemplate }, t('import.template.download')),
-    state.templateErrorKey ? el('p', { class: 'message', role: 'alert' }, t(state.templateErrorKey)) : null);
+    el('button', { type: 'button', id: 'import-template', class: 'button button--secondary', onclick: downloadTemplate },
+      icon('download'), t('import.template.download')),
+    state.templateErrorKey ? note('error', t(state.templateErrorKey), { role: 'alert' }) : null);
 }
 
 // Row 1 of the file as it looks in Excel: column letters, the titles, and which ones must be filled.
@@ -162,13 +169,15 @@ function stepFile() {
   return step(3, 'import.step.file', true,
     el('div', { class: 'file' },
       input,
-      el('label', { for: 'import-file', class: 'button button--quiet file__button' }, t(state.file ? 'import.file.another' : 'import.file.choose')),
+      el('label', { for: 'import-file', class: 'button button--secondary file__button' },
+        icon('upload'), t(state.file ? 'import.file.another' : 'import.file.choose')),
       state.file ? el('p', { class: 'file__name' },
-        el('span', { class: 'mono' }, state.file.name),
+        icon('sheet', 'file__icon'),
+        el('span', { class: 'file__title' }, state.file.name),
         el('span', { class: 'muted' }, t('import.file.size', { size: Math.max(1, Math.ceil(state.file.size / 1024)) }))) : null),
     el('p', { class: 'step__hint' }, t('import.file.hint')),
     state.reading ? el('p', { class: 'loading', role: 'status' }, t('import.file.reading')) : null,
-    state.fileErrorKey ? el('p', { class: 'message', role: 'alert' }, t(state.fileErrorKey)) : null);
+    state.fileErrorKey ? note('error', t(state.fileErrorKey), { role: 'alert' }) : null);
 }
 
 function stepCheck() {
@@ -177,8 +186,8 @@ function stepCheck() {
   return step(4, 'import.step.check', true,
     state.checking ? el('p', { class: 'loading', role: 'status' }, t('import.check.busy')) : null,
     state.checkErrorKey ? [
-      el('p', { class: 'message', role: 'alert' }, t(state.checkErrorKey)),
-      el('button', { type: 'button', class: 'button button--quiet', onclick: check }, t('import.check.again')),
+      note('error', t(state.checkErrorKey), { role: 'alert' }),
+      el('button', { type: 'button', class: 'button button--secondary', onclick: check }, t('import.check.again')),
     ] : null,
     preview ? previewBody(preview) : null);
 }
@@ -191,18 +200,18 @@ function previewBody(preview) {
   const usable = !blocked(preview);
   return [
     preview.missingColumns.length > 0
-      ? el('p', { class: 'message', role: 'alert' }, t('import.missing', { columns: preview.missingColumns.map(columnTitle).join(', ') }))
+      ? note('error', t('import.missing', { columns: preview.missingColumns.map(columnTitle).join(', ') }), { role: 'alert' })
       : null,
-    tooMany ? el('p', { class: 'message', role: 'alert' }, t('import.error.tooManyRows')) : null,
+    tooMany ? note('error', t('import.error.tooManyRows'), { role: 'alert' }) : null,
     preview.unknownColumns.length > 0
-      ? el('p', { class: 'notice' }, t('import.unknown', { columns: preview.unknownColumns.join(', ') }))
+      ? note('warning', t('import.unknown', { columns: preview.unknownColumns.join(', ') }))
       : null,
     usable ? tally([
       [preview.newCount, 'import.tally.new'],
       [preview.updateCount, 'import.tally.update'],
       [preview.total - preview.valid, 'import.tally.errors', true],
     ]) : null,
-    usable && preview.total === 0 ? el('p', { class: 'empty' }, t('import.check.nothing')) : null,
+    usable && preview.total === 0 ? note('info', t('import.check.nothing')) : null,
     errorsBlock(preview.errors),
   ];
 }
@@ -216,33 +225,33 @@ function stepApply() {
     type: 'button', id: 'import-apply', class: 'button button--primary', disabled: !ready, onclick: apply,
   }, tCount('import.apply', preview.valid));
   if (state.applying) markBusy(button, 'import.apply.busy');
-  let note = null;
-  if (!ready) note = t('import.apply.blocked');
-  else if (preview.total > preview.valid) note = t('import.apply.skipNote');
+  let hint = null;
+  if (!ready) hint = t('import.apply.blocked');
+  else if (preview.total > preview.valid) hint = t('import.apply.skipNote');
   return step(5, 'import.step.apply', true,
     button,
-    note ? el('p', { class: 'step__hint' }, note) : null,
-    state.applyErrorKey ? el('p', { class: 'message', role: 'alert' }, t(state.applyErrorKey)) : null,
+    hint ? el('p', { class: 'step__hint' }, hint) : null,
+    state.applyErrorKey ? note('error', t(state.applyErrorKey), { role: 'alert' }) : null,
     state.applyLost ? [
-      el('p', { class: 'notice' }, t('import.apply.lost')),
-      el('button', { type: 'button', class: 'button button--quiet', onclick: check }, t('import.check.again')),
+      note('warning', t('import.apply.lost')),
+      el('button', { type: 'button', class: 'button button--secondary', onclick: check }, t('import.check.again')),
     ] : null);
 }
 
 function resultBody(result) {
   return [
-    el('p', { class: 'done', role: 'status' }, t('import.done')),
+    note('success', t('import.done'), { role: 'status' }),
     tally([
       [result.inserted, 'import.done.inserted'],
       [result.updated, 'import.done.updated'],
       [result.skipped, 'import.done.skipped', true],
     ]),
     errorsBlock(result.errors),
-    el('button', { type: 'button', id: 'import-again', class: 'button button--quiet', onclick: startOver }, t('import.again')),
+    el('button', { type: 'button', id: 'import-again', class: 'button button--secondary', onclick: startOver }, icon('upload'), t('import.again')),
   ];
 }
 
-// Counts with their labels; `bad` counts turn red-pen when they are not zero.
+// Counts with their labels; `bad` counts turn red when they are not zero.
 function tally(items) {
   return el('dl', { class: 'tally' }, items.map(([count, key, bad]) => el('div', { class: 'tally__item' + (bad && count > 0 ? ' tally__item--bad' : '') },
     el('dt', { class: 'tally__label' }, t(key)),
@@ -259,7 +268,8 @@ function errorsBlock(errors) {
   return el('div', { class: 'stack stack--tight' },
     dataTable({
       caption: t('import.errors.title'),
-      columns: [{ label: t('import.errors.row'), className: 'register__num' }, { label: t('import.errors.column') }, { label: t('import.errors.problem') }],
+      className: 'table-scroll--framed',
+      columns: [{ label: t('import.errors.row'), className: 'table__num' }, { label: t('import.errors.column') }, { label: t('import.errors.problem') }],
       rows: shown.map((error) => [
         String(error.row + state.firstRow),
         columnTitle(error.field),
@@ -273,18 +283,20 @@ function errorsBlock(errors) {
 function passwordsSection() {
   const result = state.result;
   if (!result || result.passwords.length === 0) return null;
-  return el('section', { class: 'sheet passwords printable', 'aria-labelledby': 'passwords-title' },
-    el('p', { class: 'eyebrow print-only' }, t('app.name')),
-    el('h2', { class: 'sheet__title', id: 'passwords-title' }, t('import.passwords.heading', { table: t('dir.' + state.table) })),
-    el('p', { class: 'notice no-print' }, t('import.passwords.warning')),
+  return el('section', { class: 'card passwords printable', 'aria-labelledby': 'passwords-title' },
+    el('p', { class: 'print-only' }, t('app.name')),
+    el('h2', { class: 'card__title', id: 'passwords-title' }, t('import.passwords.heading', { table: t('dir.' + state.table) })),
+    note('warning', t('import.passwords.warning'), { class: 'no-print' }),
     el('p', { class: 'print-only' }, t('import.passwords.printNote')),
     el('div', { class: 'actions no-print' },
-      el('button', { type: 'button', id: 'passwords-download', class: 'button button--primary', onclick: downloadPasswords }, t('import.passwords.download')),
-      el('button', { type: 'button', id: 'passwords-print', class: 'button button--quiet', onclick: () => window.print() }, t('import.passwords.print'))),
-    state.passwordsErrorKey ? el('p', { class: 'message no-print', role: 'alert' }, t(state.passwordsErrorKey)) : null,
+      el('button', { type: 'button', id: 'passwords-download', class: 'button button--primary', onclick: downloadPasswords },
+        icon('download'), t('import.passwords.download')),
+      el('button', { type: 'button', id: 'passwords-print', class: 'button button--secondary', onclick: () => window.print() },
+        icon('printer'), t('import.passwords.print'))),
+    state.passwordsErrorKey ? note('error', t(state.passwordsErrorKey), { class: 'no-print', role: 'alert' }) : null,
     dataTable({
-      className: 'register--slips',
-      columns: [{ label: t('field.login'), className: 'register__id' }, { label: t('field.fullName') }, { label: t('field.password'), className: 'register__secret' }],
+      className: 'table-scroll--framed table--slips',
+      columns: [{ label: t('field.login'), className: 'table__id' }, { label: t('field.fullName') }, { label: t('field.password'), className: 'table__secret' }],
       rows: result.passwords.map((person) => [person.login, person.fullName, person.tempPassword]),
     }));
 }
@@ -295,7 +307,7 @@ function questionDialog(question) {
     el('h2', { class: 'dialog__title', id: 'import-ask-title' }, t(leaving ? 'import.leave.title' : 'import.again.title')),
     el('p', {}, t('import.leave.text')),
     el('div', { class: 'dialog__actions' },
-      el('button', { type: 'button', class: 'button button--quiet', onclick: () => answer(true) }, t(leaving ? 'import.leave.go' : 'import.again.go')),
+      el('button', { type: 'button', class: 'button button--secondary', onclick: () => answer(true) }, t(leaving ? 'import.leave.go' : 'import.again.go')),
       el('button', { type: 'button', class: 'button button--primary', autofocus: true, onclick: () => dialog.close() }, t('import.leave.stay'))));
   return dialog;
 }

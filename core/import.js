@@ -3,10 +3,12 @@ import { normalizeRow, validateRow } from './validate.js';
 
 export const MAX_IMPORT_ROWS = 2000;
 
-const column = (key, ru, ky, en, required = false) => ({ key, titles: { ru, ky, en }, required });
+// `aliases`: other header titles accepted for the column (older template versions); never written to a template.
+const column = (key, ru, ky, en, required = false, aliases) => ({ key, titles: { ru, ky, en }, required, ...(aliases ? { aliases } : {}) });
 const NAME = column('name', 'Название', 'Аталышы', 'Name', true);
 const FULL_NAME = column('fullName', 'ФИО', 'Аты-жөнү', 'Full name', true);
 const LANG = column('lang', 'Язык', 'Тил', 'Language');
+const GROUP = column('groupId', 'Группа', 'Топ', 'Group', true, ['Тайпа']);
 
 export const IMPORT_SPECS = {
   groups: { uniqueBy: ['name'], columns: [NAME, column('course', 'Курс', 'Курс', 'Year', true)] },
@@ -16,7 +18,7 @@ export const IMPORT_SPECS = {
     columns: [
       FULL_NAME,
       column('cardNo', '№ студ. билета', 'Студенттик билеттин №', 'Student ID', true),
-      column('groupId', 'Группа', 'Тайпа', 'Group', true),
+      GROUP,
       LANG,
     ],
   },
@@ -26,7 +28,7 @@ export const IMPORT_SPECS = {
   },
   subjects: {
     uniqueBy: ['name', 'groupId'],
-    columns: [NAME, column('teacherId', 'Преподаватель', 'Окутуучу', 'Teacher', true), column('groupId', 'Группа', 'Тайпа', 'Group', true)],
+    columns: [NAME, column('teacherId', 'Преподаватель', 'Окутуучу', 'Teacher', true), GROUP],
   },
 };
 
@@ -63,7 +65,7 @@ function mapHeaders(spec, headerRow) {
   (headerRow || []).forEach((cell, i) => {
     const text = cellText(cell);
     if (!text) return;
-    const col = spec.columns.find(c => Object.values(c.titles).some(t => norm(t) === norm(text)));
+    const col = spec.columns.find(c => [...Object.values(c.titles), ...(c.aliases || [])].some(t => norm(t) === norm(text)));
     if (!col || col.key in index) unknownColumns.push(text);
     else index[col.key] = i;
   });

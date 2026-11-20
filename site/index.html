@@ -1,17 +1,29 @@
 <!doctype html>
-<html lang="ky">
+<html lang="ky" data-theme="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#1e4d40">
+  <meta name="color-scheme" content="dark">
+  <meta name="theme-color" content="#080d16">
+  <script>
+    // Applies the stored theme before the first paint; mirrors pickTheme() in js/theme.js. Dark unless "light".
+    (function () {
+      var theme = 'dark';
+      try { if (localStorage.getItem('journal.theme') === 'light') theme = 'light'; } catch (error) { /* storage blocked */ }
+      if (theme === 'light') {
+        document.documentElement.setAttribute('data-theme', 'light');
+        document.querySelector('meta[name="color-scheme"]').setAttribute('content', 'light');
+        document.querySelector('meta[name="theme-color"]').setAttribute('content', '#f9fcff');
+      }
+    })();
+  </script>
   <title></title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/screens.css">
   <script type="module" src="js/main.js"></script>
 </head>
 <body>
-  <header id="cover" class="cover"></header>
-  <main id="app" class="page"></main>
+  <div id="page"></div>
 </body>
 </html>

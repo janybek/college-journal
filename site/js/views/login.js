@@ -1,7 +1,7 @@
 import { API_URL } from '../../config.js';
 import { call } from '../api.js';
 import { t } from '../i18n.js';
-import { el, errorKey, field, focusFirstInvalid, markBusy, refresh, startSession } from '../ui.js';
+import { el, errorKey, field, focusFirstInvalid, markBusy, note, refresh, startSession } from '../ui.js';
 
 // The screen is drawn from this state, so typed text and messages survive a redraw (e.g. a language switch).
 // It is dropped after a successful sign-in.
@@ -32,13 +32,13 @@ export function render(root) {
       attrs: { autocomplete: 'current-password' },
     }),
     button,
-    state.messageKey ? el('p', { class: 'message', role: 'alert' }, t(state.messageKey)) : null);
+    state.messageKey ? note('error', t(state.messageKey), { role: 'alert' }) : null);
 
-  root.append(el('section', { class: 'sheet sheet--label', 'aria-labelledby': 'login-title' },
-    el('h1', { class: 'sheet__title', id: 'login-title' }, t('login.title')),
-    API_URL === '' ? el('p', { class: 'message message--top', role: 'status' }, t('error.not_configured')) : null,
+  root.append(el('section', { class: 'card auth-card', 'aria-labelledby': 'login-title' },
+    el('h1', { class: 'auth-card__title', id: 'login-title' }, t('login.title')),
+    API_URL === '' ? note('warning', t('error.not_configured'), { role: 'status' }) : null,
     form,
-    el('p', { class: 'sheet__note' }, t('login.help'))));
+    el('p', { class: 'auth-card__foot' }, t('login.help'))));
 }
 
 async function signIn() {

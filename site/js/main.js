@@ -2,19 +2,19 @@ import { API_URL } from '../config.js';
 import { call, onSessionEnd } from './api.js';
 import { getToken, getUser, setSession, clearSession, getPref, setPref } from './session.js';
 import { resolveRoute } from './router.js';
-import { t, getLang, setLang, pickLang, applyOverrides, onTextsChange, LANGS } from './i18n.js';
-import { el, onRefresh, onSessionStart, isLeaveHeld, mayLeave } from './ui.js';
+import { t, getLang, setLang, pickLang, applyOverrides, onTextsChange } from './i18n.js';
+import { onRefresh, onSessionStart, isLeaveHeld, mayLeave } from './ui.js';
+import { renderShell } from './shell.js';
 import * as login from './views/login.js';
 import * as changePassword from './views/changePassword.js';
 import * as home from './views/home.js';
 import * as directory from './views/directory.js';
 import * as importView from './views/import.js';
 
-// The app shell: the green cover band (title, language, sign-out) and the screen chosen by the router.
+// Puts the screen chosen by the router into its frame (shell.js: sign-in card, student bar or staff sidebar).
 // A screen may export leave(): it is called when another screen replaces it, to drop what it held.
 const VIEWS = { login, changePassword, home, directory, import: importView };
-const cover = document.getElementById('cover');
-const app = document.getElementById('app');
+const page = document.getElementById('page');
 let shownView = null;
 let shownHash = location.hash;
 
@@ -28,28 +28,12 @@ function renderCurrent() {
   shownHash = location.hash;
   const focus = sameView ? rememberFocus() : null;
   document.title = t('app.name');
-  cover.dataset.view = view;
-  cover.replaceChildren(coverBar(user));
+  const app = renderShell(page, { user, view, params }, { onLang: chooseLang, onLogout: logout });
   app.dataset.view = view;
   app.classList.toggle('is-entering', !sameView);
   shownView = view;
-  app.replaceChildren();
   VIEWS[view].render(app, params);
   restoreFocus(focus);
-}
-
-function coverBar(user) {
-  const title = user
-    ? el('a', { class: 'cover__title', href: '#/' }, t('app.name'))
-    : el('p', { class: 'cover__title' }, t('app.name'));
-  return el('div', { class: 'cover__bar' }, title,
-    el('div', { class: 'cover__tools' },
-      el('div', { class: 'langs', role: 'group', 'aria-label': t('lang.label') }, LANGS.map((lang) => el('button', {
-        type: 'button', id: 'lang-' + lang, class: 'langs__button', lang,
-        title: t('lang.name.' + lang), 'aria-pressed': String(lang === getLang()),
-        onclick: () => chooseLang(lang),
-      }, t('lang.short.' + lang)))),
-      user ? el('button', { type: 'button', id: 'logout', class: 'cover__logout', onclick: logout }, t('common.logout')) : null));
 }
 
 // A click on the switcher is the person's explicit choice on this device: it is remembered, it wins over the

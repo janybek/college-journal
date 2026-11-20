@@ -9,6 +9,7 @@
     "build:gas": "node scripts/build-gas.js"
   },
   "devDependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz"
   }
 }

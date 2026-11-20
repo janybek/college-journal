@@ -1,6 +1,6 @@
 import { call } from '../api.js';
 import { t } from '../i18n.js';
-import { el, errorKey, field, focusFirstInvalid, markBusy, refresh, startSession } from '../ui.js';
+import { el, errorKey, field, focusFirstInvalid, markBusy, note, refresh, startSession } from '../ui.js';
 
 // Drawn from `state`, like the sign-in screen: typed text survives a redraw and is dropped after success.
 // Server field name -> field of this form.
@@ -18,15 +18,15 @@ export function render(root) {
     ...extra,
   });
 
-  root.append(el('section', { class: 'sheet sheet--label', 'aria-labelledby': 'password-title' },
-    el('h1', { class: 'sheet__title', id: 'password-title' }, t('password.title')),
-    el('p', { class: 'sheet__lead' }, t('password.intro')),
+  root.append(el('section', { class: 'card auth-card', 'aria-labelledby': 'password-title' },
+    el('h1', { class: 'auth-card__title', id: 'password-title' }, t('password.title')),
+    el('p', { class: 'auth-card__lead' }, t('password.intro')),
     el('form', { class: 'form', novalidate: true, onsubmit: (event) => { event.preventDefault(); save(); } },
       input('old', t('password.old'), 'current-password'),
       input('new', t('password.new'), 'new-password', { hint: t('password.newHint') }),
       input('repeat', t('password.repeat'), 'new-password'),
       button,
-      state.messageKey ? el('p', { class: 'message', role: 'alert' }, t(state.messageKey)) : null)));
+      state.messageKey ? note('error', t(state.messageKey), { role: 'alert' }) : null)));
 }
 
 function check() {

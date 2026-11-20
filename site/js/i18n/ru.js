@@ -9,6 +9,9 @@ export default {
   'lang.name.ru': 'Русский',
   'lang.name.en': 'English',
 
+  'theme.toLight': 'Включить светлую тему',
+  'theme.toDark': 'Включить тёмную тему',
+
   'common.logout': 'Выйти',
   'common.toHome': 'На главную',
   'common.retry': 'Попробовать снова',
@@ -44,6 +47,14 @@ export default {
   'role.prorector': 'Проректор',
   'role.teacher': 'Преподаватель',
   'role.student': 'Студент',
+
+  'nav.label': 'Разделы',
+  'nav.home': 'Главная',
+  'nav.data': 'Данные',
+  'nav.teaching': 'Преподавание',
+  'nav.menu': 'Открыть меню',
+  'nav.close': 'Закрыть меню',
+  'nav.skip': 'Перейти к содержимому',
 
   'home.role': 'Ваша роль',
   'home.directories': 'Справочники',
@@ -89,7 +100,9 @@ export default {
   'dir.allGroups': 'Все группы',
   'dir.number': '№',
   'dir.actions': 'Действия',
-  'dir.inactive': 'не активен',
+  'dir.inactive': 'Не активен',
+  'dir.status': 'Статус',
+  'dir.mustChange': 'Временный пароль',
   'dir.empty': 'В этом справочнике пока нет записей.',
   'dir.emptyHint': 'Добавьте первую запись или загрузите готовый список из Excel.',
   'dir.nothingFound': 'Ничего не найдено. Измените условия поиска.',

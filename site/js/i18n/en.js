@@ -9,6 +9,9 @@ export default {
   'lang.name.ru': 'Русский',
   'lang.name.en': 'English',
 
+  'theme.toLight': 'Switch to light theme',
+  'theme.toDark': 'Switch to dark theme',
+
   'common.logout': 'Sign out',
   'common.toHome': 'Back to home',
   'common.retry': 'Try again',
@@ -44,6 +47,14 @@ export default {
   'role.prorector': 'Vice-rector',
   'role.teacher': 'Teacher',
   'role.student': 'Student',
+
+  'nav.label': 'Sections',
+  'nav.home': 'Home',
+  'nav.data': 'Data',
+  'nav.teaching': 'Teaching',
+  'nav.menu': 'Open menu',
+  'nav.close': 'Close menu',
+  'nav.skip': 'Skip to content',
 
   'home.role': 'Your role',
   'home.directories': 'Directories',
@@ -89,7 +100,9 @@ export default {
   'dir.allGroups': 'All groups',
   'dir.number': 'No.',
   'dir.actions': 'Actions',
-  'dir.inactive': 'inactive',
+  'dir.inactive': 'Inactive',
+  'dir.status': 'Status',
+  'dir.mustChange': 'Temporary password',
   'dir.empty': 'This directory has no records yet.',
   'dir.emptyHint': 'Add the first record or upload a ready-made list from Excel.',
   'dir.nothingFound': 'Nothing found. Try a different search.',
