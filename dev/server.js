@@ -10,7 +10,8 @@ import { seed } from './seed.js';
 
 // Local stand: serves the static site and answers the production API from a JSON file. Node only.
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const MAX_BODY = 20 * 1024 * 1024;
+export const MAX_BODY_BYTES = 20 * 1024 * 1024;
+const TOO_LARGE = Symbol('too large');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -24,8 +25,8 @@ const TYPES = {
 };
 const JSON_TYPE = 'application/json; charset=utf-8';
 
-function sendJson(res, status, body) {
-  res.writeHead(status, { 'Content-Type': JSON_TYPE, 'Cache-Control': 'no-store' });
+function sendJson(res, status, body, extraHeaders = {}) {
+  res.writeHead(status, { 'Content-Type': JSON_TYPE, 'Cache-Control': 'no-store', ...extraHeaders });
   res.end(JSON.stringify(body));
 }
 
@@ -34,20 +35,22 @@ function sendNotFound(res) {
   res.end('Not found');
 }
 
-function readBody(req) {
+// Resolves with the UTF-8 body, or TOO_LARGE once the limit is passed (the rest of the upload is discarded).
+function readBody(req, maxBytes) {
   return new Promise((resolve, reject) => {
     const chunks = [];
     let size = 0;
+    let tooLarge = false;
     req.on('data', (chunk) => {
       size += chunk.length;
-      if (size > MAX_BODY) {
-        reject(Object.assign(new Error('too large'), { tooLarge: true }));
-        req.destroy();
-        return;
+      if (size > maxBytes) {
+        tooLarge = true;
+        chunks.length = 0;
+      } else if (!tooLarge) {
+        chunks.push(chunk);
       }
-      chunks.push(chunk);
     });
-    req.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    req.on('end', () => resolve(tooLarge ? TOO_LARGE : Buffer.concat(chunks).toString('utf8')));
     req.on('error', reject);
   });
 }
@@ -73,7 +76,7 @@ function serveFile(req, res, siteDir, pathname) {
   res.end(req.method === 'HEAD' ? undefined : body);
 }
 
-export async function startDevServer({ port = 5173, dataFile = 'dev/data/db.json', siteDir = 'site' } = {}) {
+export async function startDevServer({ port = 5173, dataFile = 'dev/data/db.json', siteDir = 'site', maxBodyBytes = MAX_BODY_BYTES } = {}) {
   const dataPath = path.resolve(ROOT, dataFile);
   const sitePath = path.resolve(ROOT, siteDir);
   const platform = createNodePlatform();
@@ -87,13 +90,11 @@ export async function startDevServer({ port = 5173, dataFile = 'dev/data/db.json
       const { pathname } = new URL(req.url, 'http://localhost');
       if (pathname === '/api') {
         if (req.method !== 'POST') {
-          res.setHeader('Allow', 'POST');
-          return sendJson(res, 405, { ok: false, error: { code: 'bad_request' } });
+          return sendJson(res, 405, { ok: false, error: { code: 'method_not_allowed' }, serverTime: platform.now() }, { Allow: 'POST' });
         }
-        let body;
-        try { body = await readBody(req); } catch (error) {
-          if (error.tooLarge) return sendJson(res, 413, { ok: false, error: { code: 'bad_request' } });
-          throw error;
+        const body = await readBody(req, maxBodyBytes);
+        if (body === TOO_LARGE) {
+          return sendJson(res, 413, { ok: false, error: { code: 'payload_too_large' }, serverTime: platform.now() }, { Connection: 'close' });
         }
         return sendJson(res, 200, handleRequest(body, ctx));
       }
