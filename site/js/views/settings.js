@@ -9,30 +9,32 @@ import { permissions } from '../shell.js';
 import { isDate, isTime, minutesOf, addMinutes, dayParts } from '../dates.js';
 import { bellOptions, nextBell } from '../bells.js';
 
-// Semester settings (#/settings): the semester dates, the days off and the bell times. Drawn from `state`, so a
-// redraw (language switch) keeps what was typed. What depends on a typed value (the date under a date field,
-// the end of a class, the breaks, the day ribbon) is updated in place while typing: a redraw would throw the
-// caret out of a date field. A bell time is picked from a list (site/js/bells.js), never typed. Without
-// settings.save (the vice-rector) everything is read-only.
+// Semester settings (#/settings): the semester dates and which semester is on, the days off and the bell times.
+// Drawn from `state`, so a redraw (language switch) keeps what was typed. What depends on a typed value (the date
+// under a date field, the end of a class, the breaks, the day ribbon) is updated in place while typing: a redraw
+// would throw the caret out of a date field. A bell time is picked from a list (site/js/bells.js), never typed.
+// Without settings.save (the vice-rector) everything is read-only.
 
 // A copy of MAX_SLOTS in core/settings.js: the server checks it again.
 const MAX_BELLS = 8;
 const LAST_MINUTE = 23 * 60 + 59;
 // The break a new class gets after the last one.
 const NEW_BREAK = 10;
-const FIELD_NAMES = ['semesterStart', 'semesterEnd', 'holidays', 'bells'];
+const FIELD_NAMES = ['semesterStart', 'semesterEnd', 'semester', 'holidays', 'bells'];
+const SEMESTERS = [1, 2];
 
 const blank = () => ({
   loaded: null,          // { settings, defaultBells, pairMinutes } from settings.get; null until loaded
   loadErrorKey: null,
   pending: false,
-  values: null,          // what is on screen: { semesterStart, semesterEnd, holidays, bells }
+  values: null,          // what is on screen: { semesterStart, semesterEnd, semester, holidays, bells }
   newHoliday: '',
   holidayErrorKey: null,
   errors: {},            // field -> { key, params }
   badBells: [],          // indexes of the bell fields to mark
   messageKey: null,      // an error about the whole form
   saved: false,          // the last save went through and nothing changed since
+  savedSemester: null,   // the semester the last save switched to; null: it did not switch
   busy: false,
 });
 let state = blank();
@@ -131,7 +133,34 @@ function semesterPanel(editable) {
   return panel('settings-semester', 'calendar', 'settings.semester', t('settings.semesterHint'),
     el('div', { class: 'date-pair' },
       dateField('semesterStart', 'settings-start', 'settings.start'),
-      dateField('semesterEnd', 'settings-end', 'settings.end')));
+      dateField('semesterEnd', 'settings-end', 'settings.end')),
+    semesterSwitch(editable));
+}
+
+// «Сейчас идёт: 1 семестр / 2 семестр»: the topics of this semester go on the pairs. Read-only, the chosen one
+// stays plain to read and nothing can be pressed.
+function semesterSwitch(editable) {
+  const error = state.errors.semester;
+  return el('div', { class: 'field semester-now' },
+    el('p', { class: 'field__label', id: 'settings-semester-no' }, t('settings.semesterNo')),
+    el('p', { class: 'field__hint', id: 'settings-semester-no-hint' }, t('settings.semesterNoHint')),
+    el('div', {
+      class: 'segmented semester-now__switch', role: 'group', 'aria-labelledby': 'settings-semester-no',
+      'aria-describedby': error ? 'settings-semester-no-hint settings-semester-error' : 'settings-semester-no-hint',
+    }, SEMESTERS.map((n) => el('button', {
+      type: 'button', id: 'settings-semester-' + n, class: 'segmented__button', 'aria-pressed': String(state.values.semester === n),
+      disabled: !editable, onclick: () => chooseSemester(n),
+    }, t('topics.semesterN', { n })))),
+    error ? fieldLine('settings-semester-error', t(error.key, error.params)) : null);
+}
+
+function chooseSemester(n) {
+  if (state.values.semester === n) return;
+  state.values.semester = n;
+  delete state.errors.semester;
+  state.messageKey = null;
+  changed();
+  focusById('settings-semester-' + n);
 }
 
 function holidaysPanel(editable) {
@@ -416,7 +445,10 @@ function saveBar() {
   live.status = el('p', { class: 'savebar__status', 'aria-live': 'polite' });
   return [
     el('div', { class: 'notes settings-notes', id: 'settings-notes', role: 'status' },
-      state.saved ? [note('success', t('settings.saved')), note('info', t('settings.savedHint'))] : null,
+      state.saved ? [
+        note('success', state.savedSemester ? t('settings.saved') + ' ' + t('settings.savedSemester', { n: state.savedSemester }) : t('settings.saved')),
+        note('info', t('settings.savedHint')),
+      ] : null,
       state.messageKey ? note('error', t(state.messageKey), { role: 'alert', id: 'settings-message' }) : null),
     el('div', { class: 'savebar' }, live.status, submit),
   ];
@@ -430,6 +462,7 @@ async function save() {
   owner.badBells = [];
   owner.messageKey = null;
   owner.saved = false;
+  owner.savedSemester = null;
   for (const name of ['semesterStart', 'semesterEnd']) if (values[name] === '') owner.errors[name] = { key: 'error.required' };
   const bells = checkBells(values.bells, owner.loaded.pairMinutes);
   if (bells) {
@@ -447,7 +480,9 @@ async function save() {
   try {
     const data = await call('settings.save', { settings: copy(values) });
     if (state !== owner) return;
+    const before = owner.loaded.settings.semester;
     owner.loaded.settings = copy(data.settings);
+    if (data.settings.semester !== before) owner.savedSemester = data.settings.semester;
     owner.values = copy(data.settings);
     owner.saved = true;
   } catch (error) {

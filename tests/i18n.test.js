@@ -102,6 +102,12 @@ test('every server error code has a text', () => {
     assert.ok(ru['error.' + code], code);
 });
 
+test('topics by semester and the semester switch have their texts; the unit is called a module', () => {
+  for (const key of ['topics.semesterN', 'topics.semesterNow', 'topics.otherSemester', 'topics.notNow', 'plan.readOnly', 'home.syllabus',
+    'settings.semesterNo', 'settings.savedSemester', 'settings.error.semester.bad_value']) assert.ok(ru[key], key);
+  for (const dict of [ru, ky, en]) assert.doesNotMatch(dict['topics.field.unit'], /Юнит|Unit/);
+});
+
 test('every schedule error code has a text', () => {
   for (const code of ['group_busy', 'teacher_busy', 'room_busy', 'in_past', 'pair_locked', 'empty_template', 'held', 'out_of_semester', 'day_off', 'bad_request'])
     assert.ok(ru['error.' + code], code);

@@ -1426,6 +1426,63 @@ button.lesson:hover { box-shadow: inset 0 0 0 1px var(--lesson); }
   row-gap: var(--space-2);
 }
 
+/* A tab per semester under the subject. The semester that is on carries a green light and «идёт сейчас», as a
+   lamp over a door says the room is in session. */
+.semester-tabs {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.semester-tabs__switch { max-width: 100%; }
+
+.semester-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: 0 var(--space-4);
+}
+
+.semester-tab__name { font-weight: 600; }
+
+.semester-tab__now {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--success);
+  font-size: 0.75rem;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.semester-tab__now::before {
+  content: "";
+  flex: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: currentColor;
+  box-shadow: 0 0 0 3px var(--success-wash);
+}
+
+/* A topic of another semester without a pair is not late, just not due yet: a quiet line, no warning. */
+.when__later {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-style: italic;
+}
+
+/* «Сейчас идёт» in the semester settings: two buttons under the dates. Read-only, the chosen one stays plain. */
+.semester-now__switch { justify-self: start; }
+
+.semester-now .segmented__button {
+  min-height: 2.25rem;
+  padding: 0 var(--space-4);
+  font-weight: 600;
+}
+
+.semester-now .segmented__button:disabled[aria-pressed="true"] { opacity: 1; }
+
 /* Screens: schedule — the week as day columns (a list on a narrower window), each day under its calendar page;
    a pair keeps its subject's colour on every schedule screen, and a cancelled one is struck out and hatched */
 
@@ -1903,9 +1960,7 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   .student .week-nav__this { flex: none; }
 }
 
-/* The read-only topic plan of a subject. */
-.plan-toolbar { border-bottom: 1px solid var(--border); }
-
+/* The syllabus page of one subject: its name in the toolbar. */
 .plan-subject {
   font-size: 1.0625rem;
   font-weight: 600;

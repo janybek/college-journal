@@ -145,7 +145,7 @@ function subjectsBody(user, redraw) {
       el('span', { class: 'subject__count' }, t('home.studentCount', { count: subject.studentCount })),
       plans ? el('a', {
         class: 'button button--secondary subject__plan', href: '#/plan/' + subject.id, 'aria-describedby': 'subject-' + subject.id,
-      }, icon('clipboard'), t('topics.title')) : null)));
+      }, icon('clipboard'), t('home.syllabus')) : null)));
   }
   if (subjects.errorKey && !subjects.pending) {
     return emptyState('alert',

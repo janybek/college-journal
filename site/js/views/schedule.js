@@ -6,6 +6,7 @@ import {
 } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
+import { getToken } from '../session.js';
 import { addDays, addMinutes, isDate, isTime, mondayOf } from '../dates.js';
 import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref } from '../pairs.js';
 import { weekNav, dayList, pairCardId, pairTime, weekdayDate, typeBadge, flagBadge } from './pairParts.js';
@@ -48,13 +49,31 @@ const blank = () => ({
   dialog: null,        // { kind: 'change' | 'cancel' | 'restore', ... }
 });
 let state = blank();
+// What the dean was looking at when they left the screen (for the week template, say): the mode, the group or the
+// teacher, the week or the day. Coming back shows it again. It belongs to the session it was taken in, so after
+// signing out (a new token) it is forgotten.
+let kept = null;
 
 const can = (permission) => permissions().includes(permission);
 const canChange = () => can('schedule.changePair');
 const canOpen = (pair) => canEditPair(pair, state.today) || canRestorePair(pair, state.today);
 
 export function leave() {
+  if (state.refs !== null) {
+    const { mode, groupId, teacherId, from, day } = state;
+    kept = { token: getToken(), mode, groupId, teacherId, from, day };
+  }
   state = blank();
+}
+
+// The view kept on leaving, if it is of this session and its group or teacher still exists.
+function restoreKept(owner) {
+  const view = kept;
+  kept = null;
+  if (!view || view.token === null || view.token !== getToken()) return;
+  if (owner.refs.groups.some((group) => group.id === view.groupId)) owner.groupId = view.groupId;
+  if (owner.refs.teachers.some((person) => person.id === view.teacherId)) owner.teacherId = view.teacherId;
+  Object.assign(owner, { mode: view.mode, from: view.from, day: view.day });
 }
 
 // What is asked of the server: the scope (mode and whose week) and the week or the day in it.
@@ -98,6 +117,7 @@ async function loadRefs(owner) {
     };
     owner.groupId = owner.refs.groups[0]?.id ?? '';
     owner.teacherId = owner.refs.teachers[0]?.id ?? '';
+    restoreKept(owner);
     owner.refsErrorKey = null;
   } catch (error) {
     if (state !== owner) return;

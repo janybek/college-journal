@@ -70,16 +70,18 @@ export function render(root, params = {}) {
 }
 
 // The address is applied only when it changed: a redraw with the same address (a language switch) keeps the group
-// chosen since. A group the address names that does not exist leaves the first one (load() checks it too).
+// chosen since. A group the address names that does not exist leaves the first one with no day marked (load()
+// checks it too).
 function applyRoute({ groupId = null, weekday = null }) {
   if (state.route && state.route.groupId === groupId && state.route.weekday === weekday) return;
   state.route = { groupId, weekday };
-  if (groupId !== null && groupId !== state.groupId && (state.data === null || state.data.groups.some((group) => group.id === groupId))) {
+  const known = groupId === null || state.data === null || state.data.groups.some((group) => group.id === groupId);
+  if (groupId !== null && known && groupId !== state.groupId) {
     state.groupId = groupId;
     state.status = null;
     state.freshId = null;
   }
-  state.targetDay = WEEKDAYS.includes(weekday) ? weekday : null;
+  state.targetDay = known && WEEKDAYS.includes(weekday) ? weekday : null;
   state.scrollPending = state.targetDay !== null;
 }
 
@@ -114,7 +116,14 @@ async function load(owner) {
       semester: semester && semester.semesterStart !== '' && semester.semesterEnd !== ''
         ? { start: semester.semesterStart, end: semester.semesterEnd } : null,
     };
-    if (!owner.data.groups.some((group) => group.id === owner.groupId)) owner.groupId = owner.data.groups[0]?.id ?? '';
+    if (!owner.data.groups.some((group) => group.id === owner.groupId)) {
+      // The group the address named is unknown: the first group is shown, and no day of it is marked.
+      if (owner.groupId !== '') {
+        owner.targetDay = null;
+        owner.scrollPending = false;
+      }
+      owner.groupId = owner.data.groups[0]?.id ?? '';
+    }
     owner.loadErrorKey = null;
   } catch (error) {
     if (state !== owner) return;

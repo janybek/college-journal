@@ -8,31 +8,41 @@ import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { FIELDS } from './directoryConfig.js';
 import { isTime, dayParts } from '../dates.js';
+import { semesterTopics, nextTopic, planWarnings } from '../syllabus.js';
 
-// Topics (#/topics): the topic plan of one subject in order, each topic with the pair the journal put it on
-// (the server lays topics on the subject's pairs by date: one topic, one pair). Above the table: topics that
-// did not fit and pairs left without a topic. Adding, editing and deleting a topic lays them out again, so the
-// plan is read again after every change. Drawn from `state`, so a redraw (language switch) keeps the chosen
-// subject and an open dialog. Without dir.save:topics (the vice-rector) there is only the table.
+// The syllabus of a subject: its topics by semester, each topic with the pair the journal put it on (the server
+// lays the topics of the current semester on the subject's pairs by date: one topic, one pair). Two screens share
+// this code: the deanery's «Темы» (#/topics) with a choice of subject, and the page of one subject
+// (#/plan/<subjectId>) a teacher opens from «Мои предметы». A tab per semester; the current one opens first and is
+// the only one that warns about topics that did not fit and pairs left without a topic. Adding, editing and
+// deleting a topic lays them out again, so the plan is read again after every change. Who may change the topics
+// depends on the subject, so the buttons follow `plan.canEdit` from the server. Drawn from `state`, so a redraw
+// (language switch) keeps the subject, the tab and an open dialog.
 
 // A copy of LESSON_TYPES in core/schema.js: the server checks the type again.
 const LESSON_TYPES = ['lecture', 'practice', 'control'];
 const TYPE_TONES = { lecture: 'primary', practice: 'neutral', control: 'warning' };
+const SEMESTERS = [1, 2];
 const FORM_FIELDS = ['order', 'unit', 'name', 'lessonType'];
 const FIELD_IDS = { order: 'topics-order', unit: 'topics-unit', name: 'topics-name', lessonType: 'topics-type' };
 const NAME_MAX = 200;
 // Failures worth trying again; any other answer would not change on a retry.
 const RETRYABLE_ERRORS = ['network', 'internal'];
+// Answers about the subject page a retry would not change: the screen explains them with a way back home.
+const FINAL_ERRORS = { forbidden: 'plan.forbidden', not_found: 'plan.notFound' };
 
 const blank = () => ({
-  subjects: null,      // [{ id, label }] sorted by label; null until loaded
+  mode: 'list',        // 'list': the deanery's screen with a choice of subject; 'subject': the page of one subject
+  subjects: null,      // [{ id, label }] sorted by label; null until loaded (the list mode only)
   loadErrorKey: null,
   pending: false,
   subjectId: '',
   plan: null,          // the answer of topics.plan for subjectId
   planErrorKey: null,
+  planErrorCode: null,
   planTicket: 0,       // bumps with every plan request; older answers are dropped
   planPending: false,
+  tab: null,           // the semester shown; null: the current one, once the plan is read
   status: null,        // { key, params }: what the last change did
   freshId: null,       // the topic saved last, marked in the table
   dialog: null,        // { kind: 'edit' | 'remove', ... }
@@ -40,18 +50,18 @@ const blank = () => ({
 let state = blank();
 
 const can = (permission) => permissions().includes(permission);
-const canSave = () => can('dir.save:topics');
-const canRemove = () => can('dir.remove:topics');
+const canEdit = () => state.plan !== null && state.plan.canEdit === true;
+const canUpload = () => state.mode === 'list' && can('import.apply:topics');
 
 export function leave() {
   state = blank();
 }
 
+// The deanery's «Темы».
 export function render(root) {
+  if (state.mode !== 'list') state = blank();
   if (state.subjects === null && state.loadErrorKey === null && !state.pending) load(state);
-  if (state.subjects !== null && state.subjectId !== '' && state.plan === null && state.planErrorKey === null && !state.planPending) {
-    loadPlan(state);
-  }
+  if (state.subjects !== null && state.subjectId !== '') loadPlanIfNeeded();
   root.append(pageHeader({ id: 'topics-title', title: t('topics.title'), lead: t('topics.lead'), actions: headerActions() }));
   if (state.subjects === null) {
     root.append(failure(state.loadErrorKey, () => { state.loadErrorKey = null; refresh(); }));
@@ -63,22 +73,46 @@ export function render(root) {
       can('dir.list:subjects') ? el('a', { class: 'button button--secondary', href: '#/dir/subjects' }, icon('book'), t('dir.subjects')) : null));
     return;
   }
-  root.append(
-    el('div', { class: 'notes topics-notes', role: 'status' }, state.status ? note('success', t(state.status.key, state.status.params)) : null),
-    planCard());
+  root.append(statusNotes(), planCard());
   if (state.dialog) showModal(root, dialogFor(state.dialog));
 }
 
+// The page of one subject («Силлабус»).
+export function renderSubject(root, subjectId) {
+  if (state.mode !== 'subject' || state.subjectId !== subjectId) state = { ...blank(), mode: 'subject', subjectId };
+  loadPlanIfNeeded();
+  root.append(pageHeader({ id: 'topics-title', title: t('plan.title'), lead: t('plan.lead'), actions: headerActions() }));
+  const final = state.plan === null ? FINAL_ERRORS[state.planErrorCode] : null;
+  if (final) {
+    const failed = emptyState('alert',
+      el('p', {}, t(final)),
+      el('a', { class: 'button button--secondary', href: '#/' }, icon('home'), t('common.toHome')));
+    failed.setAttribute('role', 'alert');
+    root.append(el('section', { class: 'card topics-card' }, el('div', { class: 'topics-wait' }, failed)));
+    return;
+  }
+  if (state.plan !== null && !canEdit()) root.append(note('info', t('plan.readOnly')));
+  root.append(statusNotes(), planCard());
+  if (state.dialog) showModal(root, dialogFor(state.dialog));
+}
+
+function loadPlanIfNeeded() {
+  if (state.plan === null && state.planErrorKey === null && !state.planPending) loadPlan(state);
+}
+
 function headerActions() {
-  if (state.subjects === null || state.subjects.length === 0) return null;
-  const upload = can('import.apply:topics')
+  if (state.mode === 'list' && (state.subjects === null || state.subjects.length === 0)) return null;
+  const upload = canUpload()
     ? el('a', { class: 'button button--secondary', href: '#/import' }, icon('sheetUp'), t('topics.import'))
     : null;
-  const add = canSave() && state.plan !== null
+  const add = canEdit()
     ? el('button', { type: 'button', id: 'topics-add', class: 'button button--primary', onclick: () => openEdit(null) }, icon('plus'), t('topics.add'))
     : null;
   return upload || add ? [upload, add] : null;
 }
+
+const statusNotes = () => el('div', { class: 'notes topics-notes', role: 'status' },
+  state.status ? note('success', t(state.status.key, state.status.params)) : null);
 
 async function load(owner) {
   owner.pending = true;
@@ -102,7 +136,8 @@ async function load(owner) {
   refresh();
 }
 
-// Reads the plan of the chosen subject. Resolves when the answer is on screen (or was dropped as stale).
+// Reads the plan of the chosen subject. Resolves when the answer is on screen (or was dropped as stale). The
+// first answer opens the tab of the current semester.
 async function loadPlan(owner) {
   const ticket = ++owner.planTicket;
   const subjectId = owner.subjectId;
@@ -112,10 +147,13 @@ async function loadPlan(owner) {
     const plan = await call('topics.plan', { subjectId });
     if (!current()) return;
     owner.plan = plan;
+    if (owner.tab === null) owner.tab = plan.semester === 2 ? 2 : 1;
     owner.planErrorKey = null;
+    owner.planErrorCode = null;
   } catch (error) {
     if (!current()) return;
     owner.planErrorKey = errorKey(error.code);
+    owner.planErrorCode = error.code;
   }
   owner.planPending = false;
   refresh();
@@ -131,7 +169,12 @@ function failure(key, retry) {
   return body;
 }
 
-const subjectLabel = () => state.subjects.find((subject) => subject.id === state.subjectId)?.label ?? '';
+// «Информатика — 01-1»: the subject the dialogs are about.
+function subjectLabel() {
+  if (state.mode === 'list') return state.subjects.find((subject) => subject.id === state.subjectId)?.label ?? '';
+  const { subject } = state.plan;
+  return subject.groupName ? t('topics.subjectOption', { subject: subject.name, group: subject.groupName }) : subject.name;
+}
 
 function dayMonth(date) {
   const { day, month } = dayParts(date);
@@ -142,7 +185,30 @@ function dayMonth(date) {
 
 function planCard() {
   const { plan } = state;
-  const toolbar = el('div', { class: 'toolbar topics-toolbar' },
+  const labelledBy = state.mode === 'list' ? 'topics-title' : 'plan-subject';
+  let body;
+  if (!plan) body = el('div', { class: 'topics-wait' }, failure(state.planErrorKey, () => { state.planErrorKey = null; refresh(); }));
+  else {
+    const topics = semesterTopics(plan, state.tab);
+    body = [
+      semesterTabs(plan),
+      topics.length === 0 ? el('div', { class: 'topics-wait' }, emptyBody(plan)) : topicsTable(topics, state.tab !== plan.semester),
+    ];
+  }
+  return el('div', { class: 'stack' },
+    plan ? warnings(plan) : null,
+    el('section', { class: 'card topics-card', 'aria-labelledby': labelledBy },
+      state.mode === 'list' ? listToolbar() : subjectToolbar(),
+      body));
+}
+
+function topicCount() {
+  return state.plan ? el('p', { class: 'toolbar__count' }, tCount('topics.count', semesterTopics(state.plan, state.tab).length)) : null;
+}
+
+function listToolbar() {
+  const { plan } = state;
+  return el('div', { class: 'toolbar topics-toolbar' },
     selectField({
       id: 'topics-subject', label: t('topics.subject'), value: state.subjectId, hideLabel: true,
       options: state.subjects.map((subject) => ({ value: subject.id, label: subject.label })), onChange: chooseSubject,
@@ -152,22 +218,48 @@ function planCard() {
       el('span', { class: 'topics-teacher__text' },
         el('span', { class: 'topics-teacher__caption' }, t('topics.teacher')),
         el('span', { class: 'topics-teacher__name' }, plan.subject.teacherName))) : null,
-    plan ? el('p', { class: 'toolbar__count' }, tCount('topics.count', plan.topics.length)) : null);
-  let body;
-  if (!plan) body = el('div', { class: 'topics-wait' }, failure(state.planErrorKey, () => { state.planErrorKey = null; refresh(); }));
-  else if (plan.topics.length === 0) body = el('div', { class: 'topics-wait' }, emptyBody());
-  else body = topicsTable(plan.topics);
-  return el('div', { class: 'stack' },
-    plan ? warnings(plan) : null,
-    el('section', { class: 'card topics-card', 'aria-labelledby': 'topics-title' }, toolbar, body));
+    topicCount());
 }
 
+function subjectToolbar() {
+  const subject = state.plan?.subject ?? null;
+  return el('div', { class: 'toolbar topics-toolbar' },
+    el('span', { class: 'list__icon' }, icon('book')),
+    subject ? el('h2', { class: 'plan-subject', id: 'plan-subject' }, subject.name) : null,
+    subject && subject.groupName ? badge(subject.groupName, 'primary') : null,
+    topicCount());
+}
+
+// One tab per semester; the current semester carries a green mark.
+function semesterTabs(plan) {
+  return el('div', { class: 'semester-tabs' },
+    el('div', { class: 'segmented semester-tabs__switch', role: 'group', 'aria-label': t('topics.semesterTabs') },
+      SEMESTERS.map((n) => el('button', {
+        type: 'button', id: 'topics-semester-' + n, class: 'segmented__button semester-tab', 'aria-pressed': String(n === state.tab),
+        onclick: () => chooseTab(n),
+      },
+      el('span', { class: 'semester-tab__name' }, t('topics.semesterN', { n })),
+      n === plan.semester ? el('span', { class: 'semester-tab__now' }, t('topics.semesterNow')) : null))));
+}
+
+function chooseTab(n) {
+  if (n === state.tab) return;
+  state.tab = n;
+  state.status = null;
+  state.freshId = null;
+  refresh();
+  focusById('topics-semester-' + n);
+}
+
+// Topics that did not fit and pairs without a topic concern the current semester only; another semester says
+// when its topics will go on pairs.
 function warnings(plan) {
-  const notPlaced = plan.topics.filter((topic) => topic.pair === null).length;
+  const { notPlaced, withoutTopic } = planWarnings(plan, state.tab);
   const list = [
     state.planErrorKey ? staleNote() : null,
+    state.tab !== plan.semester ? note('info', t('topics.otherSemester')) : null,
     notPlaced > 0 ? note('warning', t('topics.notPlaced', { count: notPlaced })) : null,
-    plan.withoutTopic > 0 ? note('warning', t('topics.withoutTopic', { count: plan.withoutTopic })) : null,
+    withoutTopic > 0 ? note('warning', t('topics.withoutTopic', { count: withoutTopic })) : null,
   ].filter(Boolean);
   return list.length > 0 ? el('div', { class: 'notes topics-warnings' }, list) : null;
 }
@@ -187,17 +279,18 @@ async function reloadPlan() {
   const reading = loadPlan(owner);
   refresh();
   await reading;
-  if (state === owner) focusById('topics-reload', 'topics-subject');
+  if (state === owner) focusById('topics-reload', 'topics-subject', 'topics-semester-' + owner.tab);
 }
 
-function emptyBody() {
+function emptyBody(plan) {
   return emptyState('clipboard',
-    el('p', { class: 'empty__title' }, t('topics.empty')),
-    canSave() ? el('p', {}, t('topics.emptyHint')) : null);
+    el('p', { class: 'empty__title' }, t(plan.topics.length === 0 ? 'topics.empty' : 'topics.emptySemester')),
+    canEdit() && canUpload() ? el('p', {}, t('topics.emptyHint')) : null);
 }
 
-function topicsTable(topics) {
-  const actions = canSave() || canRemove();
+// other: the tab of a semester that is not the current one, whose topics wait for the switch of the semester.
+function topicsTable(topics, other) {
+  const actions = canEdit();
   const head = el('tr', {},
     el('th', { scope: 'col', class: 'table__num' }, t('import.col.topics.order')),
     el('th', { scope: 'col', class: 'topics__unit' }, t('import.col.topics.unit')),
@@ -205,41 +298,42 @@ function topicsTable(topics) {
     el('th', { scope: 'col' }, t('import.col.topics.lessonType')),
     el('th', { scope: 'col' }, t('topics.pair')),
     actions ? el('th', { scope: 'col', class: 'table__actions' }, el('span', { class: 'visually-hidden' }, t('dir.actions'))) : null);
-  const rows = topics.map((topic, i) => topicRow(topic, i === 0 || topics[i - 1].unit !== topic.unit, actions));
+  const rows = topics.map((topic, i) => topicRow(topic, i === 0 || topics[i - 1].unit !== topic.unit, actions, other));
   return el('div', { class: 'table-scroll' },
-    el('table', { class: 'table topics-table', 'aria-labelledby': 'topics-title' },
+    el('table', { class: 'table topics-table', 'aria-labelledby': state.mode === 'list' ? 'topics-title' : 'plan-subject' },
       el('thead', {}, head),
       el('tbody', {}, rows)));
 }
 
-// A topic. The first topic of a unit opens it with a line and its number; the next ones of that unit repeat the
-// number only for screen readers.
-function topicRow(topic, unitStart, actions) {
+// A topic. The first topic of a module opens it with a line and its number; the next ones of that module repeat
+// the number only for screen readers.
+function topicRow(topic, unitStart, actions, other) {
   const nameId = 'topics-name-' + topic.id;
   const action = (kind, iconName, textKey, onClick, extra = '') => iconButton({
     id: `topics-${kind}-${topic.id}`, iconName, label: t(textKey), onClick, className: 'row-action' + extra, attrs: { 'aria-describedby': nameId },
   });
-  const classes = [unitStart ? 'is-unit-start' : '', topic.pair === null ? 'is-unplaced' : '', topic.id === state.freshId ? 'is-fresh' : ''];
+  const unplaced = topic.pair === null && !other;
+  const classes = [unitStart ? 'is-unit-start' : '', unplaced ? 'is-unplaced' : '', topic.id === state.freshId ? 'is-fresh' : ''];
   return el('tr', { class: classes.filter(Boolean).join(' ') || null },
     el('td', { class: 'table__num' }, String(topic.order)),
     el('td', { class: 'topics__unit' }, el('span', { class: unitStart ? 'unit' : 'visually-hidden' }, String(topic.unit))),
     el('td', {}, el('span', { class: 'table__label', id: nameId }, topic.name)),
     el('td', {}, typeBadge(topic.lessonType)),
-    el('td', {}, pairCell(topic.pair)),
+    el('td', {}, pairCell(topic.pair, other)),
     actions ? el('td', { class: 'table__actions' },
-      canSave() ? action('edit', 'pencil', 'common.edit', () => openEdit(topic)) : null,
-      canRemove() ? action('remove', 'trash', 'common.remove', () => openRemove(topic), ' row-action--danger') : null) : null);
+      action('edit', 'pencil', 'common.edit', () => openEdit(topic)),
+      action('remove', 'trash', 'common.remove', () => openRemove(topic), ' row-action--danger')) : null);
 }
 
 const typeBadge = (type) => (LESSON_TYPES.includes(type) ? badge(t('lessonType.' + type), TYPE_TONES[type]) : badge(String(type ?? '')));
 
-// The pair a topic stands on, as a page of a tear-off calendar with the date and the pair beside it. Also on the
-// read-only plan of a subject (plan.js).
-export function pairCell(pair) {
+// The pair a topic stands on, as a page of a tear-off calendar with the date and the pair beside it. A topic of
+// another semester without a pair is simply not due yet; one with a pair (held before) shows its date.
+function pairCell(pair, other) {
   if (pair === null) {
     return el('span', { class: 'when' },
       el('span', { class: 'when__leaf when__leaf--empty', 'aria-hidden': 'true' }),
-      badge(t('topics.noPair'), 'warning'));
+      other ? el('span', { class: 'when__later' }, t('topics.notNow')) : badge(t('topics.noPair'), 'warning'));
   }
   const { day, weekday } = dayParts(pair.date);
   const slot = t('settings.pairN', { n: pair.slot });
@@ -260,6 +354,8 @@ function chooseSubject(subjectId) {
   state.planPending = false;
   state.plan = null;
   state.planErrorKey = null;
+  state.planErrorCode = null;
+  state.tab = null;
   state.status = null;
   state.freshId = null;
   refresh();
@@ -280,17 +376,21 @@ function closeDialog() {
   focusById(d.returnId, 'topics-add', 'topics-subject');
 }
 
-// A new topic gets the number after the last one and the unit of the last one.
+// «Информатика — 01-1 · 2 семестр» above the title of a dialog: the semester of a topic is not changed there.
+const kicker = (d) => el('p', { class: 'dialog__kicker' },
+  t('topics.kicker', { subject: subjectLabel(), semester: t('topics.semesterN', { n: d.semester }) }));
+
+// A new topic goes into the semester of the open tab, with the number after the last one and its module.
 function openEdit(topic) {
-  const topics = state.plan.topics;
-  const last = topics[topics.length - 1];
+  const semester = topic ? topic.semester : state.tab;
+  const next = nextTopic(semesterTopics(state.plan, semester));
   state.status = null;
   state.freshId = null;
   state.dialog = {
-    kind: 'edit', topic, subjectId: state.subjectId,
+    kind: 'edit', topic, subjectId: state.subjectId, semester,
     values: topic
       ? { order: String(topic.order), unit: String(topic.unit), name: topic.name, lessonType: topic.lessonType }
-      : { order: String(Math.max(0, ...topics.map((item) => item.order)) + 1), unit: String(last ? last.unit : 1), name: '', lessonType: '' },
+      : { order: String(next.order), unit: String(next.unit), name: '', lessonType: '' },
     fieldErrors: {}, messageKey: null, blocked: false, busy: false,
     returnId: topic ? 'topics-edit-' + topic.id : 'topics-add',
   };
@@ -303,7 +403,7 @@ function editDialog(d) {
   const error = (name) => d.fieldErrors[name] ?? null;
   const numberAttrs = (name) => ({ min: FIELDS[name].min, max: FIELDS[name].max, step: 1, inputmode: 'numeric', required: true });
   const dialog = modal({ id: 'topics-dialog', labelledBy: 'topics-dialog-title', onClose: closeDialog, canCancel: () => !d.busy },
-    el('p', { class: 'dialog__kicker' }, subjectLabel()),
+    kicker(d),
     el('h2', { class: 'dialog__title', id: 'topics-dialog-title' }, d.topic ? t('topics.editTitle', { order: d.topic.order }) : t('topics.new')),
     el('form', { class: 'form', novalidate: true, onsubmit: (event) => { event.preventDefault(); saveTopic(d); } },
       el('div', { class: 'topics-numbers' },
@@ -372,7 +472,8 @@ async function saveTopic(d) {
   d.busy = true;
   refresh();
   const row = {
-    subjectId: d.subjectId, order: +d.values.order, unit: +d.values.unit, name: d.values.name.trim(), lessonType: d.values.lessonType,
+    subjectId: d.subjectId, semester: d.semester, order: +d.values.order, unit: +d.values.unit,
+    name: d.values.name.trim(), lessonType: d.values.lessonType,
   };
   if (d.topic) row.id = d.topic.id;
   try {
@@ -402,14 +503,17 @@ function showSaveError(d, error) {
   const other = fields.find(({ field: name }) => !FORM_FIELDS.includes(name));
   if (other) d.messageKey = fieldErrorKey('topics', other.field, other.code, 'topics');
   else if (fields.length === 0) d.messageKey = errorKey(error.code);
-  // The topic or its subject is gone: saving again cannot help.
-  d.blocked = error.code === 'not_found' || other !== undefined;
+  // The topic or its subject is gone, or the subject is not the person's: saving again cannot help.
+  d.blocked = error.code === 'not_found' || error.code === 'forbidden' || other !== undefined;
 }
 
 function openRemove(topic) {
   state.status = null;
   state.freshId = null;
-  state.dialog = { kind: 'remove', topic, subjectId: state.subjectId, messageKey: null, blocked: false, busy: false, returnId: 'topics-remove-' + topic.id };
+  state.dialog = {
+    kind: 'remove', topic, subjectId: state.subjectId, semester: topic.semester,
+    messageKey: null, blocked: false, busy: false, returnId: 'topics-remove-' + topic.id,
+  };
   refresh();
 }
 
@@ -417,7 +521,7 @@ function removeDialog(d) {
   const confirm = el('button', { type: 'button', id: 'topics-confirm', class: 'button button--danger', onclick: () => removeTopic(d) }, t('common.remove'));
   if (d.busy) markBusy(confirm, 'dir.removing');
   const dialog = modal({ id: 'topics-dialog', labelledBy: 'topics-dialog-title', className: 'dialog--confirm', onClose: closeDialog, canCancel: () => !d.busy },
-    el('p', { class: 'dialog__kicker' }, subjectLabel()),
+    kicker(d),
     el('h2', { class: 'dialog__title', id: 'topics-dialog-title' }, t('topics.removeTitle')),
     el('p', {}, t('topics.removeText', { name: d.topic.name })),
     d.messageKey ? note('error', t(d.messageKey), { role: 'alert' }) : null,
