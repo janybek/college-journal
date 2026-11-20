@@ -1,0 +1,7 @@
+node_modules/
+build/
+dev/data/
+.clasp.json
+.clasprc.json
+.superpowers/
+.claude/settings.local.json
