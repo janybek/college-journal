@@ -109,3 +109,79 @@
 - Final fix wave: re-review — all 7 ADDRESSED, no new breakage; reviewer ran npm test 234/234.
   - minor (deferred): changePair compares pair[key] ?? '' (extra write of changed:false if undefined); subjects import rows swapping teachers checked against stored template, not each other
 - Final review: complete (0375bde..73116fa). Unit 2 ready for owner acceptance on the stand (Task 13).
+- OWNER ACCEPTANCE FEEDBACK (21.11.2026, re-asked and confirmed): (1) bell time from a dropdown; (2) «Расписание»: clicking a weekday opens the week template of that group; (3) topics = teacher's own syllabus: teacher uploads an Excel file by the journal template, dean sees all and can upload/fix for the teacher; one file per year with a semester column (1/2); own number of modules; modules restart at 1 each semester. Supersedes «темы вводит деканат». Next: plan addendum Tasks 14+.
+- Plan addendum: Tasks 14–20 added before Task 13 (commit b65b655); owner-summary-2.md with 3 questions (current semester switch, re-upload keeps missing topics, bells 07:00–22:25 step 5).
+- OWNER APPROVED the addendum (Tasks 14–20) with all 3 defaults. Preflight of Tasks 14–20 dispatched (journal-reviewer/opus).
+- Preflight (addendum): 12 findings (2 medium, 8 low, 2 info); full report in the reviewer's message (it may not write files). Rulings:
+  - Ruling A1 (medium): relayout strips the topic from NOT-held pairs outside the current semester dates when that topic belongs to the semester being laid out (variant a); topics.plan prefers the pair inside semester dates; test for the moved-start case (scheduleApi 198-201 scenario) asserting each topic sits on one pair — enforces the owner's «одна тема — одна пара»; decision row 89 wording adjusted — costs: autumn planned pairs in the "switch semester before dates" edge lose a wrongly placed spring topic (correct).
+  - Ruling A2: Task 17 Step 1 states tests/scheduleApi.test.js:76 becomes ['id','semester','unit','order','name','lessonType','pair'].
+  - Ruling A3: Task 16 — both expectations in tests/settings.test.js readSettings get semester: 1.
+  - Ruling A4: empty semester (undefined, null or '') → 1 in normalizeRow; Task 18 compares the normalized row.
+  - Ruling A5: write `const s = semesterScope(...); layoutTopics(s.topics, s.pairs)`.
+  - Ruling A6: the "no semester = 1" rule lives in semesterOf; keyDefaults and normalizeRow default are explicitly allowed to use it (call semesterOf / the shared constant) — not a duplication finding.
+  - Ruling A7: Task 18 — analyse answers bad_request for specs with a `table` field reached via import.*; one test line.
+  - Ruling A8: reviewers of 14/17/18/20 must check the word-only checks are real tests.
+  - Ruling A9: router test fragments of Tasks 15 and 20 go in separate test() blocks.
+  - Ruling A10: drop site/js/main.js from the addendum file list.
+  - Ruling A11: transient two-semester table on the dean's «Темы» between Tasks 17 and 19 accepted.
+  - A12: info only.
+- Plan amendment (addendum): dispatched (general-purpose/opus) in parallel with Task 14 (Task 14 touches only site settings/bells files; amendment touches plan.md only).
+- Task 14: dispatched (BASE b28e929, journal-screens/opus)
+- Plan amendment (addendum): applied A1–A11 (commit 1fd5835). Note for Task 17 dispatch: the new speed test's 'restore' step assumed restorePair accepts a moved (not cancelled) pair — wrong (restore requires status cancelled); implementer must cancel first, then restore.
+- Task 14: implementer DONE, commit b783a3f, 238/238 (RED recorded). Notes: ky texts for native check; time column widened to minmax(8rem,13.5rem); open-list screenshot is a drawn copy (headless). Review dispatched (journal-reviewer/sonnet).
+- Task 14: review — spec ✅, Approved, 0 Critical/Important. ⚠️ RF12 (off-list bell survives saving another field) verified only in the browser (no DOM harness) — accepted, implementer reported the check; controller saw the 08:02 «вне списка» screenshot.
+- Task 14: complete (commits b28e929..b783a3f, review clean)
+- Task 14: minor (deferred): off-list option stays in the select until redraw; i18n test for new keys checks ru only (general parity test covers ky/en)
+- Task 15: dispatched (BASE 1fd5835, journal-screens/opus)
+- Task 15: implementer DONE_WITH_CONCERNS, commit 888d183, 241/241 (RED 3). Concerns: extra state field scrollPending; aria-describedby instead of aria-label; Back from template opens the schedule on the first group (pre-existing: schedule forgets its choice); ky texts. Review dispatched (journal-reviewer/sonnet).
+- Task 15: review — spec ✅, Approved, 0 Critical/Important.
+- Task 15: complete (commits 1fd5835..888d183, review clean)
+- Task 15: minor (→ folded into Task 19 dispatch): «Назад» from the template returns the schedule to its first group — Ruling: remember the schedule's group/mode/week in a module-level variable that survives leave() and is cleared on logout — the round trip is now a normal flow, the owner will hit it — costs a small state holder; unknown group in #/template/<g>/<d> still marks a day (clear targetDay/scrollPending on fallback)
+- Task 15: minor (deferred): title + aria-describedby double announcement; applyRoute/dayHref without automated tests
+- Task 16: dispatched (BASE 888d183, journal-logic/sonnet)
+- Task 16: implementer DONE, commit 4392ce7, 249/249 (RED 15 fail). Notes: settings.save without semester must keep the stored row — Task 17 must check (settingsToRows writes only present keys); syllabus order comes out as string like other imports. Review dispatched (journal-reviewer/sonnet).
+- Task 16: review — spec ❌, Needs fixes. I1: parseSheet('syllabus', …, fixed) drops subjectId: bad_ref (field filter keeps only spec columns) — a nonexistent or missing fixed subject is accepted.
+  - ⚠️ resolved: settings.save without semester keeps the stored row (settingsToRows skips the key) — response lacks semester; Task 17 owns the response shape.
+- Task 16: minor (→ Task 18 via ruling A7): import.* with table 'syllabus' → loadDb throws → internal.
+- Task 16: fix round 1 dispatched (resume implementer, FIX_BASE 4392ce7): I1 + minor 2 (semester '01' text vs 1 compared as text)
+- Task 16: fix round 1 returned DONE, commit 6e95b63, 250/250; scoped re-review dispatched
+- Task 16: fix round 1/5 (2 addressed, 0 open — fixed subject checked, semester as number; commits 4392ce7..6e95b63)
+- Task 16: complete (commits 888d183..6e95b63, review clean after 1 fix round)
+- Task 16: minor (deferred): a file with missing columns and a bad fixed subject reports only the missing columns
+- Task 17: dispatched (BASE 6e95b63, journal-server/sonnet) + note: restorePair requires a cancelled pair (speed-test 'restore' step must cancel first); settings.save response must include the semester even when not sent
+- Task 17: implementer DONE, commit 2ec436d, 253/253, build:gas ok (RED 5/44 via stash). Stand: Информатика 01-1 plan 24 topics (18 sem1 with pairs, 6 sem2 without). restorePair unchanged (test cancels first); settings.save w/o semester keeps row and returns semester. Review dispatched (journal-reviewer/sonnet).
+- Task 17: review — spec ✅, Approved but one Important (plan-mandated): the "two pairs with one topic" test cannot fail on the old last-wins behaviour (in-semester pair is also the later one).
+  - Ruling: strengthen the test (opposite order: topic on 09-08 and on a later out-of-semester planned pair → shown() still 09-08; plus held-over-planned case) — the plan's intent is that last-wins is not allowed; adding cases doesn't contradict the plan — none.
+- Task 17: minor (deferred): settings.save writes settings before relayout with no rollback (next generate/topic save realigns)
+- Task 17: fix round 1 dispatched (resume implementer, FIX_BASE 2ec436d)
+- Task 17: fix round 1 returned DONE, commit 940a8a3 (test-only), 253/253; mutation check: last-wins fails case 1; scoped re-review dispatched
+- Task 17: fix round 1/5 (1 addressed, 0 open — duplicate-pair test now fails on last-wins in both cases; commits 2ec436d..940a8a3)
+- Task 17: complete (commits 6e95b63..940a8a3, review clean after 1 fix round)
+- Task 18: dispatched (BASE 940a8a3, journal-server/sonnet)
+- Task 18: implementer DONE, commit 012d399, 255/255, build:gas ok (RED 3). Extras: import.apply table syllabus → bad_request; non-string subjectId → bad_request. New topic with unknown subjectId: no ownership check (bad_ref as before). Review dispatched (journal-reviewer/sonnet).
+- Task 18: review — spec ❌, Needs fixes. Security holds (no cross-teacher write path; prorector/student cannot write). I1: syllabus.* reads «Предметы» twice (store.get + loadDb list) and the speed test doesn't count get.
+- Task 18: fix round 1 dispatched (resume implementer, FIX_BASE 012d399): I1 + minor 1 (dir.remove of a topic whose subject is gone skips the ownership check → only admin/dean, else forbidden)
+- Task 18: fix round 1 returned DONE, commit cf42dc3, 255/255; scoped re-review dispatched
+- Task 18: fix round 1/5 (2 addressed, 0 open — syllabus reads subjects once with get counted; orphan topic edit/remove admin/dean only; commits 012d399..cf42dc3)
+- Task 18: complete (commits 940a8a3..cf42dc3, review clean after 1 fix round)
+- Task 19: dispatched (BASE cf42dc3, journal-screens/opus) + Task 15 minors (schedule remembers group/mode/week across leave(), cleared on logout; unknown template group clears targetDay)
+- Task 19: implementer DONE_WITH_CONCERNS, commit 8c65fb8, 259/259 (RED). Notes: extra keys topics.emptySemester, topics.kicker; emptyHint only on deanery screen; schedule return point tied to session token instead of explicit logout clear (main.js untouched); after semester switch the old «нажмите Создать расписание» line still shows; ky texts. Review dispatched (journal-reviewer/sonnet).
+- Task 19: review — spec ✅, Approved, 0 Critical/Important. Schedule memory tied to session token judged safe (logout clears token before leave(); new login = new token). Controller viewed screenshots (teacher syllabus dark, settings semester switch light): fine.
+- Task 19: complete (commits cf42dc3..8c65fb8, review clean)
+- Task 19: minor (→ folded into Task 20 dispatch): nextTopic may prefill order 201 (> max 200) — leave the field empty in that case; restore topics.emptyHint on the teacher's page once upload exists
+- Task 19: minor (deferred): no automated tests for schedule memory / unknown-group fallback (DOM); savedHint still shown after a semester switch (owner may judge at acceptance)
+- Task 20: dispatched (BASE 8c65fb8, journal-screens/opus) + Task 19 minors
+- Task 20: implementer DONE, commit 9f7826d (incl. Task 19 follow-ups), 262/262 (RED 4). Notes: payload {subjectId, cells} per brief and server (my note said rows — implementer correct); nextTopic caps at FIELDS.order.max; «Загрузить другой файл» stays after import; template download checked by intercepting the workbook. Review dispatched (journal-reviewer/sonnet).
+- Task 20: review — spec ✅, Approved, 0 Critical/Important.
+- Task 20: complete (commits 8c65fb8..9f7826d, review clean)
+- Task 20: minor (deferred): any row-0 preview error reads «больше 2000 строк» (unreachable for syllabus today); no DOM tests for topics applyRoute/canUpload/emptyHint; startOver keeps the read subject
+- Addendum Tasks 14–20 complete. Addendum final review dispatched (fable) over b28e929..9f7826d.
+- Addendum final review (fable): Yes after fixes; Critical 1 (C1: dir.save topics ownership checked on raw subjectId before normalizeRow — ['sb2'] or ' sb2 ' lets a teacher add a topic to a colleague's subject), Important 0, Minor 4. RF 7, 9, 10, 11, 12 hold; RF8 breaks only via C1. 262/262.
+  - Deferred triage: fix now = Task 18 note (= C1); all others leave.
+  - M1 (stand only, unit 2 has no held pairs): order of saves at the semester turn changes past pairs' topics; switch + new dates in one save keeps them — demo advice, carried to unit 3 with the past-planned-pairs item. M3 (upload screen reads whole plan for the subject name) and M4 ('01' in № → duplicate) leave.
+  - Ruling: fix wave = C1 + M2 (dean's Back from syllabus upload → same subject) — M2 is the same class as the Task 15 fix the owner will hit — costs a small site change.
+  - Declined: design-v1.md does not mention syllabus/semester yet — update with Task 13 docs; next academic year rollover (held pairs of any date count as topic used) — raise when archiving is planned.
+- Addendum fix wave dispatched (FIX_BASE 9f7826d, journal-server/sonnet, site/js/views/topics.js + import.js allowed)
+- Addendum fix wave: DONE, commit 55c5a7e, 262/262, build:gas ok; scoped re-review dispatched
+- Addendum fix wave: re-review — C1 and M2 ADDRESSED; no other bypass found (arrays, whitespace, case, non-string id, existing id + other subject, missing subjectId). Minor (deferred): main.js shownHash not updated by replaceState in chooseSubject (only matters with a leave guard).
+- Addendum complete (b28e929..55c5a7e). Unit 2 ready for the owner's re-check on the stand.
