@@ -190,3 +190,7 @@ Models: implementers sonnet; task reviewers sonnet; final review most capable.
   - minor (deferred): site/js/excel.js findDateCell scans every cell of !ref — huge declared range may hang the tab (same family as M-6)
 - Final review: complete (8cf0b22..2e97f68). Unit 1 ready for owner acceptance on the stand.
 - OWNER ACCEPTED unit 1 on the stand (20.11.2026). Next: Task 12 deployment with the owner.
+- Task 12: clasp login as the owner-confirmed college account; Apps Script project created and pushed (scriptId in aidlc-state.md).
+- Task 12: deployment @1 created (id in aidlc-state.md); live: GET ok, bad action → bad_request, wrong password → bad_credentials (setup ran). Timing: empty ≈2.2 s, login 3.3–4.9 s. site/config.js gets the URL; .github/workflows/pages.yml publishes site/.
+- Task 12: owner chose to hide the author email: history rewritten (filter-branch, trees identical) to janybek@users.noreply.github.com; local user.email set; old→new ids in aidlc-docs/commit-map.md. Account email removed from aidlc-state.md.
+- Task 12: site live on GitHub Pages; fetch from the Pages origin to the web app works (i18n.overrides ok, ~2 s). Left: owner's live check (step 7) + hash-rounds decision.
