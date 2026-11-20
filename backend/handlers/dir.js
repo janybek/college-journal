@@ -75,7 +75,8 @@ function save(data, ctx, user) {
 
   if (table === 'topics') {
     const subject = db.subjects.find((r) => r.id === (old ? old.subjectId : input.subjectId));
-    if (subject && !canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
+    // A new topic of an unknown subject is left to validateRow (bad_ref); an existing orphan is staff-only.
+    if ((subject || old) && !canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
   }
   const row = normalizeRow(table, { ...old, ...input, id: old ? old.id : undefined, passwordHash: old ? old.passwordHash : undefined });
   if (old && table === 'subjects') checkSubjectGroup(old, row, db);
@@ -134,7 +135,7 @@ function remove(data, ctx, user) {
   if (!row) throw new AppError('not_found');
   if (table === 'topics') {
     const subject = read('subjects').find((r) => r.id === row.subjectId);
-    if (subject && !canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
+    if (!canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
   }
   if (usedBy(read, table, row.id)) throw new AppError('in_use');
   if (table === 'staff' && isActiveAdmin(row) && !rows.some((s) => s.id !== row.id && isActiveAdmin(s))) {

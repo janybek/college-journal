@@ -19,7 +19,7 @@ function spyOn(store) {
   for (const name of Object.keys(store)) {
     spy[name] = (...args) => {
       calls[name] = (calls[name] || 0) + 1;
-      if (name === 'list') reads[args[0]] = (reads[args[0]] || 0) + 1;
+      if (name === 'list' || name === 'get') reads[args[0]] = (reads[args[0]] || 0) + 1;
       if (['insertMany', 'updateMany', 'removeMany'].includes(name)) writes[`${name}:${args[0]}`] = (writes[`${name}:${args[0]}`] || 0) + 1;
       return store[name](...args);
     };
@@ -117,6 +117,11 @@ test('syllabus upload and topic editing by the teacher of the subject', () => {
   assert.deepEqual(call('dir.save', { table: 'rooms', row: { name: '999' } }, teacher1).error, { code: 'forbidden' });
   assert.deepEqual([call('topics.plan', { subjectId: sb2 }, prorector).data.canEdit, call('topics.plan', { subjectId: sb2 }, dean).data.canEdit], [false, true]);
 
+  const orphan = store.insert('topics', { subjectId: 'sb_gone', semester: 1, unit: 1, order: 1, name: 'Сирота', lessonType: 'lecture' });
+  assert.deepEqual(call('dir.remove', { table: 'topics', id: orphan.id }, teacher1).error, { code: 'forbidden' });
+  assert.deepEqual(save({ id: orphan.id, name: 'Моя' }, teacher1).error, { code: 'forbidden' });
+  assert.equal(call('dir.remove', { table: 'topics', id: orphan.id }, dean).ok, true);
+
   const hctx = { store, platform, log: () => {} };
   assert.throws(() => importHandlers['import.preview']({ table: 'syllabus', cells: [HEAD] }, hctx), { code: 'bad_request' });
   assert.throws(() => importHandlers['import.apply']({ table: 'syllabus', cells: [HEAD] }, hctx), { code: 'bad_request' });
@@ -124,6 +129,7 @@ test('syllabus upload and topic editing by the teacher of the subject', () => {
   reset();
   assert.equal(send('syllabus.apply', sb1, year, dean).ok, true);
   for (const [table, n] of Object.entries(reads)) assert.ok(n <= 1, `${table} read ${n} times`);
+  assert.equal(reads.subjects, 1);
   assert.equal((calls.update || 0) + (calls.remove || 0) + (calls.removeMany || 0), 0);
   assert.ok((calls.insertMany || 0) <= 1);
   assert.ok((calls.updateMany || 0) <= 2);

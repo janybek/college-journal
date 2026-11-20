@@ -31,10 +31,10 @@ function analyseSyllabus(data, store, user) {
   const { subjectId, cells } = data;
   if (typeof subjectId !== 'string') throw new AppError('bad_request');
   checkCells(cells);
-  const subject = store.get('subjects', subjectId);
+  const db = loadDb(store, 'topics', ['pairs']);
+  const subject = db.subjects.find((r) => r.id === subjectId);
   if (!subject) throw new AppError('not_found');
   if (!canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
-  const db = loadDb(store, 'topics', ['pairs']);
   return parseAgainst('syllabus', 'topics', cells, db, { subjectId });
 }
 
