@@ -81,6 +81,7 @@ core/dates.js            даты и время строками, часовой
 core/settings.js         настройки семестра: чтение, проверка, звонки                      новый
 core/topics.js           раскладка тем по парам                                             новый
 core/schedule.js         рабочие дни, создание пар семестра, проверка изменения пары       новый
+core/busy.js             проверка «двое в одном месте» для шаблона и пар (одна на весь проект)   новый
 core/schema.js           + weekTemplate, topics, pairs, статусы пары, типы пар
 core/validate.js         + правила строк шаблона и тем
 core/import.js           + импорт тем
@@ -95,7 +96,7 @@ dev/seed.js
 site/js/dates.js  site/js/pairs.js                    помощники без DOM                     новые
 site/js/views/settings.js  weekTemplate.js  topics.js  schedule.js  pairParts.js  mySchedule.js  plan.js   новые
 site/js/router.js  main.js  shell.js  icons.js  views/home.js  views/directoryConfig.js  i18n/*.js  css/screens.css
-tests/storeContract.js  dates.test.js  settings.test.js  topics.test.js  schedule.test.js
+tests/storeContract.js  dates.test.js  settings.test.js  busy.test.js  topics.test.js  schedule.test.js
 tests/settingsApi.test.js  dirSchedule.test.js  scheduleApi.test.js  pairsApi.test.js  siteDates.test.js  pairs.test.js
 ```
 
@@ -109,7 +110,7 @@ tests/settingsApi.test.js  dirSchedule.test.js  scheduleApi.test.js  pairsApi.te
 
 Закрывает отложенные замечания юнита 1 (журнал хода работ, задача 2: строки 64, 65, 67, 74; общая проверка: M-4).
 
-**Files:** Create `backend/store/rowShape.js`, `tests/storeContract.js`, `core/dates.js`. Modify `backend/store/memoryStore.js`, `backend/store/fileStore.js`, `backend/store/sheetsStore.js`, `backend/gas/main.js`, `tests/fakes/fakeSpreadsheet.js`, `tests/fakes/fakeGas.js`, `tests/store.test.js`, `tests/sheetsStore.test.js`, `tests/gasBundle.test.js`.
+**Files:** Create `backend/store/rowShape.js`, `tests/storeContract.js`, `core/dates.js`, `tests/dates.test.js`. Modify `backend/store/memoryStore.js`, `backend/store/fileStore.js`, `backend/store/sheetsStore.js`, `backend/gas/main.js`, `tests/fakes/fakeSpreadsheet.js`, `tests/fakes/fakeGas.js`, `tests/store.test.js`, `tests/sheetsStore.test.js`, `tests/gasBundle.test.js`.
 
 **Interfaces — Produces:**
 
@@ -140,7 +141,7 @@ export function storeContract(name, makeStore);   // общий набор пр�
 - Ключ, который есть в `patch` со значением `undefined` или `null`, очищает поле (`''`, `null`, `false`) — одинаково во всех трёх хранилищах.
 - `sheetsStore`: чтение и запись значений идут через `shapeValue`; колонка `id` ищется по `key === 'id'`, а не как первая в схеме. Ячейка-дата в строковой колонке читается как `localDate(v.getTime())`.
 - `sheetsStore.updateMany`: одно чтение листа и по одной записи `setValues` на каждую изменённую колонку схемы — диапазон от первой до последней изменённой строки этой колонки; строки внутри диапазона, которых изменение не касается, получают свои же прежние значения ячеек. Чужие колонки не трогаются. Всё под `withLock`.
-- `sheetsStore.removeMany`: одно чтение, удаление снизу вверх; подряд идущие строки удаляются одним вызовом `sheet.deleteRows(position, howMany)`.
+- `sheetsStore.removeMany`: всё под `withLock`; повторы id в списке сначала убираются (иначе `[a, a]` удалил бы строку `a` и следующую за ней); одно чтение, удаление снизу вверх; подряд идущие строки удаляются одним вызовом `sheet.deleteRows(position, howMany)`. В памяти и в файле повторы id тоже не ошибка.
 - `fakeSpreadsheet`: у листа появляются `deleteRows(position, howMany)` и счётчики вызовов `ss.calls(name) -> { getValues, setValues, appendRow, deleteRow, deleteRows }`. Строка вида `2026-09-01`, записанная в колонку без текстового формата, превращается в дату «полночь в Бишкеке» (`new Date('2026-09-01T00:00:00+06:00')`), как делает таблица с часовым поясом Бишкека.
 - `setup()` при каждом запуске вызывает `spreadsheet.setSpreadsheetTimeZone('Asia/Bishkek')` и `spreadsheet.setSpreadsheetLocale('ru_RU')`. В `fakeGas` у таблицы появляются эти методы и `getSpreadsheetTimeZone()`, `getSpreadsheetLocale()` (по умолчанию `'Etc/GMT'` и `'en_US'`).
 
@@ -162,7 +163,7 @@ assert.throws(() => s.updateMany('rooms', [{ id: b.id, patch: { name: 'B2' } }, 
 assert.equal(s.get('rooms', b.id).name, 'B');                    // ничего не записано
 assert.throws(() => s.removeMany('rooms', [b.id, 'r_nope']), e => e.code === 'not_found');
 assert.equal(s.list('rooms').length, 3);
-s.removeMany('rooms', [a.id, c.id]);
+s.removeMany('rooms', [a.id, a.id, c.id]);                       // повтор id не удаляет лишнюю строку
 assert.deepEqual(s.list('rooms').map(r => r.name), ['B']);
 assert.deepEqual(s.updateMany('rooms', []), []);
 s.removeMany('rooms', []);
@@ -202,7 +203,7 @@ assert.equal(localDate(Date.UTC(2026, 10, 20, 17, 59)), '2026-11-20');
 
 ### Task 2 (Л): даты, новые таблицы, настройки семестра, права
 
-**Files:** Modify `core/dates.js`, `core/schema.js`, `core/permissions.js`, `tests/dates.test.js`, `tests/schema.test.js`, `tests/permissions.test.js`, `tests/sheetsStore.test.js` и `tests/gasBundle.test.js` (только ожидаемое число листов). Create `core/settings.js`, `tests/settings.test.js`.
+**Files:** Modify `core/dates.js`, `core/schema.js`, `core/permissions.js`, `tests/dates.test.js`, `tests/schema.test.js`, `tests/permissions.test.js`, `tests/api.test.js` (только ожидание прав учителя в тесте `publicUser`), `tests/sheetsStore.test.js` (только ожидаемое число листов). Create `core/settings.js`, `tests/settings.test.js`.
 
 **Interfaces — Consumes:** `TZ_OFFSET_MS`, `localDate` (Task 1).
 
@@ -253,7 +254,7 @@ export function settingsToRows(value);    // -> [{ key, value }] в порядк
 
 - `semesterStart`, `semesterEnd`: пусто → `required`; не `isDate` → `bad_value`; конец раньше начала → `semesterEnd: bad_value`; между ними больше `MAX_SEMESTER_DAYS` дней → `semesterEnd: too_long`.
 - `holidays`: массив строк, каждая `isDate`, иначе `bad_value`; повторы убираются, список сортируется; больше `MAX_HOLIDAYS` → `too_long`. Даты вне семестра допустимы.
-- `bells`: массив от 1 до `MAX_SLOTS` строк `isTime`; каждый следующий звонок не раньше предыдущего плюс `PAIR_MINUTES`; последняя пара заканчивается не позже 24:00. Любое нарушение → `bad_value`.
+- `bells`: массив от 1 до `MAX_SLOTS` строк `isTime`; каждый следующий звонок не раньше предыдущего плюс `PAIR_MINUTES`; последняя пара заканчивается не позже 23:59: `minutesOf(последний звонок) + PAIR_MINUTES <= minutesOf('23:59')` (то есть последний звонок не позже `'22:29'`; `addMinutes` никогда не переходит через полночь). Любое нарушение → `bad_value`.
 
 Права (добавить к матрице юнита 1):
 
@@ -310,6 +311,8 @@ assert.deepEqual(errorsOf({ semesterEnd: '2027-06-01' }), [{ field: 'semesterEnd
 assert.deepEqual(errorsOf({ holidays: ['7 ноября'] }), [{ field: 'holidays', code: 'bad_value' }]);
 assert.deepEqual(errorsOf({ bells: ['08:00', '09:29'] }), [{ field: 'bells', code: 'bad_value' }]);     // пары накладываются
 assert.deepEqual(errorsOf({ bells: ['23:00'] }), [{ field: 'bells', code: 'bad_value' }]);              // конец после полуночи
+assert.deepEqual(errorsOf({ bells: ['22:29'] }), []);                                                   // граница: конец ровно в 23:59
+assert.deepEqual(errorsOf({ bells: ['22:30'] }), [{ field: 'bells', code: 'bad_value' }]);              // конец в 24:00 — уже нельзя
 assert.deepEqual(errorsOf({ bells: [] }), [{ field: 'bells', code: 'bad_value' }]);
 // 9 звонков -> bad_value; 61 нерабочий день -> too_long
 
@@ -328,22 +331,37 @@ assert.equal(can(['student'], 'schedule.list'), false);
 assert.equal(can(['dean'], 'schedule.mine'), false);
 assert.deepEqual(listPermissions(['student']), ['schedule.mine']);          // прежнее ожидание [] заменить
 assert.ok(listPermissions(['dean']).includes('settings.save'));
+
+// tests/api.test.js, тест 'publicUser': у учителя появились права юнита 2 (прежнее ожидание ['teacher.mySubjects'] заменить)
+//   permissions: ['schedule.mine', 'teacher.mySubjects', 'topics.plan']
 ```
 
-- [ ] **Step 2:** падает. **Step 3:** написать; в `tests/sheetsStore.test.js` и `tests/gasBundle.test.js` поправить ожидания, которые считают листы (в схеме было 7 таблиц, стало 10). **Step 4:** `npm test` зелёное.
+- [ ] **Step 2:** падает. **Step 3:** написать; в `tests/sheetsStore.test.js:88` (тест «ensureSheets: creates sheets…») поправить `assert.equal(made.created.length, 6)` на `9`: в схеме было 7 таблиц, стало 10, лист «Группы» в этом тесте уже есть. Больше листы нигде не считаются: в `tests/gasBundle.test.js` проверки числа листов нет, этот файл в задаче не трогается. **Step 4:** `npm test` зелёное.
 - [ ] **Step 5:** коммит `feat: schedule tables, date helpers, semester settings rules, permissions`.
 
 ---
 
 ### Task 3 (Л): правила шаблона и тем, раскладка тем, импорт тем
 
-**Files:** Modify `core/validate.js`, `core/import.js`, `tests/validate.test.js`, `tests/import.test.js`. Create `core/topics.js`, `tests/topics.test.js`. В чужой зоне, только названное: `site/js/views/directoryConfig.js` — добавить `IMPORT_COLUMNS.topics` (шесть обязательных колонок в порядке таблицы ниже); `site/js/i18n/ru.js`, `ky.js`, `en.js` — шесть ключей `import.col.topics.<key>` со значениями заголовков из таблицы ниже. Без этого два теста в `tests/i18n.test.js`, которые сверяют сайт с `IMPORT_SPECS`, упадут. В список `IMPORT_TABLES` тема не добавляется: экран импорта получит её в Task 10.
+**Files:** Modify `core/validate.js`, `core/import.js`, `tests/validate.test.js`, `tests/import.test.js`. Create `core/busy.js`, `tests/busy.test.js`, `core/topics.js`, `tests/topics.test.js`. В чужой зоне, только названное: `site/js/views/directoryConfig.js` — добавить `IMPORT_COLUMNS.topics` (шесть обязательных колонок в порядке таблицы ниже); `site/js/i18n/ru.js`, `ky.js`, `en.js` — шесть ключей `import.col.topics.<key>` со значениями заголовков из таблицы ниже. Без этого два теста в `tests/i18n.test.js`, которые сверяют сайт с `IMPORT_SPECS`, упадут. В список `IMPORT_TABLES` тема не добавляется: экран импорта получит её в Task 10.
 
 **Interfaces — Consumes:** `SCHEMA`, `FIXED_STATUSES`, `LESSON_TYPES`, `WEEKDAYS` (Task 2), `MAX_SLOTS` (Task 2).
 
 **Produces:**
 
 ```js
+// core/busy.js — единственная проверка «двое в одном месте» во всём проекте:
+// шаблон (validateRow здесь, смена преподавателя предмета в Task 5) и пары (planGeneration и checkPairChange в Task 4, сервер в Task 7).
+// Slot = { id, day, slot, groupId, teacherId, roomId }; day — день недели 1–5 (шаблон) или дата 'YYYY-MM-DD' (пара).
+export function templateSlots(template, subjects);
+// строки шаблона -> Slot[] в том же порядке: day = weekday, roomId из строки; groupId и teacherId — из предмета строки (предмета нет -> '')
+export function pairSlots(pairs);
+// пары -> Slot[] в том же порядке: day = date; пары со статусом 'cancelled' и 'missed' не входят (место не занимают)
+export function busyCodes(slots, cand);
+// cand: Slot -> подмножество ['group_busy', 'teacher_busy', 'room_busy'] в этом порядке.
+// Код есть, если в slots есть запись с тем же day (строгое ===), тем же slot, id !== cand.id
+// и тем же НЕПУСТЫМ groupId / teacherId / roomId соответственно. Пустые значения ни с чем не совпадают.
+
 // core/validate.js — validateRow понимает две новые таблицы
 validateRow('weekTemplate', row, db);   // db = { weekTemplate, subjects, rooms, slotCount }
 validateRow('topics', row, db);         // db = { topics, subjects }
@@ -367,6 +385,7 @@ IMPORT_SPECS.topics;                    // см. ниже
 - `subjectId` — есть в `db.subjects`, иначе `bad_ref`; на этот день и номер пары уже стоит предмет того же преподавателя → `teacher_busy`.
 - `roomId` — пусто можно; не пусто и нет в `db.rooms` → `bad_ref`; аудитория уже занята на этот день и номер пары → `room_busy`.
 - Строка сама с собой (тот же `id`) не конфликтует.
+- Занятость (`group_busy`, `teacher_busy`, `room_busy`) считается только через `core/busy.js`: `busyCodes(templateSlots(db.weekTemplate, db.subjects), cand)`, где `cand = { id: row.id || '', day: row.weekday, slot: row.slot, groupId, teacherId, roomId: row.roomId }`, а `groupId` и `teacherId` — из предмета `row.subjectId`. Коды ставятся на поля: `group_busy` → `slot`, `teacher_busy` → `subjectId`, `room_busy` → `roomId`. Если `weekday` или `slot` неверны, занятость не проверяется; поле, у которого уже есть `bad_value` или `bad_ref`, второй ошибки не получает. Своей проверки занятости в `validate.js` нет.
 
 Правила темы: `subjectId` есть (`bad_ref`); `unit` — целое 1–12 (`bad_value`); `order` — целое 1–200 (`bad_value`), в этом предмете такого номера ещё нет (`duplicate`); `name` обязателен, не длиннее 200; `lessonType` из `LESSON_TYPES` (`bad_value`).
 
@@ -390,11 +409,34 @@ IMPORT_SPECS.topics;                    // см. ниже
 
 - Служебная колонка (`virtual`) проверяется как обычная, но в `records` не попадает.
 - `subjectId` ищется по названию предмета внутри группы из той же строки. Группа не найдена → ошибка только у `groupId` (`bad_ref`); группа есть, а предмета с таким названием в ней нет → `subjectId: bad_ref`.
+- Ловушка порядка: `parseSheet` разбирает ячейки в порядке колонок спецификации (`subjectId` раньше `groupId`) и потом добавляет ошибки `validateRow` по каждой колонке. Поэтому для строки сначала найти группу (по ячейке «Группа»), и если группы нет — ошибку `subjectId: bad_ref` этой строки подавить (и при разборе ячейки, и из `validateRow`): у строки 6 в тесте ниже ровно одна ошибка — `groupId: bad_ref`.
 - `lessonType` в файле: `лекция`, `lecture` → `lecture`; `практика`, `практическое`, `practice` → `practice`; `рубежный`, `рубежный контроль`, `экзамен`, `аралык текшерүү`, `control`, `exam` → `control`; другое слово → `bad_value`.
 - `check` для тем: строка совпала с существующей темой, эта тема стоит на паре со статусом из `FIXED_STATUSES` (`db.pairs`), и название, тип или юнит в файле другие → `{ field: 'name', code: 'held' }`.
 - Рабочая копия базы в `parseSheet` строится по всем ключам `db`, а не по пяти зашитым таблицам.
 
 - [ ] **Step 1: тесты.**
+
+```js
+// tests/busy.test.js
+const subjects = [{ id: 'sb_1', groupId: 'g_1', teacherId: 'sf_1' }, { id: 'sb_2', groupId: 'g_2', teacherId: 'sf_2' }];
+assert.deepEqual(templateSlots([{ id: 'wt_1', weekday: 1, slot: 2, subjectId: 'sb_1', roomId: 'r_1' }, { id: 'wt_2', weekday: 3, slot: 1, subjectId: 'sb_x', roomId: '' }], subjects),
+  [{ id: 'wt_1', day: 1, slot: 2, groupId: 'g_1', teacherId: 'sf_1', roomId: 'r_1' }, { id: 'wt_2', day: 3, slot: 1, groupId: '', teacherId: '', roomId: '' }]);
+const pairs = [{ id: 'p1', date: '2026-09-08', slot: 1, groupId: 'g_1', teacherId: 'sf_1', roomId: 'r_1', status: 'planned' },
+  { id: 'p2', date: '2026-09-08', slot: 2, groupId: 'g_1', teacherId: 'sf_1', roomId: '', status: 'cancelled' },
+  { id: 'p3', date: '2026-09-08', slot: 3, groupId: 'g_2', teacherId: 'sf_2', roomId: '', status: 'missed' }];
+const slots = pairSlots(pairs);
+assert.deepEqual(slots, [{ id: 'p1', day: '2026-09-08', slot: 1, groupId: 'g_1', teacherId: 'sf_1', roomId: 'r_1' }]);
+const at = (extra) => busyCodes(slots, { id: '', day: '2026-09-08', slot: 1, groupId: 'g_2', teacherId: 'sf_2', roomId: '', ...extra });
+assert.deepEqual(at({}), []);
+assert.deepEqual(at({ groupId: 'g_1', teacherId: 'sf_1', roomId: 'r_1' }), ['group_busy', 'teacher_busy', 'room_busy']);
+assert.deepEqual(at({ teacherId: 'sf_1' }), ['teacher_busy']);
+assert.deepEqual(at({ roomId: 'r_1' }), ['room_busy']);
+assert.deepEqual(at({ id: 'p1', groupId: 'g_1', teacherId: 'sf_1', roomId: 'r_1' }), []);       // сама с собой
+assert.deepEqual(at({ slot: 2, groupId: 'g_1', teacherId: 'sf_1' }), []);                        // отменённая место не занимает
+assert.deepEqual(at({ day: '2026-09-09', groupId: 'g_1' }), []);                                  // другой день
+assert.deepEqual(busyCodes([{ id: 'x', day: 1, slot: 1, groupId: '', teacherId: '', roomId: '' }],
+  { id: '', day: 1, slot: 1, groupId: '', teacherId: '', roomId: '' }), []);                     // пустые значения не совпадают
+```
 
 ```js
 // tests/validate.test.js
@@ -478,7 +520,7 @@ assert.deepEqual(plan.toUpdate, [{ id: 'tp_1', patch: { unit: 1, name: 'Цифр
 // файл без столбца «Группа» -> missingColumns: ['groupId']
 ```
 
-- [ ] **Step 2:** падает. **Step 3:** написать. Прежние тесты импорта пяти справочников остаются зелёными без правок. **Step 4:** `npm test` зелёное.
+- [ ] **Step 2:** падает. **Step 3:** написать. Прежние тесты импорта пяти справочников остаются зелёными; разрешена ровно одна правка в них: в `tests/import.test.js:131` (тест «duplicate header and specs») ожидание ключей `IMPORT_SPECS` становится `['groups', 'rooms', 'staff', 'students', 'subjects', 'topics']`. **Step 4:** `npm test` зелёное.
 - [ ] **Step 5:** коммит `feat: week template and topic rules, topic layout, topics import`.
 
 ---
@@ -487,7 +529,7 @@ assert.deepEqual(plan.toUpdate, [{ id: 'tp_1', patch: { unit: 1, name: 'Цифр
 
 **Files:** Create `core/schedule.js`, `tests/schedule.test.js`.
 
-**Interfaces — Consumes:** `core/dates.js`, `PAIR_MINUTES`, настройки в форме `readSettings` (Task 2).
+**Interfaces — Consumes:** `core/dates.js`, `PAIR_MINUTES`, настройки в форме `readSettings` (Task 2); `pairSlots(pairs)` и `busyCodes(slots, cand)` из `core/busy.js` (Task 3): `pairSlots` превращает пары в `Slot = { id, day: date, slot, groupId, teacherId, roomId }` без пар `cancelled` и `missed`; `busyCodes` возвращает подмножество `['group_busy', 'teacher_busy', 'room_busy']` — есть запись с тем же `day` и `slot`, другим `id` и тем же непустым `groupId` / `teacherId` / `roomId`. Вся занятость в этой задаче считается только через них; своей проверки занятости в `core/schedule.js` нет.
 
 **Produces:**
 
@@ -508,11 +550,11 @@ export function checkPairChange(pair, patch, ctx);
 2. Существующие пары с `planDate` раньше `from` не рассматриваются вообще.
 3. Заменяемая пара — `status === 'planned'` и `changed === false`. Её ключ — (`groupId`, `planDate`, `planSlot`).
    - ключ есть среди нужных и `subjectId`, `teacherId`, `roomId`, `startTime` совпадают → `kept`;
-   - ключ есть, что-то отличается → в `toUpdate` только отличающиеся поля (при смене `subjectId` ещё `topicId: ''`);
+   - ключ есть, что-то отличается → в `toUpdate` только отличающиеся поля (при смене `subjectId` ещё `topicId: ''`); но если меняется `teacherId` или `roomId` и пара с новыми значениями занята (правило 5, `cand.id` = id этой пары) — пара в `toUpdate` не попадает и остаётся как есть, `kept` не растёт, `conflicts` растёт на 1;
    - ключа нет → в `toRemove`;
    - вторая заменяемая пара с тем же ключом → в `toRemove`.
 4. Незаменяемая пара (тронута вручную или статус не `planned`) остаётся как есть (`kept`), её ключ считается занятым.
-5. Нужные пары без существующей → в `toInsert`. Если на эти (`groupId`, `date`, `slot`) уже стоит незаменяемая пара со статусом не `cancelled` и не `missed` — пара не создаётся, `conflicts` растёт.
+5. Нужные пары без существующей → в `toInsert`. Занятость проверяется против незаменяемых пар (рассматриваемых по правилу 2): `busyCodes(pairSlots(незаменяемые), { id: '', day: date, slot, groupId, teacherId, roomId })` не пуст — то есть на эти `date` и `slot` уже стоит незаменяемая пара не `cancelled` и не `missed` той же группы, того же преподавателя или в той же непустой аудитории (общих лекций потока нет) — пара не создаётся, `conflicts` растёт. Заменяемые пары и другие нужные пары в эту проверку не входят: их согласованность держит шаблон (Task 3).
 6. `restart: true` → `toRemove` — все пары, `toInsert` — все нужные, остальное пусто.
 7. `toInsert` и `toUpdate` отсортированы по дате, номеру пары, `groupId`.
 
@@ -525,7 +567,7 @@ export function checkPairChange(pair, patch, ctx);
 - `teacherId`: нет в `staff` → `bad_ref`; не активен или нет роли `teacher` → `bad_value`; у него на эти дату и номер другая пара → `teacher_busy`.
 - `roomId`: пусто можно; нет в `rooms` → `bad_ref`; занята на эти дату и номер → `room_busy`.
 - `note`: обрезается по краям; длиннее 200 → `too_long`.
-- Занятость считается по парам со статусом не `cancelled` и не `missed`, сама пара не в счёт. Если дата или номер пары неверны, занятость не проверяется.
+- Занятость считается по парам со статусом не `cancelled` и не `missed`, сама пара не в счёт: `busyCodes(pairSlots(ctx.pairs), { id: pair.id, day: next.date, slot: next.slot, groupId: pair.groupId, teacherId: next.teacherId, roomId: next.roomId })`; `group_busy` → поле `slot`, `teacher_busy` → `teacherId`, `room_busy` → `roomId`. Если дата или номер пары неверны, занятость не проверяется; поле, у которого уже есть ошибка, второй не получает.
 
 - [ ] **Step 1: тесты.** 1 сентября 2026 — вторник; 7 сентября — понедельник.
 
@@ -571,6 +613,19 @@ const T5 = [...T, { id: 'wt_4', weekday: 4, slot: 3, subjectId: 'sb_3', roomId: 
 const E5 = E.map(p => (p.id === 'p3' ? { ...p, date: '2026-09-10', slot: 3, startTime: '11:20', changed: true } : p));
 const busy = planGeneration({ template: T5, subjects, settings: S, pairs: E5, from: '2026-09-01' });
 assert.deepEqual([busy.toInsert.map(p => [p.date, p.slot, p.subjectId]), busy.conflicts], [[['2026-09-03', 3, 'sb_3']], 1]);
+// Review Focus 5, аудитория: другая группа в той же аудитории, где стоит перенесённая пара p3 (2026-09-10, пара 3, r_1)
+const TR = [...T, { id: 'wt_5', weekday: 4, slot: 3, subjectId: 'sb_2', roomId: 'r_1' }];
+const roomBusy = planGeneration({ template: TR, subjects, settings: S, pairs: E5, from: '2026-09-01' });
+assert.deepEqual([roomBusy.toInsert.map(p => [p.date, p.slot, p.subjectId]), roomBusy.conflicts], [[['2026-09-03', 3, 'sb_2']], 1]);
+// Review Focus 5, преподаватель: на пару p1 (2026-09-01, пара 1) вручную поставили замену sf_2; строка шаблона предмета sf_2 в это же время
+const E7 = E.map(p => (p.id === 'p1' ? { ...p, teacherId: 'sf_2', changed: true } : p));
+const TT = [...T, { id: 'wt_6', weekday: 2, slot: 1, subjectId: 'sb_2', roomId: '' }];
+const teacherBusy = planGeneration({ template: TT, subjects, settings: S, pairs: E7, from: '2026-09-01' });
+assert.deepEqual([teacherBusy.toInsert.map(p => [p.date, p.slot, p.subjectId]), teacherBusy.conflicts], [[['2026-09-08', 1, 'sb_2']], 1]);
+// то же для toUpdate: p2 вручную перенесли на 2026-09-08, пара 1, в r_2; шаблон отдаёт r_2 строке wt_1 -> p3 (2026-09-08, пара 1) не меняется
+const E8 = E.map(p => (p.id === 'p2' ? { ...p, date: '2026-09-08', slot: 1, roomId: 'r_2', changed: true } : p));
+assert.deepEqual(planGeneration({ template: T2, subjects, settings: S, pairs: E8, from: '2026-09-01' }),
+  { toInsert: [], toUpdate: [{ id: 'p1', patch: { roomId: 'r_2' } }], toRemove: [], kept: 2, conflicts: 1 });
 // случайный дубль убирается
 assert.deepEqual(planGeneration({ template: T, subjects, settings: S, pairs: [...E, { ...E[0], id: 'p5' }], from: '2026-09-01' }).toRemove, ['p5']);
 // номер пары больше числа звонков
@@ -623,9 +678,9 @@ assert.equal(pairLock({ ...p3, status: 'closed' }, '2026-09-02'), 'pair_locked')
 
 ### Task 5 (С): настройки семестра, шаблон и темы через справочники, запрет удаления
 
-**Files:** Create `backend/handlers/settings.js`, `tests/settingsApi.test.js`, `tests/dirSchedule.test.js`. Modify `backend/handlers/dir.js`, `backend/handlers/import.js` (только вызов `loadDb`), `backend/api.js` (регистрация).
+**Files:** Create `backend/handlers/settings.js`, `tests/settingsApi.test.js`, `tests/dirSchedule.test.js`. Modify `backend/handlers/dir.js`, `backend/handlers/import.js` (только вызов `loadDb`: `loadDb(store, table)`, а для `topics` сразу `loadDb(store, 'topics', ['groups', 'pairs'])` — импорту тем нужны группы для столбца «Группа» и пары для проверки `held`), `backend/api.js` (регистрация).
 
-**Interfaces — Consumes:** `readSettings`, `validateSettings`, `settingsToRows`, `DEFAULT_BELLS`, `PAIR_MINUTES` (Task 2); `validateRow` для `weekTemplate` и `topics` (Task 3); `FIXED_STATUSES` (Task 2); `updateMany`, `removeMany` (Task 1).
+**Interfaces — Consumes:** `readSettings`, `validateSettings`, `settingsToRows`, `DEFAULT_BELLS`, `PAIR_MINUTES` (Task 2); `validateRow` для `weekTemplate` и `topics` (Task 3); `templateSlots(template, subjects)` и `busyCodes(slots, cand)` из `core/busy.js` (Task 3): `templateSlots` даёт `Slot = { id, day: weekday, slot, groupId, teacherId, roomId }` (группа и преподаватель — из предмета строки), `busyCodes` — подмножество `['group_busy', 'teacher_busy', 'room_busy']` (есть запись с тем же `day` и `slot`, другим `id` и тем же непустым значением); `FIXED_STATUSES` (Task 2); `updateMany`, `removeMany` (Task 1).
 
 **Produces:**
 
@@ -644,10 +699,16 @@ assert.equal(pairLock({ ...p3, status: 'closed' }, '2026-09-02'), 'pair_locked')
 | weekTemplate | weekTemplate, subjects, rooms + `slotCount` (число звонков из настроек) |
 | topics | topics, subjects |
 
+`extra` — дополнительные листы, каждый читается один раз и кладётся в результат под своим именем. Кто какие `extra` передаёт:
+
+- `dir.save` для `subjects` — всегда `loadDb(store, 'subjects', ['weekTemplate', 'pairs'])`: особым правилам ниже нужны строки шаблона и пары;
+- импорт тем (`backend/handlers/import.js`) — `loadDb(store, 'topics', ['groups', 'pairs'])`;
+- остальные вызовы — без `extra`.
+
 Особые правила `dir.save`:
 
 - `subjects`: у существующего предмета меняют `groupId`, а на предмет ссылается строка шаблона или пара → `invalid`, `[{ field: 'groupId', code: 'in_use' }]`. Эта проверка идёт раньше `validateRow`.
-- `subjects`: у существующего предмета меняют `teacherId`, а у нового преподавателя в шаблоне уже есть пара в тот же день и с тем же номером, что у этого предмета → `invalid`, `[{ field: 'teacherId', code: 'teacher_busy' }]`. В остальных случаях смена преподавателя разрешена; будущие пары получат его при следующем «Создать расписание».
+- `subjects`: у существующего предмета меняют `teacherId`, а у нового преподавателя в шаблоне уже есть пара в тот же день и с тем же номером, что у этого предмета → `invalid`, `[{ field: 'teacherId', code: 'teacher_busy' }]`. Проверка — только через `core/busy.js`, своей в обработчике нет: `slots = templateSlots(db.weekTemplate, db.subjects)`; для каждой строки шаблона `r` этого предмета `busyCodes(slots, { id: r.id, day: r.weekday, slot: r.slot, groupId: '', teacherId: <новый преподаватель>, roomId: '' })` содержит `'teacher_busy'` → ошибка. В остальных случаях смена преподавателя разрешена; будущие пары получат его при следующем «Создать расписание».
 - `topics`: у существующей темы меняют `subjectId` → `invalid`, `[{ field: 'subjectId', code: 'bad_value' }]`.
 
 `dir.remove` — `in_use`, если на строку ссылаются (читаются только нужные листы):
@@ -715,11 +776,14 @@ for (const [table, id] of [['groups', g3], ['staff', teacher3Id], ['rooms', r3],
 // та же тема на паре со статусом 'planned' удаляется; строка шаблона удаляется всегда
 assert.equal(call('dir.remove', { table: 'weekTemplate', id: wt.id }, dean).ok, true);
 
-// скорость: обёртка над хранилищем считает вызовы list по таблицам
-// dir.save для groups читает только 'groups' (и 'staff' — проверка ключа входа); dir.remove для rooms не читает 'students'
+// скорость: обёртка-шпион над хранилищем записывает таблицу каждого вызова list в массив reads (обнуляется перед каждым запросом).
+// Ключ входа проверяется через store.get, а не list, поэтому 'staff' в reads не попадает.
+// dir.save { table: 'groups', row: { name: '09-9', course: 3 } }   -> assert.deepEqual(reads, ['groups'])
+// dir.save { table: 'subjects', row: { id: sb2, name: 'Анатомия' } } -> assert.deepEqual([...reads].sort(), ['groups', 'pairs', 'staff', 'subjects', 'weekTemplate'])
+// dir.remove { table: 'rooms', id: r2 }                            -> reads не содержит 'students', и ни одна таблица не встречается дважды
 ```
 
-- [ ] **Step 2:** падает. **Step 3:** написать. Прежние тесты `tests/dir.test.js` и `tests/importApi.test.js` остаются зелёными. **Step 4:** `npm test` зелёное.
+- [ ] **Step 2:** падает. **Step 3:** написать. Прежние тесты `tests/dir.test.js` и `tests/importApi.test.js` остаются зелёными. Пересчёт тем после изменения тем и импорта появится в Task 6; здесь импорт тем уже получает группы и пары (`loadDb(store, 'topics', ['groups', 'pairs'])`), чтобы между задачами не было сломанного импорта. **Step 4:** `npm test` зелёное.
 - [ ] **Step 5:** коммит `feat: semester settings API, week template and topics directories, delete protection`.
 
 ---
@@ -736,19 +800,24 @@ assert.equal(call('dir.remove', { table: 'weekTemplate', id: wt.id }, dean).ok, 
 // backend/scheduleData.js — без объектов Node и Apps Script
 export function todayOf(platform);                         // localDate(platform.now())
 export function loadSettings(store);                       // readSettings(store.list('settings'))
-export function relayout(store, subjectIds = null);        // пересчитывает темы предметов (null — всех); -> число изменённых пар
+export function relayout(store, subjectIds = null, rows = {});
+// пересчитывает темы предметов (null — всех).
+// rows = { topics?, pairs? } — строки, которые этот запрос уже прочитал, в состоянии ПОСЛЕ своей записи; переданный лист не читается.
+// -> { changed, topics, pairs }: changed — число пар, у которых сменилась тема; topics и pairs — все строки после пересчёта
+//    (у пар уже новый topicId), чтобы вызывающий не читал эти листы ещё раз.
 export function generateSchedule(store, platform, { dryRun = false, restart = false } = {});
 // -> { from, to, inserted, updated, removed, kept, conflicts }
 ```
 
-- `relayout`: одно чтение «Тем», одно чтение «Пар», `layoutTopics` по каждому предмету, одна запись `updateMany`. Нечего менять — записи нет.
+- `relayout`: «Темы» и «Пары» берутся из `rows`, а чего там нет — читается одним `list`; `layoutTopics` по каждому предмету; одна запись `updateMany`. Нечего менять — записи нет.
+- Правило одного чтения (Global Constraints): за запрос каждый лист читается не больше одного раза. Обработчик передаёт в `relayout` всё, что уже прочитал, приведя в памяти к состоянию после своей записи: удалённые строки убраны, к изменённым применён `patch`, новые добавлены в том виде, в каком их вернул `insertMany` / `insert` (с `id`).
 - `generateSchedule`:
   - нет дат семестра → `AppError('invalid', { fields: [{ field: 'semesterStart', code: 'required' }] })`;
   - шаблон пуст → `AppError('empty_template')`;
   - `restart` и есть пара со статусом не `planned` и не `cancelled` → `AppError('in_use')`;
   - `from`: пар ещё нет или `restart` → начало семестра; иначе более поздняя из дат «сегодня» и «начало семестра»; `to` — конец семестра;
   - `dryRun` → только числа, записи нет;
-  - иначе по одному вызову `removeMany`, `updateMany`, `insertMany` (пустые не делаются), затем `relayout(store)`.
+  - иначе по одному вызову `removeMany`, `updateMany`, `insertMany` (пустые не делаются), затем `relayout(store, null, { pairs })`, где `pairs` — прочитанные пары после этой записи в памяти. «Темы» читает сам `relayout`.
 - Действия: `schedule.generate { dryRun?, restart? }` → результат `generateSchedule`; `topics.plan { subjectId }` →
 
 ```js
@@ -758,7 +827,8 @@ export function generateSchedule(store, platform, { dryRun = false, restart = fa
 ```
 
   Предмета нет → `not_found`. Вошедший действует только как преподаватель (нет ролей `admin`, `dean`, `prorector`) и предмет не его → `forbidden`.
-- Пересчёт после изменения тем: `dir.save` и `dir.remove` для `topics` вызывают `relayout(store, [subjectId])`; `import.apply` для `topics` после записи вызывает `relayout` по затронутым предметам. Для импорта тем база собирается как `loadDb(store, 'topics', ['groups', 'pairs'])`.
+- Пересчёт после изменения тем: `dir.save` и `dir.remove` для `topics` вызывают `relayout(store, [subjectId], rows)`, где `rows` — уже прочитанные в запросе «Темы» (из `loadDb`) и/или «Пары» (проверка `in_use` при удалении) после записи; `import.apply` для `topics` после записи вызывает `relayout(store, <затронутые предметы>, { topics, pairs: db.pairs })`, где `topics` — `db.topics` после записи. База для импорта тем уже собирается как `loadDb(store, 'topics', ['groups', 'pairs'])` (с Task 5).
+- Запись импорта: `apply` в `backend/handlers/import.js` пишет обновления одним `store.updateMany(table, items)` — только строки, у которых `sameValues` ложно; пустой список не пишется — вместо `store.update` в цикле. Код `apply` общий, поэтому так пишут все таблицы импорта; порядок прежний (сначала обновления, потом `insertMany`), прежние тесты импорта остаются зелёными.
 
 - [ ] **Step 1: тесты.** Настройки `S` и шаблон `T` — как в Task 4, записаны в хранилище; группы `01-1` (g1) и `02-1` (g2); предметы `sb1` «Информатика» (g1, teacher1), `sb2` «Анатомия» (g2, teacher2); у `sb1` три темы с номерами 1–3 (`topic1`…`topic3`). Часы: 31 августа 2026, 12:00 по Бишкеку (`Date.UTC(2026, 7, 31, 6)`).
 
@@ -772,7 +842,7 @@ assert.deepEqual(mine().map(p => [p.date, p.topicId]), [['2026-09-01', topic1], 
 const plan = call('topics.plan', { subjectId: sb1 }, dean).data;
 assert.deepEqual(plan.topics.map(t => [t.order, t.pair && t.pair.date]), [[1, '2026-09-01'], [2, '2026-09-08'], [3, null]]);
 assert.equal(plan.withoutTopic, 0);
-assert.equal('passwordHash' in plan.subject, false);
+assert.equal(JSON.stringify(plan).includes('passwordHash'), false);
 
 // Review Focus 2
 assert.deepEqual(call('schedule.generate', {}, dean).data, { ...dry, inserted: 0, kept: 4 });
@@ -784,7 +854,9 @@ assert.deepEqual(later, { from: '2026-09-03', to: '2026-09-11', inserted: 0, upd
 assert.equal(mine()[0].roomId, r1);                                             // пара 1 сентября не тронута
 
 // скорость: настоящий запуск делает не больше одного insertMany, двух updateMany и одного removeMany,
-// и ни одного insert, update, remove (обёртка-шпион над хранилищем)
+// и ни одного insert, update, remove (обёртка-шпион над хранилищем); list каждой таблицы — не больше одного раза за запрос.
+// Тот же шпион: dir.save и dir.remove для topics и import.apply для topics читают каждую таблицу не больше одного раза;
+// import.apply для topics делает ни одного update и не больше одного updateMany('topics').
 
 // ошибки
 assert.deepEqual(call('schedule.generate', {}, teacher1).error, { code: 'forbidden' });
@@ -823,28 +895,33 @@ assert.deepEqual(call('topics.plan', { subjectId: 'sb_nope' }, dean).error, { co
 
 **Files:** Modify `backend/scheduleData.js`, `backend/handlers/schedule.js`, `dev/seed.js`, `tests/devServer.test.js`, `tests/gasBundle.test.js`. Create `tests/pairsApi.test.js`.
 
-**Interfaces — Consumes:** `checkPairChange`, `pairLock` (Task 4), `relayout`, `todayOf`, `loadSettings`, `generateSchedule` (Task 6), `mondayOf`, `addDays`, `addMinutes`, `isDate`, `daysBetween` (Task 2), `PAIR_MINUTES`.
+**Interfaces — Consumes:** `checkPairChange`, `pairLock` (Task 4), `relayout(store, subjectIds, rows) -> { changed, topics, pairs }` (Task 6: `rows = { topics?, pairs? }` — уже прочитанные строки после записи, переданный лист не читается; в ответе — все строки после пересчёта), `todayOf`, `loadSettings`, `generateSchedule` (Task 6), `mondayOf`, `addDays`, `addMinutes`, `isDate`, `daysBetween` (Task 2), `PAIR_MINUTES`. Занятость («двое в одном месте») сервер сам не считает: только через `checkPairChange` (он внутри использует `pairSlots` и `busyCodes` из `core/busy.js`, Task 3/4).
 
 **Produces:**
 
 ```js
 // backend/scheduleData.js
-export function pairViews(store, keep);     // keep(pair) -> boolean; -> PairView[] по дате, номеру пары, названию группы
+export function pairViews(store, keep, rows = {});
+// keep(pair) -> boolean; -> PairView[] по дате, номеру пары, названию группы.
+// rows = { pairs?, topics?, groups?, subjects?, staff?, rooms? } — уже прочитанные в этом запросе строки (после записи и пересчёта тем);
+// переданный лист не читается, остальные читаются одним list каждый.
 // PairView — собирается по полям:
 // { id, date, slot, startTime, endTime, status, groupId, groupName, subjectId, subjectName, teacherId, teacherName,
 //   roomId, roomName, topic: { id, unit, order, name, lessonType } | null,
 //   substitution: boolean, moved: boolean, planDate, planSlot, note }
-// endTime = startTime + PAIR_MINUTES; substitution — преподаватель пары не тот, что у предмета; moved — date или slot отличаются от плановых.
+// endTime = addMinutes(startTime, PAIR_MINUTES); через полночь не переходит: звонки проверены так, что конец пары не позже 23:59 (Task 2).
+// substitution — преподаватель пары не тот, что у предмета; moved — date или slot отличаются от плановых.
 // Названия несуществующих записей — пустая строка. Каждый лист читается один раз.
 ```
 
-Действия:
+Действия (ответ `{ pair }` у трёх действий изменения — это `{ pair: PairView }`, тот же вид, что в списках):
 
-- `schedule.list { from, to?, groupId?, teacherId? }` → `{ today, from, to, pairs }`. `to` по умолчанию `from + 6`. Даты не `isDate`, `to` раньше `from` или диапазон длиннее 31 дня → `bad_request`. Фильтры необязательные; без них — все группы.
+- Правило одного чтения: за запрос каждый лист читается не больше одного раза. Действия изменения читают «Пары», сотрудников, аудитории и настройки для `checkPairChange`, после записи передают пары (с применённым изменением) в `relayout(store, [subjectId], { pairs })`, а результат `relayout` и уже прочитанные `staff`, `rooms` — в `pairViews(store, p => p.id === id, { pairs, topics, staff, rooms })`. Если `relayout` не вызывается, в `pairViews` идут пары после записи, `staff`, `rooms`.
+- `schedule.list { from?, to?, groupId?, teacherId? }` → `{ today, from, to, pairs }`. `from` необязателен: по умолчанию `mondayOf(today)`, где `today = todayOf(platform)` (сайт часам устройства не верит, поэтому первый запрос экрана идёт без `from`); переданный `from` к понедельнику не приводится. `to` по умолчанию `from + 6`. Даты не `isDate`, `to` раньше `from` или `daysBetween(from, to) > 30` (больше 31 дня включительно) → `bad_request`. Фильтры необязательные; без них — все группы.
 - `schedule.mine { from? }` → `{ today, from, to, pairs }`. `from` приводится к понедельнику своей недели (по умолчанию — неделя «сегодня»), `to = from + 6`. Студент получает пары своей группы; сотрудник — пары, где он преподаватель. Неверная дата → `bad_request`.
-- `schedule.changePair { id, teacherId?, date?, slot?, roomId?, note? }` → `{ pair }`. Пары нет → `not_found`; `pairLock` → `AppError` с этим кодом; ошибки `checkPairChange` → `invalid` с полями; запись одним `update`; если изменились дата или номер пары — `relayout(store, [subjectId])`.
-- `schedule.cancelPair { id, note? }` → `{ pair }`. Тот же `pairLock`; примечание длиннее 200 → `invalid`, `note: too_long`; ставит `status: 'cancelled'`, `topicId: ''`, `changed: true`; затем `relayout`.
-- `schedule.restorePair { id }` → `{ pair }`. Статус не `cancelled` → `pair_locked`; дата раньше «сегодня» → `in_past`; занятость проверяется `checkPairChange(pair, {}, ctx)`; ставит `status: 'planned'`; затем `relayout`.
+- `schedule.changePair { id, teacherId?, date?, slot?, roomId?, note? }` → `{ pair: PairView }`. Пары нет → `not_found`; `pairLock` → `AppError` с этим кодом; ошибки `checkPairChange` → `invalid` с полями; запись одним `update`; если изменились дата или номер пары — `relayout(store, [subjectId], { pairs })`.
+- `schedule.cancelPair { id, note? }` → `{ pair: PairView }`. Тот же `pairLock`; примечание длиннее 200 → `invalid`, `note: too_long`; ставит `status: 'cancelled'`, `topicId: ''`, `changed: true` и, если `note` передано, записывает его обрезанным по краям (не передано — прежнее примечание остаётся); затем `relayout(store, [subjectId], { pairs })`.
+- `schedule.restorePair { id }` → `{ pair: PairView }`. Статус не `cancelled` → `pair_locked`; дата раньше «сегодня» → `in_past`; занятость проверяется `checkPairChange(pair, {}, ctx)`; ставит `status: 'planned'`; затем `relayout(store, [subjectId], { pairs })`.
 
 Данные стенда (вымышленные; `seed` по-прежнему ничего не делает, если сотрудники уже есть):
 
@@ -878,12 +955,17 @@ assert.equal(call('schedule.list', { from: '2026-09-01', to: '2026-09-11' }, pro
 assert.equal(call('schedule.list', { from: '2026-09-01', to: '2026-09-11', groupId: g1 }, dean).data.pairs.length, 2);
 assert.equal(call('schedule.list', { from: '2026-09-01', to: '2026-09-11', teacherId: teacher2Id }, dean).data.pairs.length, 2);
 assert.deepEqual(call('schedule.list', { from: '2026-09-01', to: '2026-10-15' }, dean).error, { code: 'bad_request' });
+assert.equal(call('schedule.list', { from: '2026-09-01', to: '2026-10-01' }, dean).ok, true);                         // граница: daysBetween = 30
+assert.deepEqual(call('schedule.list', { from: '2026-09-01', to: '2026-10-02' }, dean).error, { code: 'bad_request' });  // daysBetween = 31
+const firstWeek = call('schedule.list', {}, dean).data;                         // без from: неделя «сегодня» по серверу
+assert.deepEqual([firstWeek.today, firstWeek.from, firstWeek.to], ['2026-09-02', '2026-08-31', '2026-09-06']);
 
 // Review Focus 1: пара 1 сентября проведена; отмена пары 8 сентября сдвигает темы следующих пар
 store.update('pairs', pair1, { status: 'closed' });
 const topicsByDate = () => Object.fromEntries(call('schedule.list', { from: '2026-09-01', to: '2026-09-25', groupId: g1 }, dean).data.pairs
   .map(p => [p.date, p.topic ? p.topic.order : null]));
-assert.equal(call('schedule.cancelPair', { id: pair8, note: 'Преподаватель на конференции' }, dean).data.pair.status, 'cancelled');
+const cancelled = call('schedule.cancelPair', { id: pair8, note: '  Преподаватель на конференции ' }, dean).data.pair;
+assert.deepEqual([cancelled.status, cancelled.note, cancelled.topic], ['cancelled', 'Преподаватель на конференции', null]);
 assert.deepEqual(topicsByDate(), { '2026-09-01': 1, '2026-09-08': null, '2026-09-15': 2, '2026-09-22': 3 });
 assert.equal(call('schedule.restorePair', { id: pair8 }, dean).data.pair.status, 'planned');
 assert.deepEqual(topicsByDate(), { '2026-09-01': 1, '2026-09-08': 2, '2026-09-15': 3, '2026-09-22': 4 });
@@ -909,6 +991,9 @@ assert.deepEqual(call('schedule.cancelPair', { id: pair15, note: 'x'.repeat(201)
 now = Date.UTC(2026, 8, 9, 6);                                                   // 9 сентября
 assert.deepEqual(call('schedule.cancelPair', { id: pair8 }, dean).error, { code: 'in_past' });
 assert.deepEqual(call('schedule.changePair', { id: pair8, slot: 2 }, dean).error, { code: 'in_past' });
+
+// скорость (обёртка-шпион над хранилищем, как в Task 6): changePair с переносом, cancelPair и restorePair
+// вызывают list каждой таблицы не больше одного раза за запрос и ни одного update/remove в цикле (одна пара — один update, пересчёт тем — один updateMany)
 ```
 
 ```js
@@ -927,9 +1012,10 @@ assert.deepEqual(pairs.filter(p => p.note === 'Замена').map(p => p.date), 
 // tests/gasBundle.test.js — после setup()
 for (const name of ['Шаблон недели', 'Темы', 'Пары']) assert.ok(spreadsheet.getSheetByName(name), name);
 // колонка «дата» листа «Пары» имеет текстовый формат '@': дата не превращается в дату Google
+// (защита от регрессии: формат ставит уже существующий markTextColumns, как только в схеме есть «Пары» (Task 2), поэтому на Step 2 эта проверка уже зелёная — это ожидаемо)
 ```
 
-- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное; `npm run build:gas` проходит.
+- [ ] **Step 2:** падает (кроме проверки формата `'@'` в `tests/gasBundle.test.js`: она зелёная с Task 2, красной не ждать). **Step 3:** написать. **Step 4:** `npm test` зелёное; `npm run build:gas` проходит.
 - [ ] **Step 5:** `npm run dev:reset`, запрос `schedule.mine` под `teacher1` и под `S1001` возвращает пары текущей недели.
 - [ ] **Step 6:** коммит `feat: schedule views, substitutions, moves and cancellations, dev seed with a schedule`.
 
@@ -944,7 +1030,8 @@ for (const name of ['Шаблон недели', 'Темы', 'Пары']) assert
 **Produces:**
 
 ```js
-// site/js/dates.js — без DOM и без Intl; сайт не может загрузить core/, поэтому это копия нужных функций core/dates.js
+// site/js/dates.js — без DOM и без Intl; публикуется только site/, сайт не может загрузить core/, поэтому это копия нужных функций core/dates.js;
+// совпадение с core держит сверка в tests/siteDates.test.js
 export function isDate(text); export function addDays(date, n); export function weekday(date); export function mondayOf(date);
 export function addMinutes(time, n);
 export function dayParts(date);            // '2026-11-21' -> { day: 21, month: 11, weekday: 6 }
@@ -962,7 +1049,10 @@ export function dayParts(date);            // '2026-11-21' -> { day: 21, month: 
 import * as site from '../site/js/dates.js'; import * as core from '../core/dates.js';
 for (const d of ['2026-01-01', '2026-02-28', '2026-11-21', '2026-12-31', '2028-02-29']) {
   assert.equal(site.weekday(d), core.weekday(d)); assert.equal(site.mondayOf(d), core.mondayOf(d)); assert.equal(site.addDays(d, 1), core.addDays(d, 1));
+  assert.equal(site.addDays(d, -1), core.addDays(d, -1)); assert.equal(site.isDate(d), core.isDate(d));
 }
+for (const v of ['2026-02-30', '2026-13-01', '26-01-01', '2026-1-1', '', null, 20260101]) assert.equal(site.isDate(v), core.isDate(v), String(v));   // те же плохие значения, что в tests/dates.test.js
+for (const [time, n] of [['08:00', 90], ['09:40', 90], ['22:29', 90], ['00:00', 0], ['11:20', 130]]) assert.equal(site.addMinutes(time, n), core.addMinutes(time, n), time);
 assert.deepEqual(site.dayParts('2026-11-21'), { day: 21, month: 11, weekday: 6 });
 assert.equal(site.addMinutes('08:00', 90), '09:30');
 
@@ -980,7 +1070,7 @@ assert.deepEqual(outline(navFor([...DEAN, 'settings.get'], 'dean')),
 assert.deepEqual(outline(navFor(DEAN, 'dean')).map(([title]) => title), [null, 'home.directories', 'nav.data']);     // без прав группы нет
 
 // tests/i18n.test.js
-for (const code of ['group_busy', 'teacher_busy', 'room_busy', 'in_past', 'pair_locked', 'empty_template', 'held', 'out_of_semester', 'day_off'])
+for (const code of ['group_busy', 'teacher_busy', 'room_busy', 'in_past', 'pair_locked', 'empty_template', 'held', 'out_of_semester', 'day_off', 'bad_request'])
   assert.ok(ru['error.' + code], code);
 for (let n = 1; n <= 7; n++) assert.ok(ru['date.weekday.' + n] && ru['date.weekdayShort.' + n]);
 for (let n = 1; n <= 12; n++) assert.ok(ru['date.month.' + n]);
@@ -1000,7 +1090,7 @@ for (let n = 1; n <= 12; n++) assert.ok(ru['date.month.' + n]);
 **Interfaces — Consumes:** `dir.list` (`groups`, `subjects`, `rooms`, `staff`, `weekTemplate`), `dir.save` и `dir.remove` для `weekTemplate`, `settings.get`, `schedule.generate`; `site/js/dates.js` (Task 8).
 
 - `resolveRoute`: `#/template` → `weekTemplate`, если есть `dir.list:weekTemplate`. Пункт меню `{ name: 'weekTemplate', href: '#/template', textKey: 'template.title', icon: 'grid', hintKey: 'template.hint' }` перед `settings`.
-- Экран: выбор группы; сетка «дни недели (пн–пт) × пары» — у каждой строки номер пары и время из звонков. В занятой клетке — предмет, преподаватель, аудитория; в пустой — кнопка «+». Нажатие открывает окно: предмет (только предметы выбранной группы; если их нет — подсказка завести предметы в справочнике), аудитория (с вариантом «без аудитории»), «Сохранить», у существующей строки — «Удалить». Ошибки `group_busy`, `teacher_busy`, `room_busy` — у своих полей, своим текстом: «У этого преподавателя в это время пара в другой группе», «Аудитория в это время занята».
+- Экран: выбор группы; сетка «дни недели (пн–пт) × пары» — у каждой строки номер пары и время из звонков. В занятой клетке — предмет, преподаватель, аудитория; в пустой — кнопка «+». Нажатие открывает окно: предмет (только предметы выбранной группы; если их нет — подсказка завести предметы в справочнике), аудитория (с вариантом «без аудитории»), «Сохранить», у существующей строки — «Удалить». Ошибки `teacher_busy` (поле `subjectId` — у выбора предмета) и `room_busy` (поле `roomId` — у выбора аудитории) — у своих полей, своим текстом: «У этого преподавателя в это время пара в другой группе», «Аудитория в это время занята». `group_busy` сервер ставит на поле `slot`, а поля ввода для него в окне нет (день и номер пары задаёт клетка): эта ошибка показывается общим сообщением окна над кнопками — «У группы в это время уже есть пара».
 - Блок «Расписание на семестр» под сеткой: даты семестра из настроек (если не заданы — сообщение со ссылкой на `#/settings`, кнопки нет). «Создать расписание» → `schedule.generate { dryRun: true }` → окно со сводкой «Добавится / Изменится / Удалится / Без изменений / Не поместилось» и периодом `from`–`to` → «Создать» → настоящий запрос → сообщение об успехе со ссылкой на `#/schedule`. Кнопка на время запроса занята, повторное нажатие не отправляет второй запрос. «Начать заново» → окно-предупреждение (все пары семестра удалятся вместе с заменами, переносами и отменами) → `{ restart: true }`; ответ `in_use` → «Пары уже проводились — начать заново нельзя». `empty_template` → «В шаблоне нет ни одной пары».
 - Без права `dir.save:weekTemplate` (проректор) клетки не нажимаются, блока создания нет.
 
@@ -1067,7 +1157,9 @@ for (const key of ['dir.topics', 'import.matchBy.topics', 'import.error.name.hel
 // site/js/pairs.js — без DOM
 export function groupByDay(pairs, from, days = 7);   // -> [{ date, pairs }] на каждый день подряд, пары по slot
 export function pairFlags(pair);                      // -> подмножество ['cancelled', 'substitution', 'moved'] в этом порядке
-export function canEditPair(pair, today);             // status === 'planned' && pair.date >= today
+export function canEditPair(pair, today);             // status === 'planned' && pair.date >= today — копия условия pairLock(pair, today) === null из core/schedule.js
+export function canRestorePair(pair, today);          // status === 'cancelled' && pair.date >= today — когда показывать «Вернуть пару»
+// сайт публикуется только из site/ и core/ загрузить не может; совпадение canEditPair с pairLock держит сверка в tests/pairs.test.js
 // site/js/views/pairParts.js — общие части трёх экранов расписания (этот, Task 12)
 export function weekNav({ from, onChange });          // «‹ неделя ›», «Эта неделя»; подпись «16–22 ноября»
 export function pairCard(pair, { show, onOpen });     // show: какие из ['group', 'teacher'] показывать; onOpen — карточка становится кнопкой
@@ -1076,8 +1168,8 @@ export function dayList(days, today, cardOptions);    // дни подряд, «
 
 - `resolveRoute`: `#/schedule` → `schedule`, если есть `schedule.list`. Пункт меню `{ name: 'schedule', href: '#/schedule', textKey: 'schedule.title', icon: 'calendar', hintKey: 'schedule.hint' }` первым в группе.
 - Карточка пары: время «08:00–09:30», предмет, группа или преподаватель, аудитория, тема («Тема 3. Защита данных» и метка типа) или «Без темы», метки «Замена», «Перенос» (с подписью «с 8 сентября, 1 пара»), «Отменена»; примечание, если есть. Отменённая пара приглушена.
-- Экран: переключатель «По группе / По преподавателю / День». В первых двух режимах — выбор группы или преподавателя и неделя: дни с понедельника по субботу колонками на широком экране и списком на узком; воскресенье показывается, только если в нём есть пара. В режиме «День» — поле даты, кнопки «‹ ›» и «Сегодня», таблица всех пар дня по всем группам: пара и время, группа, предмет, преподаватель, аудитория, тема, статус. «Сегодня» берётся из ответа сервера.
-- С правом `schedule.changePair` пара, для которой `canEditPair`, открывает окно «Изменить пару»: преподаватель (активные сотрудники с ролью преподавателя), дата, номер пары (со временем из звонков), аудитория, примечание; «Сохранить»; «Отменить пару» — с подтверждением и примечанием. У отменённой пары — «Вернуть пару». Ошибки `fields` — у полей своими текстами (`day_off`: «В этот день занятий нет», `out_of_semester`, `in_past`, `group_busy`, `teacher_busy`, `room_busy`). `pair_locked` и `in_past` на всю пару — сообщением в окне. После успеха неделя перечитывается.
+- Экран: переключатель «По группе / По преподавателю / День». В первых двух режимах — выбор группы или преподавателя и неделя: дни с понедельника по субботу колонками на широком экране и списком на узком; воскресенье показывается, только если в нём есть пара. В режиме «День» — поле даты, кнопки «‹ ›» и «Сегодня», таблица всех пар дня по всем группам: пара и время, группа, предмет, преподаватель, аудитория, тема, статус. «Сегодня» берётся из ответа сервера: `from` у `schedule.list` необязателен (Task 7), поэтому первый запрос экрана и кнопка «Эта неделя» идут без `from` — сервер отвечает неделей «сегодня» (`from` = понедельник, `to` = воскресенье) и полем `today`; дальше неделя листается от полученного `from` через `addDays`, а режим «День» и кнопка «Сегодня» берут дату из последнего `today`. Часы устройства не используются.
+- С правом `schedule.changePair` пара, для которой `canEditPair`, открывает окно «Изменить пару»: преподаватель (активные сотрудники с ролью преподавателя), дата, номер пары (со временем из звонков), аудитория, примечание; «Сохранить»; «Отменить пару» — с подтверждением и примечанием. Отменённая пара, для которой `canRestorePair`, открывает окно с кнопкой «Вернуть пару» (отменённая пара прошедшего дня не открывается). Ошибки `fields` — у полей своими текстами (`day_off`: «В этот день занятий нет», `out_of_semester`, `in_past`, `group_busy`, `teacher_busy`, `room_busy`). `pair_locked` и `in_past` на всю пару — сообщением в окне. После успеха неделя перечитывается.
 - Проректор видит то же без окна изменения.
 
 - [ ] **Step 1: тесты.**
@@ -1092,6 +1184,13 @@ assert.deepEqual(pairFlags(p('a', '2026-09-08', 1)), []);
 assert.equal(canEditPair(p('a', '2026-09-08', 1), '2026-09-08'), true);
 assert.equal(canEditPair(p('a', '2026-09-08', 1), '2026-09-09'), false);
 assert.equal(canEditPair(p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-01'), false);
+assert.equal(canRestorePair(p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-08'), true);
+assert.equal(canRestorePair(p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-09'), false);   // прошедший день
+assert.equal(canRestorePair(p('a', '2026-09-08', 1), '2026-09-01'), false);                             // не отменена
+// сверка копии с core: import { pairLock } from '../core/schedule.js'
+for (const [pair, today] of [[p('a', '2026-09-08', 1), '2026-09-08'], [p('a', '2026-09-08', 1), '2026-09-09'],
+  [p('a', '2026-09-08', 1, { status: 'closed' }), '2026-09-01'], [p('a', '2026-09-08', 1, { status: 'cancelled' }), '2026-09-01']])
+  assert.equal(canEditPair(pair, today), pairLock(pair, today) === null);
 // tests/router.test.js
 assert.equal(resolveRoute('#/schedule', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'schedule');
 assert.equal(resolveRoute('#/schedule', { mustChangePassword: false, permissions: ['schedule.mine'] }).view, 'home');
@@ -1109,7 +1208,7 @@ assert.deepEqual(outline(navFor([...DEAN, 'settings.get', 'dir.list:weekTemplate
 
 ### Task 12 (Э): расписание преподавателя и студента
 
-**Files:** Create `site/js/views/mySchedule.js`, `site/js/views/plan.js`. Modify `site/js/views/home.js`, `site/js/router.js`, `site/js/main.js`, `site/js/shell.js`, `site/js/i18n/*.js`, `site/css/screens.css`, `tests/router.test.js`, `tests/ui.test.js`.
+**Files:** Create `site/js/views/mySchedule.js`, `site/js/views/plan.js`. Modify `site/js/views/home.js`, `site/js/router.js`, `site/js/main.js`, `site/js/shell.js`, `site/js/i18n/*.js`, `site/css/screens.css`, `tests/router.test.js`, `tests/ui.test.js`, `tests/i18n.test.js`.
 
 **Interfaces — Consumes:** `schedule.mine`, `topics.plan`, `teacher.mySubjects`; `weekNav`, `pairCard`, `dayList` (Task 11); `groupByDay` (Task 11).
 
