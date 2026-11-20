@@ -1,6 +1,7 @@
 // Semester pairs: what the week template asks for, and the rules for changing one pair by hand.
 import { addDays, daysBetween, isDate, weekday } from './dates.js';
 import { pairSlots, busyCodes } from './busy.js';
+import { AppError } from './errors.js';
 
 const NOTE_MAX = 200;
 const BUSY_FIELD = { group_busy: 'slot', teacher_busy: 'teacherId', room_busy: 'roomId' };
@@ -21,6 +22,8 @@ const keyOf = (groupId, date, slot) => groupId + '|' + date + '|' + slot;
 const byPlace = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.slot - b.slot || (a.groupId < b.groupId ? -1 : a.groupId > b.groupId ? 1 : 0));
 
 export function planGeneration({ template, subjects, settings, pairs, from, restart = false }) {
+  if (!isDate(from)) throw new AppError('bad_request');
+  if (restart && (pairs || []).some(p => p.status !== 'planned' && p.status !== 'cancelled')) throw new AppError('in_use');
   const subjectById = new Map((subjects || []).map(s => [s.id, s]));
   let conflicts = 0;
 
@@ -102,7 +105,7 @@ export function checkPairChange(pair, patch, ctx) {
     date: has('date') ? patch.date : pair.date,
     slot: has('slot') ? patch.slot : pair.slot,
     teacherId: has('teacherId') ? patch.teacherId : pair.teacherId,
-    roomId: has('roomId') ? patch.roomId : pair.roomId,
+    roomId: (has('roomId') ? patch.roomId : pair.roomId) || '',
     note: has('note') ? (typeof patch.note === 'string' ? patch.note.trim() : patch.note) : (pair.note || ''),
   };
   const errors = [];

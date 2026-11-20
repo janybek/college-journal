@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { workingDays, planGeneration, pairLock, checkPairChange } from '../core/schedule.js';
 import { DEFAULT_BELLS } from '../core/settings.js';
+import { AppError } from '../core/errors.js';
 
 const S = { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: ['2026-09-07'], bells: DEFAULT_BELLS };
 const subjects = [{ id: 'sb_1', groupId: 'g_1', teacherId: 'sf_1' }, { id: 'sb_2', groupId: 'g_2', teacherId: 'sf_2' }, { id: 'sb_3', groupId: 'g_1', teacherId: 'sf_2' }];
@@ -102,4 +103,34 @@ test('pairLock', () => {
   assert.equal(pairLock(p3, '2026-09-08'), null);
   assert.equal(pairLock(p3, '2026-09-09'), 'in_past');
   assert.equal(pairLock({ ...p3, status: 'closed' }, '2026-09-02'), 'pair_locked');
+});
+
+test('planGeneration: restart is refused when a pair was held', () => {
+  const held = E.map(p => (p.id === 'p1' ? { ...p, status: 'closed' } : p));
+  assert.throws(() => planGeneration({ template: T, subjects, settings: S, pairs: held, from: '2026-09-01', restart: true }),
+    e => e instanceof AppError && e.code === 'in_use');
+  const soft = E.map(p => (p.id === 'p1' ? { ...p, status: 'cancelled', changed: true } : p));
+  const r = planGeneration({ template: T, subjects, settings: S, pairs: soft, from: '2026-09-01', restart: true });
+  assert.deepEqual([r.toRemove, r.toInsert.length], [['p1', 'p2', 'p3', 'p4'], 4]);
+});
+
+test('planGeneration: plan key taken by a fixed pair', () => {
+  const fixed = { ...E[0], id: 'p9', status: 'cancelled', changed: true };
+  const dup = { ...E[0], id: 'p8' };
+  const r = planGeneration({ template: T, subjects, settings: S, pairs: [fixed, dup, E[1], E[2], E[3]], from: '2026-09-01' });
+  assert.deepEqual(r, { toInsert: [], toUpdate: [], toRemove: ['p8'], kept: 4, conflicts: 0 });
+  const none = planGeneration({ template: T, subjects, settings: S, pairs: [fixed, E[1], E[2], E[3]], from: '2026-09-01' });
+  assert.deepEqual([none.toInsert, none.conflicts], [[], 0]);
+});
+
+test('planGeneration: from must be a date', () => {
+  for (const from of [undefined, '', 'soon']) {
+    assert.throws(() => planGeneration({ template: T, subjects, settings: S, pairs: E, from }),
+      e => e instanceof AppError && e.code === 'bad_request');
+  }
+});
+
+test('checkPairChange: null room means no room', () => {
+  assert.equal(checkPairChange(p3, { roomId: null }, ctx).next.roomId, '');
+  assert.deepEqual(errors({ roomId: null }), []);
 });
