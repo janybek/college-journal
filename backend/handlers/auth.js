@@ -32,8 +32,12 @@ function me(data, ctx, user) {
 
 function changePassword(data, ctx, user) {
   if (!verifyPassword(ctx.platform, data.oldPassword, user.row.passwordHash)) throw new AppError('bad_credentials');
+  const newPasswordError = (code) => new AppError('invalid', { fields: [{ field: 'newPassword', code }] });
+  if (typeof data.newPassword !== 'string') throw newPasswordError('invalid');
+  // The first password is printed on the dean's list: keeping it would leave the account open to whoever saw it.
+  if (data.newPassword === data.oldPassword) throw newPasswordError('same_as_old');
   const problem = passwordProblem(data.newPassword, loginOf(user.row, user.kind));
-  if (problem) throw new AppError('invalid', { fields: [{ field: 'newPassword', code: problem }] });
+  if (problem) throw newPasswordError(problem);
   const row = ctx.store.update(USER_TABLES[user.kind], user.id, {
     passwordHash: hashPassword(ctx.platform, data.newPassword),
     mustChangePassword: false,

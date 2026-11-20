@@ -13,6 +13,10 @@ function analyse(data, store) {
   return { table, db, parsed, badRows };
 }
 
+// Every patched field already holds the same value (compared as text: a sheet may give 1 where the patch has '1').
+const sameValues = (row, patch) => row !== undefined
+  && Object.keys(patch).every((key) => String(row[key] ?? '') === String(patch[key] ?? ''));
+
 function preview(data, ctx) {
   const { table, db, parsed, badRows } = analyse(data, ctx.store);
   const { records, errors, unknownColumns, missingColumns } = parsed;
@@ -47,8 +51,13 @@ function apply(data, ctx) {
       return { ...row, ...stored, active: true };
     });
   }
+  // Updates go first and new people last: if a write fails, nobody is left in the sheet with a lost password.
+  // A row whose values are already stored is not written again (it still counts as updated).
+  const stored = new Map(db[table].map((row) => [row.id, row]));
+  for (const { id, patch } of plan.toUpdate) {
+    if (!sameValues(stored.get(id), patch)) store.update(table, id, patch);
+  }
   if (toInsert.length > 0) store.insertMany(table, toInsert);
-  for (const { id, patch } of plan.toUpdate) store.update(table, id, patch);
   return { inserted: toInsert.length, updated: plan.toUpdate.length, skipped: badRows, passwords, ...report };
 }
 

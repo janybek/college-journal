@@ -6,7 +6,8 @@ import {
 } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
-import { IMPORT_TABLES, IMPORT_COLUMNS } from './directoryConfig.js';
+import { IMPORT_TABLES, IMPORT_COLUMNS, FIELDS } from './directoryConfig.js';
+import { templateSheet, findDateCell, READ_OPTIONS } from '../excel.js';
 
 // Excel import (#/import): five numbered steps on one page — directory, template, file, check, import.
 // SheetJS is loaded only from this screen. Drawn from `state`; the one-time passwords of an import live only
@@ -25,6 +26,7 @@ const blank = (table = null) => ({
   firstRow: 0,           // empty rows above the sheet's used range, added to the server's row numbers
   reading: false,
   fileErrorKey: null,
+  fileErrorParams: null,  // { row, column } of a cell Excel turned into a date
   templateErrorKey: null,
   checking: false,
   checkErrorKey: null,
@@ -177,7 +179,7 @@ function stepFile() {
         el('span', { class: 'muted' }, t('import.file.size', { size: Math.max(1, Math.ceil(state.file.size / 1024)) }))) : null),
     el('p', { class: 'step__hint' }, t('import.file.hint')),
     state.reading ? el('p', { class: 'loading', role: 'status' }, t('import.file.reading')) : null,
-    state.fileErrorKey ? note('error', t(state.fileErrorKey), { role: 'alert' }) : null);
+    state.fileErrorKey ? note('error', t(state.fileErrorKey, state.fileErrorParams), { role: 'alert' }) : null);
 }
 
 function stepCheck() {
@@ -327,15 +329,16 @@ async function readFile(file) {
   const owner = state;
   const ticket = ++owner.ticket;
   Object.assign(owner, {
-    file: { name: file.name, size: file.size }, cells: null, firstRow: 0, reading: true, fileErrorKey: null,
+    file: { name: file.name, size: file.size }, cells: null, firstRow: 0, reading: true, fileErrorKey: null, fileErrorParams: null,
     preview: null, checking: false, checkErrorKey: null, applyErrorKey: null, applyLost: false,
   });
   refresh();
   const current = () => state === owner && owner.ticket === ticket;
-  const fail = (key) => {
+  const fail = (key, params = null) => {
     if (!current()) return;
     owner.reading = false;
     owner.fileErrorKey = key;
+    owner.fileErrorParams = params;
     refresh();
   };
   if (file.size > MAX_FILE_BYTES) return fail('import.error.tooBig');
@@ -351,6 +354,7 @@ async function readFile(file) {
   } catch (error) {
     return fail('import.error.unreadable');
   }
+  if (sheet.dateCell) return fail('import.error.dateCell', sheet.dateCell);
   if (sheet.cells.length === 0) return fail('import.error.empty');
   if (!current()) return;
   owner.reading = false;
@@ -367,10 +371,13 @@ async function readFirstSheet(XLSX, file) {
     const bytes = new Uint8Array(await file.arrayBuffer());
     // An .xlsx file is a ZIP archive. Anything else under that name would be read as plain text and show garbage.
     if (/\.xlsx$/i.test(file.name) && !(bytes[0] === 0x50 && bytes[1] === 0x4b)) throw new Error('not an xlsx file');
-    book = XLSX.read(bytes, { type: 'array' });
+    book = XLSX.read(bytes, { type: 'array', ...READ_OPTIONS });
   }
   const sheet = book.Sheets[book.SheetNames[0]];
   if (!sheet || !sheet['!ref']) return { cells: [], firstRow: 0 };
+  // Excel turns "01-1" typed into a General cell into a date; its serial number must not reach the directory.
+  const dateCell = findDateCell(XLSX, sheet);
+  if (dateCell) return { dateCell };
   const cells = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: '' });
   while (cells.length > 0 && isBlankRow(cells[cells.length - 1])) cells.pop();
   return { cells, firstRow: XLSX.utils.decode_range(sheet['!ref']).s.r };
@@ -417,7 +424,8 @@ async function apply() {
   } catch (error) {
     if (state !== owner) return;
     owner.applyErrorKey = errorKey(error.code);
-    owner.applyLost = error.code === 'network';
+    // A dropped connection or a server failure may leave part of the rows written.
+    owner.applyLost = error.code === 'network' || error.code === 'internal';
   }
   owner.applying = false;
   refresh();
@@ -462,7 +470,10 @@ async function downloadTemplate() {
     refresh();
     return;
   }
-  saveWorkbook(XLSX, t('dir.' + table), [IMPORT_COLUMNS[table].map(({ key }) => columnTitle(key))], `template-${table}.xlsx`);
+  const columns = IMPORT_COLUMNS[table];
+  const titles = columns.map(({ key }) => columnTitle(key));
+  const sheet = templateSheet(XLSX, titles, columns.map(({ key }) => FIELDS[key].kind !== 'number'));
+  saveWorkbook(XLSX, t('dir.' + table), sheet, [titles], `template-${table}.xlsx`);
   if (state.templateErrorKey) {
     state.templateErrorKey = null;
     refresh();
@@ -483,11 +494,11 @@ async function downloadPasswords() {
     [t('field.login'), t('field.fullName'), t('field.password')],
     ...result.passwords.map((person) => [person.login, person.fullName, person.tempPassword]),
   ];
-  saveWorkbook(XLSX, t('dir.' + table), rows, `passwords-${table}.xlsx`);
+  saveWorkbook(XLSX, t('dir.' + table), XLSX.utils.aoa_to_sheet(rows), rows, `passwords-${table}.xlsx`);
 }
 
-function saveWorkbook(XLSX, sheetName, rows, fileName) {
-  const sheet = XLSX.utils.aoa_to_sheet(rows);
+// `rows`: the text of the sheet, used to size the columns.
+function saveWorkbook(XLSX, sheetName, sheet, rows, fileName) {
   sheet['!cols'] = rows[0].map((title, i) => ({ wch: Math.max(14, ...rows.map((row) => String(row[i] ?? '').length + 2)) }));
   const book = XLSX.utils.book_new();
   // Excel sheet names: at most 31 characters, none of : \ / ? * [ ]

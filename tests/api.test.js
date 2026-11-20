@@ -116,6 +116,20 @@ test('changePassword rejects password equal to login', () => {
   assert.equal(call('auth.changePassword', { oldPassword: 'secret12', newPassword: 'director-1' }, d.token).ok, true);
 });
 
+test('changePassword rejects the same password and a non-string one, and keeps the old password', () => {
+  const { call } = setup();
+  const st = call('auth.login', { login: 'S1001', password: STUDENT_TEMP }).data;
+  assert.deepEqual(call('auth.changePassword', { oldPassword: STUDENT_TEMP, newPassword: STUDENT_TEMP }, st.token).error,
+    { code: 'invalid', fields: [{ field: 'newPassword', code: 'same_as_old' }] });
+  for (const newPassword of [12345678, { a: 1 }, ['kitep-42'], null]) {
+    assert.deepEqual(call('auth.changePassword', { oldPassword: STUDENT_TEMP, newPassword }, st.token).error,
+      { code: 'invalid', fields: [{ field: 'newPassword', code: 'invalid' }] }, JSON.stringify(newPassword));
+  }
+  const me = call('auth.me', {}, st.token).data.user;
+  assert.equal(me.mustChangePassword, true);
+  assert.equal(call('auth.login', { login: 'S1001', password: STUDENT_TEMP }).ok, true);
+});
+
 test('disabled, expired and password-less users are unauthorized', () => {
   const { call, store, admin, clock } = setup();
   const a = call('auth.login', { login: 'admin', password: 'secret12' }).data;

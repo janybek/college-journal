@@ -64,3 +64,31 @@ test('groups import needs no passwords; a row with two errors is skipped once', 
   assert.deepEqual([bad.total, bad.valid], [1, 0]);
   assert.ok(bad.errors.length >= 2);
 });
+
+test('re-importing identical rows writes nothing but still counts them as updated', () => {
+  const { store, call, dean } = setup();
+  const good = cells.slice(0, 3);
+  call('import.apply', { table: 'students', cells: good }, dean);
+  const updates = [];
+  const update = store.update;
+  store.update = (...args) => { updates.push(args); return update(...args); };
+  const pre = call('import.preview', { table: 'students', cells: good }, dean).data;
+  assert.deepEqual([pre.newCount, pre.updateCount], [0, 2]);
+  const again = call('import.apply', { table: 'students', cells: good }, dean).data;
+  assert.deepEqual([again.inserted, again.updated, again.passwords.length], [0, 2, 0]);
+  assert.deepEqual(updates, []);
+  const renamed = [good[0], ['Асанов Азамат Бекович', '01-1', 2001], good[2]];
+  const changed = call('import.apply', { table: 'students', cells: renamed }, dean).data;
+  assert.deepEqual([changed.inserted, changed.updated], [0, 2]);
+  assert.equal(updates.length, 1);
+  assert.equal(store.list('students').find((s) => s.cardNo === '2001').fullName, 'Асанов Азамат Бекович');
+});
+
+test('updates run before inserts: a failing update leaves no new people behind', () => {
+  const { store, call, dean } = setup();
+  call('import.apply', { table: 'students', cells: cells.slice(0, 2) }, dean);
+  store.update = () => { throw new Error('sheet write failed'); };
+  const mixed = [cells[0], ['Асанов Азамат Бекович', '01-1', 2001], ['Бекова Бегимай', '01-1', 2002]];
+  assert.deepEqual(call('import.apply', { table: 'students', cells: mixed }, dean).error, { code: 'internal' });
+  assert.deepEqual(store.list('students').map((s) => s.cardNo), ['2001']);
+});
