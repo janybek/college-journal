@@ -61,7 +61,7 @@ export const IMPORT_SPECS = {
     check: topicHeld,
   },
   // The teacher's own file: one subject for the whole file (`fixed`), stored in the topics table.
-  syllabus: { table: 'topics', uniqueBy: TOPIC_KEY, keyDefaults: TOPIC_KEY_DEFAULTS, columns: TOPIC_COLUMNS, check: topicHeld },
+  syllabus: { table: 'topics', fixedKeys: ['subjectId'], uniqueBy: TOPIC_KEY, keyDefaults: TOPIC_KEY_DEFAULTS, columns: TOPIC_COLUMNS, check: topicHeld },
 };
 
 const ROLE_WORDS = {
@@ -119,6 +119,7 @@ function resolveCell(key, text, db, rowGroup) {
     const subject = (db.subjects || []).find(s => s.groupId === rowGroup && norm(s.name) === norm(text));
     return subject ? { value: subject.id } : { error: 'bad_ref' };
   }
+  if (key === 'semester' && /^\d+$/.test(text)) return { value: Number(text) };
   if (key === 'lessonType') {
     const type = LESSON_WORDS[norm(text)];
     return type ? { value: type } : { error: 'bad_value' };
@@ -156,6 +157,13 @@ export function parseSheet(table, cells, db, fixed = {}) {
   const missingColumns = spec.columns.filter(c => c.required && !(c.key in index)).map(c => c.key);
   const result = { records: [], errors: [], unknownColumns, missingColumns };
   if (missingColumns.length) return result;
+  // The fixed fields are not cells of the file, so a wrong one is an error of the whole file.
+  for (const key of spec.fixedKeys || []) {
+    const code = fixed[key] === undefined || fixed[key] === '' ? 'required'
+      : validateRow(storage, { [key]: fixed[key] }, db).find(e => e.field === key)?.code;
+    if (code) result.errors.push({ row: 0, field: key, code });
+  }
+  if (result.errors.length) return result;
   if (rows.length - 1 > MAX_IMPORT_ROWS) {
     result.errors.push({ row: 0, field: '', code: 'too_many_rows' });
     return result;

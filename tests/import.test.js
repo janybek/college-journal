@@ -224,3 +224,17 @@ test('syllabus import: extra Subject column, missing Semester column, English he
   const en = parseSheet('syllabus', [['Semester', 'Unit', 'No.', 'Topic', 'Type'], [1, 1, 21, 'T', 'lecture']], db, { subjectId: 'sb_1' });
   assert.deepEqual([en.errors, en.records.length], [[], 1]);
 });
+
+test('syllabus import: the fixed subject is checked; semester text is read as a number', () => {
+  const db = topicsDb();
+  const rows = [['Семестр', 'Модуль', '№', 'Тема', 'Тип'], [1, 1, 20, 'Т', 'лекция']];
+  const bad = parseSheet('syllabus', rows, db, { subjectId: 'nope' });
+  assert.deepEqual([bad.errors, bad.records], [[{ row: 0, field: 'subjectId', code: 'bad_ref' }], []]);
+  const none = parseSheet('syllabus', rows, db);
+  assert.deepEqual([none.errors, none.records], [[{ row: 0, field: 'subjectId', code: 'required' }], []]);
+  const ok = parseSheet('syllabus', rows, db, { subjectId: 'sb_1' });
+  assert.deepEqual([ok.errors, ok.records.length], [[], 1]);
+  const text = parseSheet('syllabus', [rows[0], ['01', 1, 1, 'Цифровой пост медсестры', 'лекция']], db, { subjectId: 'sb_1' });
+  assert.deepEqual(text.errors, []);
+  assert.deepEqual(planImport('syllabus', text.records, db).toUpdate.map(u => u.id), ['tp_1']);
+});
