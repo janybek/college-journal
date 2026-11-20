@@ -1,4 +1,5 @@
 import { AppError } from '../../core/errors.js';
+import { shapeRow } from './rowShape.js';
 
 // Shared helpers (also used by sheetsStore). No Node-only APIs: this file is bundled for Apps Script.
 export function getTable(schema, table) {
@@ -20,10 +21,11 @@ export function createMemoryStore(schema, platform, data = {}) {
     return data[table];
   };
 
+  // Rows are kept in the shared shape; an old file with partial rows is shaped on the way out.
   function prepare(table, row, taken) {
     const def = getTable(schema, table);
-    const copy = { ...row };
-    if (copy.id === undefined || copy.id === null || copy.id === '') {
+    const copy = shapeRow(def, row);
+    if (copy.id === '') {
       copy.id = generateId(def, platform, taken);
     } else if (taken.has(copy.id)) {
       throw new AppError('bad_request');
@@ -38,12 +40,24 @@ export function createMemoryStore(schema, platform, data = {}) {
     if (i < 0) throw new AppError('not_found');
     return i;
   };
+  const shaped = (table, row) => shapeRow(getTable(schema, table), row);
+
+  function updateMany(table, items) {
+    const rows = rowsOf(table);
+    const def = getTable(schema, table);
+    const positions = items.map((item) => indexOf(table, item.id));
+    return items.map((item, n) => {
+      const i = positions[n];
+      rows[i] = shapeRow(def, { ...rows[i], ...item.patch, id: item.id });
+      return { ...rows[i] };
+    });
+  }
 
   return {
-    list: (table) => rowsOf(table).map((r) => ({ ...r })),
+    list: (table) => rowsOf(table).map((r) => shaped(table, r)),
     get(table, id) {
       const row = rowsOf(table).find((r) => r.id === id);
-      return row ? { ...row } : null;
+      return row ? shaped(table, row) : null;
     },
     insert(table, row) {
       const rows = rowsOf(table);
@@ -58,14 +72,16 @@ export function createMemoryStore(schema, platform, data = {}) {
       rows.push(...copies);
       return copies.map((r) => ({ ...r }));
     },
-    update(table, id, patch) {
-      const rows = rowsOf(table);
-      const i = indexOf(table, id);
-      rows[i] = { ...rows[i], ...patch, id };
-      return { ...rows[i] };
-    },
+    update: (table, id, patch) => updateMany(table, [{ id, patch }])[0],
+    updateMany,
     remove(table, id) {
       rowsOf(table).splice(indexOf(table, id), 1);
+    },
+    removeMany(table, ids) {
+      const unique = [...new Set(ids)];
+      unique.forEach((id) => indexOf(table, id));
+      const gone = new Set(unique);
+      data[table] = rowsOf(table).filter((r) => !gone.has(r.id));
     },
   };
 }

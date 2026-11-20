@@ -1,33 +1,23 @@
 import { AppError } from '../../core/errors.js';
 import { getTable, generateId } from './memoryStore.js';
+import { shapeValue, shapeRow } from './rowShape.js';
+import { localDate } from '../../core/dates.js';
 
 // Store on top of a Google Spreadsheet (or a fake with the same methods).
 // Row 1 holds headers; columns are found by title, foreign columns are never touched.
 // No Node-only APIs: this file is bundled for Apps Script.
 
-const TRUE_STRINGS = ['true', 'да'];
-
 const isDate = (v) => Object.prototype.toString.call(v) === '[object Date]';
 
+// A date cell in a string column (hand-edited, or turned into a date by Sheets) reads as its Bishkek date.
 function readValue(type, v) {
-  if (type === 'bool') {
-    if (v === true || v === 1) return true;
-    return typeof v === 'string' && TRUE_STRINGS.includes(v.trim().toLowerCase());
-  }
-  if (type === 'int') {
-    if (typeof v === 'number') return Number.isInteger(v) ? v : null;
-    const text = String(v).trim();
-    return /^-?\d+$/.test(text) ? parseInt(text, 10) : null;
-  }
-  // Safety net for hand-edited cells that Sheets turned into dates.
-  if (isDate(v)) return v.toISOString().slice(0, 10);
-  return String(v).trim();
+  if (type === 'string' && isDate(v)) return localDate(v.getTime());
+  return shapeValue(type, v);
 }
 
 function writeValue(type, v) {
-  if (v === null || v === undefined) return '';
-  if (type === 'bool') return v === true;
-  return v;
+  const shaped = shapeValue(type, v);
+  return shaped === null ? '' : shaped;
 }
 
 export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn) => fn()) {
@@ -40,13 +30,15 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
     const lastCol = sheet.getLastColumn();
     const cols = {};
     const entries = [];
+    let values = [];
     if (lastRow >= 1 && lastCol >= 1) {
-      const values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
+      values = sheet.getRange(1, 1, lastRow, lastCol).getValues();
       values[0].forEach((h, i) => { cols[String(h).trim()] = i; });
       const at = (c) => cols[c.title];
+      const idColumn = def.columns.find((c) => c.key === 'id');
+      const idIndex = at(idColumn);
       for (let r = 1; r < values.length; r++) {
-        const idIndex = at(def.columns[0]);
-        if (idIndex === undefined || String(values[r][idIndex]).trim() === '') continue;
+        if (idIndex === undefined || readValue('string', values[r][idIndex]) === '') continue;
         const row = {};
         for (const c of def.columns) {
           const i = at(c);
@@ -55,7 +47,7 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
         entries.push({ row, sheetRow: r + 1 });
       }
     }
-    return { def, sheet, cols, lastRow, lastCol, entries };
+    return { def, sheet, cols, values, lastRow, lastCol, entries };
   }
 
   const toCells = (def, cols, width, row) => {
@@ -71,8 +63,8 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
       const { def, sheet, cols, lastRow, lastCol, entries } = load(table);
       const taken = new Set(entries.map((e) => e.row.id));
       const created = rows.map((r) => {
-        const copy = { ...r };
-        if (copy.id === undefined || copy.id === null || copy.id === '') {
+        const copy = shapeRow(def, r);
+        if (copy.id === '') {
           copy.id = generateId(def, platform, taken);
         } else if (taken.has(copy.id)) {
           throw new AppError('bad_request');
@@ -105,6 +97,64 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
 
   const find = (loaded, id) => loaded.entries.find((e) => e.row.id === id);
 
+  // One read, then one setValues per changed schema column (first to last changed row of that column).
+  function updateRows(table, items) {
+    return withLock(() => {
+      const loaded = load(table);
+      const { def, sheet, cols, values } = loaded;
+      const hits = items.map((item) => {
+        const hit = find(loaded, item.id);
+        if (!hit) throw new AppError('not_found');
+        return hit;
+      });
+      const current = new Map(hits.map((h) => [h.sheetRow, { ...h.row }]));
+      const changed = new Map(); // column title -> Map(sheetRow -> new cell value)
+      const results = items.map((item, n) => {
+        const row = current.get(hits[n].sheetRow);
+        for (const c of def.columns) {
+          if (c.key === 'id' || cols[c.title] === undefined
+            || !Object.prototype.hasOwnProperty.call(item.patch, c.key)) continue;
+          const cell = writeValue(c.type, item.patch[c.key]);
+          row[c.key] = readValue(c.type, cell);
+          if (!changed.has(c.title)) changed.set(c.title, new Map());
+          changed.get(c.title).set(hits[n].sheetRow, cell);
+        }
+        return { ...row };
+      });
+      for (const [title, cells] of changed) {
+        const rowsChanged = [...cells.keys()];
+        const first = Math.min(...rowsChanged);
+        const last = Math.max(...rowsChanged);
+        const col = cols[title];
+        const block = [];
+        for (let r = first; r <= last; r++) block.push([cells.has(r) ? cells.get(r) : values[r - 1][col]]);
+        sheet.getRange(first, col + 1, block.length, 1).setValues(block);
+      }
+      return results;
+    });
+  }
+
+  function removeRows(table, ids) {
+    withLock(() => {
+      const unique = [...new Set(ids)];
+      if (unique.length === 0) return;
+      const loaded = load(table);
+      const positions = unique.map((id) => {
+        const hit = find(loaded, id);
+        if (!hit) throw new AppError('not_found');
+        return hit.sheetRow;
+      }).sort((a, b) => b - a);
+      // Bottom to top, one deleteRows per run of neighbouring rows.
+      let i = 0;
+      while (i < positions.length) {
+        let j = i;
+        while (j + 1 < positions.length && positions[j + 1] === positions[j] - 1) j++;
+        loaded.sheet.deleteRows(positions[j], j - i + 1);
+        i = j + 1;
+      }
+    });
+  }
+
   return {
     list: (table) => load(table).entries.map((e) => e.row),
     get(table, id) {
@@ -113,27 +163,10 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
     },
     insert: (table, row) => insertRows(table, [row], true)[0],
     insertMany: (table, rows) => insertRows(table, rows, false),
-    update(table, id, patch) {
-      return withLock(() => {
-        const loaded = load(table);
-        const hit = find(loaded, id);
-        if (!hit) throw new AppError('not_found');
-        for (const c of loaded.def.columns) {
-          const col = loaded.cols[c.title];
-          if (c.key === 'id' || col === undefined || !Object.prototype.hasOwnProperty.call(patch, c.key)) continue;
-          loaded.sheet.getRange(hit.sheetRow, col + 1, 1, 1).setValues([[writeValue(c.type, patch[c.key])]]);
-        }
-        return readBack(loaded.def, { ...hit.row, ...patch, id });
-      });
-    },
-    remove(table, id) {
-      withLock(() => {
-        const loaded = load(table);
-        const hit = find(loaded, id);
-        if (!hit) throw new AppError('not_found');
-        loaded.sheet.deleteRow(hit.sheetRow);
-      });
-    },
+    update: (table, id, patch) => updateRows(table, [{ id, patch }])[0],
+    updateMany: (table, items) => updateRows(table, items),
+    remove: (table, id) => removeRows(table, [id]),
+    removeMany: (table, ids) => removeRows(table, ids),
   };
 }
 

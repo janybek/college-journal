@@ -12,11 +12,12 @@ function createFakeSheet(name, rows, grid = {}) {
   let maxRows = grid.maxRows ?? Math.max(data.length, 1);
   let maxColumns = grid.maxColumns ?? Math.max(1, ...data.map((r) => r.length));
   const textColumns = new Set();
+  const calls = { getValues: 0, setValues: 0, appendRow: 0, deleteRow: 0, deleteRows: 0 };
 
   const convert = (colIndex, v) => {
     if (typeof v !== 'string' || textColumns.has(colIndex)) return v;
     if (NUMERIC.test(v)) return Number(v);
-    if (ISO_DATE.test(v)) return new Date(`${v}T00:00:00Z`);
+    if (ISO_DATE.test(v)) return new Date(`${v}T00:00:00+06:00`);
     return v;
   };
 
@@ -64,6 +65,7 @@ function createFakeSheet(name, rows, grid = {}) {
       checkRange(row, col, nr, nc);
       return {
         getValues() {
+          calls.getValues += 1;
           const out = [];
           for (let r = 0; r < nr; r++) {
             const line = [];
@@ -82,6 +84,7 @@ function createFakeSheet(name, rows, grid = {}) {
         },
         getNumberFormat: () => (textColumns.has(col - 1) ? '@' : 'General'),
         setValues(values) {
+          calls.setValues += 1;
           const ok = Array.isArray(values) && values.length === nr
             && values.every((l) => Array.isArray(l) && l.length === nc);
           if (!ok) throw new Error(`The data dimensions do not match the range dimensions (${nr}x${nc})`);
@@ -95,6 +98,7 @@ function createFakeSheet(name, rows, grid = {}) {
       };
     },
     appendRow(arr) {
+      calls.appendRow += 1;
       const at = lastRow();
       data.splice(at, data.length - at);
       data.push(arr.map((v, c) => convert(c, v)));
@@ -102,9 +106,19 @@ function createFakeSheet(name, rows, grid = {}) {
       maxColumns = Math.max(maxColumns, arr.length);
     },
     deleteRow(n) {
+      calls.deleteRow += 1;
       if (!Number.isInteger(n) || n < 1 || n > data.length) throw new Error(`Invalid row: ${n}`);
       data.splice(n - 1, 1);
     },
+    deleteRows(position, howMany) {
+      calls.deleteRows += 1;
+      if (!Number.isInteger(position) || !Number.isInteger(howMany) || position < 1 || howMany < 1
+        || position + howMany - 1 > data.length) {
+        throw new Error(`Invalid deleteRows: ${position},${howMany}`);
+      }
+      data.splice(position - 1, howMany);
+    },
+    calls: () => ({ ...calls }),
     dump: () => data.map((r) => r.slice()),
   };
 }
@@ -125,6 +139,11 @@ export function createFakeSpreadsheet(sheets = {}, grids = {}) {
     deleteSheet(sheet) {
       if (map.size <= 1) throw new Error('You cannot delete the only sheet in a spreadsheet.');
       map.delete(sheet.getName());
+    },
+    calls(name) {
+      const sheet = map.get(name);
+      if (!sheet) throw new Error(`No sheet: ${name}`);
+      return sheet.calls();
     },
     dump(name) {
       const sheet = map.get(name);

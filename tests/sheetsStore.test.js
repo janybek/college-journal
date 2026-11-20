@@ -145,7 +145,75 @@ test('ensureSheets keeps strings as text; a bare sheet loses them (fake models S
   assert.equal(bare.dump('Группы')[1][1], 12);
 });
 
-test('sheetsStore: a Date in a string column reads as YYYY-MM-DD', () => {
-  const ss = createFakeSpreadsheet({ 'Группы': [['id', 'название', 'курс'], ['g_1', new Date(Date.UTC(2026, 8, 1)), 1]] });
-  assert.equal(createSheetsStore(SCHEMA, platform, ss).list('groups')[0].name, '2026-09-01');
+test('sheetsStore: a date cell in a string column reads as its Bishkek date', () => {
+  // Bishkek midnight of 1 September is 18:00 UTC of 31 August.
+  const dated = createFakeSpreadsheet({ 'Группы': [['id', 'название', 'курс'], ['g_1', new Date('2026-08-31T18:00:00Z'), 1]] });
+  assert.equal(createSheetsStore(SCHEMA, platform, dated).list('groups')[0].name, '2026-09-01');
+});
+
+test('fakeSpreadsheet: an ISO date typed into a plain column becomes Bishkek midnight', () => {
+  const ss = createFakeSpreadsheet({ T: [['a']] });
+  ss.getSheetByName('T').getRange(1, 1, 1, 1).setValues([['2026-09-01']]);
+  assert.equal(ss.dump('T')[0][0].getTime(), new Date('2026-08-31T18:00:00Z').getTime());
+});
+
+test('sheetsStore: updateMany keeps foreign columns and writes once per column', () => {
+  const ss = groupsSheet();
+  const s = createSheetsStore(SCHEMA, platform, ss);
+  const rows = s.updateMany('groups', [{ id: 'g_1', patch: { course: 3 } }, { id: 'g_2', patch: { course: 4, name: '02-1' } }]);
+  assert.deepEqual(rows, [{ id: 'g_1', name: '01-1', course: 3 }, { id: 'g_2', name: '02-1', course: 4 }]);
+  assert.deepEqual(ss.dump('Группы'), [['курс', 'моя заметка', 'id', 'название'], [3, 'не трогать', 'g_1', '01-1'], ['', '', '', ''], [4, 'и эту', 'g_2', '02-1']]);
+  assert.deepEqual([ss.calls('Группы').getValues, ss.calls('Группы').setValues], [1, 2]);
+});
+
+test('sheetsStore: updateMany with a missing id writes nothing', () => {
+  const ss = groupsSheet();
+  const before = ss.dump('Группы');
+  const s = createSheetsStore(SCHEMA, platform, ss);
+  assert.throws(() => s.updateMany('groups', [{ id: 'g_1', patch: { course: 9 } }, { id: 'g_nope', patch: {} }]), e => e.code === 'not_found');
+  assert.deepEqual(ss.dump('Группы'), before);
+  assert.equal(ss.calls('Группы').setValues, 0);
+});
+
+function bigSheet() {
+  const rows = [['id', 'название', 'курс']];
+  for (let i = 1; i <= 300; i++) rows.push([`g_${i}`, `n${i}`, 1]);
+  return createFakeSpreadsheet({ 'Группы': rows });
+}
+
+test('sheetsStore: 300 rows changed in one column is one read and one write', () => {
+  const ss = bigSheet();
+  const s = createSheetsStore(SCHEMA, platform, ss);
+  s.updateMany('groups', Array.from({ length: 300 }, (_, i) => ({ id: `g_${i + 1}`, patch: { course: 2 } })));
+  assert.deepEqual([ss.calls('Группы').getValues, ss.calls('Группы').setValues], [1, 1]);
+  assert.ok(s.list('groups').every((r) => r.course === 2));
+});
+
+test('sheetsStore: removeMany deletes runs of rows with one deleteRows each, bottom up', () => {
+  const ss = bigSheet();
+  const s = createSheetsStore(SCHEMA, platform, ss);
+  const ids = Array.from({ length: 100 }, (_, i) => `g_${i + 1}`);
+  s.removeMany('groups', [...ids, 'g_201', 'g_201']);
+  const calls = ss.calls('Группы');
+  assert.equal(calls.deleteRows, 2);
+  assert.equal(calls.deleteRow, 0);
+  assert.equal(calls.getValues, 1);
+  const left = s.list('groups');
+  assert.equal(left.length, 199);
+  assert.equal(left[0].id, 'g_101');
+  assert.ok(!left.some((r) => r.id === 'g_201'));
+  assert.ok(left.some((r) => r.id === 'g_202'));
+});
+
+test('sheetsStore: the id column is found by key, not by position', () => {
+  const ss = createFakeSpreadsheet({ 'Группы': [['название', 'id', 'курс'], ['01-1', 'g_1', 1]] });
+  assert.deepEqual(createSheetsStore(SCHEMA, platform, ss).list('groups'), [{ id: 'g_1', name: '01-1', course: 1 }]);
+});
+
+test('sheetsStore: updateMany and removeMany run under the lock', () => {
+  let locked = 0;
+  const s = createSheetsStore(SCHEMA, platform, groupsSheet(), (fn) => { locked++; return fn(); });
+  s.updateMany('groups', [{ id: 'g_1', patch: { course: 5 } }]);
+  s.removeMany('groups', ['g_2']);
+  assert.equal(locked, 2);
 });

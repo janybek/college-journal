@@ -98,6 +98,9 @@ test('setup is idempotent: default sheet gone once, same spreadsheet, one admin 
   const secret = gas.properties.get('SECRET');
   assert.match(secret, /^[0-9a-f]{64}$/);
 
+  assert.equal(spreadsheet.getSpreadsheetTimeZone(), 'Asia/Bishkek');
+  assert.equal(spreadsheet.getSpreadsheetLocale(), 'ru_RU');
+
   const second = sandbox.setup();
   assert.equal(gas.spreadsheets.size, 1);
   assert.equal(second.spreadsheetUrl, first.spreadsheetUrl);

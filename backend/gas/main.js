@@ -9,6 +9,8 @@ import { createGasPlatform } from '../platform/gasPlatform.js';
 
 const SPREADSHEET_NAME = 'Журнал колледжа — база';
 const LOCK_WAIT_MS = 10000;
+const TIME_ZONE = 'Asia/Bishkek';
+const LOCALE = 'ru_RU';
 const DEFAULT_SHEET_NAMES = ['Лист1', 'Sheet1'];
 
 function jsonOutput(value) {
@@ -75,6 +77,9 @@ export function setup() {
     spreadsheetId = spreadsheet.getId();
     props.setProperty('SPREADSHEET_ID', spreadsheetId);
   }
+  // Dates typed into the sheet must mean Bishkek midnight, whoever created the file.
+  spreadsheet.setSpreadsheetTimeZone(TIME_ZONE);
+  spreadsheet.setSpreadsheetLocale(LOCALE);
   ensureSheets(SCHEMA, spreadsheet);
   removeDefaultSheet(spreadsheet);
 

@@ -48,8 +48,14 @@ export function createFakeGas() {
 
   const wrapSpreadsheet = (id) => {
     const inner = createFakeSpreadsheet({ 'Лист1': [] }, { 'Лист1': { maxRows: 1000, maxColumns: 26 } });
+    let timeZone = 'Etc/GMT';
+    let locale = 'en_US';
     return Object.assign(inner, {
       getId: () => id,
+      setSpreadsheetTimeZone(zone) { timeZone = zone; },
+      getSpreadsheetTimeZone: () => timeZone,
+      setSpreadsheetLocale(value) { locale = value; },
+      getSpreadsheetLocale: () => locale,
       getUrl: () => `https://docs.google.com/spreadsheets/d/${id}/edit`,
     });
   };

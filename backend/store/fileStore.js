@@ -22,6 +22,8 @@ export function createFileStore(schema, platform, filePath) {
     insert: persisted(store.insert),
     insertMany: persisted(store.insertMany),
     update: persisted(store.update),
+    updateMany: persisted(store.updateMany),
     remove: persisted(store.remove),
+    removeMany: persisted(store.removeMany),
   };
 }
