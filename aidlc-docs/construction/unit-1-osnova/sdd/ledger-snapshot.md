@@ -189,3 +189,4 @@ Models: implementers sonnet; task reviewers sonnet; final review most capable.
 - Final fix wave: re-review — I-1, I-2, I-3 ADDRESSED; no new Critical/Important. Controller viewed the 3 screenshots (same-password error, date-cell error, filled template passes).
   - minor (deferred): site/js/excel.js findDateCell scans every cell of !ref — huge declared range may hang the tab (same family as M-6)
 - Final review: complete (8cf0b22..2e97f68). Unit 1 ready for owner acceptance on the stand.
+- OWNER ACCEPTED unit 1 on the stand (20.11.2026). Next: Task 12 deployment with the owner.
