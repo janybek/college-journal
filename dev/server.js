@@ -76,7 +76,7 @@ function serveFile(req, res, siteDir, pathname) {
   res.end(req.method === 'HEAD' ? undefined : body);
 }
 
-export async function startDevServer({ port = 5173, dataFile = 'dev/data/db.json', siteDir = 'site', maxBodyBytes = MAX_BODY_BYTES } = {}) {
+export async function startDevServer({ port = 5273, dataFile = 'dev/data/db.json', siteDir = 'site', maxBodyBytes = MAX_BODY_BYTES } = {}) {
   const dataPath = path.resolve(ROOT, dataFile);
   const sitePath = path.resolve(ROOT, siteDir);
   const platform = createNodePlatform();
@@ -123,6 +123,6 @@ export async function startDevServer({ port = 5173, dataFile = 'dev/data/db.json
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const dataFile = 'dev/data/db.json';
   if (process.argv.includes('--reset')) fs.rmSync(path.resolve(ROOT, dataFile), { force: true });
-  const server = await startDevServer({ port: 5173, dataFile });
+  const server = await startDevServer({ port: 5273, dataFile });
   console.log(`${server.url}  data: ${path.resolve(ROOT, dataFile)}`);
 }

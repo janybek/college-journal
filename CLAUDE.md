@@ -21,7 +21,7 @@
 ## Команды
 
 - `npm test` — все тесты
-- `npm run dev` — локальный стенд на `http://localhost:5173` (данные вымышленные, пароль стенда в `dev/seed.js`)
+- `npm run dev` — локальный стенд на `http://localhost:5273` (данные вымышленные, пароль стенда в `dev/seed.js`)
 - `npm run dev:reset` — стенд с чистыми данными
 - `npm run build:gas` — сборка сервера для Apps Script в `build/gas/`
 

@@ -1,6 +1,6 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "journal-dev", "runtimeExecutable": "node", "runtimeArgs": ["dev/server.js"], "port": 5173 }
+    { "name": "journal-dev", "runtimeExecutable": "node", "runtimeArgs": ["dev/server.js"], "port": 5273 }
   ]
 }
