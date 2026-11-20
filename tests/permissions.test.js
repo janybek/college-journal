@@ -67,3 +67,18 @@ test('can: schedule actions', () => {
   assert.equal(can(['dean'], 'schedule.mine'), false);
   assert.ok(listPermissions(['dean']).includes('settings.save'));
 });
+
+test('teacher edits topics and the syllabus of own subjects', () => {
+  assert.equal(can(['teacher'], 'dir.save', 'topics'), true);
+  assert.equal(can(['teacher'], 'dir.remove', 'topics'), true);
+  assert.equal(can(['teacher'], 'dir.save', 'weekTemplate'), false);
+  assert.equal(can(['teacher'], 'dir.list', 'topics'), false);
+  assert.equal(can(['teacher'], 'import.apply', 'topics'), false);
+  assert.equal(can(['teacher'], 'syllabus.apply'), true);
+  assert.equal(can(['dean'], 'syllabus.preview'), true);
+  assert.equal(can(['prorector'], 'syllabus.apply'), false);
+  assert.equal(can(['prorector'], 'dir.save', 'topics'), false);
+  assert.equal(can(['student'], 'syllabus.apply'), false);
+  assert.deepEqual(listPermissions(['teacher']),
+    ['dir.remove:topics', 'dir.save:topics', 'schedule.mine', 'syllabus.apply', 'syllabus.preview', 'teacher.mySubjects', 'topics.plan']);
+});

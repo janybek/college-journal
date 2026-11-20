@@ -188,7 +188,7 @@ test('publicUser', () => {
   const row = { id: 'sf_1', fullName: 'A', roles: 'teacher', lang: 'en', mustChangePassword: false, passwordHash: 'x' };
   assert.deepEqual(publicUser(row, 'staff'), {
     id: 'sf_1', kind: 'staff', fullName: 'A', roles: ['teacher'], lang: 'en', mustChangePassword: false,
-    groupId: null, groupName: null, permissions: ['schedule.mine', 'teacher.mySubjects', 'topics.plan'],
+    groupId: null, groupName: null, permissions: ['dir.remove:topics', 'dir.save:topics', 'schedule.mine', 'syllabus.apply', 'syllabus.preview', 'teacher.mySubjects', 'topics.plan'],
   });
   const studentRow = { id: 'st_1', fullName: 'S', groupId: 'g_1', cardNo: 'S1', lang: 'ky', mustChangePassword: false };
   const student = publicUser(studentRow, 'student');

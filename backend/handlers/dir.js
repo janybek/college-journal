@@ -3,7 +3,8 @@ import { normalizeRow, validateRow } from '../../core/validate.js';
 import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { readSettings } from '../../core/settings.js';
 import { FIXED_STATUSES } from '../../core/schema.js';
-import { USER_TABLES } from '../users.js';
+import { semesterOf } from '../../core/topics.js';
+import { USER_TABLES, canEditSubjectTopics } from '../users.js';
 import { relayout } from '../scheduleData.js';
 
 const DIR_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms', 'weekTemplate', 'topics'];
@@ -63,7 +64,7 @@ function checkSubjectGroup(old, row, db) {
   if (used) throw new AppError('invalid', { fields: [{ field: 'groupId', code: 'in_use' }] });
 }
 
-function save(data, ctx) {
+function save(data, ctx, user) {
   const table = tableOf(data);
   const { store, platform } = ctx;
   const input = data.row !== null && typeof data.row === 'object' && !Array.isArray(data.row) ? data.row : {};
@@ -72,10 +73,17 @@ function save(data, ctx) {
   const old = isId(input.id) ? db[table].find((r) => r.id === input.id) ?? null : null;
   if (isId(input.id) && !old) throw new AppError('not_found');
 
+  if (table === 'topics') {
+    const subject = db.subjects.find((r) => r.id === (old ? old.subjectId : input.subjectId));
+    if (subject && !canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
+  }
   const row = normalizeRow(table, { ...old, ...input, id: old ? old.id : undefined, passwordHash: old ? old.passwordHash : undefined });
   if (old && table === 'subjects') checkSubjectGroup(old, row, db);
   if (old && table === 'topics' && row.subjectId !== old.subjectId) {
     throw new AppError('invalid', { fields: [{ field: 'subjectId', code: 'bad_value' }] });
+  }
+  if (old && table === 'topics' && row.semester !== semesterOf(old)) {
+    throw new AppError('invalid', { fields: [{ field: 'semester', code: 'bad_value' }] });
   }
   const fields = validateRow(table, row, db);
   if (fields.length > 0) throw new AppError('invalid', { fields });
@@ -124,6 +132,10 @@ function remove(data, ctx, user) {
   const rows = read(table);
   const row = rows.find((r) => r.id === data.id);
   if (!row) throw new AppError('not_found');
+  if (table === 'topics') {
+    const subject = read('subjects').find((r) => r.id === row.subjectId);
+    if (subject && !canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
+  }
   if (usedBy(read, table, row.id)) throw new AppError('in_use');
   if (table === 'staff' && isActiveAdmin(row) && !rows.some((s) => s.id !== row.id && isActiveAdmin(s))) {
     throw new AppError('invalid', { fields: [{ field: 'roles', code: 'last_admin' }] });

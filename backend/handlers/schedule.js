@@ -3,6 +3,8 @@ import { addDays, daysBetween, isDate, mondayOf } from '../../core/dates.js';
 import { checkPairChange, pairLock } from '../../core/schedule.js';
 import { semesterOf, inSemester } from '../../core/topics.js';
 import { FIXED_STATUSES } from '../../core/schema.js';
+import { canEditSubjectTopics } from '../users.js';
+import { can } from '../../core/permissions.js';
 import { generateSchedule, loadSettings, pairViews, relayout, todayOf } from '../scheduleData.js';
 
 const MANAGER_ROLES = ['admin', 'dean', 'prorector'];
@@ -50,6 +52,7 @@ function plan(data, ctx, user) {
       teacherId: subject.teacherId, teacherName: teacher ? teacher.fullName : '',
     },
     semester: settings.semester,
+    canEdit: can(user.roles, 'dir.save', 'topics') && canEditSubjectTopics(user, subject),
     topics,
     withoutTopic: pairs.filter((p) => p.status === 'planned' && p.topicId === '' && inSemester(p.date, settings)).length,
   };

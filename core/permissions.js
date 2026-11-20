@@ -14,8 +14,10 @@ const ANY_ACTIONS = ['auth.me', 'auth.changePassword', 'user.setLang'];
 // action -> role -> allowed tables (or true for actions without a table)
 const ROLE_ACTIONS = {
   'dir.list': { admin: LIST_TABLES, dean: LIST_TABLES, prorector: LIST_TABLES },
-  'dir.save': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES },
-  'dir.remove': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES },
+  'dir.save': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES, teacher: ['topics'] },
+  'dir.remove': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES, teacher: ['topics'] },
+  'syllabus.preview': { admin: true, dean: true, teacher: true },
+  'syllabus.apply': { admin: true, dean: true, teacher: true },
   'import.preview': { admin: IMPORT_TABLES, dean: DEAN_IMPORT_TABLES },
   'import.apply': { admin: IMPORT_TABLES, dean: DEAN_IMPORT_TABLES },
   'dir.resetPassword': { admin: ['students', 'staff'], dean: ['students'] },
