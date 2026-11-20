@@ -44,13 +44,22 @@
 5. **Двое в одном месте.** Группа, преподаватель или аудитория не оказываются на двух парах сразу — ни в шаблоне, ни после переноса или замены. Отменённая пара место не занимает. Тесты — задачи 3, 4 и 7.
 6. **Чужое расписание.** Студент видит только пары своей группы, преподаватель — только свои (включая пары, где он заменяет), преподаватель не может менять пары и смотреть план чужого предмета, проректор только смотрит. Тесты — задачи 6 и 7.
 
+Дополнение от 21.11.2026 (задачи 14–20):
+
+7. **Повторная загрузка силлабуса со сдвинутой нумерацией, когда часть пар проведена.** Ожидание: тему проведённой пары файл не переписывает (ошибка `held` в этой строке), остальные строки загружаются, темы непроведённых пар пересчитываются. Тесты — задачи 16 и 18.
+8. **Чужой предмет.** Преподаватель не может загрузить силлабус, добавить, изменить или удалить тему предмета, который ведёт не он, — ни с экрана, ни прямым запросом с чужим `subjectId` или id чужой темы. Проректор только смотрит. Тесты — задача 18.
+9. **Смена семестра.** После переключения «1 → 2» темы второго семестра встают только на непроведённые пары в датах семестра; проведённые пары и пары вне дат семестра не меняются; сохранение настроек со страницы, которая про семестр не знает (поле не прислано), семестр не сбрасывает. Тесты — задачи 16 и 17.
+10. **Старые строки тем без семестра.** Они считаются семестром 1 везде: в раскладке, в проверке повтора №, в импорте (строка обновляется, а не появляется второй раз), на экране. Тесты — задачи 16 и 17.
+11. **Один и тот же № в двух семестрах** — не повтор; повтор внутри семестра — ошибка в строке. Файл на год, где нумерация тем и модулей в каждом семестре начинается с 1, загружается целиком. Тесты — задачи 16 и 18.
+12. **Время звонка не из списка** (сохранено раньше или пришло не с экрана). Ожидание: экран его показывает и не теряет при сохранении других полей; из списка нельзя выбрать время, при котором пара закончится после 23:59. Тесты — задача 14.
+
 ## Чего в юните 2 нет
 
 - Кнопки «Начать пару», таймера, QR и отметки: это юнит 3. Статусы `running`, `closed`, `missed` в юните 2 только объявлены и учитываются в правилах; выставлять их начнёт юнит 3. Там же решается, когда прошедшая неначатая пара становится «не проведена» и отдаёт свою тему следующей.
 - Колонок «фактический старт» и «секрет QR» в листе «Пары» и колонки «материал» в листе «Темы»: их добавит тот юнит, которому они нужны (`ensureSheets` дописывает колонки сам).
 - Экрана деканата «Сейчас идёт» (версия 2), подгрупп, недель «числитель / знаменатель», субботы в шаблоне.
 - Записи замен и переносов в «Журнал изменений» (юнит 6) — пока остаётся только примечание у пары. Объявлений и уведомлений о переносе.
-- Правки тем преподавателем: он только видит. Копирования тем из одной группы в другую кнопкой.
+- ~~Правки тем преподавателем: он только видит.~~ Отменено дополнением от 21.11.2026 (задачи 16–20): преподаватель сам загружает и правит силлабус своего предмета. Копирования тем из одной группы в другую кнопкой по-прежнему нет.
 - Печати и выгрузки расписания в Excel.
 - Кеша и ограничения попыток входа (юнит 3).
 
@@ -73,6 +82,20 @@
 | «Создать расписание» при повторном запуске обновляет только будущие пары, не тронутые вручную | — |
 | «Начать заново» (удалить все пары и создать снова) доступно, пока ни одна пара не проводилась | — |
 | Тем меньше, чем пар — последние пары «без темы»; тем больше — экран «Темы» показывает, какие не поместились | — |
+| **Дополнение от 21.11.2026 (задачи 14–20).** Координатор показывает эти строки владельцу вместе с `owner-summary-2.md` | |
+| Время звонка выбирается из списка: каждые 5 минут с 07:00 до 22:25 (186 значений). Правило сервера прежнее: пара 90 минут, конец не позже 23:59 | время не из списка, сохранённое раньше, стоит в списке первой строкой «08:02 — вне списка» и не теряется, пока его не заменят |
+| В «Расписании» в режиме «По группе» название дня с понедельника по пятницу — ссылка на «Шаблон недели» этой группы; столбец этого дня там подсвечен | у субботы и воскресенья (их нет в шаблоне) и в режиме «По преподавателю» (там нет одной группы) ссылки нет |
+| Новая настройка «Сейчас идёт: 1 семестр / 2 семестр» на экране «Настройки семестра»; в листе «Настройки» — строка `semester` | 1 |
+| Когда меняется номер семестра или его даты, журнал сразу перекладывает темы: на непроведённые пары в датах семестра встают темы выбранного семестра. Проведённые пары и пары вне дат семестра не меняются | — |
+| Новая колонка «семестр» в листе «Темы» (1 или 2). Строки без семестра считаются семестром 1 | колонку допишет повторный запуск `setup` |
+| № темы уникален в пределах предмета и семестра: в каждом семестре темы и модули нумеруются с 1. Семестр уже сохранённой темы не меняется (тему удаляют и добавляют заново) | № 1–200, модуль 1–12 |
+| Силлабус преподавателя — файл Excel со столбцами «Семестр», «Модуль», «№», «Тема», «Тип». Предмет и группа берутся со страницы предмета, в файле их нет | один файл на год |
+| Повторная загрузка силлабуса: тема с тем же семестром и № обновляется, новая добавляется; тем, которых нет в файле, журнал не удаляет | лишнюю тему удаляют на экране |
+| В файле деканата (импорт тем сразу по многим предметам) появляется обязательный столбец «Семестр»; файл без него не принимается | — |
+| Темы предмета правят и силлабус загружают: преподаватель этого предмета, деканат и администратор. Проректор смотрит. Экран «Темы» со всеми предметами — по-прежнему только у деканата, администратора и проректора | — |
+| Тему проведённой пары загрузка файла не меняет (ошибка в строке). Вручную её может поправить тот, кто правит темы предмета (раньше — только деканат); удалить её нельзя | — |
+| На экранах и в файлах пишем «Модуль» вместо «Юнит»; столбец «Юнит» в файле тоже принимается | — |
+| У преподавателя кнопка и страница предмета называются «Силлабус». У деканата экран «Темы» остаётся: темы по семестрам и кнопка «Загрузить силлабус (Excel)» для выбранного предмета; ссылка на общий импорт с этого экрана убрана (он остаётся в «Импорте из Excel») | — |
 
 ## Файлы
 
@@ -1242,14 +1265,690 @@ assert.equal('home.todaySoon' in ru, false);
 
 ---
 
+## Дополнение от 21.11.2026: три замечания владельца при приёмке
+
+Задачи 1–12 сделаны и не переписываются (`HEAD 3ed1727`, 234 теста). При приёмке владелец дал три изменения (таблица решений в `aidlc-docs/aidlc-state.md`, строки от 21.11.2026):
+
+1. Время звонка выбирается из списка, а не вписывается.
+2. В «Расписании» нажатие на день недели открывает «Шаблон недели» этой группы.
+3. Темы — это силлабус преподавателя: он сам загружает его файлом Excel на год, у каждой темы указан семестр (1 или 2), модули в каждом семестре нумеруются заново. Деканат видит все силлабусы и может загрузить или поправить за преподавателя. Прежнее правило «темы вводит деканат, преподаватель только видит» отменено.
+
+**Порядок.** Задачи идут так: 14 → 15 → 16 → 17 → 18 → 19 → 20, затем задача 13 «приёмка и выкладка». Номер 13 у неё сохранён (на него ссылаются `aidlc-state.md` и журнал хода работ), в файле она стоит последней. Задачи по-прежнему идут строго по одной; общие файлы (`site/js/router.js`, `shell.js`, словари, `core/import.js`, `backend/handlers/dir.js`) правит только та задача, которая сейчас в работе.
+
+**Что из прежнего текста больше не действует:** строка «Правки тем преподавателем: он только видит» в разделе «Чего в юните 2 нет»; слова «темы вводит деканат» в строке **Spec**; в описании задач 10 и 12 — «только просмотр» у плана тем преподавателя и ссылка «Загрузить темы из Excel» на экране «Темы». Остальные Global Constraints и Review Focus 1–6 действуют полностью.
+
+**Правила дополнения (к Global Constraints):**
+
+- Ключ темы — предмет + семестр + №. Семестр — число 1 или 2. Строка темы без семестра (создана до дополнения) везде считается семестром 1; для этого есть одна функция `semesterOf` в `core/topics.js`, своих сравнений `semester === 1` в коде нет.
+- Раскладка тем работает только с темами текущего семестра (настройка `semester`) и только с парами в датах семестра. Пару со статусом из `FIXED_STATUSES` не меняет ничто.
+- Обработчик, который уже прочитал лист «Настройки», передаёт настройки в `relayout`, а не даёт прочитать лист второй раз.
+- Словарь: на экранах и в шаблонах файлов — «Модуль» (ky «Модуль», en «Module»), не «Юнит». Заголовок колонки листа («юнит») и ключ `unit` в коде не меняются.
+- Скриншоты задач «Экраны» — в `.superpowers/sdd/plan-unit-2-raspisanie/task-<N>-shots/`.
+
+**Файлы дополнения:**
+
+```
+site/js/bells.js            список времени звонков (без DOM)                              новый
+site/js/syllabus.js         темы семестра, номер новой темы, предупреждения (без DOM)     новый
+core/schema.js              + колонка semester в topics, SEMESTERS
+core/settings.js            + настройка semester
+core/topics.js              + semesterOf, inSemester, semesterScope
+core/validate.js            + семестр темы, повтор № внутри семестра
+core/import.js              + столбец «Семестр», спецификация syllabus, поля fixed
+core/permissions.js         + преподаватель: dir.save/dir.remove для topics, syllabus.*
+backend/users.js            + canEditSubjectTopics
+backend/scheduleData.js  handlers/settings.js  handlers/schedule.js  handlers/dir.js  handlers/import.js
+dev/seed.js
+site/js/pairs.js  router.js  shell.js  main.js
+site/js/views/settings.js  schedule.js  pairParts.js  weekTemplate.js  topics.js  plan.js  home.js  import.js  directoryConfig.js
+site/js/i18n/*.js  site/css/screens.css
+tests/bells.test.js  syllabus.test.js  syllabusApi.test.js                                 новые
+```
+
+---
+
+### Task 14 (Э): время звонка выбирается из списка
+
+**Files:** Create `site/js/bells.js`, `tests/bells.test.js`. Modify `site/js/views/settings.js`, `site/js/i18n/ru.js`, `ky.js`, `en.js`, `site/css/screens.css`, `tests/i18n.test.js`.
+
+**Interfaces — Consumes:** экран «Настройки семестра» (Task 8), `isTime`, `minutesOf`, `addMinutes` из `site/js/dates.js`. Сервер не меняется: `validateSettings` по-прежнему принимает любое время `'HH:MM'`, при котором пары не накладываются и последняя кончается не позже 23:59.
+
+**Produces:**
+
+```js
+// site/js/bells.js — без DOM
+export const BELL_FIRST = '07:00';
+export const BELL_LAST = '22:25';      // 22:25 + 90 минут = 23:55: любое значение списка проходит правило «конец не позже 23:59»
+export const BELL_STEP = 5;            // минут
+export function bellTimes();                       // ['07:00', '07:05', …, '22:25'] — 186 строк
+export function bellOptions(current);              // -> [{ value, offList }]: все bellTimes() с offList: false;
+                                                   //    если current — время 'HH:MM' не из списка, оно стоит первым с offList: true
+export function nextBell(last, pairMinutes, gap);  // первое время списка не раньше last + pairMinutes + gap; такого нет или last не время -> ''
+```
+
+Экран:
+
+- В блоке «Звонки» у каждой пары вместо поля `type="time"` — список `<select class="field__input bell__input">` с теми же `id` (`settings-bell-<i>`) и подписью. Пункты — `bellOptions(значение)`: текст пункта — само время, у пункта вне списка — `settings.bellOffList` («08:02 — вне списка»). У пустого значения первым стоит пункт `settings.bellChoose` («Выберите время») со значением `''`.
+- Вписать время с клавиатуры негде. Конец пары, перерывы, лента дня и проверка перед сохранением (`checkBells`: «укажите время», «пары накладываются», «последняя должна закончиться до полуночи») работают как раньше, обновление — на месте, без перерисовки.
+- «Добавить пару» ставит `nextBell(последний звонок, pairMinutes, NEW_BREAK)`; если подходящего времени в списке нет — пустое значение, и сохранение просит выбрать время.
+- Без права `settings.save` (проректор) списки выключены (`disabled`).
+- Подсказка блока `settings.bellsHint`: «Пара длится {minutes} минут: выберите начало из списка, конец посчитается сам.»
+- Время не из списка, пришедшее с сервера, не меняется, пока человек сам не выберет другое: сохранение остальных полей его сохраняет.
+
+- [ ] **Step 1: тесты.**
+
+```js
+// tests/bells.test.js
+import { isTime, minutesOf } from '../core/dates.js';
+import { DEFAULT_BELLS, PAIR_MINUTES, validateSettings } from '../core/settings.js';
+const times = bellTimes();
+assert.equal(times.length, 186);
+assert.deepEqual([times[0], times[1], times[185]], [BELL_FIRST, '07:05', BELL_LAST]);
+for (const time of times) assert.ok(isTime(time) && minutesOf(time) % BELL_STEP === 0 && minutesOf(time) + PAIR_MINUTES <= 23 * 60 + 59, time);
+for (const time of DEFAULT_BELLS) assert.ok(times.includes(time), time);
+assert.equal(times.includes('02:00'), false);                                  // замечание владельца: 02:00 вместо 14:00 выбрать нельзя
+assert.deepEqual(validateSettings({ semesterStart: '2026-09-01', semesterEnd: '2026-12-25', holidays: [], bells: [BELL_LAST] }).errors, []);
+assert.deepEqual(bellOptions('08:00'), times.map((value) => ({ value, offList: false })));
+assert.deepEqual(bellOptions(''), bellOptions('08:00'));
+assert.equal(bellOptions('мусор').length, 186);
+// Review Focus 12
+assert.deepEqual(bellOptions('08:02').slice(0, 2), [{ value: '08:02', offList: true }, { value: '07:00', offList: false }]);
+assert.equal(bellOptions('08:02').length, 187);
+assert.deepEqual(bellOptions('06:30')[0], { value: '06:30', offList: true });  // раньше начала списка
+assert.deepEqual(bellOptions('22:29')[0], { value: '22:29', offList: true });  // позже конца списка
+assert.equal(nextBell('16:50', 90, 10), '18:30');
+assert.equal(nextBell('08:02', 90, 10), '09:45');                              // 09:42 в списке нет — ближайшее следующее
+assert.equal(nextBell('20:45', 90, 10), '22:25');
+assert.equal(nextBell('20:50', 90, 10), '');
+assert.equal(nextBell('', 90, 10), '');
+
+// tests/i18n.test.js
+for (const key of ['settings.bellChoose', 'settings.bellOffList']) assert.ok(ru[key], key);
+```
+
+- [ ] **Step 2:** `npm test` — новые проверки падают. **Step 3:** написать `site/js/bells.js`, переделать блок звонков, добавить ключи в три словаря. **Step 4:** `npm test` зелёное.
+- [ ] **Step 5: проверка в браузере** на `npm run dev:reset`, под `dean`: у каждой пары список от 07:00 до 22:25 через 5 минут, поля для ввода времени нет; вторую пару поставить на 09:00 — пометка «накладывается» сразу, при сохранении ошибка у звонков, ничего не сохранено; «Вернуть стандартные»; «Добавить пару» после 16:50 даёт 18:30; сохранить и перезагрузить — значения на месте. Время не из списка: при остановленном стенде поправить в `dev/data/db.json` строку `bells` на `08:02,09:40` — первая пара показывает «08:02 — вне списка», сохранение другого поля время не меняет, после выбора 08:05 и сохранения пункта «вне списка» больше нет. Под `prorector` списки выключены. Три языка, обе темы, консоль без ошибок.
+- [ ] **Step 6:** скриншоты (блок звонков с раскрытым списком; время вне списка; обе темы, ширина 1280) — в `task-14-shots/`.
+- [ ] **Step 7:** коммит `feat: bell times are picked from a list`.
+
+---
+
+### Task 15 (Э): день недели в «Расписании» открывает «Шаблон недели» группы
+
+**Files:** Modify `site/js/pairs.js`, `site/js/router.js`, `site/js/views/pairParts.js`, `site/js/views/schedule.js`, `site/js/views/weekTemplate.js`, `site/js/i18n/ru.js`, `ky.js`, `en.js`, `site/css/screens.css`, `tests/pairs.test.js`, `tests/router.test.js`, `tests/i18n.test.js`.
+
+**Interfaces — Consumes:** `dayList(days, today, cardOptions)` (Task 11), экран «Шаблон недели» (Task 9), `dayParts` из `site/js/dates.js`.
+
+**Produces:**
+
+```js
+// site/js/pairs.js
+export function templateHref(groupId, date);
+// '#/template/<groupId>/<день недели 1–5>' для даты с понедельника по пятницу; null для субботы, воскресенья и пустого groupId
+
+// site/js/views/pairParts.js — у dayList новая необязательная настройка
+dayList(days, today, { show, onOpen, canOpen, dayHref });   // dayHref(date) -> адрес или null: название дня становится ссылкой
+```
+
+- `resolveRoute` (нужно право `dir.list:weekTemplate`, как раньше): `#/template` → `{ view: 'weekTemplate', params: {} }`; `#/template/<groupId>` → `params: { groupId }`; `#/template/<groupId>/<n>`, где `n` от 1 до 5, → `params: { groupId, weekday: n }` (число). Другой хвост адреса ведёт на главную.
+- «Расписание»: в режиме «По группе» при праве `dir.list:weekTemplate` экран передаёт `dayHref: (date) => templateHref(state.groupId, date)`. В режиме «По преподавателю» и в режиме «День» ссылки нет. Заголовок дня со ссылкой: `<h2 class="day__title"><a class="day__link" href="…">` с прежним содержимым; подсказка и подпись для экранного диктора — `schedule.toTemplate` («Шаблон недели: {weekday}»). Тексты `schedule.lead` и `schedule.leadEdit` дополняются фразой «Нажмите на день недели, чтобы открыть шаблон недели этой группы.»
+- «Шаблон недели»: `render(root, params = {})`. В состоянии экрана — `route` (последние применённые параметры адреса) и `targetDay`. Параметры применяются один раз, когда адрес изменился: `groupId` из адреса становится выбранной группой (если такой группы нет — остаётся первая, как сейчас), `weekday` — днём, чей столбец помечен классом `is-target` (id заголовка `template-day-<n>`) и один раз прокручен в видимую область сетки. Повторная перерисовка с тем же адресом выбор не трогает: группа, выбранная потом в списке, остаётся. `chooseGroup` снимает пометку дня.
+- Проректор по ссылке попадает в тот же шаблон только для чтения.
+
+- [ ] **Step 1: тесты.** 16 ноября 2026 — понедельник.
+
+```js
+// tests/pairs.test.js
+assert.equal(templateHref('g_12ab34cd', '2026-11-16'), '#/template/g_12ab34cd/1');
+assert.equal(templateHref('g_12ab34cd', '2026-11-20'), '#/template/g_12ab34cd/5');
+assert.equal(templateHref('g_12ab34cd', '2026-11-21'), null);       // суббота: в шаблоне её нет
+assert.equal(templateHref('g_12ab34cd', '2026-11-22'), null);
+assert.equal(templateHref('', '2026-11-16'), null);
+
+// tests/router.test.js
+const office = { mustChangePassword: false, permissions: ['dir.list:weekTemplate'] };
+assert.deepEqual(resolveRoute('#/template', office), { view: 'weekTemplate', params: {} });
+assert.deepEqual(resolveRoute('#/template/g_12ab34cd', office), { view: 'weekTemplate', params: { groupId: 'g_12ab34cd' } });
+assert.deepEqual(resolveRoute('#/template/g_12ab34cd/3', office), { view: 'weekTemplate', params: { groupId: 'g_12ab34cd', weekday: 3 } });
+assert.equal(resolveRoute('#/template/g_12ab34cd/6', office).view, 'home');
+assert.equal(resolveRoute('#/template/g_12ab34cd/3/x', office).view, 'home');
+assert.equal(resolveRoute('#/template/g_12ab34cd/3', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'home');
+
+// tests/i18n.test.js
+assert.ok(ru['schedule.toTemplate']);
+```
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное.
+- [ ] **Step 5: проверка в браузере** под `dean`: «Расписание» → «По группе», группа `02-1` → нажать «Среда» — открылся «Шаблон недели» группы `02-1`, столбец среды подсвечен; выбрать в шаблоне группу `01-1` и переключить язык — группа `01-1` осталась, подсветки нет. Кнопка «Назад» возвращает в расписание. У субботы ссылки нет. В режиме «По преподавателю» названия дней — обычный текст. Под `prorector` ссылка открывает шаблон только для чтения. «Моё расписание» преподавателя и студента — без ссылок. Ширина 900 px и 360 px (студент): ничего не съехало. Обе темы, три языка, консоль без ошибок.
+- [ ] **Step 6:** скриншоты (расписание группы с наведённой ссылкой дня; шаблон с подсвеченным столбцом; обе темы) — в `task-15-shots/`.
+- [ ] **Step 7:** коммит `feat: a weekday in the schedule opens the week template of the group`.
+
+---
+
+### Task 16 (Л): семестр в настройках и темах, файл силлабуса
+
+**Files:** Modify `core/schema.js`, `core/settings.js`, `core/topics.js`, `core/validate.js`, `core/import.js`, `tests/schema.test.js`, `tests/settings.test.js`, `tests/topics.test.js`, `tests/validate.test.js`, `tests/import.test.js`. В чужой зоне, только названное:
+
+- `site/js/views/directoryConfig.js`: `IMPORT_COLUMNS.topics` получает `col('semester', true)` после `groupId`; новый `IMPORT_COLUMNS.syllabus` — пять обязательных колонок `semester`, `unit`, `order`, `name`, `lessonType`; `FIELDS.semester = { kind: 'number', required: true, min: 1, max: 2 }`. В `IMPORT_TABLES` ничего не добавляется.
+- `site/js/i18n/ru.js`, `ky.js`, `en.js` — ключи из таблицы ниже.
+- `tests/i18n.test.js`: в тесте про импорт тем числовые колонки теперь `['semester', 'unit', 'order']`; в тесте про слова типа пары строка файла становится `['Анатомия', '01-1', 1, 1, i + 1, 'Тема', word]`.
+- `tests/scheduleApi.test.js`: `HEAD = ['Предмет', 'Группа', 'Семестр', 'Юнит', '№', 'Тема', 'Тип']`, в каждой строке файла после группы добавляется ячейка семестра `1`. Ожидания тестов не меняются.
+- `tests/settingsApi.test.js` и `tests/devServer.test.js`: в ожиданиях, которые сравнивают настройки целиком, появляется `semester: 1`.
+
+**Interfaces — Consumes:** `FIXED_STATUSES`, `layoutTopics` (Task 3), `parseSheet`, `planImport` (юнит 1 и Task 3).
+
+**Produces:**
+
+```js
+// core/schema.js
+export const SEMESTERS = [1, 2];
+// topics: в конец колонок добавляется col('semester', 'семестр', 'int')
+
+// core/settings.js
+export const SETTING_KEYS = ['semesterStart', 'semesterEnd', 'holidays', 'bells', 'semester'];
+readSettings(rows);       // + semester: 2, если в строке стоит '2'; во всех остальных случаях 1
+validateSettings(input);  // + semester, см. правила
+settingsToRows(value);    // строки только для ключей, которые есть в value, в порядке SETTING_KEYS; value всегда строка
+
+// core/topics.js
+export function semesterOf(topic);                    // 2, если topic.semester === 2; иначе 1 (строки без семестра — семестр 1)
+export function inSemester(date, settings);           // дата от semesterStart до semesterEnd включительно; если хотя бы одной даты нет — true
+export function semesterScope(topics, pairs, settings);
+// topics и pairs — строки ОДНОГО предмета; -> { topics, pairs } для layoutTopics:
+//   topics — те, у кого semesterOf(t) === settings.semester;
+//   pairs  — пары со статусом из FIXED_STATUSES (любой даты: их темы считаются занятыми) и пары, у которых inSemester(p.date, settings).
+// Порядок строк сохраняется. layoutTopics не меняется.
+
+// core/import.js
+IMPORT_SPECS.topics;      // + столбец «Семестр», новый ключ
+IMPORT_SPECS.syllabus;    // файл преподавателя: таблица хранения — topics
+export function parseSheet(table, cells, db, fixed = {});
+// fixed — поля, одинаковые для всех строк файла (силлабус: { subjectId }): входят в ключ, в проверку строки и в records.
+// У спецификации может быть table — таблица хранения, если она не совпадает с именем спецификации:
+// parseSheet и planImport берут строки из db[spec.table ?? table] и проверяют их правилами этой таблицы.
+```
+
+Правила:
+
+- `validateSettings`: поле `semester` не прислано (`undefined`) — ошибки нет, ключа `semester` в `value` нет (сервер оставит сохранённое значение). Прислано — должно быть `1` или `2` (число или строка `'1'`, `'2'`), в `value` — число; иначе `{ field: 'semester', code: 'bad_value' }`, последней в списке ошибок.
+- Тема (`validateRow('topics')`, к прежним правилам): `semester` пуст — допустимо (строка считается семестром 1); не пуст и не из `SEMESTERS` → `bad_value`. `order` — `duplicate`, если у этого предмета в том же семестре (`semesterOf`) такой № уже есть; при неверном `semester` повтор не проверяется. `normalizeRow('topics', …)` ставит `semester: 1`, если семестр не задан.
+- Столбцы файлов (ru / ky / en; все обязательные):
+
+| key | Заголовки | Другие принимаемые заголовки |
+| --- | --- | --- |
+| semester | Семестр / Семестр / Semester | — |
+| unit | Модуль / Модуль / Module | Юнит, Unit |
+| order | № / № / No. | № по порядку, № темы, No, N |
+| name | Тема / Тема / Topic | Название |
+| lessonType | Тип / Түрү / Type | Тип пары |
+
+- `IMPORT_SPECS.topics` (файл деканата): колонки `subjectId`, `groupId` (служебная), `semester`, `unit`, `order`, `name`, `lessonType`; `uniqueBy: ['order', 'semester', 'subjectId']`.
+- `IMPORT_SPECS.syllabus` (файл преподавателя): `table: 'topics'`; колонки `semester`, `unit`, `order`, `name`, `lessonType`; тот же `uniqueBy`; `subjectId` приходит через `fixed`.
+- У обеих спецификаций одна и та же проверка `check` (прежняя: тема стоит на паре со статусом из `FIXED_STATUSES`, а название, тип или модуль в файле другие → `{ field: 'name', code: 'held' }`) и `keyDefaults: { semester: 1 }`: при поиске существующей строки пустое значение ключа у строки базы заменяется значением из `keyDefaults` (старая тема без семестра находится по семестру 1 и обновляется, а не появляется второй раз).
+- Значение ячейки «Семестр» в файле — `1` или `2`; другое → `semester: bad_value` (из правил темы), пустая ячейка → `required`.
+- Ключи словарей (ru / ky / en): `import.col.topics.semester` и `import.col.syllabus.semester` — Семестр / Семестр / Semester; `import.col.topics.unit` (меняется) и `import.col.syllabus.unit` — Модуль / Модуль / Module; `import.col.syllabus.order` — № / № / No.; `import.col.syllabus.name` — Тема / Тема / Topic; `import.col.syllabus.lessonType` — Тип / Түрү / Type. Чтобы экран импорта деканата сразу объяснял новый столбец: `import.colHint.topics.semester` («1 или 2. В каждом семестре № тем начинаются с 1.»), `import.colHint.topics.unit` («Число от 1 до 12. В каждом семестре модули считаются с 1.»), `import.matchBy.topics` («Тема с тем же семестром и номером у того же предмета обновится, а не появится второй раз.»), `import.error.semester.bad_value` («Семестр — 1 или 2.»).
+
+- [ ] **Step 1: тесты.**
+
+```js
+// tests/schema.test.js
+assert.deepEqual(SCHEMA.topics.columns.map(c => c.title), ['id', 'предмет', 'юнит', '№ по порядку', 'название', 'тип пары', 'семестр']);
+assert.deepEqual(SEMESTERS, [1, 2]);
+
+// tests/settings.test.js
+assert.deepEqual(readSettings([]), { semesterStart: '', semesterEnd: '', holidays: [], bells: DEFAULT_BELLS, semester: 1 });
+assert.equal(readSettings([{ key: 'semester', value: '2' }]).semester, 2);
+for (const bad of ['3', 'два', '', '0']) assert.equal(readSettings([{ key: 'semester', value: bad }]).semester, 1, bad);
+const base = { semesterStart: '2026-09-01', semesterEnd: '2026-12-25', holidays: [], bells: ['08:00', '09:40'] };
+assert.equal(validateSettings({ ...base, semester: 2 }).value.semester, 2);
+assert.equal(validateSettings({ ...base, semester: '1' }).value.semester, 1);
+assert.deepEqual(settingsToRows(validateSettings({ ...base, semester: 2 }).value).at(-1), { key: 'semester', value: '2' });
+// Review Focus 9: поле не прислано — ошибки нет и строки «semester» нет
+assert.deepEqual(validateSettings(base).errors, []);
+assert.equal('semester' in validateSettings(base).value, false);
+assert.equal(settingsToRows(validateSettings(base).value).length, 4);
+for (const bad of [3, 0, '1 семестр', null, true]) assert.deepEqual(validateSettings({ ...base, semester: bad }).errors, [{ field: 'semester', code: 'bad_value' }], String(bad));
+// прежнее ожидание validateSettings({}).errors (четыре ошибки) не меняется
+```
+
+```js
+// tests/topics.test.js
+assert.deepEqual([{ semester: 2 }, { semester: 1 }, { semester: null }, {}, { semester: 3 }].map(semesterOf), [2, 1, 1, 1, 1]);
+const S1 = { semesterStart: '2026-09-01', semesterEnd: '2026-12-25', semester: 1 };
+const S2 = { semesterStart: '2027-02-01', semesterEnd: '2027-06-18', semester: 2 };
+assert.deepEqual(['2026-08-31', '2026-09-01', '2026-12-25', '2026-12-26'].map(d => inSemester(d, S1)), [false, true, true, false]);
+assert.equal(inSemester('2030-01-01', { semesterStart: '', semesterEnd: '' }), true);
+const T = (id, semester, order) => ({ id, subjectId: 'sb_1', ...(semester ? { semester } : {}), unit: 1, order, name: id, lessonType: 'lecture' });
+const year = [T('a1', 1, 1), T('a2', 1, 2), T('old', null, 3), T('b1', 2, 1), T('b2', 2, 2)];     // 'old' — строка без семестра
+const P = (id, date, status = 'planned', topicId = '') => ({ id, subjectId: 'sb_1', date, slot: 1, status, topicId });
+const pairs = [P('h1', '2026-09-01', 'closed', 'a1'), P('o1', '2026-12-22', 'planned', 'a2'), P('n1', '2027-02-02'), P('n2', '2027-02-09'), P('n3', '2027-02-16')];
+// Review Focus 9: второй семестр — свои темы, свои пары; проведённая пара остаётся в выборке только как «занятая тема»
+const second = semesterScope(year, pairs, S2);
+assert.deepEqual([second.topics.map(t => t.id), second.pairs.map(p => p.id)], [['b1', 'b2'], ['h1', 'n1', 'n2', 'n3']]);
+assert.deepEqual(layoutTopics(second.topics, second.pairs),
+  { assign: [{ id: 'n1', topicId: 'b1' }, { id: 'n2', topicId: 'b2' }], unplaced: [], withoutTopic: 1 });
+// Review Focus 10: первый семестр — строка без семестра входит в него
+const first = semesterScope(year, pairs, S1);
+assert.deepEqual([first.topics.map(t => t.id), first.pairs.map(p => p.id)], [['a1', 'a2', 'old'], ['h1', 'o1']]);
+assert.deepEqual(layoutTopics(first.topics, first.pairs), { assign: [], unplaced: ['old'], withoutTopic: 0 });
+// проведённая пара вне дат семестра держит тему текущего семестра: второй раз тема не выдаётся
+const held = semesterScope(year, [P('h9', '2026-08-20', 'closed', 'b1'), P('n1', '2027-02-02')], S2);
+assert.deepEqual(layoutTopics(held.topics, held.pairs).assign, [{ id: 'n1', topicId: 'b2' }]);
+// дат семестра нет — все пары
+assert.equal(semesterScope(year, pairs, { semesterStart: '', semesterEnd: '', semester: 1 }).pairs.length, 5);
+```
+
+```js
+// tests/validate.test.js
+assert.equal(normalizeRow('topics', { subjectId: 'sb_1', unit: 1, order: 1, name: 'Т', lessonType: 'lecture' }).semester, 1);
+assert.equal(normalizeRow('topics', { subjectId: 'sb_1', semester: '2', unit: 1, order: 1, name: 'Т', lessonType: 'lecture' }).semester, 2);
+const sdb = { subjects: wdb.subjects, topics: [{ id: 'tp_1', subjectId: 'sb_1', semester: 1, unit: 1, order: 1, name: 'Введение', lessonType: 'lecture' },
+  { id: 'tp_old', subjectId: 'sb_1', unit: 1, order: 5, name: 'Старая строка', lessonType: 'lecture' }] };
+const topic = (patch) => validateRow('topics', { subjectId: 'sb_1', semester: 1, unit: 1, order: 9, name: 'Т', lessonType: 'lecture', ...patch }, sdb);
+assert.deepEqual(topic({}), []);
+// Review Focus 11
+assert.deepEqual(topic({ semester: 2, order: 1 }), []);                                              // тот же № в другом семестре
+assert.deepEqual(topic({ order: 1 }), [{ field: 'order', code: 'duplicate' }]);
+// Review Focus 10
+assert.deepEqual(topic({ order: 5 }), [{ field: 'order', code: 'duplicate' }]);                      // строка без семестра — семестр 1
+assert.deepEqual(topic({ semester: 2, order: 5 }), []);
+assert.deepEqual(topic({ semester: 3 }), [{ field: 'semester', code: 'bad_value' }]);
+assert.deepEqual(topic({ semester: 0, order: 1 }), [{ field: 'semester', code: 'bad_value' }]);     // при неверном семестре повтор не проверяется
+// прежние проверки теста «topics rules» (строки без semester) остаются зелёными без правок
+```
+
+```js
+// tests/import.test.js — topicsDb(): у tp_1 и tp_2 появляется semester: 1; добавляются
+//   { id: 'tp_3', subjectId: 'sb_1', unit: 1, order: 7, name: 'Старая строка', lessonType: 'lecture' }            — без семестра
+//   { id: 'tp_9', subjectId: 'sb_2', semester: 1, unit: 1, order: 9, name: 'Тема другой группы', lessonType: 'lecture' }
+// Тест «topics import»: заголовок ['Предмет', 'Группа', 'Семестр', 'Юнит', '№ темы', 'Тема', 'Тип'] («Юнит» теперь принимается как старое название),
+// в прежние строки 2–9 после группы добавляется ячейка семестра 1, после них — пять новых строк:
+  ['Информатика', '01-1', 2, 1, 1, 'Первая тема второго семестра', 'лекция'],   // 10: новая — № 1 есть только в семестре 1
+  ['Информатика', '01-1', 2, 1, 1, 'Повтор во втором', 'лекция'],               // 11
+  ['Информатика', '01-1', 3, 1, 4, 'Третий семестр', 'лекция'],                 // 12
+  ['Информатика', '01-1', '', 1, 5, 'Без семестра', 'лекция'],                  // 13
+  ['Информатика', '01-1', 1, 1, 7, 'Старая строка, новое имя', 'лекция'],       // 14: обновит tp_3
+assert.deepEqual(r.errors, [{ row: 3, field: 'name', code: 'held' }, { row: 5, field: 'order', code: 'duplicate' },
+  { row: 6, field: 'groupId', code: 'bad_ref' }, { row: 7, field: 'subjectId', code: 'bad_ref' },
+  { row: 9, field: 'unit', code: 'bad_value' }, { row: 9, field: 'lessonType', code: 'bad_value' },
+  { row: 11, field: 'order', code: 'duplicate' }, { row: 12, field: 'semester', code: 'bad_value' }, { row: 13, field: 'semester', code: 'required' }]);
+assert.deepEqual(r.records.map(x => [x.row, x.subjectId, x.lessonType]),
+  [[2, 'sb_1', 'lecture'], [4, 'sb_1', 'practice'], [8, 'sb_2', 'control'], [10, 'sb_1', 'lecture'], [14, 'sb_1', 'lecture']]);
+const plan = planImport('topics', r.records, db);
+assert.deepEqual(plan.toInsert.map(t => [t.subjectId, t.semester, t.unit, t.order, t.name]),
+  [['sb_1', 1, 1, 3, 'Защита данных'], ['sb_2', 1, 2, 1, 'Модуль 2 — экзамен'], ['sb_1', 2, 1, 1, 'Первая тема второго семестра']]);
+assert.deepEqual(plan.toUpdate, [{ id: 'tp_1', patch: { unit: 1, name: 'Цифровой пост медсестры', lessonType: 'lecture' } },
+  { id: 'tp_3', patch: { unit: 1, name: 'Старая строка, новое имя', lessonType: 'lecture' } }]);
+// во втором тесте тем: заголовки с «Семестр» / 'Semester', 'Module'; файл без столбца «Группа» -> missingColumns: ['groupId'];
+// файл без столбца «Семестр» -> missingColumns: ['semester']
+// в тесте «duplicate header and specs»: ключи IMPORT_SPECS — ['groups', 'rooms', 'staff', 'students', 'subjects', 'syllabus', 'topics']
+
+// файл преподавателя — Review Focus 7 и 11
+const s = parseSheet('syllabus', [
+  ['Семестр', 'Модуль', '№', 'Тема', 'Тип'],
+  [1, 1, 1, 'Цифровой пост медсестры', 'лекция'],      // 2: обновит tp_1
+  [1, 1, 2, 'Другое имя', 'практика'],                  // 3: пара с этой темой проведена
+  [1, 2, 3, 'Новая в первом', 'практика'],              // 4: новая
+  [2, 1, 1, 'Первая во втором', 'лекция'],              // 5: новая, № снова с 1
+  [2, 2, 2, 'Экзамен', 'экзамен'],                      // 6: новая
+  [2, 2, 2, 'Повтор', 'лекция'],                        // 7
+  [0, 1, 3, 'Нулевой семестр', 'лекция'],               // 8: только ошибка семестра, хотя № 3 уже занят строкой 4
+  ['', '', '', '', ''],                                  // 9: пустая строка пропускается
+  [2, 13, 201, '', 'семинар'],                           // 10
+  [1, 1, 9, 'Девятая', 'лекция'],                        // 11: новая — № 9 занят только у предмета другой группы (tp_9)
+], db, { subjectId: 'sb_1' });
+assert.deepEqual(s.errors, [{ row: 3, field: 'name', code: 'held' }, { row: 7, field: 'order', code: 'duplicate' },
+  { row: 8, field: 'semester', code: 'bad_value' }, { row: 10, field: 'unit', code: 'bad_value' }, { row: 10, field: 'order', code: 'bad_value' },
+  { row: 10, field: 'name', code: 'required' }, { row: 10, field: 'lessonType', code: 'bad_value' }]);
+assert.deepEqual(s.records.map(x => [x.row, x.subjectId, x.lessonType]),
+  [[2, 'sb_1', 'lecture'], [4, 'sb_1', 'practice'], [5, 'sb_1', 'lecture'], [6, 'sb_1', 'control'], [11, 'sb_1', 'lecture']]);
+const sp = planImport('syllabus', s.records, db);
+assert.deepEqual(sp.toInsert.map(t => [t.subjectId, t.semester, t.unit, t.order, t.name]),
+  [['sb_1', 1, 2, 3, 'Новая в первом'], ['sb_1', 2, 1, 1, 'Первая во втором'], ['sb_1', 2, 2, 2, 'Экзамен'], ['sb_1', 1, 1, 9, 'Девятая']]);
+assert.deepEqual(sp.toUpdate, [{ id: 'tp_1', patch: { unit: 1, name: 'Цифровой пост медсестры', lessonType: 'lecture' } }]);
+// лишний столбец «Предмет» в файле преподавателя -> unknownColumns: ['Предмет'], строки загружаются в предмет из fixed;
+// файл без столбца «Семестр» -> missingColumns: ['semester']; заголовки 'Semester', 'Unit', 'No.', 'Topic', 'Type' принимаются
+```
+
+```js
+// tests/i18n.test.js — к двум названным правкам: у каждой колонки силлабуса есть поле, числовые колонки шаблона — семестр, модуль и №
+for (const { key } of IMPORT_COLUMNS.syllabus) assert.ok(FIELDS[key], key);
+assert.deepEqual(IMPORT_COLUMNS.syllabus.filter(({ key }) => FIELDS[key].kind === 'number').map(({ key }) => key), ['semester', 'unit', 'order']);
+assert.equal(IMPORT_TABLES.includes('syllabus'), false);                        // силлабус загружается со страницы предмета, не из общего импорта
+for (const key of ['import.colHint.topics.semester', 'import.error.semester.bad_value']) assert.ok(ru[key], key);
+// прежние тесты «заголовки словарей равны IMPORT_SPECS» и «сайт перечисляет те же колонки» проверяют новые ключи сами
+```
+
+- [ ] **Step 2:** падает. **Step 3:** написать; поправить названные файлы чужой зоны. Прежние тесты импорта пяти справочников зелёные без правок. **Step 4:** `npm test` зелёное.
+- [ ] **Step 5:** коммит `feat: semester of a topic, semester setting, syllabus file`.
+
+---
+
+### Task 17 (С): раскладка по текущему семестру, настройка семестра на сервере, данные стенда
+
+**Files:** Modify `backend/scheduleData.js`, `backend/handlers/settings.js`, `backend/handlers/schedule.js`, `dev/seed.js`, `tests/scheduleApi.test.js`, `tests/settingsApi.test.js`, `tests/pairsApi.test.js`, `tests/devServer.test.js`, `tests/sheetsStore.test.js`.
+
+**Interfaces — Consumes:** `semesterOf`, `inSemester`, `semesterScope` (Task 16: `semesterScope(topics, pairs, settings) -> { topics, pairs }` для `layoutTopics`), `readSettings` с полем `semester`, `validateSettings` (не присланный `semester` в `value` не попадает), `settingsToRows` (Task 16).
+
+**Produces:**
+
+```js
+// backend/scheduleData.js
+export function relayout(store, subjectIds = null, rows = {});
+// rows = { topics?, pairs?, settings? }; settings — объект в форме readSettings. Нет в rows — читается loadSettings(store), один раз.
+// По каждому предмету: layoutTopics(...semesterScope(темы предмета, пары предмета, settings)). Ответ прежний: { changed, topics, pairs }.
+```
+
+- `generateSchedule`, `schedule.changePair` и `schedule.restorePair` уже читают настройки и передают их в `relayout` (`rows.settings`). Остальные вызовы (`dir.save` и `dir.remove` тем, импорт тем, `schedule.cancelPair`, `seed`) настроек не читали — их читает сам `relayout`.
+- `settings.get` → в `settings` есть `semester`.
+- `settings.save { settings }` → `{ settings }` со всеми пятью полями. Поле `semester` не прислано — остаётся сохранённое (строка `semester` не пишется и не создаётся). Если после сохранения изменился `semester`, `semesterStart` или `semesterEnd` — `relayout(store, null, { settings: <новые настройки> })`; если не изменились — «Темы» и «Пары» не читаются.
+- `topics.plan { subjectId }` → к прежнему ответу: `semester` (текущий, из настроек) и `semester` у каждой темы (`semesterOf`); темы идут по семестру, затем по `order`; `withoutTopic` — запланированные пары предмета без темы, у которых `inSemester(date, settings)`. `pair` у темы — как раньше, пара, на которой тема стоит (у темы другого семестра это может быть давно проведённая пара).
+- Данные стенда: у прежних 18 тем каждой «Информатики» `semester: 1`; добавляются 6 тем семестра 2 (№ 1–6): модуль 1 — «Электронные таблицы: учёт лекарств и расчёт доз» (лекция, практика), «Презентация для пациента: памятка и санбюллетень» (практика); модуль 2 — «Электронная очередь и запись на приём» (лекция, практика), «Модуль 2 — экзамен» (`control`). В настройках стенда `semester: 1`.
+
+- [ ] **Step 1: тесты.**
+
+```js
+// tests/scheduleApi.test.js — новый тест; setup() прежний: у sb1 три темы без семестра (topic1…topic3), пары sb1 — 1 и 8 сентября
+const b1 = store.insert('topics', { subjectId: sb1, semester: 2, unit: 1, order: 1, name: 'Второй семестр 1', lessonType: 'lecture' }).id;
+const b2 = store.insert('topics', { subjectId: sb1, semester: 2, unit: 1, order: 2, name: 'Второй семестр 2', lessonType: 'lecture' }).id;
+call('schedule.generate', {}, dean);
+const mine = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
+const planOf = () => call('topics.plan', { subjectId: sb1 }, dean).data;
+const rows = (plan) => plan.topics.map(t => [t.semester, t.order, t.pair && t.pair.date]);
+// Review Focus 10: темы без семестра разложены как семестр 1, темы семестра 2 ждут
+assert.deepEqual(mine().map(p => p.topicId), [topic1, topic2]);
+assert.equal(planOf().semester, 1);
+assert.deepEqual(rows(planOf()), [[1, 1, '2026-09-01'], [1, 2, '2026-09-08'], [1, 3, null], [2, 1, null], [2, 2, null]]);
+
+// Review Focus 9: пара 1 сентября проведена; деканат переключает семестр
+store.update('pairs', mine()[0].id, { status: 'closed' });
+assert.equal(call('settings.save', { settings: { ...S, semester: 2 } }, dean).data.settings.semester, 2);
+assert.deepEqual(mine().map(p => p.topicId), [topic1, b1]);
+assert.deepEqual([planOf().semester, planOf().withoutTopic], [2, 0]);
+assert.deepEqual(rows(planOf()), [[1, 1, '2026-09-01'], [1, 2, null], [1, 3, null], [2, 1, '2026-09-08'], [2, 2, null]]);
+assert.equal(call('settings.save', { settings: S }, dean).data.settings.semester, 2);       // поле не прислано — семестр прежний
+assert.deepEqual(mine().map(p => p.topicId), [topic1, b1]);
+call('settings.save', { settings: { ...S, semester: 1 } }, dean);
+assert.deepEqual(mine().map(p => p.topicId), [topic1, topic2]);
+
+// второй семестр с новыми датами: пары первого семестра не трогаются (в шаблоне у sb1 вторник, пара 1, и понедельник, пара 2)
+state.now = Date.UTC(2026, 8, 12, 6);                                                         // 12 сентября
+const dean12 = call('auth.login', { login: 'dean', password: 'secret12' }).data.token;        // ключ сотрудника живёт 7 дней: войти заново
+assert.equal(call('settings.save', { settings: { semesterStart: '2026-09-14', semesterEnd: '2026-09-25', holidays: [], bells: DEFAULT_BELLS, semester: 2 } }, dean12).ok, true);
+assert.equal(call('schedule.generate', {}, dean12).data.inserted, 6);
+assert.deepEqual(mine().map(p => [p.date, p.topicId]), [['2026-09-01', topic1], ['2026-09-08', topic2],
+  ['2026-09-14', b1], ['2026-09-15', b2], ['2026-09-21', ''], ['2026-09-22', '']]);
+assert.equal(call('topics.plan', { subjectId: sb1 }, dean12).data.withoutTopic, 2);
+
+// скорость (шпион над хранилищем, как в прежних тестах): settings.save со сменой семестра читает каждый лист не больше одного раза
+// и делает не больше одного updateMany('pairs'); settings.save без смены семестра и дат не читает 'topics' и 'pairs';
+// schedule.generate, schedule.changePair с переносом, schedule.cancelPair, schedule.restorePair, dir.save и dir.remove тем,
+// import.apply тем: reads.settings <= 1 и каждый лист по-прежнему не больше одного раза.
+// Тест «relayout: nothing to change…»: в rows добавить settings — calls по-прежнему {}.
+```
+
+```js
+// tests/settingsApi.test.js
+assert.equal(call('settings.get', {}, prorector).data.settings.semester, 1);
+assert.equal(call('settings.save', { settings: { ...input, semester: 2 } }, dean).data.settings.semester, 2);
+assert.equal(store.list('settings').length, 5);
+assert.equal(call('settings.save', { settings: input }, dean).data.settings.semester, 2);
+assert.equal(call('settings.get', {}, dean).data.settings.semester, 2);
+assert.deepEqual(call('settings.save', { settings: { ...input, semester: 3 } }, dean).error, { code: 'invalid', fields: [{ field: 'semester', code: 'bad_value' }] });
+// прежние проверки «строк в „Настройках“ четыре» (сохранение без поля semester) остаются
+
+// tests/sheetsStore.test.js — Review Focus 10: лист «Темы», созданный до дополнения
+const old = createFakeSpreadsheet({ 'Темы': [['id', 'предмет', 'юнит', '№ по порядку', 'название', 'тип пары'], ['tp_1', 'sb_1', 1, 1, 'Введение', 'lecture']] });
+assert.ok(ensureSheets(SCHEMA, old).addedColumns.includes('Темы.семестр'));
+const legacy = createSheetsStore(SCHEMA, platform, old).list('topics')[0];
+assert.deepEqual([legacy.semester, semesterOf(legacy)], [null, 1]);
+// (ensureSheets и чтение уже умеют это с Task 1: проверка закрепляет поведение и может быть зелёной сразу)
+
+// tests/devServer.test.js
+assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('topics').length, store.list('pairs').length], [6, 9, 72, 159]);
+assert.equal(store.list('topics').filter(t => t.semester === 2).length, 18);
+const second = new Set(store.list('topics').filter(t => t.semester === 2).map(t => t.id));
+assert.equal(pairs.some(p => second.has(p.topicId)), false);                                  // темы семестра 2 на пары не встали
+assert.equal(readSettings(store.list('settings')).semester, 1);
+// прежние проверки «Информатики» (18 пар с разными темами у 01-1, 17 у 02-1) остаются
+```
+
+- [ ] **Step 2:** падает (кроме проверки в `tests/sheetsStore.test.js`). **Step 3:** написать. **Step 4:** `npm test` зелёное; `npm run build:gas` проходит.
+- [ ] **Step 5:** `npm run dev:reset`; запрос `topics.plan` под `dean` для «Информатики» группы `01-1` возвращает 24 темы: 18 семестра 1 с датами и 6 семестра 2 без пар.
+- [ ] **Step 6:** коммит `feat: topics are laid out by the current semester`.
+
+---
+
+### Task 18 (С): преподаватель правит темы своих предметов и загружает силлабус
+
+**Files:** Modify `backend/users.js`, `backend/handlers/dir.js`, `backend/handlers/import.js`, `backend/handlers/schedule.js`. Create `tests/syllabusApi.test.js`. В чужой зоне, только названное: `core/permissions.js`, `tests/permissions.test.js`, `tests/api.test.js` (ожидание прав преподавателя в тесте `publicUser`). Права меняются в этой же задаче, что и проверка «свой предмет»: между задачами не должно быть состояния, в котором преподаватель может править чужие темы.
+
+**Interfaces — Consumes:** `parseSheet('syllabus', cells, db, { subjectId })`, `planImport('syllabus', records, db)`, `IMPORT_SPECS.syllabus` (Task 16); `relayout` (Task 17); `loadDb(store, 'topics', ['pairs'])` (Task 5); `semesterOf` (Task 16).
+
+**Produces:**
+
+```js
+// backend/users.js
+export function canEditSubjectTopics(user, subject);   // у пользователя есть роль admin или dean, либо subject.teacherId === user.id
+```
+
+Права (к матрице):
+
+| Действие | Кто |
+| --- | --- |
+| `dir.save`, `dir.remove` для `topics` | admin, dean, teacher (преподаватель — только свои предметы) |
+| `syllabus.preview`, `syllabus.apply` | admin, dean, teacher (преподаватель — только свои предметы) |
+| `dir.list` для `topics`, `import.*` для `topics` | без изменений: преподавателю нельзя |
+
+Действия:
+
+- `dir.save` для `topics`: предмет темы (у существующей темы — её прежний предмет, у новой — `row.subjectId`) найден и `canEditSubjectTopics` ложно → `forbidden`; проверка идёт раньше `validateRow`. Предмета нет — как раньше, `subjectId: bad_ref`. У существующей темы меняют семестр (`row.semester !== semesterOf(old)`) → `invalid`, `[{ field: 'semester', code: 'bad_value' }]`.
+- `dir.remove` для `topics`: предмет темы читается из «Предметов» (лист — один раз); `canEditSubjectTopics` ложно → `forbidden`. Прежний запрет `in_use` для темы проведённой пары остаётся.
+- `topics.plan`: в ответе `canEdit` — у вошедшего есть право `dir.save` для `topics` и `canEditSubjectTopics(user, subject)`. Кто видит план — без изменений (деканат, администратор, проректор — любой предмет; преподаватель — свой).
+- `syllabus.preview { subjectId, cells }` → ответ той же формы, что у `import.preview`; `syllabus.apply { subjectId, cells }` → той же формы, что у `import.apply` (`passwords: []`). `subjectId` не строка или `cells` не массив массивов → `bad_request`; предмета нет → `not_found`; `canEditSubjectTopics` ложно → `forbidden`. База — `loadDb(store, 'topics', ['pairs'])`; запись и пересчёт — тем же кодом, что у импорта тем: одно `updateMany` только изменившихся строк, одно `insertMany`, затем `relayout` для этого предмета. Обработчики лежат в `backend/handlers/import.js` и регистрируются вместе с `importHandlers`.
+
+- [ ] **Step 1: тесты.** `tests/syllabusApi.test.js`: подготовка — как `setup()` в `tests/scheduleApi.test.js` (сотрудники `dean` с ролями `dean,teacher`, `prorector`, `teacher1`, `teacher2`; `sb1` «Информатика» у `teacher1`, `sb2` «Анатомия» у `teacher2`; настройки `S`, шаблон, шпион над хранилищем), но без тем; расписание создано 31 августа: пары `sb1` — 1 и 8 сентября.
+
+```js
+const HEAD = ['Семестр', 'Модуль', '№', 'Тема', 'Тип'];
+const year = [HEAD, [1, 1, 1, 'Введение', 'лекция'], [1, 1, 2, 'Практикум', 'практика'], [1, 2, 3, 'Рубежный', 'рубежный'],
+  [2, 1, 1, 'Таблицы', 'лекция'], [2, 2, 2, 'Экзамен', 'экзамен']];
+const send = (action, subjectId, cells, token) => call(action, { subjectId, cells }, token);
+
+// преподаватель загружает силлабус своего предмета на год — Review Focus 11
+const pre = send('syllabus.preview', sb1, year, teacher1).data;
+assert.deepEqual([pre.total, pre.valid, pre.newCount, pre.updateCount, pre.errors], [5, 5, 5, 0, []]);
+assert.equal(store.list('topics').length, 0);
+const first = send('syllabus.apply', sb1, year, teacher1).data;
+assert.deepEqual([first.inserted, first.updated, first.skipped, first.passwords, first.errors], [5, 0, 0, [], []]);
+assert.deepEqual(store.list('topics').map(t => [t.subjectId, t.semester]), [[sb1, 1], [sb1, 1], [sb1, 1], [sb1, 2], [sb1, 2]]);
+const plan = call('topics.plan', { subjectId: sb1 }, teacher1).data;
+assert.deepEqual([plan.semester, plan.canEdit], [1, true]);
+assert.deepEqual(plan.topics.map(t => [t.semester, t.order, t.pair && t.pair.date]),
+  [[1, 1, '2026-09-01'], [1, 2, '2026-09-08'], [1, 3, null], [2, 1, null], [2, 2, null]]);
+const again = send('syllabus.apply', sb1, year, teacher1).data;
+assert.deepEqual([again.inserted, again.updated, store.list('topics').length], [0, 5, 5]);
+
+// Review Focus 8: чужой предмет и роли
+assert.deepEqual(send('syllabus.preview', sb2, year, teacher1).error, { code: 'forbidden' });
+assert.deepEqual(send('syllabus.apply', sb2, year, teacher1).error, { code: 'forbidden' });
+assert.equal(store.list('topics').some(t => t.subjectId === sb2), false);
+assert.deepEqual(send('syllabus.apply', sb1, year, prorector).error, { code: 'forbidden' });
+assert.equal(send('syllabus.apply', sb2, year, dean).data.inserted, 5);                      // деканат — за преподавателя
+assert.deepEqual(send('syllabus.apply', 'sb_nope', year, dean).error, { code: 'not_found' });
+assert.deepEqual(send('syllabus.apply', sb1, 'x', teacher1).error, { code: 'bad_request' });
+const noColumn = send('syllabus.apply', sb1, [['Модуль', '№', 'Тема', 'Тип'], [1, 1, 'Т', 'лекция']], teacher1).data;
+assert.deepEqual([noColumn.inserted, noColumn.missingColumns], [0, ['semester']]);
+
+// Review Focus 7: пара 1 сентября проведена, в новом файле нумерация сдвинута
+store.update('pairs', store.list('pairs').find(p => p.subjectId === sb1 && p.date === '2026-09-01').id, { status: 'closed' });
+const shifted = [HEAD, [1, 1, 1, 'Новое введение', 'лекция'], [1, 1, 2, 'Введение', 'лекция'], [1, 1, 3, 'Практикум', 'практика']];
+const res = send('syllabus.apply', sb1, shifted, teacher1).data;
+assert.deepEqual([res.inserted, res.updated, res.skipped, res.errors], [0, 2, 1, [{ row: 2, field: 'name', code: 'held' }]]);
+assert.deepEqual(call('topics.plan', { subjectId: sb1 }, teacher1).data.topics.slice(0, 3).map(t => [t.order, t.name, t.pair && t.pair.date]),
+  [[1, 'Введение', '2026-09-01'], [2, 'Введение', '2026-09-08'], [3, 'Практикум', null]]);
+
+// правка тем вручную — Review Focus 8 и 11
+const save = (row, token) => call('dir.save', { table: 'topics', row }, token);
+const own = save({ subjectId: sb1, semester: 2, unit: 1, order: 3, name: 'Своя тема', lessonType: 'lecture' }, teacher1).data.row;
+assert.equal(own.semester, 2);
+assert.deepEqual(save({ subjectId: sb2, semester: 1, unit: 1, order: 9, name: 'Чужая', lessonType: 'lecture' }, teacher1).error, { code: 'forbidden' });
+const foreign = store.insert('topics', { subjectId: sb2, semester: 1, unit: 1, order: 8, name: 'Тема коллеги', lessonType: 'lecture' });
+assert.deepEqual(save({ id: foreign.id, name: 'Не моя' }, teacher1).error, { code: 'forbidden' });
+assert.deepEqual(call('dir.remove', { table: 'topics', id: foreign.id }, teacher1).error, { code: 'forbidden' });
+assert.equal(store.get('topics', foreign.id).name, 'Тема коллеги');
+assert.equal(call('dir.remove', { table: 'topics', id: own.id }, teacher1).ok, true);
+assert.equal(save({ id: foreign.id, name: 'Правка деканата' }, dean).ok, true);
+assert.deepEqual(save({ id: foreign.id, semester: 2 }, dean).error, { code: 'invalid', fields: [{ field: 'semester', code: 'bad_value' }] });
+assert.equal(save({ subjectId: sb2, semester: 2, unit: 1, order: 8, name: 'Тот же номер, другой семестр', lessonType: 'lecture' }, dean).ok, true);
+assert.deepEqual(call('dir.list', { table: 'topics' }, teacher1).error, { code: 'forbidden' });
+assert.deepEqual(call('dir.save', { table: 'rooms', row: { name: '999' } }, teacher1).error, { code: 'forbidden' });
+assert.deepEqual([call('topics.plan', { subjectId: sb2 }, prorector).data.canEdit, call('topics.plan', { subjectId: sb2 }, dean).data.canEdit], [false, true]);
+
+// скорость: syllabus.apply читает каждый лист не больше одного раза, не делает ни одного update и remove,
+// не больше одного insertMany и двух updateMany (темы и пары)
+```
+
+```js
+// tests/permissions.test.js
+assert.equal(can(['teacher'], 'dir.save', 'topics'), true);
+assert.equal(can(['teacher'], 'dir.remove', 'topics'), true);
+assert.equal(can(['teacher'], 'dir.save', 'weekTemplate'), false);
+assert.equal(can(['teacher'], 'dir.list', 'topics'), false);
+assert.equal(can(['teacher'], 'import.apply', 'topics'), false);
+assert.equal(can(['teacher'], 'syllabus.apply'), true);
+assert.equal(can(['dean'], 'syllabus.preview'), true);
+assert.equal(can(['prorector'], 'syllabus.apply'), false);
+assert.equal(can(['prorector'], 'dir.save', 'topics'), false);
+assert.equal(can(['student'], 'syllabus.apply'), false);
+assert.deepEqual(listPermissions(['teacher']),
+  ['dir.remove:topics', 'dir.save:topics', 'schedule.mine', 'syllabus.apply', 'syllabus.preview', 'teacher.mySubjects', 'topics.plan']);
+// tests/api.test.js, тест 'publicUser': permissions преподавателя — тот же список из семи строк
+```
+
+- [ ] **Step 2:** падает. **Step 3:** написать. Прежние тесты `tests/dirSchedule.test.js`, `tests/scheduleApi.test.js`, `tests/importApi.test.js` зелёные. **Step 4:** `npm test` зелёное; `npm run build:gas` проходит.
+- [ ] **Step 5:** коммит `feat: teachers edit the topics of their own subjects and upload a syllabus`.
+
+---
+
+### Task 19 (Э): темы по семестрам, правка преподавателем, переключатель семестра
+
+**Files:** Create `site/js/syllabus.js`, `tests/syllabus.test.js`. Modify `site/js/views/topics.js`, `site/js/views/plan.js`, `site/js/views/settings.js`, `site/js/views/home.js` (только подпись кнопки у предмета), `site/js/i18n/ru.js`, `ky.js`, `en.js`, `site/css/screens.css`, `tests/i18n.test.js`.
+
+**Interfaces — Consumes:** `topics.plan` → `{ subject, semester, canEdit, topics: [{ id, semester, unit, order, name, lessonType, pair }], withoutTopic }` (Task 17, 18); `dir.save` и `dir.remove` для `topics` (в строке темы есть `semester`; чужой предмет → `forbidden`); `settings.get` и `settings.save` с полем `semester` (Task 17).
+
+**Produces:**
+
+```js
+// site/js/syllabus.js — без DOM
+export function semesterTopics(plan, semester);   // темы плана этого семестра по order
+export function nextTopic(topics);                // -> { order, unit } для новой темы: наибольший № + 1 и модуль последней темы; тем нет -> { order: 1, unit: 1 }
+export function planWarnings(plan, semester);     // -> { notPlaced, withoutTopic }: для plan.semester — темы семестра без пары и plan.withoutTopic; для другого семестра — нули
+
+// site/js/views/topics.js
+export function render(root, params = {});        // экран деканата «Темы» (#/topics)
+export function renderSubject(root, subjectId);   // страница одного предмета (#/plan/<subjectId>): та же таблица и окна, без выбора предмета
+export function leave();
+// site/js/views/plan.js становится обёрткой: leave — тот же, render(root, { subjectId }) вызывает renderSubject
+```
+
+Экран тем (оба вида):
+
+- Над таблицей — переключатель «1 семестр / 2 семестр» (`topics.semesterN`), у текущего семестра метка `topics.semesterNow` («идёт сейчас»). При открытии предмета выбрана вкладка текущего семестра (`plan.semester`). Таблица и счётчик тем — `semesterTopics(plan, вкладка)`; модули и № в каждой вкладке свои.
+- Предупреждения «Не поместилось тем» и «Пар без темы» — из `planWarnings`, то есть только на вкладке текущего семестра. На вкладке другого семестра — `note('info', t('topics.otherSemester'))`; у темы без пары там вместо метки «без пары» приглушённый текст `topics.notNow`, строка не помечается как непоместившаяся. Если у темы другого семестра есть пара (она была проведена) — её дата показывается.
+- Кнопки «Добавить тему», «Изменить», «Удалить» показываются по `plan.canEdit`, а не по правам из входа: право преподавателя зависит от предмета, это знает только сервер. Новая тема получает семестр открытой вкладки, № и модуль — из `nextTopic`. В окне темы семестр виден строкой над заголовком («Информатика — 01-1 · 2 семестр») и не меняется; в запрос уходит `semester`. Ответ `forbidden` при сохранении или удалении — сообщением в окне.
+- Слово «Юнит» на экране заменяется на «Модуль»: колонка таблицы, поле окна, текст ошибки.
+- Страница одного предмета (`renderSubject`): заголовок `plan.title` («Силлабус»), в панели — название предмета и группа, как сейчас; ответы `forbidden` и `not_found` — прежние сообщения со ссылкой на главную; при `canEdit === false` — `note('info', t('plan.readOnly'))`. На главной преподавателя кнопка у предмета называется `home.syllabus` («Силлабус»).
+- Экран деканата «Темы»: всё прежнее (выбор предмета, преподаватель предмета) плюс вкладки семестров. Проректор видит таблицы без кнопок.
+
+Экран «Настройки семестра»: в блоке «Семестр» под датами — переключатель «Сейчас идёт: 1 семестр / 2 семестр» (`settings.semesterNo`, пункты — `topics.semesterN`) с подсказкой `settings.semesterNoHint`. Значение входит в «несохранённые изменения» и уходит в `settings.save`. Если сохранение сменило семестр — к сообщению об успехе добавляется `settings.savedSemester`. Проректор видит значение без переключения.
+
+Словари (ru; ky и en — по смыслу): `topics.semesterTabs` «Семестр»; `topics.semesterN` «{n} семестр»; `topics.semesterNow` «идёт сейчас»; `topics.otherSemester` «Темы этого семестра встанут на пары, когда деканат переключит семестр в „Настройках семестра“.»; `topics.notNow` «не в этом семестре»; `plan.readOnly` «Темы этого предмета меняют его преподаватель и деканат, здесь они только для просмотра.»; `home.syllabus` «Силлабус»; `settings.semesterNo` «Сейчас идёт»; `settings.semesterNoHint` «От этого зависит, темы какого семестра встают на пары. Переключайте вместе с датами нового семестра.»; `settings.savedSemester` «Семестр переключён: на непроведённые пары встали темы {n} семестра.»; `settings.error.semester.bad_value` «Выберите семестр: 1 или 2.». Меняются: `topics.field.unit` «Модуль»; `topics.field.unitHint` «Число от 1 до 12. В каждом семестре модули считаются с 1.»; `error.unit.bad_value` «Модуль — целое число от 1 до 12.»; `error.topics.order.duplicate` «Тема с таким номером в этом семестре уже есть.»; `topics.lead` «Силлабусы предметов: темы по семестрам. Журнал ставит темы текущего семестра на пары предмета по датам: одна тема — одна пара.»; `topics.hint` «Силлабусы предметов и даты пар»; `plan.title` «Силлабус»; `plan.lead` «Темы вашего предмета по семестрам. Журнал ставит темы текущего семестра на пары по датам: одна тема — одна пара.»
+
+- [ ] **Step 1: тесты.**
+
+```js
+// tests/syllabus.test.js
+const topic = (semester, order, unit, pair = null) => ({ id: `t${semester}_${order}`, semester, order, unit, name: 'Т', lessonType: 'lecture', pair });
+const plan = { semester: 1, withoutTopic: 2,
+  topics: [topic(1, 1, 1, { date: '2026-09-01' }), topic(1, 2, 2), topic(2, 1, 1), topic(2, 2, 1), topic(2, 5, 2)] };
+assert.deepEqual(semesterTopics(plan, 1).map(t => t.id), ['t1_1', 't1_2']);
+assert.deepEqual(semesterTopics(plan, 2).map(t => t.order), [1, 2, 5]);
+assert.deepEqual(nextTopic(semesterTopics(plan, 2)), { order: 6, unit: 2 });
+assert.deepEqual(nextTopic([]), { order: 1, unit: 1 });
+assert.deepEqual(planWarnings(plan, 1), { notPlaced: 1, withoutTopic: 2 });
+assert.deepEqual(planWarnings(plan, 2), { notPlaced: 0, withoutTopic: 0 });     // не текущий семестр: предупреждений нет
+
+// tests/i18n.test.js
+for (const key of ['topics.semesterN', 'topics.semesterNow', 'topics.otherSemester', 'topics.notNow', 'plan.readOnly', 'home.syllabus',
+  'settings.semesterNo', 'settings.savedSemester', 'settings.error.semester.bad_value']) assert.ok(ru[key], key);
+for (const dict of [ru, ky, en]) assert.doesNotMatch(dict['topics.field.unit'], /Юнит|Unit/);
+```
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное.
+- [ ] **Step 5: проверка в браузере** на `npm run dev:reset`. Под `teacher1`: «Мои предметы» → «Силлабус» у «Информатики» группы `01-1`: вкладка «1 семестр» (идёт сейчас) — 18 тем с датами, модули 1 и 2; вкладка «2 семестр» — 6 тем, «не в этом семестре», предупреждений нет. Добавить тему во втором семестре — № 7, модуль 2; изменить её название; удалить. Адрес силлабуса чужого предмета («Анатомия») — сообщение «нет прав». Под `dean`: «Темы» — те же вкладки у любого предмета, правка работает; в «Настройках семестра» переключить на «2 семестр» и сохранить — сообщение о переключении; на «Темах» у «Информатики» текущим стал второй семестр, его 6 тем встали на пары (на стенде проведённых пар ещё нет — их начнёт отмечать юнит 3, — поэтому с первой пары семестра), у остальных пар «без темы»; вернуть «1 семестр». Под `prorector`: вкладки есть, кнопок нет, переключатель семестра не нажимается. Обе темы, три языка, ширина 900 px, консоль без ошибок.
+- [ ] **Step 6:** скриншоты (силлабус преподавателя — обе вкладки; окно темы; «Темы» деканата; блок «Семестр» в настройках; обе темы) — в `task-19-shots/`.
+- [ ] **Step 7:** коммит `feat: topics by semester, teachers edit their syllabus, semester switch`.
+
+---
+
+### Task 20 (Э): загрузка силлабуса из Excel со страницы предмета
+
+**Files:** Modify `site/js/views/import.js`, `site/js/views/topics.js` (кнопка и применение адреса), `site/js/router.js`, `site/js/shell.js`, `site/js/i18n/ru.js`, `ky.js`, `en.js`, `site/css/screens.css`, `tests/router.test.js`, `tests/i18n.test.js`.
+
+**Interfaces — Consumes:** `syllabus.preview { subjectId, cells }` и `syllabus.apply { subjectId, cells }` — ответы той же формы, что у импорта (Task 18); `topics.plan` → `subject`, `canEdit`; `IMPORT_COLUMNS.syllabus`, `FIELDS.semester`, ключи `import.col.syllabus.*` (Task 16); экран импорта (юнит 1, Task 10); `render(root, params)` и `renderSubject` экрана тем (Task 19).
+
+- `resolveRoute`: `#/syllabus/<subjectId>` → `{ view: 'import', params: { subjectId } }`, если есть право `syllabus.apply`; `#/topics/<subjectId>` → `{ view: 'topics', params: { subjectId } }`, если есть `dir.list:topics` (экран «Темы» с уже выбранным предметом; параметр применяется один раз при смене адреса, как у «Шаблона недели» в Task 15). `#/import` по-прежнему требует право `import.apply:<таблица>`: преподавателю общий импорт не открывается.
+- Экран тем: при `plan.canEdit` в шапке — кнопка-ссылка `syllabus.upload` («Загрузить силлабус (Excel)») на `#/syllabus/<id предмета>`. Прежняя ссылка «Загрузить темы из Excel» (на общий импорт) убирается вместе с ключом `topics.import`.
+- Экран импорта в режиме силлабуса (`render(root, params = {})`, в адресе есть `subjectId`):
+  - заголовок `syllabus.title`, текст `syllabus.lead`; шаг 1 — «Предмет» (`syllabus.step.subject`): название предмета, группа и преподаватель из `topics.plan`, подсказка `syllabus.subjectHint`; выбора справочника нет;
+  - шаги 2–5 — прежние, для колонок `IMPORT_COLUMNS.syllabus`: вид первой строки файла, подсказки `import.colHint.syllabus.*`, правило `import.matchBy.syllabus`, шаблон `template-syllabus.xlsx` (лист называется `syllabus.sheet`; текстовые колонки — «Тема» и «Тип», числовые — «Семестр», «Модуль», «№»), проверка — `syllabus.preview`, импорт — `syllabus.apply`; ошибки показываются с номером строки и названием столбца, как в импорте справочников;
+  - `topics.plan` ответил `forbidden` или `not_found`, либо `canEdit === false` — сообщение `syllabus.forbidden` или `plan.notFound` и ссылка на главную, шагов нет;
+  - после импорта — итог и ссылка `syllabus.back` («К темам предмета»): на `#/topics/<id>`, если есть право `dir.list:topics`, иначе на `#/plan/<id>`;
+  - переход между `#/import` и `#/syllabus/<id>` или между двумя предметами начинает экран заново (выбранный файл не переносится).
+- `shell.js`: для режима силлабуса в меню подсвечен пункт «Темы» (у деканата), в «хлебных крошках» — страница `syllabus.title` в группе `nav.schedule` (есть `dir.list:topics`) или `home.mySubjects`.
+- Словари (ru; ky и en — по смыслу; слова типа пары в подсказке — те же, что читает импорт): `syllabus.title` «Загрузка силлабуса»; `syllabus.lead` «Силлабус предмета из Excel: темы на весь год, у каждой указан семестр. Новые темы добавятся, темы с тем же семестром и номером обновятся.»; `syllabus.step.subject` «Предмет»; `syllabus.subjectHint` «Файл загружается только в этот предмет этой группы. Для другой группы откройте её предмет и загрузите файл там — тот же файл подойдёт.»; `syllabus.sheet` «Силлабус»; `syllabus.upload` «Загрузить силлабус (Excel)»; `syllabus.back` «К темам предмета»; `syllabus.forbidden` «Силлабус этого предмета загружают его преподаватель и деканат.»; `import.matchBy.syllabus` «Тема с тем же семестром и номером обновится, а не появится второй раз. Тем, которых нет в файле, журнал не удаляет: лишнюю удалите на странице предмета.»; `import.colHint.syllabus.semester` «1 или 2.»; `import.colHint.syllabus.unit` «Номер модуля в семестре, от 1 до 12. В каждом семестре модули считаются с 1.»; `import.colHint.syllabus.order` «Номер темы по порядку в семестре, в каждом семестре с 1. Одна строка — одна пара: лекция и практика по одной теме — две строки.»; `import.colHint.syllabus.lessonType` «лекция, практика или рубежный»; `import.error.order.duplicate` «Такой № в этом семестре уже есть — выше в файле или в журнале.»
+
+- [ ] **Step 1: тесты.**
+
+```js
+// tests/router.test.js
+const teacher = { mustChangePassword: false, permissions: ['dir.save:topics', 'syllabus.apply', 'syllabus.preview', 'topics.plan'] };
+assert.deepEqual(resolveRoute('#/syllabus/sb_12ab34cd', teacher), { view: 'import', params: { subjectId: 'sb_12ab34cd' } });
+assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', { mustChangePassword: false, permissions: ['topics.plan'] }).view, 'home');
+assert.equal(resolveRoute('#/syllabus', teacher).view, 'home');
+assert.equal(resolveRoute('#/import', teacher).view, 'home');                                  // общий импорт преподавателю не открывается
+assert.deepEqual(resolveRoute('#/import', dean), { view: 'import', params: {} });
+const office = { mustChangePassword: false, permissions: ['dir.list:topics'] };
+assert.deepEqual(resolveRoute('#/topics', office), { view: 'topics', params: {} });
+assert.deepEqual(resolveRoute('#/topics/sb_12ab34cd', office), { view: 'topics', params: { subjectId: 'sb_12ab34cd' } });
+assert.equal(resolveRoute('#/topics/sb_12ab34cd', teacher).view, 'home');
+
+// tests/i18n.test.js
+for (const key of ['syllabus.title', 'syllabus.upload', 'syllabus.back', 'syllabus.forbidden', 'syllabus.sheet', 'import.matchBy.syllabus',
+  'import.error.order.duplicate']) assert.ok(ru[key], key);
+for (const key of ['semester', 'unit', 'order', 'lessonType']) assert.ok(ru['import.colHint.syllabus.' + key], key);
+for (const dict of [ru, ky, en]) assert.equal('topics.import' in dict, false);
+// слова типа пары из подсказки import.colHint.syllabus.lessonType на трёх языках читаются parseSheet('syllabus', …) — по образцу прежнего теста для тем
+```
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное.
+- [ ] **Step 5: проверка в браузере** на `npm run dev:reset`. Под `teacher1`: «Силлабус» у «Информатики» `01-1` → «Загрузить силлабус (Excel)»; скачать шаблон — пять столбцов, «Тема» и «Тип» текстовые; вписать три строки: `2 | 2 | 7 | Итоговое занятие | практика`, `2 | 1 | 1 | Электронные таблицы: новая редакция | лекция`, `3 | 1 | 1 | Третий семестр | лекция`; проверка — 1 новая, 1 обновится, 1 ошибка с номером строки и столбцом «Семестр»; импорт; «К темам предмета» — во втором семестре 7 тем, первая с новым названием. Тот же файл второй раз — 0 новых. Адрес `#/syllabus/<id «Анатомии»>` — сообщение, что силлабус загружают преподаватель предмета и деканат; `#/import` ведёт на главную. Под `dean`: «Темы» → «Анатомия — 01-1» → «Загрузить силлабус (Excel)» → файл на год (семестр 1 — три строки, семестр 2 — две) → «К темам предмета»: открыт тот же предмет, темы первого семестра встали на пары, во втором — «не в этом семестре». «Импорт из Excel» → «Темы»: в шаблоне есть столбец «Семестр». Под `prorector` кнопки загрузки нет. Обе темы, три языка, ширина 900 px, консоль без ошибок.
+- [ ] **Step 6:** скриншоты (шаги загрузки силлабуса с ошибкой в строке; итог; кнопка на странице предмета; обе темы) — в `task-20-shots/`.
+- [ ] **Step 7:** коммит `feat: syllabus upload from the subject page`.
+
+---
+
 ### Task 13 (координатор и владелец): приёмка и выкладка
 
 Делается после общей проверки юнита самой сильной моделью и исправления её замечаний.
 
-- [ ] **Step 1:** показать владельцу на стенде (`npm run dev:reset`, `http://localhost:5273`) шесть экранов по скриншотам задач 8–12 и вживую; получить приёмку. Кыргызские тексты новых экранов добавить в список на вычитку.
-- [ ] **Step 2:** согласованные решения из раздела «Решения плана» и ответы владельца на вопросы из `owner-summary.md` записать в таблицу решений `aidlc-docs/aidlc-state.md`.
+Дополнение от 21.11.2026: задача идёт после задач 14–20. Перед показом владельцу — общая проверка диапазона дополнения (`3ed1727..HEAD`) самой сильной моделью по Review Focus 7–12 и исправление её замечаний. Вопросы к владельцу и то, что он увидит, — в `owner-summary-2.md`.
+
+- [ ] **Step 1:** показать владельцу на стенде (`npm run dev:reset`, `http://localhost:5273`) шесть экранов по скриншотам задач 8–12 и вживую; получить приёмку. Кыргызские тексты новых экранов добавить в список на вычитку. Дополнение: показать ещё три изменения по скриншотам задач 14, 15, 19 и 20 — список времени звонков; день недели → шаблон группы; силлабус преподавателя (вкладки семестров, загрузка файла, правка) и переключатель семестра.
+- [ ] **Step 2:** согласованные решения из раздела «Решения плана» и ответы владельца на вопросы из `owner-summary.md` записать в таблицу решений `aidlc-docs/aidlc-state.md`. Дополнение: то же для строк дополнения и вопросов из `owner-summary-2.md`; в `aidlc-docs/inception/design-v1.md` (раздел 6 «Расписание и темы» и раздел 8) дописать: темы — силлабус преподавателя по семестрам, колонка «семестр» в листе «Темы», строка `semester` в «Настройках».
 - [ ] **Step 3 (только по прямой просьбе владельца):** `npm run build:gas`; `npx -y @google/clasp@latest push --force`; `npx -y @google/clasp@latest deploy -i <ID публикации из aidlc-state.md> -d "unit 2: schedule and topics"` — адрес сервера прежний.
-- [ ] **Step 4:** владелец в редакторе Apps Script ещё раз запускает `setup`: появляются листы «Шаблон недели», «Темы», «Пары», таблице ставятся часовой пояс Бишкека и русский язык. Временный пароль администратора при этом не меняется.
+- [ ] **Step 4:** владелец в редакторе Apps Script ещё раз запускает `setup`: появляются листы «Шаблон недели», «Темы», «Пары», таблице ставятся часовой пояс Бишкека и русский язык. Временный пароль администратора при этом не меняется. Дополнение: лист «Темы» создаётся сразу с колонкой «семестр»; строка `semester` в «Настройках» появится при первом сохранении настроек с переключателем семестра.
 - [ ] **Step 5 (только по прямой просьбе владельца):** `git push` — сайт обновится на GitHub Pages.
-- [ ] **Step 6: проверка на живом сайте** на вымышленных данных: сохранить настройки семестра; три строки шаблона; «Создать расписание» — замерить время (ожидание: до 15 секунд на семестр трёх групп); импорт трёх тем; замена и отмена пары; расписание студента с телефона. В таблице: дата в листе «Пары» осталась текстом `2026-…`, а не превратилась в дату.
-- [ ] **Step 7:** обновить `aidlc-docs/aidlc-state.md`: юнит 2 принят и выложен; в «Что перенести в следующие юниты» записать для юнита 3: статусы `running`, `closed`, `missed` выставляет он; прошедшая неначатая пара должна стать `missed` и отдать тему следующей (`relayout`); колонки «фактический старт» и «секрет QR» добавляются в схему `pairs`.
+- [ ] **Step 6: проверка на живом сайте** на вымышленных данных: сохранить настройки семестра; три строки шаблона; «Создать расписание» — замерить время (ожидание: до 15 секунд на семестр трёх групп); импорт трёх тем; замена и отмена пары; расписание студента с телефона. В таблице: дата в листе «Пары» осталась текстом `2026-…`, а не превратилась в дату. Дополнение: под вымышленным преподавателем загрузить силлабус своего предмета на год (по две темы в каждом семестре) — темы первого семестра встали на пары; чужой предмет не открывается; время звонка выбирается из списка; день недели в «Расписании» открывает шаблон группы.
+- [ ] **Step 7:** обновить `aidlc-docs/aidlc-state.md`: юнит 2 принят и выложен; в «Что перенести в следующие юниты» записать для юнита 3: статусы `running`, `closed`, `missed` выставляет он; прошедшая неначатая пара должна стать `missed` и отдать тему следующей (`relayout`); колонки «фактический старт» и «секрет QR» добавляются в схему `pairs`. Дополнение — записать для юнитов 4–6: модуль теперь определяется тройкой «предмет + семестр + номер модуля» (ведомость, рубежный контроль, закрытие юнита); на экранах слово «Модуль», а не «Юнит».
