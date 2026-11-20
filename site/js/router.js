@@ -12,7 +12,14 @@ export function resolveRoute(hash, user) {
   if (dir && DIR_TABLES.includes(dir[1]) && permissions.includes('dir.list:' + dir[1])) return { view: 'directory', params: { table: dir[1] } };
   if (path === '/import' && permissions.some((p) => p.startsWith('import.apply:'))) return { view: 'import', params: {} };
   if (path === '/schedule' && permissions.includes('schedule.list')) return { view: 'schedule', params: {} };
-  if (path === '/template' && permissions.includes('dir.list:weekTemplate')) return { view: 'weekTemplate', params: {} };
+  // #/template, #/template/<groupId>, #/template/<groupId>/<weekday 1–5>: the group to show and the day to mark.
+  const template = /^\/template(?:\/([^/]+)(?:\/([1-5]))?)?$/.exec(path);
+  if (template && permissions.includes('dir.list:weekTemplate')) {
+    const params = {};
+    if (template[1]) params.groupId = template[1];
+    if (template[2]) params.weekday = Number(template[2]);
+    return { view: 'weekTemplate', params };
+  }
   if (path === '/topics' && permissions.includes('dir.list:topics')) return { view: 'topics', params: {} };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };

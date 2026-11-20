@@ -12,7 +12,9 @@ import { isTime, addMinutes, dayParts } from '../dates.js';
 // opens a dialog to put a subject and a room there. Under it, the semester schedule is built from the template:
 // first a dry run that says what would change, then the real request. Drawn from `state`, so a redraw (language
 // switch) keeps the chosen group and an open dialog. Without dir.save:weekTemplate (the vice-rector) the grid is
-// read-only and there is no generation block.
+// read-only and there is no generation block. The address may name a group and a weekday
+// (#/template/<groupId>/<1–5>, from a day of the deanery's schedule): that group is shown and that day's column
+// is marked and scrolled into view, once per address.
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const FORM_FIELDS = ['subjectId', 'roomId'];
@@ -24,6 +26,9 @@ const blank = () => ({
   loadErrorKey: null,
   pending: false,
   groupId: '',
+  route: null,         // { groupId, weekday }: the address parameters applied last
+  targetDay: null,     // the weekday (1–5) whose column is marked; null: none
+  scrollPending: false, // the marked column is still to be scrolled into view
   status: null,        // { key, params }: what the last change of the template did
   freshId: null,       // the template row saved last, marked in the grid
   generation: null,    // { kind: 'success' | 'error', key, params }: what the last generation did
@@ -40,7 +45,8 @@ export function leave() {
   state = blank();
 }
 
-export function render(root) {
+export function render(root, params = {}) {
+  applyRoute(params);
   if (state.data === null && state.loadErrorKey === null && !state.pending) load(state);
   root.append(pageHeader({ id: 'template-title', title: t('template.title'), lead: t('template.lead') }));
   if (state.data === null) {
@@ -60,6 +66,30 @@ export function render(root) {
     weekCard());
   if (canGenerate()) root.append(semesterPanel());
   if (state.dialog) showModal(root, dialogFor(state.dialog));
+  scrollToTarget(root);
+}
+
+// The address is applied only when it changed: a redraw with the same address (a language switch) keeps the group
+// chosen since. A group the address names that does not exist leaves the first one (load() checks it too).
+function applyRoute({ groupId = null, weekday = null }) {
+  if (state.route && state.route.groupId === groupId && state.route.weekday === weekday) return;
+  state.route = { groupId, weekday };
+  if (groupId !== null && groupId !== state.groupId && (state.data === null || state.data.groups.some((group) => group.id === groupId))) {
+    state.groupId = groupId;
+    state.status = null;
+    state.freshId = null;
+  }
+  state.targetDay = WEEKDAYS.includes(weekday) ? weekday : null;
+  state.scrollPending = state.targetDay !== null;
+}
+
+// Once per address: the marked column is brought into the visible part of the grid, past the pinned pair column.
+function scrollToTarget(root) {
+  if (!state.scrollPending || state.data === null) return;
+  const head = root.querySelector('#' + dayHeadId(state.targetDay));
+  if (!head) return;
+  state.scrollPending = false;
+  head.scrollIntoView({ block: 'nearest', inline: 'center' });
 }
 
 async function load(owner) {
@@ -130,6 +160,8 @@ function slotNumbers(rows) {
 }
 
 const cellId = (weekday, slot) => `template-cell-${weekday}-${slot}`;
+const dayHeadId = (weekday) => 'template-day-' + weekday;
+const targetClass = (weekday) => (weekday === state.targetDay ? ' is-target' : '');
 const placeText = (weekday, slot) => t('template.place', { weekday: t('date.weekday.' + weekday), pair: t('settings.pairN', { n: slot }) });
 
 function dayMonth(date) {
@@ -153,11 +185,11 @@ function weekCard() {
     el('p', { class: 'toolbar__count' }, tCount('template.perWeek', rows.length)));
   const head = el('tr', {},
     el('th', { scope: 'col', class: 'week__corner' }, t('template.pairColumn')),
-    WEEKDAYS.map((weekday) => el('th', { scope: 'col', class: 'week__day' },
+    WEEKDAYS.map((weekday) => el('th', { scope: 'col', id: dayHeadId(weekday), class: 'week__day' + targetClass(weekday) },
       el('span', { class: 'week__dayname' }, t('date.weekday.' + weekday)))));
   const body = slotNumbers(rows).map((slot) => el('tr', {},
     slotHeader(slot),
-    WEEKDAYS.map((weekday) => el('td', { class: 'week__cell' },
+    WEEKDAYS.map((weekday) => el('td', { class: 'week__cell' + targetClass(weekday) },
       cell(weekday, slot, rows.find((row) => row.weekday === weekday && row.slot === slot), tones)))));
   return el('section', { class: 'card week-card', 'aria-labelledby': 'template-title' },
     toolbar,
@@ -215,6 +247,8 @@ function cell(weekday, slot, row, tones) {
 
 function chooseGroup(groupId) {
   state.groupId = groupId;
+  state.targetDay = null;
+  state.scrollPending = false;
   state.status = null;
   state.freshId = null;
   refresh();

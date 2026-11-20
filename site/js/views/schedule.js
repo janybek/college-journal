@@ -7,13 +7,14 @@ import {
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { addDays, addMinutes, isDate, isTime, mondayOf } from '../dates.js';
-import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch } from '../pairs.js';
+import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref } from '../pairs.js';
 import { weekNav, dayList, pairCardId, pairTime, weekdayDate, typeBadge, flagBadge } from './pairParts.js';
 
 // The deanery's schedule (#/schedule): the week of a group or of a teacher, or one day across all groups. A pair
 // that may still change opens a dialog to substitute the teacher, move the pair, change the room or cancel it;
 // a cancelled pair of today or later can be put back. Without schedule.changePair (the vice-rector) the
-// schedule is read-only. «Today» always comes from the server's answer, never from the device clock.
+// schedule is read-only. In the week of a group a weekday opens that day of the group's week template.
+// «Today» always comes from the server's answer, never from the device clock.
 // Drawn from `state`, so a redraw (language switch) keeps the mode, the week and an open dialog.
 
 const MODES = ['group', 'teacher', 'day'];
@@ -259,6 +260,8 @@ function weekBody(shown) {
     show: state.mode === 'group' ? ['teacher'] : ['group'],
     onOpen: canChange() ? openPair : null,
     canOpen,
+    // The week of a group: a weekday opens that day of the group's week template.
+    dayHref: state.mode === 'group' && can('dir.list:weekTemplate') ? (date) => templateHref(state.groupId, date) : null,
   });
   if (state.freshId) list.querySelector('#' + CSS.escape(pairCardId({ id: state.freshId })))?.classList.add('is-fresh');
   return el('div', { class: 'schedule-week' },

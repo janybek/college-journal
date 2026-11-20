@@ -411,8 +411,9 @@ export default {
 
   'schedule.title': 'Schedule',
   'schedule.hint': 'Classes by week, substitutions and moves',
-  'schedule.lead': 'The week of a group or a teacher, or one day of all groups at once.',
-  'schedule.leadEdit': 'The week of a group or a teacher, or one day of all groups at once. Click a class to substitute the teacher, move it or cancel it.',
+  'schedule.lead': 'The week of a group or a teacher, or one day of all groups at once. Click a weekday to open the week template of this group.',
+  'schedule.leadEdit': 'The week of a group or a teacher, or one day of all groups at once. Click a class to substitute the teacher, move it or cancel it. Click a weekday to open the week template of this group.',
+  'schedule.toTemplate': 'Week template: {weekday}',
   'schedule.readOnly': 'The dean’s office changes classes; here you can only view the schedule.',
   'schedule.mode': 'What to show',
   'schedule.mode.group': 'By group',

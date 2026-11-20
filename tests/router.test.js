@@ -30,6 +30,16 @@ test('resolveRoute: the week template needs dir.list:weekTemplate', () => {
   assert.equal(resolveRoute('#/template', { mustChangePassword: false, permissions: ['settings.get'] }).view, 'home');
 });
 
+test('resolveRoute: the week template of a group and its weekday', () => {
+  const office = { mustChangePassword: false, permissions: ['dir.list:weekTemplate'] };
+  assert.deepEqual(resolveRoute('#/template', office), { view: 'weekTemplate', params: {} });
+  assert.deepEqual(resolveRoute('#/template/g_12ab34cd', office), { view: 'weekTemplate', params: { groupId: 'g_12ab34cd' } });
+  assert.deepEqual(resolveRoute('#/template/g_12ab34cd/3', office), { view: 'weekTemplate', params: { groupId: 'g_12ab34cd', weekday: 3 } });
+  assert.equal(resolveRoute('#/template/g_12ab34cd/6', office).view, 'home');
+  assert.equal(resolveRoute('#/template/g_12ab34cd/3/x', office).view, 'home');
+  assert.equal(resolveRoute('#/template/g_12ab34cd/3', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'home');
+});
+
 test('resolveRoute: the topics screen needs dir.list:topics', () => {
   const office = { mustChangePassword: false, permissions: ['settings.get', 'dir.list:groups', 'dir.list:topics', 'dir.list:weekTemplate'] };
   assert.equal(resolveRoute('#/topics', office).view, 'topics');

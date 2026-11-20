@@ -1,4 +1,4 @@
-import { addDays } from './dates.js';
+import { addDays, weekday } from './dates.js';
 
 // Pairs of the schedule screens (PairView from the server), without the DOM.
 
@@ -8,6 +8,13 @@ export function groupByDay(pairs, from, days = 7) {
     const date = addDays(from, i);
     return { date, pairs: pairs.filter((pair) => pair.date === date).sort((a, b) => a.slot - b.slot) };
   });
+}
+
+// The week template of the group opened on the weekday of `date` (#/template/<groupId>/<1–5>); the template has
+// no weekend, so Saturday and Sunday (and a missing group) have no address.
+export function templateHref(groupId, date) {
+  const day = weekday(date);
+  return groupId && day <= 5 ? '#/template/' + groupId + '/' + day : null;
 }
 
 // What is special about a pair, always in this order: cancelled, substitution, moved.

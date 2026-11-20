@@ -76,6 +76,10 @@ test('the «Сегодня» placeholder of the student home is gone: the home s
   for (const dict of [ru, ky, en]) assert.equal('home.todaySoon' in dict, false);
 });
 
+test('a weekday of the schedule names the week template it opens', () => {
+  assert.ok(ru['schedule.toTemplate']);
+});
+
 test('dictionaries have identical key sets', () => {
   assert.deepEqual(Object.keys(ky).sort(), Object.keys(ru).sort());
   assert.deepEqual(Object.keys(en).sort(), Object.keys(ru).sort());

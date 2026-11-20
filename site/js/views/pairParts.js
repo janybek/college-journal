@@ -91,21 +91,29 @@ export function flagBadge(flag, pair) {
 }
 
 // Days in a row, each with its pairs; «today» is marked, an empty day says so.
-// cardOptions: { show, onOpen, canOpen(pair) }: only the pairs canOpen accepts (all, without it) become buttons.
-export function dayList(days, today, { show = [], onOpen = null, canOpen = null } = {}) {
+// cardOptions: { show, onOpen, canOpen(pair), dayHref(date) }: only the pairs canOpen accepts (all, without it)
+// become buttons; a day for which dayHref(date) gives an address has its name as a link there.
+export function dayList(days, today, { show = [], onOpen = null, canOpen = null, dayHref = null } = {}) {
   return el('div', { class: 'days', 'data-count': days.length }, days.map(({ date, pairs }) => {
     const { day, weekday } = dayParts(date);
     const isToday = date === today;
     const titleId = 'day-' + date;
+    const title = [
+      el('span', { class: 'day__name' }, t('date.weekday.' + weekday)),
+      el('span', { class: 'visually-hidden' }, ', '),
+      el('span', { class: 'day__date' }, dayMonth(date)),
+    ];
+    const href = dayHref ? dayHref(date) : null;
+    // The hint is the link's description, so the day keeps its own name as the title of its section.
+    const hint = href ? t('schedule.toTemplate', { weekday: t('date.weekday.' + weekday) }) : null;
     return el('section', { class: 'day' + (isToday ? ' is-today' : '') + (pairs.length === 0 ? ' is-empty' : ''), 'aria-labelledby': titleId },
       el('header', { class: 'day__head' },
         el('span', { class: 'day__leaf', 'aria-hidden': 'true' },
           el('span', { class: 'day__weekday' }, t('date.weekdayShort.' + weekday)),
           el('span', { class: 'day__number' }, String(day))),
         el('h2', { class: 'day__title', id: titleId },
-          el('span', { class: 'day__name' }, t('date.weekday.' + weekday)),
-          el('span', { class: 'visually-hidden' }, ', '),
-          el('span', { class: 'day__date' }, dayMonth(date))),
+          href ? el('a', { class: 'day__link', href, title: hint, 'aria-describedby': titleId + '-hint' }, title) : title),
+        href ? el('span', { class: 'visually-hidden', id: titleId + '-hint' }, hint) : null,
         isToday ? badge(t('pairs.today'), 'primary', true) : null),
       pairs.length === 0
         ? el('p', { class: 'day__none' }, t('pairs.none'))

@@ -1146,6 +1146,18 @@
   padding: var(--space-1);
 }
 
+/* The day opened from the schedule: its column is washed in the accent, its name underlined by an accent bar. */
+.week thead th.is-target {
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  box-shadow: inset 0 -2px 0 var(--primary);
+}
+
+.week td.is-target {
+  background: var(--primary-wash);
+  box-shadow: inset 1px 0 0 var(--primary-line), inset -1px 0 0 var(--primary-line);
+}
+
 /* A pair of the template: the subject in its colour, the teacher, the room at the bottom. */
 .lesson {
   display: flex;
@@ -1576,6 +1588,29 @@ button.lesson:hover { box-shadow: inset 0 0 0 1px var(--lesson); }
 .day__date {
   color: var(--text-muted);
   font-size: var(--hint-fs);
+}
+
+/* In the week of a group the name of a day opens that day of the group's week template: a quiet dotted line
+   says it is a link, the accent comes on hover. */
+.day__link {
+  display: grid;
+  min-width: 0;
+  border-radius: var(--radius-inner);
+  text-decoration: none;
+}
+
+.day__link .day__name {
+  text-decoration-line: underline;
+  text-decoration-style: dotted;
+  text-decoration-color: var(--primary-ink);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 1px;
+}
+
+.day__link:hover .day__name {
+  color: var(--primary-ink);
+  text-decoration-style: solid;
+  text-decoration-color: currentColor;
 }
 
 .day__head > .badge { margin-left: auto; }

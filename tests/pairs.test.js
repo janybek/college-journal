@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch } from '../site/js/pairs.js';
+import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref } from '../site/js/pairs.js';
 import { pairLock } from '../core/schedule.js';
 import { SCHEMA } from '../core/schema.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
@@ -68,4 +68,12 @@ test('pairPatch: only what differs from the pair, the note trimmed', () => {
   assert.deepEqual(pairPatch(values, { ...pair, roomId: null }), {});
   assert.deepEqual(pairPatch({ ...values, slot: '3' }, pair), { slot: 3 });
   assert.deepEqual(pairPatch({ ...values, roomId: 'rm_1', note: ' Новая ' }, pair), { roomId: 'rm_1', note: 'Новая' });
+});
+
+test('templateHref: a weekday of the schedule opens that day of the week template of the group', () => {
+  assert.equal(templateHref('g_12ab34cd', '2026-11-16'), '#/template/g_12ab34cd/1');
+  assert.equal(templateHref('g_12ab34cd', '2026-11-20'), '#/template/g_12ab34cd/5');
+  assert.equal(templateHref('g_12ab34cd', '2026-11-21'), null);       // суббота: в шаблоне её нет
+  assert.equal(templateHref('g_12ab34cd', '2026-11-22'), null);
+  assert.equal(templateHref('', '2026-11-16'), null);
 });
