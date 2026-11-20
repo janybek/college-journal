@@ -194,3 +194,11 @@ Models: implementers sonnet; task reviewers sonnet; final review most capable.
 - Task 12: deployment @1 created (id in aidlc-state.md); live: GET ok, bad action → bad_request, wrong password → bad_credentials (setup ran). Timing: empty ≈2.2 s, login 3.3–4.9 s. site/config.js gets the URL; .github/workflows/pages.yml publishes site/.
 - Task 12: owner chose to hide the author email: history rewritten (filter-branch, trees identical) to janybek@users.noreply.github.com; local user.email set; old→new ids in aidlc-docs/commit-map.md. Account email removed from aidlc-state.md.
 - Task 12: site live on GitHub Pages; fetch from the Pages origin to the web app works (i18n.overrides ok, ~2 s). Left: owner's live check (step 7) + hash-rounds decision.
+- OWNER DECISION: make login faster (live login 3.3–4.9 s).
+  - Ruling: HASH_ROUNDS 500 → 100 for own passwords, new TEMP_HASH_ROUNDS = 20 for temporary passwords (reset, import, setup admin) — live: ~1–2.5 s per 500 rounds, import of 66 = 33 000 digests; temp passwords are random 8 chars and must be changed at first login; stored hashes keep their own round count so old 500-round hashes still verify — costs weaker offline resistance if the sheet itself leaks (it is private to the college account).
+- Task 12a: dispatched (BASE b484ca2, journal-logic/sonnet, cross-zone allowed: backend/handlers/dir.js, backend/gas/main.js, tests)
+- Task 12a: implementer DONE, commit ce0f0aa, 127/127 (RED seen). Review dispatched (journal-reviewer/sonnet).
+- Task 12a: review — spec ✅, Approved, 0 Critical/Important.
+- Task 12a: complete (commits b484ca2..ce0f0aa, review clean)
+- Task 12a: minor (deferred): only the reset path asserts v1$20$ (import/create share issueTempPassword); hashPassword accepts rounds <= 0 (pre-existing)
+- Task 12a: deployed to the same deployment (@2). Live timing after: empty 2.4–3.3 s, login 3.0–3.7 s (hash overhead ~0.3–0.7 s, was 1–2.5 s).
