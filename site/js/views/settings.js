@@ -120,7 +120,7 @@ function semesterPanel(editable) {
     const input = field({
       id, label: t(labelKey), type: 'date', value: state.values[name], hint: dateHint(state.values[name]),
       error: error ? error.key : null,
-      onInput: (value) => { state.values[name] = value; syncAll(); },
+      onInput: (value) => { state.values[name] = value; forgetError(name); syncAll(); },
       attrs: { readonly: !editable, required: true },
     });
     live.dateHints.push({ name, hint: input.querySelector('.field__hint') });
@@ -149,7 +149,7 @@ function holidayItem(date, editable) {
   const outside = badge(t('settings.outside'), 'warning');
   live.holidays.push({ date, outside });
   return el('li', { class: 'holiday' },
-    el('span', { class: 'holiday__leaf' + (weekday >= 6 ? ' holiday__leaf--weekend' : ''), 'aria-hidden': 'true' },
+    el('span', { class: 'holiday__leaf', 'aria-hidden': 'true' },
       el('span', { class: 'holiday__weekday' }, t('date.weekdayShort.' + weekday)),
       el('span', { class: 'holiday__day' }, String(day))),
     el('span', { class: 'holiday__text' },
@@ -188,6 +188,7 @@ function addHoliday() {
     state.values.holidays = [...state.values.holidays, date].sort();
     state.newHoliday = '';
     delete state.errors.holidays;
+    state.messageKey = null;
   }
   changed();
   focusById('settings-holiday-new');
@@ -196,6 +197,8 @@ function addHoliday() {
 function removeHoliday(date) {
   const at = state.values.holidays.indexOf(date);
   state.values.holidays = state.values.holidays.filter((day) => day !== date);
+  delete state.errors.holidays;
+  state.messageKey = null;
   changed();
   const next = state.values.holidays[Math.min(at, state.values.holidays.length - 1)];
   focusById(next ? 'settings-holiday-remove-' + next : null, 'settings-holiday-new');
@@ -216,7 +219,7 @@ function bellsPanel(editable) {
       id, name: id, type: 'time', class: 'field__input bell__input', value: time, required: true, readonly: !editable,
       'aria-invalid': state.badBells.includes(i) ? 'true' : null,
       'aria-describedby': state.errors.bells ? 'settings-bells-error' : null,
-      oninput: () => { state.values.bells[i] = input.value; syncAll(); },
+      oninput: () => { state.values.bells[i] = input.value; forgetError('bells'); syncAll(); },
     });
     rows.push({ gap, end });
     if (gap) items.push(gap);
@@ -260,7 +263,8 @@ function removeBell() {
   state.values.bells = state.values.bells.slice(0, -1);
   forgetBellErrors();
   changed();
-  focusById('settings-bell-remove');
+  // With one pair left the button is disabled and cannot hold focus.
+  focusById(state.values.bells.length > 1 ? 'settings-bell-remove' : 'settings-bell-add');
 }
 
 function resetBells() {
@@ -273,6 +277,31 @@ function resetBells() {
 function forgetBellErrors() {
   delete state.errors.bells;
   state.badBells = [];
+  state.messageKey = null;
+}
+
+// The person is fixing a marked field: its mark and the message about the whole form go at once. In place, as a
+// redraw would throw the caret out of a date or time field.
+const INPUT_IDS = { semesterStart: 'settings-start', semesterEnd: 'settings-end' };
+
+function forgetError(name) {
+  if (state.messageKey) {
+    state.messageKey = null;
+    document.getElementById('settings-message')?.remove();
+  }
+  if (!state.errors[name]) return;
+  delete state.errors[name];
+  const bells = name === 'bells';
+  if (bells) state.badBells = [];
+  const errorId = bells ? 'settings-bells-error' : INPUT_IDS[name] + '-error';
+  document.getElementById(errorId)?.remove();
+  const inputs = bells ? [...document.querySelectorAll('.bell__input')] : [document.getElementById(INPUT_IDS[name])];
+  for (const input of inputs.filter(Boolean)) {
+    input.removeAttribute('aria-invalid');
+    const rest = (input.getAttribute('aria-describedby') ?? '').split(' ').filter((ref) => ref && ref !== errorId);
+    if (rest.length > 0) input.setAttribute('aria-describedby', rest.join(' '));
+    else input.removeAttribute('aria-describedby');
+  }
 }
 
 // The bell times checked the way the server checks them, with a reason and the fields to mark.
@@ -376,7 +405,7 @@ function saveBar() {
   return [
     el('div', { class: 'notes settings-notes', id: 'settings-notes', role: 'status' },
       state.saved ? [note('success', t('settings.saved')), note('info', t('settings.savedHint'))] : null,
-      state.messageKey ? note('error', t(state.messageKey), { role: 'alert' }) : null),
+      state.messageKey ? note('error', t(state.messageKey), { role: 'alert', id: 'settings-message' }) : null),
     el('div', { class: 'savebar' }, live.status, submit),
   ];
 }

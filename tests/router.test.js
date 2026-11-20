@@ -23,6 +23,13 @@ test('resolveRoute: the semester settings need settings.get; only real directori
   assert.equal(resolveRoute('#/dir/groups', office).view, 'directory');
 });
 
+test('resolveRoute: the week template needs dir.list:weekTemplate', () => {
+  const office = { mustChangePassword: false, permissions: ['settings.get', 'dir.list:groups', 'dir.list:weekTemplate'] };
+  assert.equal(resolveRoute('#/template', office).view, 'weekTemplate');
+  assert.deepEqual(resolveRoute('#/template', office).params, {});
+  assert.equal(resolveRoute('#/template', { mustChangePassword: false, permissions: ['settings.get'] }).view, 'home');
+});
+
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {
   assert.deepEqual(resolveRoute('', dean), { view: 'home', params: {} });
   assert.equal(resolveRoute('#/dir/groups', { mustChangePassword: false }).view, 'home');

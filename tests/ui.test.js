@@ -69,8 +69,15 @@ test('navFor: the office roles with settings.get get a schedule group between ho
   assert.deepEqual(outline(navFor(['settings.get'], 'teacher')), [[null, ['home']]]);
 });
 
+test('navFor: the week template comes before the settings in the schedule group', () => {
+  assert.deepEqual(outline(navFor([...DEAN, 'settings.get', 'dir.list:weekTemplate'], 'dean'))[1], ['nav.schedule', ['weekTemplate', 'settings']]);
+  assert.deepEqual(navFor([...DEAN, 'settings.get', 'dir.list:weekTemplate'], 'dean')[1].items[0],
+    { name: 'weekTemplate', href: '#/template', textKey: 'template.title', icon: 'grid', hintKey: 'template.hint' });
+  assert.deepEqual(outline(navFor([...DEAN, 'dir.list:weekTemplate'], 'dean'))[1], ['nav.schedule', ['weekTemplate']]);
+});
+
 test('navFor: every item but home names the hint its tile shows', () => {
-  for (const group of navFor([...DEAN, 'settings.get'], 'dean').slice(1)) {
+  for (const group of navFor([...DEAN, 'settings.get', 'dir.list:weekTemplate'], 'dean').slice(1)) {
     for (const item of group.items) assert.equal(typeof item.hintKey, 'string', item.name);
   }
   assert.equal(navFor(DEAN, 'dean')[1].items[0].hintKey, 'dir.groups.hint');

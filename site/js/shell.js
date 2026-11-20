@@ -45,6 +45,9 @@ export function navFor(permissionList, role) {
   if (!parts.includes('office')) return groups;
   // Tasks 8–11 fill this group; final order: schedule, weekTemplate, topics, settings.
   const schedule = [];
+  if (list.includes('dir.list:weekTemplate')) {
+    schedule.push({ name: 'weekTemplate', href: '#/template', textKey: 'template.title', icon: 'grid', hintKey: 'template.hint' });
+  }
   if (list.includes('settings.get')) {
     schedule.push({ name: 'settings', href: '#/settings', textKey: 'settings.title', icon: 'settings', hintKey: 'settings.hint' });
   }
@@ -223,6 +226,7 @@ function crumbs(groups, view, params, current) {
     if (view === 'directory') [groupKey, pageKey] = ['home.directories', 'dir.' + params.table];
     else if (view === 'import') [groupKey, pageKey] = ['nav.data', 'import.title'];
     else if (view === 'settings') [groupKey, pageKey] = ['nav.schedule', 'settings.title'];
+    else if (view === 'weekTemplate') [groupKey, pageKey] = ['nav.schedule', 'template.title'];
     else pageKey = 'nav.home';
   }
   return el('p', { class: 'crumbs' },
