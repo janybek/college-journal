@@ -4,7 +4,7 @@ import en from './i18n/en.js';
 
 // Texts of the interface in three languages. Nothing here touches the DOM or storage at load time.
 export const LANGS = ['ky', 'ru', 'en'];
-const DEFAULT_LANG = 'ky';
+export const DEFAULT_LANG = 'ky';
 
 const BASE = { ky, ru, en };
 const hasOwn = (object, key) => object !== null && typeof object === 'object' && Object.prototype.hasOwnProperty.call(object, key);
@@ -25,6 +25,17 @@ const changed = () => { if (listener) listener(); };
 
 export function t(key, params) {
   return translate(dicts, current, key, params);
+}
+
+// A text that depends on a number: '<key>.<form>' by the language's plural rules (one, few, many, other),
+// with {count} filled in. Every dictionary has all four forms; Kyrgyz and English repeat theirs.
+export function tCount(key, count) {
+  let form = 'other';
+  try {
+    form = new Intl.PluralRules(current).select(count);
+  } catch (error) { /* no plural rules for this language: 'other' */ }
+  const exact = `${key}.${form}`;
+  return t(textIn(dicts[current], exact) === undefined ? `${key}.other` : exact, { count });
 }
 
 export function getLang() {

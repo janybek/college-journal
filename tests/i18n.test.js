@@ -1,9 +1,40 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { translate, t, applyOverrides, pickLang } from '../site/js/i18n.js';
+import { translate, t, tCount, setLang, applyOverrides, pickLang } from '../site/js/i18n.js';
 import ru from '../site/js/i18n/ru.js';
 import ky from '../site/js/i18n/ky.js';
 import en from '../site/js/i18n/en.js';
+import { IMPORT_SPECS } from '../core/import.js';
+import { IMPORT_COLUMNS } from '../site/js/views/directoryConfig.js';
+
+test('template column titles in the dictionaries equal IMPORT_SPECS', () => {
+  for (const [table, spec] of Object.entries(IMPORT_SPECS)) for (const col of spec.columns)
+    for (const [lang, dict] of Object.entries({ ru, ky, en }))
+      assert.equal(dict[`import.col.${table}.${col.key}`], col.titles[lang], `${lang} ${table}.${col.key}`);
+});
+
+test('the site lists the same template columns as IMPORT_SPECS', () => {
+  const fromSpecs = Object.fromEntries(Object.entries(IMPORT_SPECS)
+    .map(([table, spec]) => [table, spec.columns.map(({ key, required }) => ({ key, required }))]));
+  assert.deepEqual(IMPORT_COLUMNS, fromSpecs);
+});
+
+test('tCount picks the plural form of the current language', () => {
+  try {
+    setLang('ru');
+    assert.equal(tCount('import.apply', 1), 'Импортировать 1 строку');
+    assert.equal(tCount('import.apply', 3), 'Импортировать 3 строки');
+    assert.equal(tCount('import.apply', 5), 'Импортировать 5 строк');
+    assert.equal(tCount('import.apply', 21), 'Импортировать 21 строку');
+    setLang('en');
+    assert.equal(tCount('import.apply', 1), 'Import 1 row');
+    assert.equal(tCount('import.apply', 2), 'Import 2 rows');
+    setLang('ky');
+    assert.equal(tCount('import.apply', 2), ky['import.apply.other'].replace('{count}', '2'));
+  } finally {
+    setLang('ky');
+  }
+});
 
 test('dictionaries have identical key sets', () => {
   assert.deepEqual(Object.keys(ky).sort(), Object.keys(ru).sort());

@@ -3,17 +3,20 @@ import { call, onSessionEnd } from './api.js';
 import { getToken, getUser, setSession, clearSession, getPref, setPref } from './session.js';
 import { resolveRoute } from './router.js';
 import { t, getLang, setLang, pickLang, applyOverrides, onTextsChange, LANGS } from './i18n.js';
-import { el, onRefresh, onSessionStart } from './ui.js';
+import { el, onRefresh, onSessionStart, isLeaveHeld, mayLeave } from './ui.js';
 import * as login from './views/login.js';
 import * as changePassword from './views/changePassword.js';
 import * as home from './views/home.js';
-import * as placeholder from './views/placeholder.js';
+import * as directory from './views/directory.js';
+import * as importView from './views/import.js';
 
 // The app shell: the green cover band (title, language, sign-out) and the screen chosen by the router.
-const VIEWS = { login, changePassword, home, directory: placeholder, import: placeholder };
+// A screen may export leave(): it is called when another screen replaces it, to drop what it held.
+const VIEWS = { login, changePassword, home, directory, import: importView };
 const cover = document.getElementById('cover');
 const app = document.getElementById('app');
 let shownView = null;
+let shownHash = location.hash;
 
 const currentUser = () => (getToken() ? getUser() : null);
 
@@ -21,6 +24,8 @@ function renderCurrent() {
   const user = currentUser();
   const { view, params } = resolveRoute(location.hash, user);
   const sameView = view === shownView;
+  if (!sameView && shownView !== null && VIEWS[shownView].leave) VIEWS[shownView].leave();
+  shownHash = location.hash;
   const focus = sameView ? rememberFocus() : null;
   document.title = t('app.name');
   cover.dataset.view = view;
@@ -90,7 +95,20 @@ function sessionEnded() {
   renderCurrent();
 }
 
-function logout() {
+// A link or the Back button changed the address. If the screen holds something it cannot show again, the
+// address goes back while it asks; after "leave" the person goes where they were heading.
+async function hashChanged() {
+  if (!isLeaveHeld() || location.hash === shownHash) {
+    renderCurrent();
+    return;
+  }
+  const target = location.hash;
+  history.replaceState(null, '', shownHash);
+  if (await mayLeave()) location.hash = target;
+}
+
+async function logout() {
+  if (!(await mayLeave())) return;
   clearSession();
   if (location.hash !== '' && location.hash !== '#/') history.replaceState(null, '', '#/');
   renderCurrent();
@@ -139,7 +157,7 @@ function start() {
   onSessionEnd(sessionEnded);
   onSessionStart(beginSession);
   onRefresh(renderCurrent);
-  window.addEventListener('hashchange', renderCurrent);
+  window.addEventListener('hashchange', hashChanged);
   renderCurrent();
   if (API_URL === '') return;
   // Texts from the «Переводы» sheet arrive later and never hold up the first screen.
