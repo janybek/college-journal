@@ -9,7 +9,7 @@ import { handleRequest } from '../backend/api.js';
 import { relayout, todayOf } from '../backend/scheduleData.js';
 
 const S = { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: ['2026-09-07'], bells: DEFAULT_BELLS };
-const HEAD = ['Предмет', 'Группа', 'Юнит', '№', 'Тема', 'Тип'];
+const HEAD = ['Предмет', 'Группа', 'Семестр', 'Юнит', '№', 'Тема', 'Тип'];
 
 // A spy over the store: counts every call by method and every list by table.
 function spyOn(store) {
@@ -135,14 +135,14 @@ test('topics are laid over pairs after directory edits and imports', () => {
   call('dir.remove', { table: 'topics', id: topic1 }, dean);
   assert.deepEqual(mine().map(p => p.topicId), [topic2, topic3]);
 
-  call('import.apply', { table: 'topics', cells: [HEAD, ['Анатомия', '02-1', 1, 1, 'Кости', 'лекция']] }, dean);
+  call('import.apply', { table: 'topics', cells: [HEAD, ['Анатомия', '02-1', 1, 1, 1, 'Кости', 'лекция']] }, dean);
   const sb2Pair = store.list('pairs').find(p => p.subjectId === sb2 && p.date === '2026-09-04');
   assert.equal(sb2Pair.topicId, store.list('topics').find(t => t.subjectId === sb2).id);
 
   store.update('pairs', mine()[0].id, { status: 'closed' });
   const cells = [HEAD,
-    ['Информатика', '01-1', 1, 2, 'Другое название', 'лекция'],
-    ['Информатика', '01-1', 1, 4, 'Новая тема', 'практика']];
+    ['Информатика', '01-1', 1, 1, 2, 'Другое название', 'лекция'],
+    ['Информатика', '01-1', 1, 1, 4, 'Новая тема', 'практика']];
   const imported = call('import.apply', { table: 'topics', cells }, dean).data;
   assert.deepEqual([imported.inserted, imported.updated, imported.skipped, imported.errors], [1, 0, 1, [{ row: 2, field: 'name', code: 'held' }]]);
   assert.deepEqual(call('topics.plan', { subjectId: sb1 }, dean).data.topics.map(t => [t.order, t.name === 'Другое название', t.pair && t.pair.date]),
@@ -170,7 +170,7 @@ test('topic writes read each sheet once and batch their writes', () => {
   assert.equal(Math.max(...Object.values(reads)), 1);
   reset();
   call('import.apply', { table: 'topics', cells: [HEAD,
-    ['Информатика', '01-1', 1, 2, 'Переименована', 'лекция'], ['Информатика', '01-1', 1, 10, 'Десятая', 'лекция']] }, dean);
+    ['Информатика', '01-1', 1, 1, 2, 'Переименована', 'лекция'], ['Информатика', '01-1', 1, 1, 10, 'Десятая', 'лекция']] }, dean);
   check();
   assert.equal(store.list('topics').find(t => t.order === 2).name, 'Переименована');
 });

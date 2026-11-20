@@ -1,4 +1,5 @@
-import { SCHEMA, STAFF_ROLES, LANGS, DEFAULT_LANG, WEEKDAYS, LESSON_TYPES } from './schema.js';
+import { SCHEMA, STAFF_ROLES, LANGS, DEFAULT_LANG, WEEKDAYS, LESSON_TYPES, SEMESTERS } from './schema.js';
+import { DEFAULT_SEMESTER, semesterOf } from './topics.js';
 import { MAX_SLOTS } from './settings.js';
 import { templateSlots, busyCodes } from './busy.js';
 
@@ -44,6 +45,7 @@ export function normalizeRow(table, input) {
   if (has('active') && out.active === undefined) out.active = true;
   if (has('mustChangePassword') && out.mustChangePassword === undefined) out.mustChangePassword = true;
   if (has('scheme') && isEmpty(out.scheme)) out.scheme = 'A';
+  if (has('semester') && isEmpty(out.semester)) out.semester = DEFAULT_SEMESTER;
   return out;
 }
 
@@ -162,11 +164,14 @@ const RULES = {
     field('unit', () => { if (!inRange(row.unit, 12)) return 'bad_value'; });
     field('order', () => {
       if (!inRange(row.order, 200)) return 'bad_value';
-      const dup = (db.topics || []).some(t => t.id !== row.id && t.subjectId === row.subjectId && t.order === row.order);
+      const semester = isEmpty(row.semester) ? DEFAULT_SEMESTER : row.semester;
+      if (!SEMESTERS.includes(semester)) return;
+      const dup = (db.topics || []).some(t => t.id !== row.id && t.subjectId === row.subjectId && semesterOf(t) === semester && t.order === row.order);
       if (dup) return 'duplicate';
     });
     field('name', () => { if (!clean(row.name)) return 'required'; });
     field('lessonType', () => { if (!LESSON_TYPES.includes(row.lessonType)) return 'bad_value'; });
+    field('semester', () => { if (!isEmpty(row.semester) && !SEMESTERS.includes(row.semester)) return 'bad_value'; });
   },
 };
 

@@ -113,3 +113,20 @@ test('subjects: a new teacher must be free at every template slot of the subject
   assert.deepEqual(validateRow('subjects', { ...row, teacherId: 'sf_2' }, sdb), []);
   assert.deepEqual(validateRow('subjects', { ...row, teacherId: 'sf_1' }, { ...sdb, weekTemplate: undefined }), []);
 });
+
+test('topics: semester', () => {
+  assert.equal(normalizeRow('topics', { subjectId: 'sb_1', unit: 1, order: 1, name: 'Т', lessonType: 'lecture' }).semester, 1);
+  assert.equal(normalizeRow('topics', { subjectId: 'sb_1', semester: '2', unit: 1, order: 1, name: 'Т', lessonType: 'lecture' }).semester, 2);
+  for (const empty of ['', null, undefined])
+    assert.equal(normalizeRow('topics', { subjectId: 'sb_1', semester: empty, unit: 1, order: 1, name: 'Т', lessonType: 'lecture' }).semester, 1, String(empty));
+  const sdb = { subjects: wdb.subjects, topics: [{ id: 'tp_1', subjectId: 'sb_1', semester: 1, unit: 1, order: 1, name: 'Введение', lessonType: 'lecture' },
+    { id: 'tp_old', subjectId: 'sb_1', unit: 1, order: 5, name: 'Старая строка', lessonType: 'lecture' }] };
+  const topic = (patch) => validateRow('topics', { subjectId: 'sb_1', semester: 1, unit: 1, order: 9, name: 'Т', lessonType: 'lecture', ...patch }, sdb);
+  assert.deepEqual(topic({}), []);
+  assert.deepEqual(topic({ semester: 2, order: 1 }), []);
+  assert.deepEqual(topic({ order: 1 }), [{ field: 'order', code: 'duplicate' }]);
+  assert.deepEqual(topic({ order: 5 }), [{ field: 'order', code: 'duplicate' }]);
+  assert.deepEqual(topic({ semester: 2, order: 5 }), []);
+  assert.deepEqual(topic({ semester: 3 }), [{ field: 'semester', code: 'bad_value' }]);
+  assert.deepEqual(topic({ semester: 0, order: 1 }), [{ field: 'semester', code: 'bad_value' }]);
+});

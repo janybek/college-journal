@@ -24,7 +24,7 @@ function setup() {
 test('settings: get defaults, save normalises, repeat save updates rows', () => {
   const { store, call, dean, prorector, teacher1 } = setup();
   assert.deepEqual(call('settings.get', {}, prorector).data,
-    { settings: { semesterStart: '', semesterEnd: '', holidays: [], bells: DEFAULT_BELLS }, defaultBells: DEFAULT_BELLS, pairMinutes: 90 });
+    { settings: { semesterStart: '', semesterEnd: '', holidays: [], bells: DEFAULT_BELLS, semester: 1 }, defaultBells: DEFAULT_BELLS, pairMinutes: 90 });
   const input = { semesterStart: '2026-09-01', semesterEnd: '2026-12-25', holidays: ['2026-11-07', '2026-09-07', '2026-11-07'], bells: ['08:00', '09:40'] };
   assert.deepEqual(call('settings.save', { settings: input }, dean).data.settings.holidays, ['2026-09-07', '2026-11-07']);
   assert.equal(store.list('settings').length, 4);

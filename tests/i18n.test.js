@@ -24,7 +24,11 @@ test('topics can be imported: last in the order, with a field for every column a
   assert.equal(IMPORT_TABLES[IMPORT_TABLES.length - 1], 'topics');
   for (const { key } of IMPORT_COLUMNS.topics) assert.ok(FIELDS[key], key);
   // The template formats every column but the numbers as Text.
-  assert.deepEqual(IMPORT_COLUMNS.topics.filter(({ key }) => FIELDS[key].kind === 'number').map(({ key }) => key), ['unit', 'order']);
+  assert.deepEqual(IMPORT_COLUMNS.topics.filter(({ key }) => FIELDS[key].kind === 'number').map(({ key }) => key), ['semester', 'unit', 'order']);
+  for (const { key } of IMPORT_COLUMNS.syllabus) assert.ok(FIELDS[key], key);
+  assert.deepEqual(IMPORT_COLUMNS.syllabus.filter(({ key }) => FIELDS[key].kind === 'number').map(({ key }) => key), ['semester', 'unit', 'order']);
+  assert.equal(IMPORT_TABLES.includes('syllabus'), false);                        // силлабус загружается со страницы предмета, не из общего импорта
+  for (const key of ['import.colHint.topics.semester', 'import.error.semester.bad_value']) assert.ok(ru[key], key);
   for (const key of ['dir.topics', 'import.matchBy.topics', 'import.error.name.held', 'import.error.subjectId.bad_ref']) assert.ok(ru[key], key);
   for (const table of IMPORT_TABLES) assert.ok(ru['import.matchBy.' + table], table);
 });
@@ -34,7 +38,7 @@ test('the lesson types the import hint names are words the importer reads; in En
   const words = (dict) => dict['import.colHint.topics.lessonType'].replace(/\.$/, '').split(/,\s*|\s+(?:или|or|же)\s+/);
   for (const [lang, dict] of Object.entries({ ru, ky, en })) {
     const cells = [IMPORT_SPECS.topics.columns.map((col) => col.titles.ru),
-      ...words(dict).map((word, i) => ['Анатомия', '01-1', 1, i + 1, 'Тема', word])];
+      ...words(dict).map((word, i) => ['Анатомия', '01-1', 1, 1, i + 1, 'Тема', word])];
     const { records, errors } = parseSheet('topics', cells, db);
     assert.deepEqual(errors, [], lang);
     assert.deepEqual(records.map((r) => r.lessonType), LESSON_TYPES, lang);

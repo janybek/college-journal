@@ -19,7 +19,9 @@ export const IMPORT_COLUMNS = {
   students: [col('fullName', true), col('cardNo', true), col('groupId', true), col('lang', false)],
   staff: [col('fullName', true), col('login', true), col('roles', true), col('lang', false)],
   subjects: [col('name', true), col('teacherId', true), col('groupId', true)],
-  topics: [col('subjectId', true), col('groupId', true), col('unit', true), col('order', true), col('name', true), col('lessonType', true)],
+  topics: [col('subjectId', true), col('groupId', true), col('semester', true), col('unit', true), col('order', true), col('name', true), col('lessonType', true)],
+  // The teacher's own file of a subject: the subject is chosen on the screen, not named in the file.
+  syllabus: [col('semester', true), col('unit', true), col('order', true), col('name', true), col('lessonType', true)],
 };
 
 // How a field is edited. A key means the same thing in every directory (and in the topics of a subject).
@@ -40,6 +42,7 @@ export const FIELDS = {
   // Topics: the subject is named in the file and chosen on the screen; the type is one of LESSON_TYPES.
   subjectId: { kind: 'text', required: true },
   lessonType: { kind: 'text', required: true },
+  semester: { kind: 'number', required: true, min: 1, max: 2 },
   unit: { kind: 'number', required: true, min: 1, max: 12 },
   order: { kind: 'number', required: true, min: 1, max: 200 },
 };

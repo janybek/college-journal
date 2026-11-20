@@ -1,5 +1,6 @@
 import { STAFF_ROLES, FIXED_STATUSES } from './schema.js';
 import { normalizeRow, validateRow } from './validate.js';
+import { DEFAULT_SEMESTER } from './topics.js';
 
 export const MAX_IMPORT_ROWS = 2000;
 
@@ -11,6 +12,23 @@ const NAME = column('name', 'Название', 'Аталышы', 'Name', true);
 const FULL_NAME = column('fullName', 'ФИО', 'Аты-жөнү', 'Full name', true);
 const LANG = column('lang', 'Язык', 'Тил', 'Language');
 const GROUP = column('groupId', 'Группа', 'Топ', 'Group', true, ['Тайпа']);
+
+const TOPIC_KEY = ['order', 'semester', 'subjectId'];
+const TOPIC_KEY_DEFAULTS = { semester: DEFAULT_SEMESTER };
+const TOPIC_COLUMNS = [
+  column('semester', 'Семестр', 'Семестр', 'Semester', true),
+  column('unit', 'Модуль', 'Модуль', 'Module', true, ['Юнит', 'Unit']),
+  column('order', '№', '№', 'No.', true, ['№ по порядку', '№ темы', 'No', 'N']),
+  column('name', 'Тема', 'Тема', 'Topic', true, ['Название']),
+  column('lessonType', 'Тип', 'Түрү', 'Type', true, ['Тип пары']),
+];
+
+// A topic whose pair is already held keeps its name, type and unit.
+function topicHeld(existing, candidate, db) {
+  const held = (db.pairs || []).some(p => p.topicId === existing.id && FIXED_STATUSES.includes(p.status));
+  const changed = ['name', 'lessonType', 'unit'].some(k => String(existing[k]) !== String(candidate[k]));
+  return held && changed ? { field: 'name', code: 'held' } : null;
+}
 
 export const IMPORT_SPECS = {
   groups: { uniqueBy: ['name'], columns: [NAME, column('course', 'Курс', 'Курс', 'Year', true)] },
@@ -33,22 +51,17 @@ export const IMPORT_SPECS = {
     columns: [NAME, column('teacherId', 'Преподаватель', 'Окутуучу', 'Teacher', true), GROUP],
   },
   topics: {
-    uniqueBy: ['order', 'subjectId'],
+    uniqueBy: TOPIC_KEY,
+    keyDefaults: TOPIC_KEY_DEFAULTS,
     columns: [
       column('subjectId', 'Предмет', 'Сабак', 'Subject', true),
       column('groupId', 'Группа', 'Топ', 'Group', true, ['Тайпа'], true),
-      column('unit', 'Юнит', 'Юнит', 'Unit', true, ['Модуль']),
-      column('order', '№', '№', 'No.', true, ['№ по порядку', '№ темы', 'No', 'N']),
-      column('name', 'Тема', 'Тема', 'Topic', true, ['Название']),
-      column('lessonType', 'Тип', 'Түрү', 'Type', true, ['Тип пары']),
+      ...TOPIC_COLUMNS,
     ],
-    // A topic whose pair is already held keeps its name, type and unit.
-    check(existing, candidate, db) {
-      const held = (db.pairs || []).some(p => p.topicId === existing.id && FIXED_STATUSES.includes(p.status));
-      const changed = ['name', 'lessonType', 'unit'].some(k => String(existing[k]) !== String(candidate[k]));
-      return held && changed ? { field: 'name', code: 'held' } : null;
-    },
+    check: topicHeld,
   },
+  // The teacher's own file: one subject for the whole file (`fixed`), stored in the topics table.
+  syllabus: { table: 'topics', uniqueBy: TOPIC_KEY, keyDefaults: TOPIC_KEY_DEFAULTS, columns: TOPIC_COLUMNS, check: topicHeld },
 };
 
 const ROLE_WORDS = {
@@ -82,7 +95,9 @@ function cellText(v) {
 // Existing row of `list` that has the same unique key as `fields`, or undefined.
 function findByKey(spec, list, fields) {
   if (spec.uniqueBy.some(k => !cellText(fields[k]))) return undefined;
-  return (list || []).find(r => spec.uniqueBy.every(k => norm(r[k]) === norm(fields[k])));
+  const defaults = spec.keyDefaults || {};
+  const stored = (r, k) => (cellText(r[k]) === '' && k in defaults ? defaults[k] : r[k]);
+  return (list || []).find(r => spec.uniqueBy.every(k => norm(stored(r, k)) === norm(fields[k])));
 }
 
 function mapHeaders(spec, headerRow) {
@@ -132,8 +147,10 @@ function resolveCell(key, text, db, rowGroup) {
   return { value: text };
 }
 
-export function parseSheet(table, cells, db) {
+// `fixed`: fields equal for every row of the file (the subject of a syllabus); they join the key, the checks and the records.
+export function parseSheet(table, cells, db, fixed = {}) {
   const spec = IMPORT_SPECS[table];
+  const storage = spec.table ?? table;
   const rows = Array.isArray(cells) ? cells : [];
   const { index, unknownColumns } = mapHeaders(spec, rows[0]);
   const missingColumns = spec.columns.filter(c => c.required && !(c.key in index)).map(c => c.key);
@@ -147,7 +164,7 @@ export function parseSheet(table, cells, db) {
   // Working copy: accepted rows of the file are visible to the later ones.
   const work = {};
   for (const t of Object.keys(db)) if (Array.isArray(db[t])) work[t] = [...db[t]];
-  work[table] = work[table] || [];
+  work[storage] = work[storage] || [];
   const seen = new Set();
   const keyOf = (fields) => spec.uniqueBy.map(k => norm(fields[k])).join('\u0000');
 
@@ -168,7 +185,7 @@ export function parseSheet(table, cells, db) {
       else rowGroup = g.value;
     }
 
-    const fields = {};
+    const fields = { ...fixed };
     const codes = {};
     for (const c of spec.columns) {
       if (!(c.key in index)) continue;
@@ -182,12 +199,12 @@ export function parseSheet(table, cells, db) {
       else fields[c.key] = res.value;
     }
 
-    const existing = findByKey(spec, db[table], fields);
+    const existing = findByKey(spec, db[storage], fields);
     if (spec.uniqueBy.every(k => k in fields) && seen.has(keyOf(fields)) && !(spec.uniqueBy[0] in codes)) {
       codes[spec.uniqueBy[0]] = 'duplicate';
     }
-    const candidate = normalizeRow(table, { ...(existing || {}), ...fields });
-    for (const { field, code } of validateRow(table, candidate, work)) {
+    const candidate = normalizeRow(storage, { ...(existing || {}), ...fields });
+    for (const { field, code } of validateRow(storage, candidate, work)) {
       if (field === 'subjectId' && groupMissing) continue;
       if (!(field in codes) && spec.columns.some(c => c.key === field)) codes[field] = code;
     }
@@ -202,8 +219,8 @@ export function parseSheet(table, cells, db) {
       continue;
     }
     seen.add(keyOf(fields));
-    if (existing) work[table] = work[table].map(r => (r.id === existing.id ? candidate : r));
-    else work[table].push({ ...candidate, id: `import_row_${rowNo}` });
+    if (existing) work[storage] = work[storage].map(r => (r.id === existing.id ? candidate : r));
+    else work[storage].push({ ...candidate, id: `import_row_${rowNo}` });
     const stored = { ...fields };
     for (const c of spec.columns) if (c.virtual) delete stored[c.key];
     result.records.push({ row: rowNo, ...stored });
@@ -213,14 +230,15 @@ export function parseSheet(table, cells, db) {
 
 export function planImport(table, records, db) {
   const spec = IMPORT_SPECS[table];
+  const storage = spec.table ?? table;
   const plan = { toInsert: [], toUpdate: [] };
   for (const { row, ...fields } of records) {
-    const existing = findByKey(spec, db[table], fields);
+    const existing = findByKey(spec, db[storage], fields);
     if (!existing) {
-      plan.toInsert.push(normalizeRow(table, fields));
+      plan.toInsert.push(normalizeRow(storage, fields));
       continue;
     }
-    const normalized = normalizeRow(table, fields);
+    const normalized = normalizeRow(storage, fields);
     const patch = {};
     for (const key of Object.keys(fields)) if (!spec.uniqueBy.includes(key)) patch[key] = normalized[key];
     plan.toUpdate.push({ id: existing.id, patch });

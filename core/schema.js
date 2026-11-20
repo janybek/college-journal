@@ -5,6 +5,7 @@ export const PAIR_STATUSES = ['planned', 'running', 'closed', 'missed', 'cancell
 export const FIXED_STATUSES = ['running', 'closed'];
 export const LESSON_TYPES = ['lecture', 'practice', 'control'];
 export const WEEKDAYS = [1, 2, 3, 4, 5];
+export const SEMESTERS = [1, 2];
 
 const col = (key, title, type = 'string') => ({ key, title, type });
 
@@ -62,7 +63,7 @@ export const SCHEMA = {
     sheet: 'Темы', prefix: 'tp',
     columns: [
       col('id', 'id'), col('subjectId', 'предмет'), col('unit', 'юнит', 'int'), col('order', '№ по порядку', 'int'),
-      col('name', 'название'), col('lessonType', 'тип пары'),
+      col('name', 'название'), col('lessonType', 'тип пары'), col('semester', 'семестр', 'int'),
     ],
   },
   pairs: {

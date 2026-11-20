@@ -6,7 +6,7 @@ export const MAX_SLOTS = 8;
 export const MAX_HOLIDAYS = 60;
 export const MAX_SEMESTER_DAYS = 200;
 export const DEFAULT_BELLS = ['08:00', '09:40', '11:20', '13:30', '15:10', '16:50'];
-export const SETTING_KEYS = ['semesterStart', 'semesterEnd', 'holidays', 'bells'];
+export const SETTING_KEYS = ['semesterStart', 'semesterEnd', 'holidays', 'bells', 'semester'];
 
 const LAST_MINUTE = 23 * 60 + 59;
 
@@ -35,6 +35,7 @@ export function readSettings(rows) {
     semesterEnd: date('semesterEnd'),
     holidays: holidayList.every((x) => isDate(x)) ? uniqueSorted(holidayList) : [],
     bells: bellsValid(bellList) ? bellList : DEFAULT_BELLS,
+    semester: byKey.semester === '2' ? 2 : 1,
   };
 }
 
@@ -73,9 +74,16 @@ export function validateSettings(input) {
     value.bells = [];
     errors.push({ field: 'bells', code: 'bad_value' });
   }
+
+  if (src.semester !== undefined) {
+    const semester = typeof src.semester === 'string' ? src.semester.trim() : src.semester;
+    if (semester === 1 || semester === 2 || semester === '1' || semester === '2') value.semester = Number(semester);
+    else errors.push({ field: 'semester', code: 'bad_value' });
+  }
   return { value, errors };
 }
 
 export function settingsToRows(value) {
-  return SETTING_KEYS.map((key) => ({ key, value: Array.isArray(value[key]) ? value[key].join(',') : value[key] }));
+  return SETTING_KEYS.filter((key) => key in value)
+    .map((key) => ({ key, value: Array.isArray(value[key]) ? value[key].join(',') : String(value[key]) }));
 }

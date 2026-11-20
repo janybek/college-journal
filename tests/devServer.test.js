@@ -141,7 +141,7 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   assert.equal(store.list('students').filter((s) => s.mustChangePassword).map((s) => s.cardNo).join(), 'S1002');
   assert.equal(store.list('staff').some((s) => s.mustChangePassword), false);
   assert.deepEqual(readSettings(store.list('settings')),
-    { semesterStart: '2026-10-19', semesterEnd: '2027-02-19', holidays: ['2026-11-25'], bells: DEFAULT_BELLS });
+    { semesterStart: '2026-10-19', semesterEnd: '2027-02-19', holidays: ['2026-11-25'], bells: DEFAULT_BELLS, semester: 1 });
   assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('topics').length, store.list('pairs').length], [6, 9, 54, 159]);
   const pairs = store.list('pairs');
   assert.equal(pairs.filter((p) => p.status === 'cancelled').length, 1);
