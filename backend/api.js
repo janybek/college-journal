@@ -4,6 +4,7 @@ import { actionKind, can } from '../core/permissions.js';
 import { USER_TABLES, isUsable, rolesOf } from './users.js';
 import { authHandlers } from './handlers/auth.js';
 import { dirHandlers } from './handlers/dir.js';
+import { importHandlers } from './handlers/import.js';
 
 // Single entry point of the server. No Node-only APIs: this file is bundled for Apps Script.
 export { publicUser } from './users.js';
@@ -16,6 +17,22 @@ export function registerHandlers(map) {
 }
 registerHandlers(authHandlers);
 registerHandlers(dirHandlers);
+registerHandlers(importHandlers);
+
+// Test seam: runs `fn` with `map` applied (a null value removes that action), then restores the registry.
+export function withHandlers(map, fn) {
+  const saved = { ...handlers };
+  for (const [action, handler] of Object.entries(map)) {
+    if (handler === null) delete handlers[action];
+    else handlers[action] = handler;
+  }
+  try {
+    return fn();
+  } finally {
+    for (const key of Object.keys(handlers)) delete handlers[key];
+    Object.assign(handlers, saved);
+  }
+}
 
 const isPlainObject = (value) => value !== null && typeof value === 'object' && !Array.isArray(value);
 

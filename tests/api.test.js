@@ -4,7 +4,7 @@ import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { SCHEMA } from '../core/schema.js';
 import { hashPassword } from '../core/auth.js';
-import { handleRequest, registerHandlers, publicUser } from '../backend/api.js';
+import { handleRequest, withHandlers, publicUser } from '../backend/api.js';
 
 const STUDENT_TEMP = 'temp4567';
 
@@ -124,22 +124,27 @@ test('role check uses data.table; missing handler is bad_request after the check
   const d = call('auth.login', { login: 'dean', password: 'secret12' }).data;
   assert.deepEqual(call('dir.save', { table: 'staff' }, d.token).error, { code: 'forbidden' });
   assert.deepEqual(call('dir.save', null, d.token).error, { code: 'forbidden' });
-  assert.deepEqual(call('import.preview', { table: 'students' }, d.token).error, { code: 'bad_request' });
+  withHandlers({ 'dir.list': null }, () => {
+    assert.deepEqual(call('dir.list', { table: 'groups' }, d.token).error, { code: 'bad_request' });
+  });
+  assert.equal(call('dir.list', { table: 'groups' }, d.token).ok, true);
 });
 
 test('handlers: AppError passes through, other errors become internal', () => {
   const { call, logged } = setup();
   const a = call('auth.login', { login: 'admin', password: 'secret12' }).data;
-  registerHandlers({
+  withHandlers({
     'dir.list': () => { throw new Error('boom'); },
     'dir.save': (data, ctx, user) => ({ echo: data, uid: user.id, kind: user.kind }),
+  }, () => {
+    assert.deepEqual(call('dir.list', { table: 'groups' }, a.token).error, { code: 'internal' });
+    assert.equal(logged.length, 1);
+    assert.equal(logged[0].message, 'boom');
+    const saved = call('dir.save', { table: 'groups', x: 1 }, a.token).data;
+    assert.equal(saved.kind, 'staff');
+    assert.equal(saved.echo.x, 1);
   });
-  assert.deepEqual(call('dir.list', { table: 'groups' }, a.token).error, { code: 'internal' });
-  assert.equal(logged.length, 1);
-  assert.equal(logged[0].message, 'boom');
-  const saved = call('dir.save', { table: 'groups', x: 1 }, a.token).data;
-  assert.equal(saved.kind, 'staff');
-  assert.equal(saved.echo.x, 1);
+  assert.equal(call('dir.list', { table: 'groups' }, a.token).ok, true);
 });
 
 test('publicUser', () => {

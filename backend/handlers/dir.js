@@ -17,7 +17,7 @@ function withoutHash(row) {
   return rest;
 }
 
-function loadDb(store) {
+export function loadDb(store) {
   return {
     groups: store.list('groups'),
     students: store.list('students'),
@@ -25,6 +25,12 @@ function loadDb(store) {
     subjects: store.list('subjects'),
     rooms: store.list('rooms'),
   };
+}
+
+// Fresh temporary password: the plain text (shown once) and the fields to store.
+export function issueTempPassword(platform) {
+  const tempPassword = generateTempPassword(platform);
+  return { tempPassword, stored: { passwordHash: hashPassword(platform, tempPassword), mustChangePassword: true } };
 }
 
 const isActiveAdmin = (row) => row.active === true
@@ -49,10 +55,8 @@ function save(data, ctx) {
   if (old) return { row: withoutHash(store.update(table, old.id, row)) };
 
   if (!LOGIN_TABLES.includes(table)) return { row: withoutHash(store.insert(table, row)) };
-  const tempPassword = generateTempPassword(platform);
-  const created = store.insert(table, {
-    ...row, passwordHash: hashPassword(platform, tempPassword), mustChangePassword: true,
-  });
+  const { tempPassword, stored } = issueTempPassword(platform);
+  const created = store.insert(table, { ...row, ...stored });
   return { row: withoutHash(created), tempPassword };
 }
 
@@ -83,8 +87,8 @@ function resetPassword(data, ctx) {
   const { store, platform } = ctx;
   const row = store.get(table, data.id);
   if (!row) throw new AppError('not_found');
-  const tempPassword = generateTempPassword(platform);
-  store.update(table, row.id, { passwordHash: hashPassword(platform, tempPassword), mustChangePassword: true });
+  const { tempPassword, stored } = issueTempPassword(platform);
+  store.update(table, row.id, stored);
   return { tempPassword };
 }
 
