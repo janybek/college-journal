@@ -1,0 +1,11 @@
+{
+  "name": "college-journal",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test \"tests/**/*.test.js\"",
+    "dev": "node dev/server.js",
+    "dev:reset": "node dev/server.js --reset",
+    "build:gas": "node scripts/build-gas.js"
+  }
+}
