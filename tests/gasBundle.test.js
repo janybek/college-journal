@@ -95,6 +95,7 @@ test('setup is idempotent: default sheet gone once, same spreadsheet, one admin 
   const [spreadsheet] = gas.spreadsheets.values();
   assert.equal(spreadsheet.getSheetByName('Лист1'), null);
   assert.notEqual(spreadsheet.getSheetByName('Сотрудники'), null);
+  for (const name of ['Шаблон недели', 'Темы', 'Пары']) assert.ok(spreadsheet.getSheetByName(name), name);
   const secret = gas.properties.get('SECRET');
   assert.match(secret, /^[0-9a-f]{64}$/);
 

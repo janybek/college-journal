@@ -1,7 +1,7 @@
 // Reading and writing semester pairs for the handlers. No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
-import { localDate } from '../core/dates.js';
-import { readSettings } from '../core/settings.js';
+import { localDate, addMinutes } from '../core/dates.js';
+import { readSettings, PAIR_MINUTES } from '../core/settings.js';
 import { planGeneration } from '../core/schedule.js';
 import { layoutTopics } from '../core/topics.js';
 
@@ -70,4 +70,34 @@ export function generateSchedule(store, platform, { dryRun = false, restart = fa
   const after = pairs.filter((p) => !gone.has(p.id)).map((p) => (patches.has(p.id) ? { ...p, ...patches.get(p.id) } : p));
   relayout(store, null, { pairs: [...after, ...created] });
   return result;
+}
+
+// Pairs the `keep` filter accepts, shaped for the screens (built field by field, never copying rows),
+// ordered by date, pair number and group name. `rows` holds sheets the request has already read.
+export function pairViews(store, keep, rows = {}) {
+  const pairs = rows.pairs ?? store.list('pairs');
+  const topics = new Map((rows.topics ?? store.list('topics')).map((t) => [t.id, t]));
+  const groups = new Map((rows.groups ?? store.list('groups')).map((g) => [g.id, g]));
+  const subjects = new Map((rows.subjects ?? store.list('subjects')).map((s) => [s.id, s]));
+  const staff = new Map((rows.staff ?? store.list('staff')).map((s) => [s.id, s]));
+  const rooms = new Map((rows.rooms ?? store.list('rooms')).map((r) => [r.id, r]));
+  const nameOf = (map, id, field) => (map.has(id) ? map.get(id)[field] : '');
+
+  const views = pairs.filter(keep).map((p) => {
+    const topic = topics.get(p.topicId);
+    const subject = subjects.get(p.subjectId);
+    return {
+      id: p.id, date: p.date, slot: p.slot, startTime: p.startTime, endTime: addMinutes(p.startTime, PAIR_MINUTES), status: p.status,
+      groupId: p.groupId, groupName: nameOf(groups, p.groupId, 'name'),
+      subjectId: p.subjectId, subjectName: subject ? subject.name : '',
+      teacherId: p.teacherId, teacherName: nameOf(staff, p.teacherId, 'fullName'),
+      roomId: p.roomId, roomName: nameOf(rooms, p.roomId, 'name'),
+      topic: topic ? { id: topic.id, unit: topic.unit, order: topic.order, name: topic.name, lessonType: topic.lessonType } : null,
+      substitution: subject ? subject.teacherId !== p.teacherId : false,
+      moved: p.date !== p.planDate || p.slot !== p.planSlot,
+      planDate: p.planDate, planSlot: p.planSlot, note: p.note,
+    };
+  });
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  return views.sort((a, b) => cmp(a.date, b.date) || a.slot - b.slot || cmp(a.groupName, b.groupName));
 }

@@ -9,6 +9,7 @@ import { SCHEMA } from '../core/schema.js';
 import http from 'node:http';
 import { startDevServer, MAX_BODY_BYTES } from '../dev/server.js';
 import { seed, DEV_PASSWORD } from '../dev/seed.js';
+import { readSettings, DEFAULT_BELLS } from '../core/settings.js';
 
 function tempDirs(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'journal-dev-'));
@@ -130,16 +131,35 @@ test('the seed is written once and kept across restarts', async (t) => {
 });
 
 test('seed creates the documented data set and is a no-op when staff exist', () => {
-  const platform = createNodePlatform({ now: () => 1 });
+  const platform = createNodePlatform({ now: () => Date.UTC(2026, 10, 21, 6) });
   const store = createMemoryStore(SCHEMA, platform);
   seed(store, platform);
   assert.equal(store.list('students').length, 66);
   assert.equal(store.list('groups').length, 3);
-  assert.equal(store.list('subjects').length, 3);
   assert.equal(store.list('rooms').length, 3);
   assert.equal(store.list('staff').length, 6);
   assert.equal(store.list('students').filter((s) => s.mustChangePassword).map((s) => s.cardNo).join(), 'S1002');
   assert.equal(store.list('staff').some((s) => s.mustChangePassword), false);
+  assert.deepEqual(readSettings(store.list('settings')),
+    { semesterStart: '2026-10-19', semesterEnd: '2027-02-19', holidays: ['2026-11-25'], bells: DEFAULT_BELLS });
+  assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('topics').length, store.list('pairs').length], [6, 9, 54, 159]);
+  const pairs = store.list('pairs');
+  assert.equal(pairs.filter((p) => p.status === 'cancelled').length, 1);
+  assert.deepEqual(pairs.filter((p) => p.note === 'Замена').map((p) => p.date), ['2026-11-26']);
+
+  const groupByName = new Map(store.list('groups').map((g) => [g.name, g.id]));
+  const subjects = store.list('subjects');
+  for (const [group, planned] of [['01-1', 18], ['02-1', 17]]) {
+    const subject = subjects.find((s) => s.name === 'Информатика' && s.groupId === groupByName.get(group));
+    const mine = pairs.filter((p) => p.subjectId === subject.id);
+    assert.equal(mine.length, 18, group);
+    const withTopic = mine.filter((p) => p.topicId !== '');
+    assert.equal(withTopic.length, planned, group);
+    assert.equal(new Set(withTopic.map((p) => p.topicId)).size, planned, group);
+  }
+  assert.equal(subjects.filter((s) => s.name === 'Анатомия').every((s) => store.list('topics').every((t) => t.subjectId !== s.id)), true);
+
   seed(store, platform);
   assert.equal(store.list('students').length, 66);
+  assert.equal(store.list('pairs').length, 159);
 });
