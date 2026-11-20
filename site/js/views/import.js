@@ -214,7 +214,8 @@ function stepSubject() {
         el('span', { class: 'topics-teacher__text' },
           el('span', { class: 'topics-teacher__caption' }, t('topics.teacher')),
           el('span', { class: 'topics-teacher__name' }, teacherName))) : null),
-    el('p', { class: 'step__hint' }, t('syllabus.subjectHint')));
+    el('p', { class: 'step__hint' }, t('syllabus.subjectHint')),
+    el('a', { id: 'import-subject-link', class: 'button button--secondary', href: subjectHref() }, icon('clipboard'), t('syllabus.back')));
 }
 
 function stepTemplate() {

@@ -104,6 +104,12 @@ test('syllabus upload and topic editing by the teacher of the subject', () => {
   const own = save({ subjectId: sb1, semester: 2, unit: 1, order: 3, name: 'Своя тема', lessonType: 'lecture' }, teacher1).data.row;
   assert.equal(own.semester, 2);
   assert.deepEqual(save({ subjectId: sb2, semester: 1, unit: 1, order: 9, name: 'Чужая', lessonType: 'lecture' }, teacher1).error, { code: 'forbidden' });
+  const before = store.list('topics').length;
+  for (const subjectId of [[sb2], ` ${sb2} `]) {
+    assert.deepEqual(save({ subjectId, semester: 1, unit: 1, order: 9, name: 'Чужая', lessonType: 'lecture' }, teacher1).error, { code: 'forbidden' });
+  }
+  assert.equal(store.list('topics').length, before);
+  assert.equal(save({ subjectId: 'sb_nope', semester: 1, unit: 1, order: 9, name: 'Ничья', lessonType: 'lecture' }, teacher1).error.code, 'invalid');
   const foreign = store.insert('topics', { subjectId: sb2, semester: 1, unit: 1, order: 8, name: 'Тема коллеги', lessonType: 'lecture' });
   assert.deepEqual(save({ id: foreign.id, name: 'Не моя' }, teacher1).error, { code: 'forbidden' });
   assert.deepEqual(call('dir.remove', { table: 'topics', id: foreign.id }, teacher1).error, { code: 'forbidden' });

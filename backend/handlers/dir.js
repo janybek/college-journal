@@ -73,12 +73,13 @@ function save(data, ctx, user) {
   const old = isId(input.id) ? db[table].find((r) => r.id === input.id) ?? null : null;
   if (isId(input.id) && !old) throw new AppError('not_found');
 
+  const row = normalizeRow(table, { ...old, ...input, id: old ? old.id : undefined, passwordHash: old ? old.passwordHash : undefined });
   if (table === 'topics') {
-    const subject = db.subjects.find((r) => r.id === (old ? old.subjectId : input.subjectId));
+    // Checked on the cleaned value that is validated and stored, so ' sb2 ' or ['sb2'] cannot slip past.
+    const subject = db.subjects.find((r) => r.id === (old ? old.subjectId : row.subjectId));
     // A new topic of an unknown subject is left to validateRow (bad_ref); an existing orphan is staff-only.
     if ((subject || old) && !canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
   }
-  const row = normalizeRow(table, { ...old, ...input, id: old ? old.id : undefined, passwordHash: old ? old.passwordHash : undefined });
   if (old && table === 'subjects') checkSubjectGroup(old, row, db);
   if (old && table === 'topics' && row.subjectId !== old.subjectId) {
     throw new AppError('invalid', { fields: [{ field: 'subjectId', code: 'bad_value' }] });

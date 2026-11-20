@@ -362,6 +362,11 @@ function pairCell(pair, other) {
 
 function chooseSubject(subjectId) {
   forgetPlan(subjectId);
+  // The choice goes into the address (replacing the entry, no new step), so Back from the syllabus upload returns to it.
+  if (state.mode === 'list') {
+    state.route = { subjectId };
+    try { history.replaceState(null, '', '#/topics/' + subjectId); } catch { /* the address stays as it was */ }
+  }
   refresh();
   focusById('topics-subject');
 }
