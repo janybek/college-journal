@@ -121,6 +121,11 @@ export function createFakeSpreadsheet(sheets = {}, grids = {}) {
       map.set(name, sheet);
       return sheet;
     },
+    getSheets: () => [...map.values()],
+    deleteSheet(sheet) {
+      if (map.size <= 1) throw new Error('You cannot delete the only sheet in a spreadsheet.');
+      map.delete(sheet.getName());
+    },
     dump(name) {
       const sheet = map.get(name);
       if (!sheet) throw new Error(`No sheet: ${name}`);
