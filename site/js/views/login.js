@@ -1,13 +1,19 @@
 import { API_URL } from '../../config.js';
 import { call } from '../api.js';
-import { setSession } from '../session.js';
-import { t, getLang, setLang } from '../i18n.js';
-import { el, errorKey, field, focusFirstInvalid, markBusy, refresh } from '../ui.js';
+import { t } from '../i18n.js';
+import { el, errorKey, field, focusFirstInvalid, markBusy, refresh, startSession } from '../ui.js';
 
 // The screen is drawn from this state, so typed text and messages survive a redraw (e.g. a language switch).
 // It is dropped after a successful sign-in.
 const blank = () => ({ login: '', password: '', fieldErrors: {}, messageKey: null, busy: false });
 let state = blank();
+
+// The server ended the session (expired or revoked token): the sign-in screen says why.
+// A normal sign-out does not call this.
+export function noteSessionEnded() {
+  state = blank();
+  state.messageKey = 'error.unauthorized';
+}
 
 export function render(root) {
   const button = el('button', { type: 'submit', id: 'login-submit', class: 'button button--primary button--wide' }, t('login.submit'));
@@ -53,10 +59,7 @@ async function signIn() {
   try {
     const data = await call('auth.login', { login: state.login.trim(), password: state.password });
     state = blank();
-    setSession(data);
-    // The account's language wins after sign-in. Either branch redraws, and the router now leads past this screen.
-    if (data.user.lang !== getLang()) setLang(data.user.lang);
-    else refresh();
+    startSession(data);
   } catch (error) {
     state.busy = false;
     state.messageKey = errorKey(error.code);

@@ -1,11 +1,10 @@
 import ky from './i18n/ky.js';
 import ru from './i18n/ru.js';
 import en from './i18n/en.js';
-import { setPref } from './session.js';
 
 // Texts of the interface in three languages. Nothing here touches the DOM or storage at load time.
 export const LANGS = ['ky', 'ru', 'en'];
-export const DEFAULT_LANG = 'ky';
+const DEFAULT_LANG = 'ky';
 
 const BASE = { ky, ru, en };
 const hasOwn = (object, key) => object !== null && typeof object === 'object' && Object.prototype.hasOwnProperty.call(object, key);
@@ -32,14 +31,21 @@ export function getLang() {
   return current;
 }
 
-// Switches the language, remembers it on this device and redraws the screen if the language changed.
+// Switches the language and redraws the screen if the language changed.
 export function setLang(lang) {
   if (!LANGS.includes(lang)) return;
   const previous = current;
   current = lang;
-  setPref('lang', lang);
   if (typeof document !== 'undefined') document.documentElement.lang = lang;
   if (lang !== previous) changed();
+}
+
+// Which language to show. A choice made with the switcher on this device (deviceLang) wins; otherwise the
+// account's language (userLang, null when signed out), otherwise the default. saveToAccount: the account
+// should learn the device's choice.
+export function pickLang({ deviceLang, userLang }) {
+  if (LANGS.includes(deviceLang)) return { lang: deviceLang, saveToAccount: userLang !== null && deviceLang !== userLang };
+  return { lang: LANGS.includes(userLang) ? userLang : DEFAULT_LANG, saveToAccount: false };
 }
 
 // Applies rows of the «Переводы» sheet on top of the built-in texts. An empty cell keeps the built-in text.

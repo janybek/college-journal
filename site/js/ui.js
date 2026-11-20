@@ -3,6 +3,7 @@ import { t } from './i18n.js';
 // Small DOM helpers shared by the screens.
 
 let redraw = () => {};
+let sessionStart = () => {};
 
 // main.js registers the function that draws the current screen; screens call refresh() after their state changes.
 export function onRefresh(fn) {
@@ -11,6 +12,16 @@ export function onRefresh(fn) {
 
 export function refresh() {
   redraw();
+}
+
+// main.js registers what happens with a new session; screens call startSession({ token, user }) after
+// a successful sign-in or password change.
+export function onSessionStart(fn) {
+  sessionStart = fn;
+}
+
+export function startSession(data) {
+  sessionStart(data);
 }
 
 // Builds an element. String children become text nodes: server data never goes in as HTML.

@@ -1,7 +1,6 @@
 import { call } from '../api.js';
-import { setSession } from '../session.js';
-import { t, getLang, setLang } from '../i18n.js';
-import { el, errorKey, field, focusFirstInvalid, markBusy, refresh } from '../ui.js';
+import { t } from '../i18n.js';
+import { el, errorKey, field, focusFirstInvalid, markBusy, refresh, startSession } from '../ui.js';
 
 // Drawn from `state`, like the sign-in screen: typed text survives a redraw and is dropped after success.
 // Server field name -> field of this form.
@@ -52,9 +51,7 @@ async function save() {
   try {
     const data = await call('auth.changePassword', { oldPassword: state.old, newPassword: state.new });
     state = blank();
-    setSession(data);
-    if (data.user.lang !== getLang()) setLang(data.user.lang);
-    else refresh();
+    startSession(data);
   } catch (error) {
     state.busy = false;
     if (error.code === 'bad_credentials') {

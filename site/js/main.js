@@ -1,9 +1,9 @@
 import { API_URL } from '../config.js';
 import { call, onSessionEnd } from './api.js';
-import { getToken, getUser, setSession, clearSession, getPref } from './session.js';
+import { getToken, getUser, setSession, clearSession, getPref, setPref } from './session.js';
 import { resolveRoute } from './router.js';
-import { t, getLang, setLang, applyOverrides, onTextsChange, LANGS, DEFAULT_LANG } from './i18n.js';
-import { el, onRefresh } from './ui.js';
+import { t, getLang, setLang, pickLang, applyOverrides, onTextsChange, LANGS } from './i18n.js';
+import { el, onRefresh, onSessionStart } from './ui.js';
 import * as login from './views/login.js';
 import * as changePassword from './views/changePassword.js';
 import * as home from './views/home.js';
@@ -47,20 +47,47 @@ function coverBar(user) {
       user ? el('button', { type: 'button', id: 'logout', class: 'cover__logout', onclick: logout }, t('common.logout')) : null));
 }
 
-// Redraws at once; a signed-in person's choice is also saved to the account.
-async function chooseLang(lang) {
-  if (lang === getLang()) return;
+// A click on the switcher is the person's explicit choice on this device: it is remembered, it wins over the
+// account's language from now on, and a signed-in person's account learns it too.
+function chooseLang(lang) {
+  setPref('lang', lang);
   const user = currentUser();
-  if (user) setSession({ token: getToken(), user: { ...user, lang } });
+  if (user && user.lang !== lang) saveLangToAccount(lang);
   setLang(lang);
+}
+
+async function saveLangToAccount(lang) {
+  const token = getToken();
+  const user = currentUser();
   if (!user) return;
+  setSession({ token, user: { ...user, lang } });
   try {
-    const token = getToken();
     const data = await call('user.setLang', { lang });
     if (getToken() === token && getLang() === lang) setSession({ token, user: data.user });
   } catch (error) {
-    // The choice stays on this device; an ended session has already returned to the sign-in screen.
+    // The choice stays on this device and is sent again on the next start; an ended session is handled in call().
   }
+}
+
+// Applies pickLang for a signed-in person. Returns true when the screen was redrawn in another language.
+function settleLanguage(user) {
+  const { lang, saveToAccount } = pickLang({ deviceLang: getPref('lang'), userLang: user.lang });
+  if (saveToAccount) saveLangToAccount(lang);
+  if (lang === getLang()) return false;
+  setLang(lang);
+  return true;
+}
+
+// A new session from sign-in or a password change: store it, settle the language, show the next screen.
+function beginSession(data) {
+  setSession(data);
+  if (!settleLanguage(data.user)) renderCurrent();
+}
+
+// The server rejected the session (already cleared in call()): back to sign-in, with the reason.
+function sessionEnded() {
+  login.noteSessionEnded();
+  renderCurrent();
 }
 
 function logout() {
@@ -98,8 +125,8 @@ async function refreshUser() {
     if (getToken() !== token) return;
     const before = JSON.stringify(getUser());
     setSession({ token, user });
-    if (user.lang !== getLang()) setLang(user.lang);
-    else if (JSON.stringify(user) !== before) renderCurrent();
+    // The device's own choice is not overwritten by the server value; the account is told about it instead.
+    if (!settleLanguage(user) && JSON.stringify(getUser()) !== before) renderCurrent();
   } catch (error) {
     // `unauthorized` has already led to the sign-in screen; on other errors the stored user stays.
   }
@@ -107,10 +134,10 @@ async function refreshUser() {
 
 function start() {
   const user = currentUser();
-  const lang = user ? user.lang : getPref('lang');
-  setLang(LANGS.includes(lang) ? lang : DEFAULT_LANG);
+  setLang(pickLang({ deviceLang: getPref('lang'), userLang: user ? user.lang : null }).lang);
   onTextsChange(renderCurrent);
-  onSessionEnd(renderCurrent);
+  onSessionEnd(sessionEnded);
+  onSessionStart(beginSession);
   onRefresh(renderCurrent);
   window.addEventListener('hashchange', renderCurrent);
   renderCurrent();

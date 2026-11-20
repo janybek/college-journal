@@ -19,15 +19,15 @@ export function isUsable(row) {
   return row.active === true && typeof row.passwordHash === 'string' && row.passwordHash !== '';
 }
 
-// Name of the group with this id, or null when there is no id or the group no longer exists.
+// Name of the group with this id, or null when there is no id, no store to look in, or the group no longer exists.
 function groupNameOf(store, groupId) {
-  if (groupId === null) return null;
+  if (!store || groupId === null) return null;
   const group = store.get('groups', groupId);
   return group ? group.name : null;
 }
 
 // The user object sent to the site. Never contains passwordHash.
-// `store` resolves a student's group name; staff never need it.
+// `store` resolves a student's group name; without it `groupName` is null.
 export function publicUser(row, kind, store) {
   const roles = rolesOf(row, kind);
   const groupId = kind === 'student' ? (row.groupId ?? null) : null;

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { translate, t, applyOverrides } from '../site/js/i18n.js';
+import { translate, t, applyOverrides, pickLang } from '../site/js/i18n.js';
 import ru from '../site/js/i18n/ru.js';
 import ky from '../site/js/i18n/ky.js';
 import en from '../site/js/i18n/en.js';
@@ -21,6 +21,16 @@ test('every server error code has a text', () => {
   for (const code of ['bad_credentials', 'unauthorized', 'forbidden', 'invalid', 'in_use', 'internal', 'network', 'must_change_password',
     'required', 'too_long', 'bad_value', 'duplicate', 'bad_ref', 'last_admin', 'too_short', 'same_as_login', 'too_simple', 'too_many_rows'])
     assert.ok(ru['error.' + code], code);
+});
+
+test('pickLang: a choice made on this device wins over the account language', () => {
+  assert.deepEqual(pickLang({ deviceLang: null, userLang: 'ru' }), { lang: 'ru', saveToAccount: false });
+  assert.deepEqual(pickLang({ deviceLang: 'en', userLang: 'ru' }), { lang: 'en', saveToAccount: true });
+  assert.deepEqual(pickLang({ deviceLang: 'ru', userLang: 'ru' }), { lang: 'ru', saveToAccount: false });
+  assert.deepEqual(pickLang({ deviceLang: 'xx', userLang: 'en' }), { lang: 'en', saveToAccount: false });
+  // Signed out: the device choice, else the default; there is no account to save to.
+  assert.deepEqual(pickLang({ deviceLang: 'en', userLang: null }), { lang: 'en', saveToAccount: false });
+  assert.deepEqual(pickLang({ deviceLang: null, userLang: null }), { lang: 'ky', saveToAccount: false });
 });
 
 test('overrides replace texts; empty values are ignored for that language', () => {

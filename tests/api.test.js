@@ -176,4 +176,8 @@ test('publicUser', () => {
     id: 'sf_1', kind: 'staff', fullName: 'A', roles: ['teacher'], lang: 'en', mustChangePassword: false,
     groupId: null, groupName: null, permissions: ['teacher.mySubjects'],
   });
+  const studentRow = { id: 'st_1', fullName: 'S', groupId: 'g_1', cardNo: 'S1', lang: 'ky', mustChangePassword: false };
+  const student = publicUser(studentRow, 'student');
+  assert.equal(student.groupId, 'g_1');
+  assert.equal(student.groupName, null);
 });
