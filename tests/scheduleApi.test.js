@@ -211,6 +211,16 @@ test('generate: pairs between today and a later semester start are removed, held
   store.update('pairs', sb1Pairs()[0].id, { topicId: topics[0] });
   assert.deepEqual(shown(), [[1, '2026-09-08'], [2, null], [3, null]]);
   store.update('pairs', sb1Pairs()[0].id, { topicId: '' });
+  // the in-semester pair comes first in the store, a later out-of-semester pair holds the same topic: the one inside the semester is shown
+  const [first, second] = sb1Pairs();
+  store.update('pairs', first.id, { date: '2026-09-09', topicId: topics[0] });
+  store.update('pairs', second.id, { date: '2026-09-20', topicId: topics[0] });
+  assert.deepEqual(shown(), [[1, '2026-09-09'], [2, null], [3, null]]);
+  // a held pair is shown before a planned one, though the planned one is later in the store
+  store.update('pairs', first.id, { date: '2026-09-01', status: 'closed' });
+  store.update('pairs', second.id, { date: '2026-09-08' });
+  assert.deepEqual(shown(), [[1, '2026-09-01'], [2, null], [3, null]]);
+  store.update('pairs', first.id, { status: 'planned', topicId: '' });
   const preview = call('schedule.generate', { dryRun: true }, dean).data;
   assert.deepEqual([preview.from, preview.removed, preview.kept], ['2026-09-04', 1, 3]);
   const early = store.list('pairs').find((p) => p.subjectId === sb1 && p.date === '2026-09-01');
