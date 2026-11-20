@@ -37,6 +37,12 @@ test('resolveRoute: the topics screen needs dir.list:topics', () => {
   assert.equal(resolveRoute('#/topics', { mustChangePassword: false, permissions: ['dir.list:weekTemplate'] }).view, 'home');
 });
 
+test('resolveRoute: the deanery schedule needs schedule.list', () => {
+  assert.equal(resolveRoute('#/schedule', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'schedule');
+  assert.deepEqual(resolveRoute('#/schedule', { mustChangePassword: false, permissions: ['schedule.list'] }).params, {});
+  assert.equal(resolveRoute('#/schedule', { mustChangePassword: false, permissions: ['schedule.mine'] }).view, 'home');
+});
+
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {
   assert.deepEqual(resolveRoute('', dean), { view: 'home', params: {} });
   assert.equal(resolveRoute('#/dir/groups', { mustChangePassword: false }).view, 'home');

@@ -905,12 +905,12 @@
 .week-toolbar > .field { flex: 0 1 10rem; }
 
 /* The colour of a subject: the tones of the initials avatars. */
-.legend__item[data-tone="0"], .lesson[data-tone="0"] { --lesson: var(--tone-0); --lesson-bg: var(--tone-0-bg); }
-.legend__item[data-tone="1"], .lesson[data-tone="1"] { --lesson: var(--tone-1); --lesson-bg: var(--tone-1-bg); }
-.legend__item[data-tone="2"], .lesson[data-tone="2"] { --lesson: var(--tone-2); --lesson-bg: var(--tone-2-bg); }
-.legend__item[data-tone="3"], .lesson[data-tone="3"] { --lesson: var(--tone-3); --lesson-bg: var(--tone-3-bg); }
-.legend__item[data-tone="4"], .lesson[data-tone="4"] { --lesson: var(--tone-4); --lesson-bg: var(--tone-4-bg); }
-.legend__item[data-tone="5"], .lesson[data-tone="5"] { --lesson: var(--tone-5); --lesson-bg: var(--tone-5-bg); }
+.legend__item[data-tone="0"], .lesson[data-tone="0"], .pair[data-tone="0"] { --lesson: var(--tone-0); --lesson-bg: var(--tone-0-bg); }
+.legend__item[data-tone="1"], .lesson[data-tone="1"], .pair[data-tone="1"] { --lesson: var(--tone-1); --lesson-bg: var(--tone-1-bg); }
+.legend__item[data-tone="2"], .lesson[data-tone="2"], .pair[data-tone="2"] { --lesson: var(--tone-2); --lesson-bg: var(--tone-2-bg); }
+.legend__item[data-tone="3"], .lesson[data-tone="3"], .pair[data-tone="3"] { --lesson: var(--tone-3); --lesson-bg: var(--tone-3-bg); }
+.legend__item[data-tone="4"], .lesson[data-tone="4"], .pair[data-tone="4"] { --lesson: var(--tone-4); --lesson-bg: var(--tone-4-bg); }
+.legend__item[data-tone="5"], .lesson[data-tone="5"], .pair[data-tone="5"] { --lesson: var(--tone-5); --lesson-bg: var(--tone-5-bg); }
 
 /* Each subject of the group and how many pairs it has a week; a subject not in the week yet is dashed. */
 .legend {
@@ -1325,6 +1325,424 @@ button.lesson:hover { box-shadow: inset 0 0 0 1px var(--lesson); }
   grid-row: span 4;
   grid-template-rows: subgrid;
   row-gap: var(--space-2);
+}
+
+/* Screens: schedule — the week as day columns (a list on a narrower window), each day under its calendar page;
+   a pair keeps its subject's colour on every schedule screen, and a cancelled one is struck out and hatched */
+
+.badge--danger { border-color: var(--danger-line); background: var(--danger-wash); color: var(--danger); }
+
+.schedule-notes {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.schedule-card { overflow: hidden; }
+
+.schedule-toolbar { border-bottom: 1px solid var(--border); }
+
+.schedule-toolbar > .field { flex: 0 1 13rem; }
+
+/* «‹ 16–22 ноября ›  Эта неделя» on the right of the toolbar. */
+.week-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.week-nav__label {
+  min-width: 9.5rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.week-nav__this { margin-left: var(--space-2); }
+
+/* The chevron points right; «back» buttons mirror it. */
+.chevron-back .icon { transform: scaleX(-1); }
+
+.schedule-day {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.schedule-day__input {
+  width: auto;
+  min-width: 10rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.schedule-day__label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.schedule-day__label > span:first-child::first-letter { text-transform: uppercase; }
+
+.schedule-empty { padding: var(--space-4); }
+
+/* The week or the day being replaced by the next one stays, dimmed, until the answer comes. */
+.schedule-body { transition: opacity 0.15s ease-out; }
+
+.schedule-body.is-stale { opacity: 0.55; }
+
+.schedule-week {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+}
+
+/* Days: a list by default; every day is a header and its pairs side by side as far as they fit. */
+.days {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.day {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.day.is-today {
+  border-color: var(--primary-line);
+  background: var(--primary-wash);
+}
+
+.day.is-empty {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+}
+
+.day__head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+/* The page of a tear-off calendar, as on the topics screen; today's page is filled with the accent. */
+.day__leaf {
+  display: grid;
+  flex: none;
+  width: 2.5rem;
+  overflow: hidden;
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-inner);
+  background: var(--surface-raised);
+  text-align: center;
+}
+
+.day__weekday {
+  padding: 0.0625rem 0;
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  font-size: 0.625rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.day__number {
+  padding: 0.0625rem 0 0.125rem;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1.25;
+  font-variant-numeric: tabular-nums;
+}
+
+.day.is-today .day__leaf { border-color: var(--primary-fill); }
+
+.day.is-today .day__weekday,
+.day.is-today .day__number {
+  background: var(--primary-fill);
+  color: var(--on-primary);
+}
+
+.day__title {
+  display: grid;
+  min-width: 0;
+  font-size: inherit;
+  font-weight: 400;
+  line-height: 1.3;
+}
+
+.day__name {
+  font-weight: 600;
+  display: inline-block;
+}
+
+.day__name::first-letter { text-transform: uppercase; }
+
+.day__date {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.day__head > .badge { margin-left: auto; }
+
+.day__none {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.day.is-empty .day__none { justify-self: end; }
+
+.day__pairs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+  gap: var(--space-2);
+}
+
+.day__pairs > li { display: grid; }
+
+/* Wide window: Monday to Saturday (and Sunday when it has a pair) as columns. */
+@media (min-width: 75rem) {
+  .schedule-week .days {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: var(--space-2);
+  }
+
+  .schedule-week .days[data-count="7"] { grid-template-columns: repeat(7, minmax(0, 1fr)); }
+
+  .schedule-week .day {
+    align-content: start;
+    min-height: 14rem;
+    padding: var(--space-2);
+  }
+
+  .schedule-week .day.is-empty {
+    grid-template-columns: none;
+    align-items: start;
+  }
+
+  .schedule-week .day.is-empty .day__none {
+    justify-self: center;
+    padding-top: var(--space-6);
+  }
+
+  .schedule-week .day__pairs { grid-template-columns: minmax(0, 1fr); }
+
+  .schedule-week .day__head { flex-wrap: wrap; }
+}
+
+/* One pair: time and number, the subject in its colour, who and where, the topic, the marks, the note. */
+.pair {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.3125rem;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--lesson);
+  border-radius: var(--radius-inner);
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  line-height: 1.3;
+}
+
+button.pair:hover {
+  border-color: var(--lesson);
+  box-shadow: inset 0 0 0 1px var(--lesson);
+}
+
+.pair:focus-visible { outline-offset: 2px; }
+
+.pair__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.pair__time {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.pair__slot {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.pair__subject {
+  color: var(--lesson);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.pair__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.pair__who {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pair__who .icon {
+  flex: none;
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.pair__who.is-substitute,
+.schedule-table .is-substitute { color: var(--warning); }
+
+.pair__topic {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem var(--space-2);
+  font-size: var(--hint-fs);
+}
+
+.pair__topic.is-none { color: var(--text-muted); }
+
+.pair__flags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+}
+
+.pair__moved {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.125rem var(--space-2);
+}
+
+.pair__from {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pair__note {
+  padding-left: var(--space-2);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  overflow-wrap: anywhere;
+}
+
+/* A cancelled pair: struck out on a hatched ground, its colour gone. */
+.pair.is-cancelled {
+  --lesson: var(--text-muted);
+  border-left-color: var(--danger);
+  background:
+    repeating-linear-gradient(-45deg, transparent 0 7px, var(--border) 7px 8px),
+    var(--surface);
+}
+
+.pair.is-cancelled .pair__subject {
+  text-decoration: line-through;
+  text-decoration-thickness: 1.5px;
+}
+
+.pair.is-cancelled .pair__time { color: var(--text-muted); }
+
+button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: inset 0 0 0 1px var(--danger-line); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .pair.is-fresh { animation: fresh-lesson 2.4s ease-out both; }
+}
+
+/* The day of all groups as a table. */
+.schedule-table .table { min-width: 64rem; }
+
+.schedule-table__when {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  white-space: nowrap;
+}
+
+.schedule-table__time { font-variant-numeric: tabular-nums; }
+
+.schedule-table__topic {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem var(--space-2);
+}
+
+.schedule-table__status { max-width: 16rem; }
+
+.schedule-table .table__actions { text-align: right; }
+
+.schedule-table__open {
+  min-height: 2rem;
+  padding: 0 var(--space-3);
+  white-space: nowrap;
+}
+
+.schedule-table tr.is-cancelled td { color: var(--text-muted); }
+
+.schedule-table tr.is-cancelled .table__label { text-decoration: line-through; }
+
+/* The dialog of a pair. */
+.dialog--pair { width: min(calc(100% - 2rem), 34rem); }
+
+.pair-now {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pair-now__place {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.pair-now__place .icon { flex: none; color: var(--primary-ink); }
+
+.pair-now__place > span::first-letter { text-transform: uppercase; }
+
+.pair-now__note {
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--border-strong);
+  color: var(--text-muted);
+}
+
+.pair-when {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+@media (max-width: 36rem) {
+  .week-nav { margin-left: 0; }
+
+  .schedule-day__label { margin-left: 0; }
 }
 
 /* Print: black on white in either theme. The passwords of an import print alone, as strips to cut apart
