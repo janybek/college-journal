@@ -5,6 +5,7 @@ import { readSettings } from '../../core/settings.js';
 import { templateSlots, busyCodes } from '../../core/busy.js';
 import { FIXED_STATUSES } from '../../core/schema.js';
 import { USER_TABLES } from '../users.js';
+import { relayout } from '../scheduleData.js';
 
 const DIR_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms', 'weekTemplate', 'topics'];
 const LOGIN_TABLES = ['students', 'staff'];
@@ -77,7 +78,8 @@ function save(data, ctx) {
   const table = tableOf(data);
   const { store, platform } = ctx;
   const input = data.row !== null && typeof data.row === 'object' && !Array.isArray(data.row) ? data.row : {};
-  const db = loadDb(store, table, table === 'subjects' ? ['weekTemplate', 'pairs'] : []);
+  const extra = table === 'subjects' ? ['weekTemplate', 'pairs'] : table === 'topics' ? ['pairs'] : [];
+  const db = loadDb(store, table, extra);
   const old = isId(input.id) ? db[table].find((r) => r.id === input.id) ?? null : null;
   if (isId(input.id) && !old) throw new AppError('not_found');
 
@@ -90,8 +92,17 @@ function save(data, ctx) {
   if (fields.length > 0) throw new AppError('invalid', { fields });
   if (old && table === 'subjects') checkSubjectTeacher(old, row, db);
 
-  if (old) return { row: withoutHash(store.update(table, old.id, row)) };
+  if (old) {
+    const saved = store.update(table, old.id, row);
+    if (table === 'topics') relayout(store, [saved.subjectId], { topics: db.topics.map((t) => (t.id === saved.id ? saved : t)), pairs: db.pairs });
+    return { row: withoutHash(saved) };
+  }
 
+  if (table === 'topics') {
+    const created = store.insert(table, row);
+    relayout(store, [created.subjectId], { topics: [...db.topics, created], pairs: db.pairs });
+    return { row: created };
+  }
   if (!LOGIN_TABLES.includes(table)) return { row: withoutHash(store.insert(table, row)) };
   const { tempPassword, stored } = issueTempPassword(platform);
   const created = store.insert(table, { ...row, ...stored });
@@ -107,23 +118,32 @@ const BLOCKERS = {
   topics: (id) => [['pairs', (r) => r.topicId === id && FIXED_STATUSES.includes(r.status)]],
 };
 
-function usedBy(store, table, id) {
+// `read` returns a sheet's rows and reads each sheet once per request.
+function usedBy(read, table, id) {
   const blockers = Object.prototype.hasOwnProperty.call(BLOCKERS, table) ? BLOCKERS[table](id) : [];
-  return blockers.some(([sheet, test]) => store.list(sheet).some(test));
+  return blockers.some(([sheet, test]) => read(sheet).some(test));
 }
 
 function remove(data, ctx, user) {
   const table = tableOf(data);
   const { store } = ctx;
   if (table === USER_TABLES[user.kind] && data.id === user.id) throw new AppError('forbidden');
-  const rows = store.list(table);
+  const sheets = new Map();
+  const read = (name) => {
+    if (!sheets.has(name)) sheets.set(name, store.list(name));
+    return sheets.get(name);
+  };
+  const rows = read(table);
   const row = rows.find((r) => r.id === data.id);
   if (!row) throw new AppError('not_found');
-  if (usedBy(store, table, row.id)) throw new AppError('in_use');
+  if (usedBy(read, table, row.id)) throw new AppError('in_use');
   if (table === 'staff' && isActiveAdmin(row) && !rows.some((s) => s.id !== row.id && isActiveAdmin(s))) {
     throw new AppError('invalid', { fields: [{ field: 'roles', code: 'last_admin' }] });
   }
   store.remove(table, row.id);
+  if (table === 'topics') {
+    relayout(store, [row.subjectId], { topics: rows.filter((r) => r.id !== row.id), pairs: read('pairs') });
+  }
   return {};
 }
 

@@ -70,8 +70,8 @@ test('re-importing identical rows writes nothing but still counts them as update
   const good = cells.slice(0, 3);
   call('import.apply', { table: 'students', cells: good }, dean);
   const updates = [];
-  const update = store.update;
-  store.update = (...args) => { updates.push(args); return update(...args); };
+  const update = store.updateMany;
+  store.updateMany = (...args) => { updates.push(args); return update(...args); };
   const pre = call('import.preview', { table: 'students', cells: good }, dean).data;
   assert.deepEqual([pre.newCount, pre.updateCount], [0, 2]);
   const again = call('import.apply', { table: 'students', cells: good }, dean).data;
@@ -87,7 +87,7 @@ test('re-importing identical rows writes nothing but still counts them as update
 test('updates run before inserts: a failing update leaves no new people behind', () => {
   const { store, call, dean } = setup();
   call('import.apply', { table: 'students', cells: cells.slice(0, 2) }, dean);
-  store.update = () => { throw new Error('sheet write failed'); };
+  store.updateMany = () => { throw new Error('sheet write failed'); };
   const mixed = [cells[0], ['Асанов Азамат Бекович', '01-1', 2001], ['Бекова Бегимай', '01-1', 2002]];
   assert.deepEqual(call('import.apply', { table: 'students', cells: mixed }, dean).error, { code: 'internal' });
   assert.deepEqual(store.list('students').map((s) => s.cardNo), ['2001']);

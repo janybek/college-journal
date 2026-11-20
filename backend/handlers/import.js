@@ -1,6 +1,7 @@
 import { AppError } from '../../core/errors.js';
 import { IMPORT_SPECS, parseSheet, planImport } from '../../core/import.js';
 import { loadDb, issueTempPassword } from './dir.js';
+import { relayout } from '../scheduleData.js';
 
 // Validates the request and parses the sheet against the current directory data.
 function analyse(data, store) {
@@ -32,6 +33,14 @@ function preview(data, ctx) {
   };
 }
 
+// Topics changed: lay them over the pairs again, for the subjects the import touched.
+function relayoutImported(store, db, updated, created) {
+  const fresh = new Map(updated.map((row) => [row.id, row]));
+  const topics = [...db.topics.map((row) => fresh.get(row.id) ?? row), ...created];
+  const subjectIds = [...new Set([...updated, ...created].map((row) => row.subjectId))];
+  if (subjectIds.length > 0) relayout(store, subjectIds, { topics, pairs: db.pairs });
+}
+
 function apply(data, ctx) {
   const { store, platform } = ctx;
   const { table, db, parsed, badRows } = analyse(data, store);
@@ -54,10 +63,10 @@ function apply(data, ctx) {
   // Updates go first and new people last: if a write fails, nobody is left in the sheet with a lost password.
   // A row whose values are already stored is not written again (it still counts as updated).
   const stored = new Map(db[table].map((row) => [row.id, row]));
-  for (const { id, patch } of plan.toUpdate) {
-    if (!sameValues(stored.get(id), patch)) store.update(table, id, patch);
-  }
-  if (toInsert.length > 0) store.insertMany(table, toInsert);
+  const changed = plan.toUpdate.filter(({ id, patch }) => !sameValues(stored.get(id), patch));
+  const updated = changed.length > 0 ? store.updateMany(table, changed) : [];
+  const created = toInsert.length > 0 ? store.insertMany(table, toInsert) : [];
+  if (table === 'topics') relayoutImported(store, db, updated, created);
   return { inserted: toInsert.length, updated: plan.toUpdate.length, skipped: badRows, passwords, ...report };
 }
 
