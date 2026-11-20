@@ -1,3 +1,5 @@
+import { FIELDS } from './views/directoryConfig.js';
+
 // The topic plan of a subject split into semesters (no DOM). Each semester has its own numbers and modules;
 // the server lays only the topics of the current semester (`plan.semester`) on pairs.
 
@@ -7,10 +9,11 @@ export function semesterTopics(plan, semester) {
 }
 
 // Number and module for a new topic of a semester: the number after the largest one, the module of the last topic.
+// After the largest number a topic may have there is none to offer: `order` is null and the person types one.
 export function nextTopic(topics) {
   if (topics.length === 0) return { order: 1, unit: 1 };
   const last = topics.reduce((a, b) => (b.order > a.order ? b : a));
-  return { order: last.order + 1, unit: last.unit };
+  return { order: last.order < FIELDS.order.max ? last.order + 1 : null, unit: last.unit };
 }
 
 // What to warn about on the tab of a semester. Only the current semester stands on pairs, so another one has

@@ -161,7 +161,12 @@ function studentFrame(main, { onLang, onLogout }) {
 
 // Staff
 
-const currentName = (view, params) => (view === 'directory' ? params.table : view);
+// The menu item of a screen. The syllabus of a subject is part of «Темы».
+function currentName(view, params) {
+  if (view === 'directory') return params.table;
+  if (view === 'import' && params.subjectId) return 'topics';
+  return view;
+}
 
 function staffFrame(user, view, params, main, { onLang, onLogout }) {
   const role = activeRole(user);
@@ -225,9 +230,14 @@ function topbar(groups, view, params, current, onLang) {
 function crumbs(groups, view, params, current) {
   let groupKey = null;
   let pageKey = null;
-  for (const group of groups) {
-    const item = group.items.find((candidate) => candidate.name === current);
-    if (item) [groupKey, pageKey] = [group.titleKey, item.textKey];
+  // The syllabus of a subject: under «Расписание» for the deanery, under the teacher's own subjects otherwise.
+  if (view === 'import' && params.subjectId) {
+    [groupKey, pageKey] = [permissions().includes('dir.list:topics') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
+  } else {
+    for (const group of groups) {
+      const item = group.items.find((candidate) => candidate.name === current);
+      if (item) [groupKey, pageKey] = [group.titleKey, item.textKey];
+    }
   }
   if (!pageKey) {
     if (view === 'directory') [groupKey, pageKey] = ['home.directories', 'dir.' + params.table];

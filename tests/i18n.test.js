@@ -47,6 +47,26 @@ test('the lesson types the import hint names are words the importer reads; in En
   assert.match(en['import.error.lessonType.bad_value'], /lecture, practice or control/);
 });
 
+test('the lesson types the syllabus hint names are words the syllabus file reads', () => {
+  const db = { groups: [{ id: 'g1', name: '01-1' }], subjects: [{ id: 'sb1', name: 'Анатомия', groupId: 'g1' }], topics: [], pairs: [] };
+  const words = (dict) => dict['import.colHint.syllabus.lessonType'].replace(/\.$/, '').split(/,\s*|\s+(?:или|or|же)\s+/);
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    const cells = [IMPORT_SPECS.syllabus.columns.map((col) => col.titles.ru),
+      ...words(dict).map((word, i) => [1, 1, i + 1, 'Тема', word])];               // Семестр, Модуль, №, Тема, Тип
+    const { records, errors } = parseSheet('syllabus', cells, db, { subjectId: 'sb1' });
+    assert.deepEqual(errors, [], lang);
+    assert.deepEqual(records.map((r) => r.lessonType), LESSON_TYPES, lang);
+  }
+  assert.deepEqual(words(en), LESSON_TYPES);                                       // en: «lecture, practice or control»
+});
+
+test('the syllabus is uploaded from the subject page; the old link to the topics import is gone', () => {
+  for (const key of ['syllabus.title', 'syllabus.upload', 'syllabus.back', 'syllabus.forbidden', 'syllabus.sheet', 'import.matchBy.syllabus',
+    'import.error.order.duplicate']) assert.ok(ru[key], key);
+  for (const key of ['semester', 'unit', 'order', 'lessonType']) assert.ok(ru['import.colHint.syllabus.' + key], key);
+  for (const dict of [ru, ky, en]) assert.equal('topics.import' in dict, false);
+});
+
 test('every directory that can be in use elsewhere explains why it cannot be removed', () => {
   for (const table of ['groups', 'staff', 'subjects', 'rooms']) assert.ok(ru['dir.inUse.' + table], table);
 });

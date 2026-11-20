@@ -61,6 +61,20 @@ test('resolveRoute: my own schedule needs schedule.mine; the topic plan of a sub
   assert.equal(resolveRoute('#/plan/sb_12ab34cd', student).view, 'home');
 });
 
+test('resolveRoute: the syllabus upload and the topics screen with a subject', () => {
+  const teacher = { mustChangePassword: false, permissions: ['dir.save:topics', 'syllabus.apply', 'syllabus.preview', 'topics.plan'] };
+  const dean = { mustChangePassword: false, permissions: ['dir.list:topics', 'import.apply:topics', 'import.preview:topics', 'syllabus.apply'] };
+  assert.deepEqual(resolveRoute('#/syllabus/sb_12ab34cd', teacher), { view: 'import', params: { subjectId: 'sb_12ab34cd' } });
+  assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', { mustChangePassword: false, permissions: ['topics.plan'] }).view, 'home');
+  assert.equal(resolveRoute('#/syllabus', teacher).view, 'home');
+  assert.equal(resolveRoute('#/import', teacher).view, 'home');                                // общий импорт преподавателю не открывается
+  assert.deepEqual(resolveRoute('#/import', dean), { view: 'import', params: {} });
+  const office = { mustChangePassword: false, permissions: ['dir.list:topics'] };
+  assert.deepEqual(resolveRoute('#/topics', office), { view: 'topics', params: {} });
+  assert.deepEqual(resolveRoute('#/topics/sb_12ab34cd', office), { view: 'topics', params: { subjectId: 'sb_12ab34cd' } });
+  assert.equal(resolveRoute('#/topics/sb_12ab34cd', teacher).view, 'home');
+});
+
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {
   assert.deepEqual(resolveRoute('', dean), { view: 'home', params: {} });
   assert.equal(resolveRoute('#/dir/groups', { mustChangePassword: false }).view, 'home');

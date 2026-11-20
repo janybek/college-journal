@@ -17,6 +17,8 @@ test('semesterTopics: the topics of one semester, in order', () => {
 test('nextTopic: the number after the largest and the module of the last topic', () => {
   assert.deepEqual(nextTopic(semesterTopics(plan, 2)), { order: 6, unit: 2 });
   assert.deepEqual(nextTopic([]), { order: 1, unit: 1 });
+  // № 200 is the largest number a topic may have: after it the number is left for the person to fill.
+  assert.deepEqual(nextTopic([topic(1, 200, 4)]), { order: null, unit: 4 });
 });
 
 test('planWarnings: only the current semester warns', () => {

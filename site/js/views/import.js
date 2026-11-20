@@ -2,7 +2,7 @@ import { call } from '../api.js';
 import { t, tCount } from '../i18n.js';
 import {
   el, errorKey, fieldErrorKey, hasText, dataTable, holdOnLeave, markBusy, modal, showModal, focusById, refresh,
-  note, pageHeader,
+  note, pageHeader, avatar, badge, emptyState,
 } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
@@ -10,15 +10,24 @@ import { IMPORT_TABLES, IMPORT_COLUMNS, FIELDS } from './directoryConfig.js';
 import { templateSheet, findDateCell, READ_OPTIONS } from '../excel.js';
 
 // Excel import (#/import): five numbered steps on one page — directory, template, file, check, import.
+// The same screen uploads the syllabus of one subject (#/syllabus/<subjectId>): step 1 shows that subject
+// instead of a choice of directory, and the file goes through syllabus.* into the topics of that subject only.
 // SheetJS is loaded only from this screen. Drawn from `state`; the one-time passwords of an import live only
 // there, and while they are shown the screen asks before it is left.
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_ERRORS_SHOWN = 200;
 const XLSX_SRC = 'vendor/xlsx.full.min.js';
+// Answers about the subject a retry would not change: the screen explains them with a way back home.
+const SUBJECT_REFUSALS = { forbidden: 'syllabus.forbidden', not_found: 'plan.notFound' };
 
-const blank = (table = null) => ({
-  table,
+const blank = (table = null, subjectId = null) => ({
+  table,                 // the directory (or 'syllabus') the file goes into
+  subjectId,             // the subject whose syllabus is uploaded; null: the import of directories
+  subject: null,         // { name, groupName, teacherName, canEdit } from topics.plan; the syllabus mode only
+  subjectErrorKey: null,
+  subjectErrorCode: null,
+  subjectPending: false,
   warmed: false,         // SheetJS was requested on this visit
   ticket: 0,             // bumps with every file read and check; answers to older requests are dropped
   file: null,            // { name, size }
@@ -77,20 +86,35 @@ function releasePasswords() {
   window.removeEventListener('beforeunload', warnBeforeUnload);
 }
 
-export function leave() {
+// subjectId: the subject of the syllabus mode, or null.
+function reset(subjectId = null) {
   releasePasswords();
   if (state.ask) state.ask.resolve(false);
-  state = blank();
+  state = blank(subjectId === null ? null : 'syllabus', subjectId);
 }
 
-export function render(root) {
+export function leave() {
+  reset();
+}
+
+function warm() {
+  if (state.warmed) return;
+  state.warmed = true;
+  loadXlsx().catch(() => { /* reported when a step needs it */ });
+}
+
+export function render(root, params = {}) {
+  const subjectId = params.subjectId ?? null;
+  // From the import of directories to a syllabus, or from one subject to another: the screen starts over.
+  if (state.subjectId !== subjectId) reset(subjectId);
+  if (subjectId !== null) {
+    renderSyllabus(root);
+    return;
+  }
   const tables = IMPORT_TABLES.filter((table) => permissions().includes('import.apply:' + table));
   if (state.table !== null && !tables.includes(state.table)) state = blank();
   if (state.table === null && tables.length === 1) state.table = tables[0];
-  if (!state.warmed) {
-    state.warmed = true;
-    loadXlsx().catch(() => { /* reported when a step needs it */ });
-  }
+  warm();
   const passwords = passwordsSection();
   root.append(
     pageHeader({ id: 'import-title', title: t('import.title'), lead: t('import.lead') }),
@@ -101,6 +125,56 @@ export function render(root) {
     root.classList.add('has-printable');
   }
   if (state.ask) showModal(root, questionDialog(state.ask));
+}
+
+// The syllabus of one subject: the subject is read first; who may not change its topics gets the reason.
+function renderSyllabus(root) {
+  if (state.subject === null && state.subjectErrorKey === null && !state.subjectPending) loadSubject(state);
+  root.append(pageHeader({ id: 'import-title', title: t('syllabus.title'), lead: t('syllabus.lead') }));
+  const refusal = state.subject !== null && !state.subject.canEdit ? 'syllabus.forbidden' : SUBJECT_REFUSALS[state.subjectErrorCode];
+  if (refusal) {
+    const body = emptyState('alert',
+      el('p', {}, t(refusal)),
+      el('a', { class: 'button button--secondary', href: '#/' }, icon('home'), t('common.toHome')));
+    body.setAttribute('role', 'alert');
+    root.append(el('section', { class: 'card syllabus-wait' }, body));
+    return;
+  }
+  if (state.subject === null) {
+    root.append(el('section', { class: 'card syllabus-wait' }, subjectWait()));
+    return;
+  }
+  warm();
+  root.append(el('ol', { class: 'card steps' }, stepSubject(), stepTemplate(), stepFile(), stepCheck(), stepApply()));
+}
+
+// A text while the subject loads; after a failure, the reason and a button to try again.
+function subjectWait() {
+  if (!state.subjectErrorKey) return el('p', { class: 'loading' }, t('common.loading'));
+  const body = emptyState('alert',
+    el('p', {}, t(state.subjectErrorKey)),
+    el('button', { type: 'button', class: 'button button--secondary', onclick: () => { state.subjectErrorKey = null; refresh(); } }, t('common.retry')));
+  body.setAttribute('role', 'alert');
+  return body;
+}
+
+async function loadSubject(owner) {
+  owner.subjectPending = true;
+  try {
+    const plan = await call('topics.plan', { subjectId: owner.subjectId });
+    if (state !== owner) return;
+    const { name, groupName, teacherName } = plan.subject;
+    owner.subject = { name, groupName, teacherName, canEdit: plan.canEdit === true };
+    owner.subjectErrorKey = null;
+    owner.subjectErrorCode = null;
+  } catch (error) {
+    if (state !== owner) return;
+    owner.subjectErrorKey = errorKey(error.code);
+    owner.subjectErrorCode = error.code;
+  } finally {
+    owner.subjectPending = false;
+  }
+  refresh();
 }
 
 // Steps
@@ -125,6 +199,22 @@ function stepTable(tables) {
       disabled: settled(), onclick: () => chooseTable(table),
     }, t('dir.' + table)))),
     el('p', { class: 'step__hint' }, t('import.order')));
+}
+
+// The subject the file goes into: its name, group and teacher. There is nothing to choose here.
+function stepSubject() {
+  const { name, groupName, teacherName } = state.subject;
+  return step(1, 'syllabus.step.subject', true,
+    el('div', { class: 'syllabus-subject' },
+      el('span', { class: 'list__icon' }, icon('book')),
+      el('p', { class: 'syllabus-subject__name' }, name),
+      groupName ? badge(groupName, 'primary') : null,
+      teacherName ? el('p', { class: 'topics-teacher syllabus-subject__teacher' },
+        avatar(teacherName),
+        el('span', { class: 'topics-teacher__text' },
+          el('span', { class: 'topics-teacher__caption' }, t('topics.teacher')),
+          el('span', { class: 'topics-teacher__name' }, teacherName))) : null),
+    el('p', { class: 'step__hint' }, t('syllabus.subjectHint')));
 }
 
 function stepTemplate() {
@@ -240,7 +330,11 @@ function stepApply() {
     ] : null);
 }
 
+// Where the topics of the subject are: the deanery's «Темы» with it chosen, or the teacher's page of the subject.
+const subjectHref = () => (permissions().includes('dir.list:topics') ? '#/topics/' : '#/plan/') + state.subjectId;
+
 function resultBody(result) {
+  const again = el('button', { type: 'button', id: 'import-again', class: 'button button--secondary', onclick: startOver }, icon('upload'), t('import.again'));
   return [
     note('success', t('import.done'), { role: 'status' }),
     tally([
@@ -249,7 +343,9 @@ function resultBody(result) {
       [result.skipped, 'import.done.skipped', true],
     ]),
     errorsBlock(result.errors),
-    el('button', { type: 'button', id: 'import-again', class: 'button button--secondary', onclick: startOver }, icon('upload'), t('import.again')),
+    state.subjectId === null ? again : el('div', { class: 'actions' },
+      el('a', { id: 'import-back', class: 'button button--primary', href: subjectHref() }, icon('clipboard'), t('syllabus.back')),
+      again),
   ];
 }
 
@@ -392,13 +488,18 @@ async function csvText(file) {
   return utf8.includes('�') ? new TextDecoder('windows-1251').decode(bytes) : utf8;
 }
 
+// The file to the server: into a directory (import.*) or into the topics of one subject (syllabus.*).
+const send = (owner, kind) => (owner.subjectId === null
+  ? call('import.' + kind, { table: owner.table, cells: owner.cells })
+  : call('syllabus.' + kind, { subjectId: owner.subjectId, cells: owner.cells }));
+
 async function check() {
   const owner = state;
   const ticket = ++owner.ticket;
   Object.assign(owner, { checking: true, preview: null, checkErrorKey: null, applyErrorKey: null, applyLost: false });
   refresh();
   try {
-    const preview = await call('import.preview', { table: owner.table, cells: owner.cells });
+    const preview = await send(owner, 'preview');
     if (state !== owner || owner.ticket !== ticket) return;
     owner.preview = preview;
   } catch (error) {
@@ -417,7 +518,7 @@ async function apply() {
   owner.applyLost = false;
   refresh();
   try {
-    const result = await call('import.apply', { table: owner.table, cells: owner.cells });
+    const result = await send(owner, 'apply');
     if (state !== owner) return;
     owner.result = result;
     if (result.passwords.length > 0) holdPasswords();
@@ -429,7 +530,7 @@ async function apply() {
   }
   owner.applying = false;
   refresh();
-  if (owner.result) focusById(owner.result.passwords.length > 0 ? 'passwords-download' : 'import-again');
+  if (owner.result) focusById(owner.result.passwords.length > 0 ? 'passwords-download' : 'import-back', 'import-again');
 }
 
 // Asks before the passwords leave the screen. Several requests while the question is open share one answer.
@@ -455,7 +556,8 @@ function answer(agree) {
 
 async function startOver() {
   if (state.result && state.result.passwords.length > 0 && !(await ask('again'))) return;
-  state = blank(state.table);
+  // The subject of a syllabus stays: it was read already.
+  state = { ...blank(state.table, state.subjectId), subject: state.subject, warmed: true };
   refresh();
   focusById('import-file');
 }
@@ -473,7 +575,7 @@ async function downloadTemplate() {
   const columns = IMPORT_COLUMNS[table];
   const titles = columns.map(({ key }) => columnTitle(key));
   const sheet = templateSheet(XLSX, titles, columns.map(({ key }) => FIELDS[key].kind !== 'number'));
-  saveWorkbook(XLSX, t('dir.' + table), sheet, [titles], `template-${table}.xlsx`);
+  saveWorkbook(XLSX, t(state.subjectId === null ? 'dir.' + table : 'syllabus.sheet'), sheet, [titles], `template-${table}.xlsx`);
   if (state.templateErrorKey) {
     state.templateErrorKey = null;
     refresh();

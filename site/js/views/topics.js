@@ -12,12 +12,13 @@ import { semesterTopics, nextTopic, planWarnings } from '../syllabus.js';
 
 // The syllabus of a subject: its topics by semester, each topic with the pair the journal put it on (the server
 // lays the topics of the current semester on the subject's pairs by date: one topic, one pair). Two screens share
-// this code: the deanery's «Темы» (#/topics) with a choice of subject, and the page of one subject
+// this code: the deanery's «Темы» (#/topics, #/topics/<subjectId>) with a choice of subject, and the page of one subject
 // (#/plan/<subjectId>) a teacher opens from «Мои предметы». A tab per semester; the current one opens first and is
 // the only one that warns about topics that did not fit and pairs left without a topic. Adding, editing and
 // deleting a topic lays them out again, so the plan is read again after every change. Who may change the topics
-// depends on the subject, so the buttons follow `plan.canEdit` from the server. Drawn from `state`, so a redraw
-// (language switch) keeps the subject, the tab and an open dialog.
+// depends on the subject, so the buttons follow `plan.canEdit` from the server; whoever may change them may also
+// upload the syllabus from Excel (#/syllabus/<subjectId>). Drawn from `state`, so a redraw (language switch) keeps
+// the subject, the tab and an open dialog.
 
 // A copy of LESSON_TYPES in core/schema.js: the server checks the type again.
 const LESSON_TYPES = ['lecture', 'practice', 'control'];
@@ -37,6 +38,7 @@ const blank = () => ({
   loadErrorKey: null,
   pending: false,
   subjectId: '',
+  route: null,         // { subjectId }: the address parameter applied last (the list mode only)
   plan: null,          // the answer of topics.plan for subjectId
   planErrorKey: null,
   planErrorCode: null,
@@ -51,15 +53,16 @@ let state = blank();
 
 const can = (permission) => permissions().includes(permission);
 const canEdit = () => state.plan !== null && state.plan.canEdit === true;
-const canUpload = () => state.mode === 'list' && can('import.apply:topics');
+const canUpload = () => canEdit() && can('syllabus.apply');
 
 export function leave() {
   state = blank();
 }
 
 // The deanery's «Темы».
-export function render(root) {
+export function render(root, params = {}) {
   if (state.mode !== 'list') state = blank();
+  applyRoute(params);
   if (state.subjects === null && state.loadErrorKey === null && !state.pending) load(state);
   if (state.subjects !== null && state.subjectId !== '') loadPlanIfNeeded();
   root.append(pageHeader({ id: 'topics-title', title: t('topics.title'), lead: t('topics.lead'), actions: headerActions() }));
@@ -96,6 +99,16 @@ export function renderSubject(root, subjectId) {
   if (state.dialog) showModal(root, dialogFor(state.dialog));
 }
 
+// The subject the address names is chosen once per address: a redraw with the same address (a language switch)
+// keeps the subject chosen since. One the list does not have leaves the choice as it was (load() checks it too).
+function applyRoute({ subjectId = null }) {
+  if (state.route && state.route.subjectId === subjectId) return;
+  state.route = { subjectId };
+  if (subjectId === null || subjectId === state.subjectId) return;
+  if (state.subjects !== null && !state.subjects.some((subject) => subject.id === subjectId)) return;
+  forgetPlan(subjectId);
+}
+
 function loadPlanIfNeeded() {
   if (state.plan === null && state.planErrorKey === null && !state.planPending) loadPlan(state);
 }
@@ -103,7 +116,7 @@ function loadPlanIfNeeded() {
 function headerActions() {
   if (state.mode === 'list' && (state.subjects === null || state.subjects.length === 0)) return null;
   const upload = canUpload()
-    ? el('a', { class: 'button button--secondary', href: '#/import' }, icon('sheetUp'), t('topics.import'))
+    ? el('a', { id: 'topics-upload', class: 'button button--secondary', href: '#/syllabus/' + state.subjectId }, icon('sheetUp'), t('syllabus.upload'))
     : null;
   const add = canEdit()
     ? el('button', { type: 'button', id: 'topics-add', class: 'button button--primary', onclick: () => openEdit(null) }, icon('plus'), t('topics.add'))
@@ -285,7 +298,7 @@ async function reloadPlan() {
 function emptyBody(plan) {
   return emptyState('clipboard',
     el('p', { class: 'empty__title' }, t(plan.topics.length === 0 ? 'topics.empty' : 'topics.emptySemester')),
-    canEdit() && canUpload() ? el('p', {}, t('topics.emptyHint')) : null);
+    canUpload() ? el('p', {}, t('topics.emptyHint')) : null);
 }
 
 // other: the tab of a semester that is not the current one, whose topics wait for the switch of the semester.
@@ -348,8 +361,15 @@ function pairCell(pair, other) {
 }
 
 function chooseSubject(subjectId) {
+  forgetPlan(subjectId);
+  refresh();
+  focusById('topics-subject');
+}
+
+// Another subject: its plan is read anew. A plan still on its way belongs to the subject chosen before: its
+// answer is dropped.
+function forgetPlan(subjectId) {
   state.subjectId = subjectId;
-  // A plan still on its way belongs to the subject chosen before: its answer is dropped.
   state.planTicket++;
   state.planPending = false;
   state.plan = null;
@@ -358,8 +378,6 @@ function chooseSubject(subjectId) {
   state.tab = null;
   state.status = null;
   state.freshId = null;
-  refresh();
-  focusById('topics-subject');
 }
 
 // Dialogs
@@ -390,7 +408,7 @@ function openEdit(topic) {
     kind: 'edit', topic, subjectId: state.subjectId, semester,
     values: topic
       ? { order: String(topic.order), unit: String(topic.unit), name: topic.name, lessonType: topic.lessonType }
-      : { order: String(next.order), unit: String(next.unit), name: '', lessonType: '' },
+      : { order: next.order === null ? '' : String(next.order), unit: String(next.unit), name: '', lessonType: '' },
     fieldErrors: {}, messageKey: null, blocked: false, busy: false,
     returnId: topic ? 'topics-edit-' + topic.id : 'topics-add',
   };

@@ -11,6 +11,9 @@ export function resolveRoute(hash, user) {
   const dir = /^\/dir\/([^/]+)$/.exec(path);
   if (dir && DIR_TABLES.includes(dir[1]) && permissions.includes('dir.list:' + dir[1])) return { view: 'directory', params: { table: dir[1] } };
   if (path === '/import' && permissions.some((p) => p.startsWith('import.apply:'))) return { view: 'import', params: {} };
+  // #/syllabus/<subjectId>: the import screen for the syllabus of one subject (its teacher and the deanery).
+  const syllabus = /^\/syllabus\/([^/]+)$/.exec(path);
+  if (syllabus && permissions.includes('syllabus.apply')) return { view: 'import', params: { subjectId: syllabus[1] } };
   if (path === '/schedule' && permissions.includes('schedule.list')) return { view: 'schedule', params: {} };
   // #/template, #/template/<groupId>, #/template/<groupId>/<weekday 1–5>: the group to show and the day to mark.
   const template = /^\/template(?:\/([^/]+)(?:\/([1-5]))?)?$/.exec(path);
@@ -20,7 +23,9 @@ export function resolveRoute(hash, user) {
     if (template[2]) params.weekday = Number(template[2]);
     return { view: 'weekTemplate', params };
   }
-  if (path === '/topics' && permissions.includes('dir.list:topics')) return { view: 'topics', params: {} };
+  // #/topics, #/topics/<subjectId>: the deanery's «Темы», with that subject chosen.
+  const topics = /^\/topics(?:\/([^/]+))?$/.exec(path);
+  if (topics && permissions.includes('dir.list:topics')) return { view: 'topics', params: topics[1] ? { subjectId: topics[1] } : {} };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
   const plan = /^\/plan\/([^/]+)$/.exec(path);
