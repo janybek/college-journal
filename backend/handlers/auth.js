@@ -13,9 +13,9 @@ function findByLogin(store, login) {
   return student ? { row: student, kind: 'student' } : null;
 }
 
-function sessionFor(platform, row, kind) {
-  const token = issueToken(platform, { uid: row.id, kind, pv: passwordVersion(row.passwordHash) });
-  return { token, user: publicUser(row, kind) };
+function sessionFor(ctx, row, kind) {
+  const token = issueToken(ctx.platform, { uid: row.id, kind, pv: passwordVersion(row.passwordHash) });
+  return { token, user: publicUser(row, kind, ctx.store) };
 }
 
 function login(data, ctx) {
@@ -23,11 +23,11 @@ function login(data, ctx) {
   const found = findByLogin(ctx.store, typed);
   const ok = found !== null && isUsable(found.row) && verifyPassword(ctx.platform, data.password, found.row.passwordHash);
   if (!ok) throw new AppError('bad_credentials');
-  return sessionFor(ctx.platform, found.row, found.kind);
+  return sessionFor(ctx, found.row, found.kind);
 }
 
 function me(data, ctx, user) {
-  return { user: publicUser(user.row, user.kind) };
+  return { user: publicUser(user.row, user.kind, ctx.store) };
 }
 
 function changePassword(data, ctx, user) {
@@ -38,13 +38,13 @@ function changePassword(data, ctx, user) {
     passwordHash: hashPassword(ctx.platform, data.newPassword),
     mustChangePassword: false,
   });
-  return sessionFor(ctx.platform, row, user.kind);
+  return sessionFor(ctx, row, user.kind);
 }
 
 function setLang(data, ctx, user) {
   if (!LANGS.includes(data.lang)) throw new AppError('invalid', { fields: [{ field: 'lang', code: 'invalid' }] });
   const row = ctx.store.update(USER_TABLES[user.kind], user.id, { lang: data.lang });
-  return { user: publicUser(row, user.kind) };
+  return { user: publicUser(row, user.kind, ctx.store) };
 }
 
 export const authHandlers = {

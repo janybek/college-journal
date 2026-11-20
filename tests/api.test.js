@@ -61,8 +61,31 @@ test('login', () => {
   assert.deepEqual(st.user.roles, ['student']);
   assert.equal(st.user.id, student.id);
   assert.equal(st.user.groupId, 'g_1');
+  assert.equal(st.user.groupName, null);
+  assert.equal(a.user.groupName, null);
   assert.equal(st.user.lang, 'ky');
   assert.equal(st.user.mustChangePassword, true);
+});
+
+test('user object carries the group name for students, null for staff and for a missing group', () => {
+  const { call, store, student } = setup();
+  const group = store.insert('groups', { name: '01-1', course: 1 });
+  store.update('students', student.id, { groupId: group.id });
+  const st = call('auth.login', { login: 'S1001', password: STUDENT_TEMP }).data;
+  assert.equal(st.user.groupId, group.id);
+  assert.equal(st.user.groupName, '01-1');
+  assert.equal(call('auth.me', {}, st.token).data.user.groupName, '01-1');
+  assert.equal(call('user.setLang', { lang: 'ru' }, st.token).data.user.groupName, '01-1');
+  const changed = call('auth.changePassword', { oldPassword: STUDENT_TEMP, newPassword: 'kitep-42' }, st.token).data;
+  assert.equal(changed.user.groupName, '01-1');
+  store.remove('groups', group.id);
+  const me = call('auth.me', {}, changed.token).data.user;
+  assert.equal(me.groupId, group.id);
+  assert.equal(me.groupName, null);
+  const a = call('auth.login', { login: 'admin', password: 'secret12' }).data;
+  assert.equal(a.user.groupName, null);
+  assert.equal(call('auth.me', {}, a.token).data.user.groupName, null);
+  assert.equal(call('user.setLang', { lang: 'en' }, a.token).data.user.groupName, null);
 });
 
 test('student flow: forbidden, setLang, changePassword, old token dies', () => {
@@ -151,6 +174,6 @@ test('publicUser', () => {
   const row = { id: 'sf_1', fullName: 'A', roles: 'teacher', lang: 'en', mustChangePassword: false, passwordHash: 'x' };
   assert.deepEqual(publicUser(row, 'staff'), {
     id: 'sf_1', kind: 'staff', fullName: 'A', roles: ['teacher'], lang: 'en', mustChangePassword: false,
-    groupId: null, permissions: ['teacher.mySubjects'],
+    groupId: null, groupName: null, permissions: ['teacher.mySubjects'],
   });
 });

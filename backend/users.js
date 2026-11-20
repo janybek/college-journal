@@ -19,9 +19,18 @@ export function isUsable(row) {
   return row.active === true && typeof row.passwordHash === 'string' && row.passwordHash !== '';
 }
 
+// Name of the group with this id, or null when there is no id or the group no longer exists.
+function groupNameOf(store, groupId) {
+  if (groupId === null) return null;
+  const group = store.get('groups', groupId);
+  return group ? group.name : null;
+}
+
 // The user object sent to the site. Never contains passwordHash.
-export function publicUser(row, kind) {
+// `store` resolves a student's group name; staff never need it.
+export function publicUser(row, kind, store) {
   const roles = rolesOf(row, kind);
+  const groupId = kind === 'student' ? (row.groupId ?? null) : null;
   return {
     id: row.id,
     kind,
@@ -29,7 +38,8 @@ export function publicUser(row, kind) {
     roles,
     lang: LANGS.includes(row.lang) ? row.lang : DEFAULT_LANG,
     mustChangePassword: row.mustChangePassword === true,
-    groupId: kind === 'student' ? (row.groupId ?? null) : null,
+    groupId,
+    groupName: groupNameOf(store, groupId),
     permissions: listPermissions(roles),
   };
 }
