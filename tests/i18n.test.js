@@ -54,6 +54,17 @@ test('every server error code has a text', () => {
     assert.ok(ru['error.' + code], code);
 });
 
+test('every schedule error code has a text', () => {
+  for (const code of ['group_busy', 'teacher_busy', 'room_busy', 'in_past', 'pair_locked', 'empty_template', 'held', 'out_of_semester', 'day_off', 'bad_request'])
+    assert.ok(ru['error.' + code], code);
+});
+
+test('days and months are in the dictionaries, not taken from Intl', () => {
+  for (let n = 1; n <= 7; n++) assert.ok(ru['date.weekday.' + n] && ru['date.weekdayShort.' + n], String(n));
+  for (let n = 1; n <= 12; n++) assert.ok(ru['date.month.' + n], String(n));
+  assert.equal(translate({ ky: {}, ru, en: {} }, 'ru', 'date.dayMonth', { day: 21, month: ru['date.month.11'] }), '21 ноября');
+});
+
 test('pickLang: a choice made on this device wins over the account language', () => {
   assert.deepEqual(pickLang({ deviceLang: null, userLang: 'ru' }), { lang: 'ru', saveToAccount: false });
   assert.deepEqual(pickLang({ deviceLang: 'en', userLang: 'ru' }), { lang: 'en', saveToAccount: true });

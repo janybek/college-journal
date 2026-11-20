@@ -51,6 +51,9 @@ const ICONS = {
   alert: [{ circle: [12, 12, 9] }, 'M12 7.5v5.5', 'M12 16.5h.01'],
   info: [{ circle: [12, 12, 9] }, 'M12 11v5.5', 'M12 7.5h.01'],
   chevron: ['M9.5 6l6 6-6 6'],
+  settings: ['M20.5 7H10', 'M14 17H3.5', { circle: [7, 7, 3] }, { circle: [17, 17, 3] }],
+  clock: [{ circle: [12, 12, 9] }, 'M12 7.5V12l3 2'],
+  calendarOff: [{ rect: [3.5, 5, 17, 15.5, 2] }, 'M3.5 10h17', 'M8 3v4M16 3v4', 'M9.5 13.5l5 5M14.5 13.5l-5 5'],
   // The brand: a register with a tick.
   journal: ['M5 5a2 2 0 0 1 2-2h12v15H7a2 2 0 0 0-2 2z', 'M5 20a2 2 0 0 0 2 2h12', 'M9 10.5l2 2 4-4'],
 };

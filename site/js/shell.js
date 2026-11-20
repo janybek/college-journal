@@ -32,7 +32,8 @@ export function activeRole(user) {
   return roles.includes(saved) ? saved : roles[0];
 }
 
-// Navigation groups for a role: [{ titleKey, items: [{ name, href, textKey, icon }] }]. Pure, for tests.
+// Navigation groups for a role: [{ titleKey, items: [{ name, href, textKey, icon, hintKey }] }]. Pure, for tests.
+// hintKey: the line under the item's tile on the home screen.
 // The teacher's home is the list of their subjects, so their first item is named after it.
 export function navFor(permissionList, role) {
   const list = Array.isArray(permissionList) ? permissionList : [];
@@ -42,11 +43,18 @@ export function navFor(permissionList, role) {
   }
   const groups = [{ titleKey: null, items: [HOME] }];
   if (!parts.includes('office')) return groups;
-  const directories = DIR_TABLES.filter((table) => list.includes('dir.list:' + table))
-    .map((table) => ({ name: table, href: '#/dir/' + table, textKey: 'dir.' + table, icon: DIR_ICONS[table] }));
+  // Tasks 8–11 fill this group; final order: schedule, weekTemplate, topics, settings.
+  const schedule = [];
+  if (list.includes('settings.get')) {
+    schedule.push({ name: 'settings', href: '#/settings', textKey: 'settings.title', icon: 'settings', hintKey: 'settings.hint' });
+  }
+  if (schedule.length > 0) groups.push({ titleKey: 'nav.schedule', items: schedule });
+  const directories = DIR_TABLES.filter((table) => list.includes('dir.list:' + table)).map((table) => ({
+    name: table, href: '#/dir/' + table, textKey: 'dir.' + table, icon: DIR_ICONS[table], hintKey: `dir.${table}.hint`,
+  }));
   if (directories.length > 0) groups.push({ titleKey: 'home.directories', items: directories });
   if (list.some((p) => p.startsWith('import.apply:'))) {
-    groups.push({ titleKey: 'nav.data', items: [{ name: 'import', href: '#/import', textKey: 'import.title', icon: 'sheetUp' }] });
+    groups.push({ titleKey: 'nav.data', items: [{ name: 'import', href: '#/import', textKey: 'import.title', icon: 'sheetUp', hintKey: 'import.hint' }] });
   }
   return groups;
 }
@@ -214,6 +222,7 @@ function crumbs(groups, view, params, current) {
   if (!pageKey) {
     if (view === 'directory') [groupKey, pageKey] = ['home.directories', 'dir.' + params.table];
     else if (view === 'import') [groupKey, pageKey] = ['nav.data', 'import.title'];
+    else if (view === 'settings') [groupKey, pageKey] = ['nav.schedule', 'settings.title'];
     else pageKey = 'nav.home';
   }
   return el('p', { class: 'crumbs' },

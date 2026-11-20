@@ -56,6 +56,27 @@ test('navFor: the office roles see the directories they may list and the import 
   assert.equal(navFor(DEAN, 'dean')[1].items[1].href, '#/dir/students');
 });
 
+test('navFor: the office roles with settings.get get a schedule group between home and the directories', () => {
+  assert.deepEqual(outline(navFor([...DEAN, 'settings.get'], 'dean')), [
+    [null, ['home']],
+    ['nav.schedule', ['settings']],
+    ['home.directories', ['groups', 'students', 'staff', 'subjects', 'rooms']],
+    ['nav.data', ['import']],
+  ]);
+  assert.deepEqual(navFor([...DEAN, 'settings.get'], 'dean')[1].items[0],
+    { name: 'settings', href: '#/settings', textKey: 'settings.title', icon: 'settings', hintKey: 'settings.hint' });
+  assert.deepEqual(outline(navFor(DEAN, 'dean')).map(([title]) => title), [null, 'home.directories', 'nav.data']);
+  assert.deepEqual(outline(navFor(['settings.get'], 'teacher')), [[null, ['home']]]);
+});
+
+test('navFor: every item but home names the hint its tile shows', () => {
+  for (const group of navFor([...DEAN, 'settings.get'], 'dean').slice(1)) {
+    for (const item of group.items) assert.equal(typeof item.hintKey, 'string', item.name);
+  }
+  assert.equal(navFor(DEAN, 'dean')[1].items[0].hintKey, 'dir.groups.hint');
+  assert.equal(navFor(DEAN, 'dean')[2].items[0].hintKey, 'import.hint');
+});
+
 test('navFor: the teacher role sees its subjects; nothing is shown without permissions', () => {
   assert.deepEqual(outline(navFor(DEAN, 'teacher')), [['nav.teaching', ['home']]]);
   assert.equal(navFor(DEAN, 'teacher')[0].items[0].textKey, 'home.mySubjects');

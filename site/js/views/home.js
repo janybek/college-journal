@@ -61,12 +61,11 @@ function section(id, title, body) {
 }
 
 function tile(item) {
-  const hintKey = item.name === 'import' ? 'import.hint' : `dir.${item.name}.hint`;
   return el('li', {}, el('a', { class: 'card tile' + (item.name === 'import' ? ' tile--accent' : ''), href: item.href },
     el('span', { class: 'tile__icon' }, icon(item.icon)),
     el('span', { class: 'tile__text' },
       el('span', { class: 'tile__title' }, t(item.textKey)),
-      el('span', { class: 'tile__hint' }, t(hintKey))),
+      el('span', { class: 'tile__hint' }, t(item.hintKey))),
     icon('chevron', 'tile__go')));
 }
 
