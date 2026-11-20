@@ -7,11 +7,13 @@ import {
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { isDate, isTime, minutesOf, addMinutes, dayParts } from '../dates.js';
+import { bellOptions, nextBell } from '../bells.js';
 
 // Semester settings (#/settings): the semester dates, the days off and the bell times. Drawn from `state`, so a
 // redraw (language switch) keeps what was typed. What depends on a typed value (the date under a date field,
 // the end of a class, the breaks, the day ribbon) is updated in place while typing: a redraw would throw the
-// caret out of a date or time field. Without settings.save (the vice-rector) everything is read-only.
+// caret out of a date field. A bell time is picked from a list (site/js/bells.js), never typed. Without
+// settings.save (the vice-rector) everything is read-only.
 
 // A copy of MAX_SLOTS in core/settings.js: the server checks it again.
 const MAX_BELLS = 8;
@@ -205,6 +207,8 @@ function removeHoliday(date) {
 }
 
 // Bells: one row per class, the break to the previous class between rows, and a ribbon of the day above.
+// Each bell is a list of times; an empty bell offers «Выберите время» first, a saved time that is not on the
+// list is shown first and marked, and stays until the person picks another one.
 
 function bellsPanel(editable) {
   const { bells } = state.values;
@@ -215,12 +219,15 @@ function bellsPanel(editable) {
     const id = 'settings-bell-' + i;
     const gap = i > 0 ? el('li', { class: 'bell-gap', 'aria-hidden': 'true' }) : null;
     const end = el('span', { class: 'bell__end' });
-    const input = el('input', {
-      id, name: id, type: 'time', class: 'field__input bell__input', value: time, required: true, readonly: !editable,
+    const input = el('select', {
+      id, name: id, class: 'field__input bell__input', required: true, disabled: !editable,
       'aria-invalid': state.badBells.includes(i) ? 'true' : null,
       'aria-describedby': state.errors.bells ? 'settings-bells-error' : null,
-      oninput: () => { state.values.bells[i] = input.value; forgetError('bells'); syncAll(); },
-    });
+      onchange: () => { state.values.bells[i] = input.value; forgetError('bells'); syncAll(); },
+    },
+    isTime(time) ? null : el('option', { value: '' }, t('settings.bellChoose')),
+    bellOptions(time).map(({ value, offList }) => el('option', { value }, offList ? t('settings.bellOffList', { time: value }) : value)));
+    input.value = isTime(time) ? time : '';
     rows.push({ gap, end });
     if (gap) items.push(gap);
     items.push(el('li', { class: 'bell' },
@@ -251,9 +258,7 @@ function addBell() {
   const { bells } = state.values;
   if (bells.length >= MAX_BELLS) return;
   const { pairMinutes } = state.loaded;
-  const last = bells[bells.length - 1];
-  const fits = isTime(last) && minutesOf(last) + 2 * pairMinutes + NEW_BREAK <= LAST_MINUTE;
-  state.values.bells = [...bells, fits ? addMinutes(last, pairMinutes + NEW_BREAK) : ''];
+  state.values.bells = [...bells, nextBell(bells[bells.length - 1], pairMinutes, NEW_BREAK)];
   changed();
   focusById('settings-bell-' + bells.length);
 }
@@ -281,7 +286,7 @@ function forgetBellErrors() {
 }
 
 // The person is fixing a marked field: its mark and the message about the whole form go at once. In place, as a
-// redraw would throw the caret out of a date or time field.
+// redraw would throw the caret out of a date field.
 const INPUT_IDS = { semesterStart: 'settings-start', semesterEnd: 'settings-end' };
 
 function forgetError(name) {

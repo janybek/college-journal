@@ -869,9 +869,19 @@
 
 .bell {
   display: grid;
-  grid-template-columns: 1.75rem minmax(0, 1fr) minmax(6.5rem, 8rem) 4.25rem;
+  grid-template-columns: 1.75rem minmax(0, 1fr) minmax(8rem, 13.5rem) 4.25rem;
   align-items: center;
   gap: var(--space-3);
+}
+
+/* The list of times is wide enough for «08:02 — вне списка» and «Выберите время». */
+.bell__input { font-variant-numeric: tabular-nums; }
+
+/* Without the right to save (the vice-rector) the time reads as a value, not as a list to open. */
+.bell__input:disabled {
+  appearance: none;
+  opacity: 1;
+  cursor: default;
 }
 
 .bell__number {

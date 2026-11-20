@@ -51,6 +51,10 @@ test('a subject whose group cannot be changed has its own error text in every la
   for (const [lang, dict] of [['ru', ru], ['ky', ky], ['en', en]]) assert.ok(dict['error.subjects.groupId.in_use'], lang);
 });
 
+test('the bell list has its texts: the empty choice and a saved time that is not on the list', () => {
+  for (const key of ['settings.bellChoose', 'settings.bellOffList']) assert.ok(ru[key], key);
+});
+
 test('tCount picks the plural form of the current language', () => {
   try {
     setLang('ru');
