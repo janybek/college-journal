@@ -551,6 +551,7 @@ export default {
   'error.groups.name.duplicate': 'A group with this name already exists.',
   'error.rooms.name.duplicate': 'This room already exists.',
   'error.subjects.name.duplicate': 'This group already has this subject.',
+  'error.subjects.groupId.in_use': 'The subject is already in the week template or the schedule, so its group cannot be changed.',
   'error.unit.bad_value': 'The unit is a whole number from 1 to 12.',
   'error.order.bad_value': 'The No. is a whole number from 1 to 200.',
   'error.topics.order.duplicate': 'This subject already has a topic with this number.',

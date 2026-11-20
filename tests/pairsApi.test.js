@@ -14,11 +14,13 @@ const S = { semesterStart: '2026-09-01', semesterEnd: '2026-09-25', holidays: ['
 function spyOn(store) {
   const calls = {};
   const reads = {};
+  const updates = [];
   const spy = {};
   for (const name of Object.keys(store)) {
     spy[name] = (...args) => {
       calls[name] = (calls[name] || 0) + 1;
       if (name === 'list') reads[args[0]] = (reads[args[0]] || 0) + 1;
+      if (name === 'update' && args[0] === 'pairs') updates.push(args[2]);
       return store[name](...args);
     };
   }
@@ -26,7 +28,7 @@ function spyOn(store) {
     for (const k of Object.keys(calls)) delete calls[k];
     for (const k of Object.keys(reads)) delete reads[k];
   };
-  return { spy, calls, reads, reset };
+  return { spy, calls, reads, updates, reset };
 }
 
 function setup() {
@@ -60,7 +62,7 @@ function setup() {
   assert.equal(call('schedule.generate', {}, t.dean).ok, true);
   const idAt = (subjectId, date) => store.list('pairs').find((p) => p.subjectId === subjectId && p.date === date).id;
   return {
-    store, spy: spied.spy, state, call, calls: spied.calls, reads: spied.reads, reset: spied.reset, ...t, ids, g1, g2, sb1, sb2, r1Name: r1.name, r2Id: r2.id,
+    store, spy: spied.spy, state, call, calls: spied.calls, reads: spied.reads, updates: spied.updates, reset: spied.reset, ...t, ids, g1, g2, sb1, sb2, r1Name: r1.name, r2Id: r2.id,
     pair1: idAt(sb1, '2026-09-01'), pair8: idAt(sb1, '2026-09-08'), pair15: idAt(sb1, '2026-09-15'), pair22: idAt(sb1, '2026-09-22'),
   };
 }
@@ -124,7 +126,7 @@ test('cancel, restore, move and substitute one pair; topics follow', () => {
   assert.deepEqual(topicsByDate(), { '2026-09-01': 1, '2026-09-08': null, '2026-09-15': 2, '2026-09-22': 3 });
   assert.equal(call('schedule.restorePair', { id: x.pair8 }, x.dean).data.pair.status, 'planned');
   assert.deepEqual(topicsByDate(), { '2026-09-01': 1, '2026-09-08': 2, '2026-09-15': 3, '2026-09-22': 4 });
-  assert.equal(store.get('pairs', x.pair8).note, 'Преподаватель на конференции');
+  assert.equal(store.get('pairs', x.pair8).note, '');
 
   const moved = call('schedule.changePair', { id: x.pair22, date: '2026-09-10', slot: 2 }, x.dean).data.pair;
   assert.deepEqual([moved.date, moved.startTime, moved.moved, moved.planDate, moved.planSlot], ['2026-09-10', '09:40', true, '2026-09-22', 1]);
@@ -173,4 +175,33 @@ test('changing one pair reads each sheet at most once and writes in batches', ()
   check('cancel', call('schedule.cancelPair', { id: x.pair8 }, x.dean));
   reset();
   check('restore', call('schedule.restorePair', { id: x.pair8 }, x.dean));
+});
+
+test('restoring a pair onto a place somebody took is refused', () => {
+  const x = setup();
+  const { call, store } = x;
+  assert.equal(call('schedule.cancelPair', { id: x.pair8, note: 'Конференция' }, x.dean).ok, true);
+  // pair22 (same group) takes the place of the cancelled pair
+  assert.equal(call('schedule.changePair', { id: x.pair22, date: '2026-09-08', slot: 1 }, x.dean).ok, true);
+  const refused = call('schedule.restorePair', { id: x.pair8 }, x.dean).error;
+  assert.equal(refused.code, 'invalid');
+  assert.ok(refused.fields.some((f) => f.field === 'slot' && f.code === 'group_busy'));
+  assert.equal(store.get('pairs', x.pair8).status, 'cancelled');
+});
+
+test('a note-only edit keeps the pair free and writes only the note; a room change freezes it', () => {
+  const x = setup();
+  const { call, store, updates } = x;
+  updates.length = 0;
+  const view = call('schedule.changePair', { id: x.pair15, note: 'Принести халаты' }, x.dean).data.pair;
+  assert.equal(view.note, 'Принести халаты');
+  assert.deepEqual(updates, [{ note: 'Принести халаты' }]);
+  assert.equal(store.get('pairs', x.pair15).changed, false);
+  updates.length = 0;
+  assert.equal(call('schedule.changePair', { id: x.pair15, roomId: x.r2Id }, x.dean).ok, true);
+  assert.deepEqual(updates, [{ roomId: x.r2Id, changed: true }]);
+  assert.equal(store.get('pairs', x.pair15).changed, true);
+  updates.length = 0;
+  assert.equal(call('schedule.changePair', { id: x.pair22 }, x.dean).ok, true);
+  assert.deepEqual(updates, []);
 });

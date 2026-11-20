@@ -80,7 +80,7 @@ const errors = (patch, c = ctx) => checkPairChange(p3, patch, c).errors;
 
 test('checkPairChange', () => {
   assert.deepEqual(checkPairChange(p3, {}, ctx), { errors: [],
-    next: { date: '2026-09-08', slot: 1, startTime: '08:00', teacherId: 'sf_1', roomId: 'r_1', note: '', changed: true } });
+    next: { date: '2026-09-08', slot: 1, startTime: '08:00', teacherId: 'sf_1', roomId: 'r_1', note: '', changed: false } });
   assert.deepEqual(checkPairChange(p3, { date: '2026-09-09', slot: 3, roomId: '', note: ' Конференция ' }, ctx).next,
     { date: '2026-09-09', slot: 3, startTime: '11:20', teacherId: 'sf_1', roomId: '', note: 'Конференция', changed: true });
   assert.deepEqual(errors({ date: '2026-09-09', slot: 2 }), [{ field: 'slot', code: 'group_busy' }]);
@@ -133,4 +133,50 @@ test('planGeneration: from must be a date', () => {
 test('checkPairChange: null room means no room', () => {
   assert.equal(checkPairChange(p3, { roomId: null }, ctx).next.roomId, '');
   assert.deepEqual(errors({ roomId: null }), []);
+});
+
+test('planGeneration: a moved pair whose plan date has passed still occupies its place', () => {
+  const T5 = [...T, { id: 'wt_4', weekday: 4, slot: 3, subjectId: 'sb_3', roomId: '' }];
+  // p3 was planned for 2026-09-08 and hand-moved to Thursday 2026-09-10, pair 3; generation runs on 2026-09-09
+  const moved = E.map(p => (p.id === 'p3' ? { ...p, date: '2026-09-10', slot: 3, startTime: '11:20', changed: true } : p));
+  const plan = planGeneration({ template: T5, subjects, settings: S, pairs: moved, from: '2026-09-09' });
+  assert.deepEqual([plan.toInsert, plan.conflicts], [[], 1]);
+  // the same for a teacher and for a room
+  const TT = [...T, { id: 'wt_6', weekday: 4, slot: 3, subjectId: 'sb_2', roomId: '' }];
+  const teacher = planGeneration({ template: TT, subjects: subjects.map(s => (s.id === 'sb_2' ? { ...s, teacherId: 'sf_1' } : s)), settings: S, pairs: moved, from: '2026-09-09' });
+  assert.deepEqual([teacher.toInsert, teacher.conflicts], [[], 1]);
+  const TR = [...T, { id: 'wt_7', weekday: 4, slot: 3, subjectId: 'sb_2', roomId: 'r_1' }];
+  const room = planGeneration({ template: TR, subjects, settings: S, pairs: moved.map(p => (p.id === 'p3' ? { ...p, roomId: 'r_1' } : p)), from: '2026-09-09' });
+  assert.deepEqual([room.toInsert, room.conflicts], [[], 1]);
+});
+
+test('planGeneration: before the semester starts, earlier planned pairs are removed, held ones stay', () => {
+  const later = { ...S, semesterStart: '2026-09-04' };
+  const held = E.map(p => (p.id === 'p2' ? { ...p, status: 'closed' } : p));
+  const plan = planGeneration({ template: T, subjects, settings: later, pairs: held, from: '2026-08-31' });
+  assert.deepEqual(plan.toRemove, ['p1']);
+  assert.deepEqual([plan.toInsert, plan.toUpdate, plan.conflicts], [[], [], 0]);
+});
+
+test('planGeneration: a new bell reaches manually changed pairs, only the time', () => {
+  const bells = ['08:30', ...DEFAULT_BELLS.slice(1)];
+  const subst = E.map(p => (p.id === 'p1' ? { ...p, teacherId: 'sf_2', changed: true } : p));
+  const plan = planGeneration({ template: T, subjects, settings: { ...S, bells }, pairs: subst, from: '2026-09-01' });
+  assert.deepEqual(plan.toUpdate.find(u => u.id === 'p1'), { id: 'p1', patch: { startTime: '08:30' } });
+  assert.equal(plan.toUpdate.length, 4);
+  // a cancelled pair and a pair before `from` are left alone
+  const cancelled = E.map(p => (p.id === 'p1' ? { ...p, status: 'cancelled', changed: true } : p));
+  assert.equal(planGeneration({ template: T, subjects, settings: { ...S, bells }, pairs: cancelled, from: '2026-09-01' }).toUpdate.some(u => u.id === 'p1'), false);
+  assert.equal(planGeneration({ template: T, subjects, settings: { ...S, bells }, pairs: subst, from: '2026-09-02' }).toUpdate.some(u => u.id === 'p1'), false);
+});
+
+test('checkPairChange: only a real change freezes the pair', () => {
+  const free = { ...p3, changed: false, note: '' };
+  const next = (patch) => checkPairChange(free, patch, { ...ctx, pairs: [...ctx.pairs.filter(p => p.id !== 'p3'), free] }).next;
+  assert.equal(next({ note: 'Принести халаты' }).changed, false);
+  assert.equal(next({}).changed, false);
+  assert.equal(next({ roomId: 'r_2' }).changed, true);
+  assert.equal(next({ slot: 4 }).changed, true);
+  assert.equal(next({ teacherId: 'sf_2' }).changed, true);
+  assert.equal(checkPairChange({ ...free, changed: true }, { note: 'x' }, ctx).next.changed, true);
 });

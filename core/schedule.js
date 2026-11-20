@@ -52,7 +52,9 @@ export function planGeneration({ template, subjects, settings, pairs, from, rest
   const considered = (pairs || []).filter(p => p.planDate >= from);
   const replaceable = p => p.status === 'planned' && p.changed === false;
   const fixed = considered.filter(p => !replaceable(p));
-  const fixedSlots = pairSlots(fixed);
+  // A hand-moved pair keeps its old plan date but still occupies its new place, so every fixed pair still ahead counts as busy.
+  const ahead = (pairs || []).filter(p => !replaceable(p) && (p.planDate >= from || p.date >= from));
+  const fixedSlots = pairSlots(ahead);
   const taken = new Set(fixed.map(p => keyOf(p.groupId, p.planDate, p.planSlot)));
   const toRemove = [];
   const toUpdate = [];
@@ -75,6 +77,13 @@ export function planGeneration({ template, subjects, settings, pairs, from, rest
       continue;
     }
     toUpdate.push({ id: pair.id, patch, date: want.date, slot: want.slot, groupId: want.groupId });
+  }
+
+  // A new bell time reaches planned pairs changed by hand too: the time only, the rest stays as it was.
+  for (const pair of ahead) {
+    const startTime = settings.bells[pair.slot - 1];
+    if (pair.status !== 'planned' || pair.date < from || startTime === undefined || pair.startTime === startTime) continue;
+    toUpdate.push({ id: pair.id, patch: { startTime }, date: pair.date, slot: pair.slot, groupId: pair.groupId });
   }
 
   const toInsert = [];
@@ -136,8 +145,10 @@ export function checkPairChange(pair, patch, ctx) {
 
   const order = ['date', 'slot', 'teacherId', 'roomId', 'note'];
   errors.sort((a, b) => order.indexOf(a.field) - order.indexOf(b.field));
+  const moved = next.date !== pair.date || next.slot !== pair.slot
+    || next.teacherId !== pair.teacherId || next.roomId !== (pair.roomId || '');
   return {
-    next: { ...next, startTime: slotOk ? settings.bells[next.slot - 1] : pair.startTime, changed: true },
+    next: { ...next, startTime: slotOk ? settings.bells[next.slot - 1] : pair.startTime, changed: pair.changed === true || moved },
     errors,
   };
 }

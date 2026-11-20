@@ -77,7 +77,7 @@ function findPair(pairs, id) {
 
 // Saves one pair, lays the topics again when the pair's place may have changed, and answers with its view.
 function saved(store, pairs, id, patch, rows, relay) {
-  store.update('pairs', id, patch);
+  if (Object.keys(patch).length > 0) store.update('pairs', id, patch);
   const after = pairs.map((p) => (p.id === id ? { ...p, ...patch } : p));
   const pair = after.find((p) => p.id === id);
   const result = relay ? relayout(store, [pair.subjectId], { pairs: after }) : { topics: undefined, pairs: after };
@@ -98,7 +98,9 @@ function changePair(data, ctx) {
   const { next, errors } = checkPairChange(pair, patch, { settings: loadSettings(store), today, staff, rooms, pairs });
   if (errors.length > 0) throw new AppError('invalid', { fields: errors });
   const placeChanged = next.date !== pair.date || next.slot !== pair.slot;
-  return saved(store, pairs, pair.id, next, { staff, rooms }, placeChanged);
+  const changes = {};
+  for (const key of Object.keys(next)) if (next[key] !== (pair[key] ?? '')) changes[key] = next[key];
+  return saved(store, pairs, pair.id, changes, { staff, rooms }, placeChanged);
 }
 
 function cancelPair(data, ctx) {
@@ -128,7 +130,7 @@ function restorePair(data, ctx) {
   const rooms = store.list('rooms');
   const { errors } = checkPairChange(pair, {}, { settings: loadSettings(store), today, staff, rooms, pairs });
   if (errors.length > 0) throw new AppError('invalid', { fields: errors });
-  return saved(store, pairs, pair.id, { status: 'planned' }, { staff, rooms }, true);
+  return saved(store, pairs, pair.id, { status: 'planned', note: '' }, { staff, rooms }, true);
 }
 
 export const scheduleHandlers = {

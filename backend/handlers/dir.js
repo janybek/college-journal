@@ -2,7 +2,6 @@ import { AppError } from '../../core/errors.js';
 import { normalizeRow, validateRow } from '../../core/validate.js';
 import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { readSettings } from '../../core/settings.js';
-import { templateSlots, busyCodes } from '../../core/busy.js';
 import { FIXED_STATUSES } from '../../core/schema.js';
 import { USER_TABLES } from '../users.js';
 import { relayout } from '../scheduleData.js';
@@ -64,16 +63,6 @@ function checkSubjectGroup(old, row, db) {
   if (used) throw new AppError('invalid', { fields: [{ field: 'groupId', code: 'in_use' }] });
 }
 
-// A new teacher must be free at every slot of the subject's template rows (the check itself lives in core/busy.js).
-function checkSubjectTeacher(old, row, db) {
-  if (row.teacherId === old.teacherId) return;
-  const slots = templateSlots(db.weekTemplate, db.subjects);
-  const busy = db.weekTemplate.some((r) => r.subjectId === old.id
-    && busyCodes(slots, { id: r.id, day: r.weekday, slot: r.slot, groupId: '', teacherId: row.teacherId, roomId: '' })
-      .includes('teacher_busy'));
-  if (busy) throw new AppError('invalid', { fields: [{ field: 'teacherId', code: 'teacher_busy' }] });
-}
-
 function save(data, ctx) {
   const table = tableOf(data);
   const { store, platform } = ctx;
@@ -90,7 +79,6 @@ function save(data, ctx) {
   }
   const fields = validateRow(table, row, db);
   if (fields.length > 0) throw new AppError('invalid', { fields });
-  if (old && table === 'subjects') checkSubjectTeacher(old, row, db);
 
   if (old) {
     const saved = store.update(table, old.id, row);

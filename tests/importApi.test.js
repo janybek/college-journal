@@ -92,3 +92,23 @@ test('updates run before inserts: a failing update leaves no new people behind',
   assert.deepEqual(call('import.apply', { table: 'students', cells: mixed }, dean).error, { code: 'internal' });
   assert.deepEqual(store.list('students').map((s) => s.cardNo), ['2001']);
 });
+
+test('subjects import refuses a teacher who is busy in the week template, other rows load', () => {
+  const { store, call, dean } = setup();
+  const g1 = store.list('groups')[0].id;
+  const g2 = store.insert('groups', { name: '02-1', course: 1 }).id;
+  const teacher = (login) => store.insert('staff', { fullName: login, login, passwordHash: 'x', roles: 'teacher', lang: 'ky', mustChangePassword: false, active: true }).id;
+  const [t1, t2, t3] = ['tea1', 'tea2', 'tea3'].map(teacher);
+  const sb1 = store.insert('subjects', { name: 'Информатика', groupId: g1, teacherId: t1, scheme: 'A' }).id;
+  const sb2 = store.insert('subjects', { name: 'Анатомия', groupId: g2, teacherId: t2, scheme: 'A' }).id;
+  const sb3 = store.insert('subjects', { name: 'Химия', groupId: g2, teacherId: t2, scheme: 'A' }).id;
+  store.insert('weekTemplate', { weekday: 1, slot: 1, subjectId: sb1, roomId: '' });
+  store.insert('weekTemplate', { weekday: 1, slot: 1, subjectId: sb2, roomId: '' });
+  const sheet = [['Название', 'Преподаватель', 'Группа'], ['Анатомия', 'tea1', '02-1'], ['Химия', 'tea3', '02-1']];
+  const pre = call('import.preview', { table: 'subjects', cells: sheet }, dean).data;
+  assert.deepEqual(pre.errors, [{ row: 2, field: 'teacherId', code: 'teacher_busy' }]);
+  const done = call('import.apply', { table: 'subjects', cells: sheet }, dean).data;
+  assert.deepEqual([done.updated, done.skipped, done.errors], [1, 1, [{ row: 2, field: 'teacherId', code: 'teacher_busy' }]]);
+  assert.equal(store.get('subjects', sb2).teacherId, t2);
+  assert.equal(store.get('subjects', sb3).teacherId, t3);
+});

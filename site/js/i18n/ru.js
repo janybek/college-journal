@@ -551,6 +551,7 @@ export default {
   'error.groups.name.duplicate': 'Группа с таким названием уже есть.',
   'error.rooms.name.duplicate': 'Такая аудитория уже есть.',
   'error.subjects.name.duplicate': 'Такой предмет в этой группе уже есть.',
+  'error.subjects.groupId.in_use': 'Предмет уже стоит в шаблоне недели или в расписании — группу менять нельзя.',
   'error.unit.bad_value': 'Юнит — целое число от 1 до 12.',
   'error.order.bad_value': '№ — целое число от 1 до 200.',
   'error.topics.order.duplicate': 'Тема с таким номером у этого предмета уже есть.',

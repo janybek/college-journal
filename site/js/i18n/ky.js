@@ -551,6 +551,7 @@ export default {
   'error.groups.name.duplicate': 'Мындай аталыштагы топ мурунтан эле бар.',
   'error.rooms.name.duplicate': 'Мындай аудитория мурунтан эле бар.',
   'error.subjects.name.duplicate': 'Бул топто мындай сабак мурунтан эле бар.',
+  'error.subjects.groupId.in_use': 'Сабак апта үлгүсүндө же жадыбалда турат — топту өзгөртүүгө болбойт.',
   'error.unit.bad_value': 'Юнит — 1ден 12ге чейинки бүтүн сан.',
   'error.order.bad_value': '№ — 1ден 200гө чейинки бүтүн сан.',
   'error.topics.order.duplicate': 'Бул сабакта мындай номердеги тема мурунтан эле бар.',

@@ -194,3 +194,18 @@ test('topics.plan: access and not found', () => {
   assert.deepEqual(call('topics.plan', { subjectId: 'sb_nope' }, dean).error, { code: 'not_found' });
   assert.equal(call('topics.plan', { subjectId: sb2 }, dean).data.withoutTopic, 2);
 });
+
+test('generate: pairs between today and a later semester start are removed, held ones stay', () => {
+  const { store, call, dean, sb1 } = setup();
+  assert.equal(call('schedule.generate', {}, dean).ok, true);
+  assert.equal(call('settings.save', { settings: { ...S, semesterStart: '2026-09-04' } }, dean).ok, true);
+  const preview = call('schedule.generate', { dryRun: true }, dean).data;
+  assert.deepEqual([preview.from, preview.removed, preview.kept], ['2026-09-04', 1, 3]);
+  const early = store.list('pairs').find((p) => p.subjectId === sb1 && p.date === '2026-09-01');
+  store.update('pairs', early.id, { status: 'closed' });
+  assert.equal(call('schedule.generate', {}, dean).data.removed, 0);
+  assert.equal(store.get('pairs', early.id).status, 'closed');
+  store.update('pairs', early.id, { status: 'planned' });
+  assert.equal(call('schedule.generate', {}, dean).data.removed, 1);
+  assert.equal(store.list('pairs').some((p) => p.date < '2026-09-04'), false);
+});

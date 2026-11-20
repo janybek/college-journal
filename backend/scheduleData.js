@@ -52,10 +52,12 @@ export function generateSchedule(store, platform, { dryRun = false, restart = fa
   const pairs = store.list('pairs');
 
   const today = todayOf(platform);
-  const from = pairs.length === 0 || restart || today < settings.semesterStart ? settings.semesterStart : today;
+  // Existing pairs are looked at from today on, even before the semester starts (planned ones before the start are removed).
+  const fresh = pairs.length === 0 || restart;
+  const from = fresh ? settings.semesterStart : today;
   const plan = planGeneration({ template, subjects, settings, pairs, from, restart });
   const result = {
-    from, to: settings.semesterEnd,
+    from: from < settings.semesterStart ? settings.semesterStart : from, to: settings.semesterEnd,
     inserted: plan.toInsert.length, updated: plan.toUpdate.length, removed: plan.toRemove.length,
     kept: plan.kept, conflicts: plan.conflicts,
   };

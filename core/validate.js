@@ -111,6 +111,14 @@ const RULES = {
       const teacher = (db.staff || []).find(s => s.id === row.teacherId);
       if (!teacher) return 'bad_ref';
       if (!parseRoles(teacher.roles).includes('teacher')) return 'bad_value';
+      // A new teacher must be free at every week-template slot of this subject.
+      const old = (db.subjects || []).find(s => s.id === row.id);
+      if (old && old.teacherId !== row.teacherId && db.weekTemplate) {
+        const slots = templateSlots(db.weekTemplate, db.subjects);
+        const busy = db.weekTemplate.some(r => r.subjectId === old.id
+          && busyCodes(slots, { id: r.id, day: r.weekday, slot: r.slot, groupId: '', teacherId: row.teacherId, roomId: '' }).includes('teacher_busy'));
+        if (busy) return 'teacher_busy';
+      }
     });
     field('groupId', () => { if (!exists(db.groups, row.groupId)) return 'bad_ref'; });
   },

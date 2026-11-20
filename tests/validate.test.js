@@ -100,3 +100,16 @@ test('topics rules', () => {
   assert.deepEqual(validateRow('topics', { id: 'tp_1', subjectId: 'sb_1', unit: 1, order: 1, name: 'Введение', lessonType: 'lecture' }, tdb), []);
   assert.deepEqual(validateRow('topics', { subjectId: 'sb_1', unit: 1, order: 3, name: 'x'.repeat(201), lessonType: 'lecture' }, tdb), [{ field: 'name', code: 'too_long' }]);
 });
+
+test('subjects: a new teacher must be free at every template slot of the subject', () => {
+  const sdb = {
+    groups: [{ id: 'g_1' }, { id: 'g_2' }],
+    staff: [{ id: 'sf_1', roles: 'teacher' }, { id: 'sf_2', roles: 'teacher' }],
+    subjects: [{ id: 'sb_1', name: 'Информатика', teacherId: 'sf_1', groupId: 'g_1' }, { id: 'sb_2', name: 'Анатомия', teacherId: 'sf_2', groupId: 'g_2' }],
+    weekTemplate: [{ id: 'wt_1', weekday: 1, slot: 1, subjectId: 'sb_1', roomId: '' }, { id: 'wt_2', weekday: 1, slot: 1, subjectId: 'sb_2', roomId: '' }],
+  };
+  const row = { id: 'sb_2', name: 'Анатомия', groupId: 'g_2', scheme: 'A' };
+  assert.deepEqual(validateRow('subjects', { ...row, teacherId: 'sf_1' }, sdb), [{ field: 'teacherId', code: 'teacher_busy' }]);
+  assert.deepEqual(validateRow('subjects', { ...row, teacherId: 'sf_2' }, sdb), []);
+  assert.deepEqual(validateRow('subjects', { ...row, teacherId: 'sf_1' }, { ...sdb, weekTemplate: undefined }), []);
+});

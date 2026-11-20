@@ -47,6 +47,10 @@ test('every directory that can be in use elsewhere explains why it cannot be rem
   for (const table of ['groups', 'staff', 'subjects', 'rooms']) assert.ok(ru['dir.inUse.' + table], table);
 });
 
+test('a subject whose group cannot be changed has its own error text in every language', () => {
+  for (const [lang, dict] of [['ru', ru], ['ky', ky], ['en', en]]) assert.ok(dict['error.subjects.groupId.in_use'], lang);
+});
+
 test('tCount picks the plural form of the current language', () => {
   try {
     setLang('ru');
