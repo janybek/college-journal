@@ -28,8 +28,14 @@ test('settings: get defaults, save normalises, repeat save updates rows', () => 
   const input = { semesterStart: '2026-09-01', semesterEnd: '2026-12-25', holidays: ['2026-11-07', '2026-09-07', '2026-11-07'], bells: ['08:00', '09:40'] };
   assert.deepEqual(call('settings.save', { settings: input }, dean).data.settings.holidays, ['2026-09-07', '2026-11-07']);
   assert.equal(store.list('settings').length, 4);
+  assert.equal(call('settings.get', {}, prorector).data.settings.semester, 1);
+  assert.equal(call('settings.save', { settings: { ...input, semester: 2 } }, dean).data.settings.semester, 2);
+  assert.equal(store.list('settings').length, 5);
+  assert.equal(call('settings.save', { settings: input }, dean).data.settings.semester, 2);
+  assert.equal(call('settings.get', {}, dean).data.settings.semester, 2);
+  assert.deepEqual(call('settings.save', { settings: { ...input, semester: 3 } }, dean).error, { code: 'invalid', fields: [{ field: 'semester', code: 'bad_value' }] });
   call('settings.save', { settings: { ...input, bells: ['08:00', '09:40', '11:20'] } }, dean);
-  assert.equal(store.list('settings').length, 4);
+  assert.equal(store.list('settings').length, 5);
   assert.deepEqual(call('settings.get', {}, dean).data.settings.bells, ['08:00', '09:40', '11:20']);
   assert.deepEqual(call('settings.save', { settings: { ...input, semesterEnd: '2026-08-01', bells: ['08:00', '09:00'] } }, dean).error,
     { code: 'invalid', fields: [{ field: 'semesterEnd', code: 'bad_value' }, { field: 'bells', code: 'bad_value' }] });

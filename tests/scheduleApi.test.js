@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { SCHEMA } from '../core/schema.js';
-import { DEFAULT_BELLS } from '../core/settings.js';
+import { DEFAULT_BELLS, readSettings } from '../core/settings.js';
 import { hashPassword } from '../core/auth.js';
 import { handleRequest } from '../backend/api.js';
 import { relayout, todayOf } from '../backend/scheduleData.js';
@@ -15,19 +15,22 @@ const HEAD = ['Предмет', 'Группа', 'Семестр', 'Юнит', '�
 function spyOn(store) {
   const calls = {};
   const reads = {};
+  const writes = {};
   const spy = {};
   for (const name of Object.keys(store)) {
     spy[name] = (...args) => {
       calls[name] = (calls[name] || 0) + 1;
       if (name === 'list') reads[args[0]] = (reads[args[0]] || 0) + 1;
+      if (['insertMany', 'updateMany', 'removeMany'].includes(name)) writes[`${name}:${args[0]}`] = (writes[`${name}:${args[0]}`] || 0) + 1;
       return store[name](...args);
     };
   }
   const reset = () => {
     for (const k of Object.keys(calls)) delete calls[k];
     for (const k of Object.keys(reads)) delete reads[k];
+    for (const k of Object.keys(writes)) delete writes[k];
   };
-  return { spy, calls, reads, reset };
+  return { spy, calls, reads, writes, reset };
 }
 
 function setup({ withSettings = true, withTemplate = true } = {}) {
@@ -56,7 +59,7 @@ function setup({ withSettings = true, withTemplate = true } = {}) {
     ? [[2, 1, sb1, r1], [1, 2, sb1, r1], [5, 1, sb2, '']].map(([weekday, slot, subjectId, roomId]) =>
       store.insert('weekTemplate', { weekday, slot, subjectId, roomId }).id)
     : [];
-  return { store, state, call, calls: spied.calls, reads: spied.reads, reset: spied.reset, ...tokens, staff, g1, g2, sb1, sb2, r1, r2, topics, wt };
+  return { store, state, call, calls: spied.calls, reads: spied.reads, writes: spied.writes, reset: spied.reset, ...tokens, staff, g1, g2, sb1, sb2, r1, r2, topics, wt };
 }
 
 test('generate: dry run, real run, repeat, later start, topics laid over pairs', () => {
@@ -73,7 +76,7 @@ test('generate: dry run, real run, repeat, later start, topics laid over pairs',
   assert.equal(plan.withoutTopic, 0);
   assert.equal(JSON.stringify(plan).includes('passwordHash'), false);
   assert.deepEqual(plan.subject, { id: sb1, name: 'Информатика', groupId: plan.subject.groupId, groupName: '01-1', teacherId: plan.subject.teacherId, teacherName: 'teacher1' });
-  assert.deepEqual(Object.keys(plan.topics[0]), ['id', 'unit', 'order', 'name', 'lessonType', 'pair']);
+  assert.deepEqual(Object.keys(plan.topics[0]), ['id', 'semester', 'unit', 'order', 'name', 'lessonType', 'pair']);
   assert.deepEqual(plan.topics[0].pair, { id: mine()[0].id, date: '2026-09-01', slot: 1, startTime: '08:00', status: 'planned' });
 
   assert.deepEqual(call('schedule.generate', {}, dean).data, { ...dry, inserted: 0, kept: 4 });
@@ -179,7 +182,7 @@ test('relayout: nothing to change writes nothing and uses the rows it is given',
   const { store, call, calls, reset, dean } = setup();
   call('schedule.generate', {}, dean);
   reset();
-  const result = relayout(store, null, { topics: store.list('topics'), pairs: store.list('pairs') });
+  const result = relayout(store, null, { topics: store.list('topics'), pairs: store.list('pairs'), settings: readSettings(store.list('settings')) });
   assert.equal(result.changed, 0);
   assert.equal(result.pairs.length, 4);
   assert.deepEqual(calls, {});
@@ -196,9 +199,18 @@ test('topics.plan: access and not found', () => {
 });
 
 test('generate: pairs between today and a later semester start are removed, held ones stay', () => {
-  const { store, call, dean, sb1 } = setup();
+  const { store, call, dean, sb1, topics } = setup();
   assert.equal(call('schedule.generate', {}, dean).ok, true);
   assert.equal(call('settings.save', { settings: { ...S, semesterStart: '2026-09-04' } }, dean).ok, true);
+  const sb1Pairs = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
+  assert.deepEqual(sb1Pairs().map(p => [p.date, p.topicId]), [['2026-09-01', ''], ['2026-09-08', topics[0]]]);
+  const shown = () => call('topics.plan', { subjectId: sb1 }, dean).data.topics.map(t => [t.order, t.pair && t.pair.date]);
+  assert.deepEqual(shown(), [[1, '2026-09-08'], [2, null], [3, null]]);
+  const onPairs = store.list('pairs').map(p => p.topicId).filter(Boolean);
+  assert.equal(new Set(onPairs).size, onPairs.length);
+  store.update('pairs', sb1Pairs()[0].id, { topicId: topics[0] });
+  assert.deepEqual(shown(), [[1, '2026-09-08'], [2, null], [3, null]]);
+  store.update('pairs', sb1Pairs()[0].id, { topicId: '' });
   const preview = call('schedule.generate', { dryRun: true }, dean).data;
   assert.deepEqual([preview.from, preview.removed, preview.kept], ['2026-09-04', 1, 3]);
   const early = store.list('pairs').find((p) => p.subjectId === sb1 && p.date === '2026-09-01');
@@ -208,4 +220,60 @@ test('generate: pairs between today and a later semester start are removed, held
   store.update('pairs', early.id, { status: 'planned' });
   assert.equal(call('schedule.generate', {}, dean).data.removed, 1);
   assert.equal(store.list('pairs').some((p) => p.date < '2026-09-04'), false);
+});
+
+test('semester: only topics of the current semester are laid, switching moves them', () => {
+  const { store, state, call, dean, sb1, topics: [topic1, topic2] } = setup();
+  const b1 = store.insert('topics', { subjectId: sb1, semester: 2, unit: 1, order: 1, name: 'Второй семестр 1', lessonType: 'lecture' }).id;
+  const b2 = store.insert('topics', { subjectId: sb1, semester: 2, unit: 1, order: 2, name: 'Второй семестр 2', lessonType: 'lecture' }).id;
+  call('schedule.generate', {}, dean);
+  const mine = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
+  const planOf = () => call('topics.plan', { subjectId: sb1 }, dean).data;
+  const rows = (plan) => plan.topics.map(t => [t.semester, t.order, t.pair && t.pair.date]);
+  assert.deepEqual(mine().map(p => p.topicId), [topic1, topic2]);
+  assert.equal(planOf().semester, 1);
+  assert.deepEqual(rows(planOf()), [[1, 1, '2026-09-01'], [1, 2, '2026-09-08'], [1, 3, null], [2, 1, null], [2, 2, null]]);
+
+  store.update('pairs', mine()[0].id, { status: 'closed' });
+  assert.equal(call('settings.save', { settings: { ...S, semester: 2 } }, dean).data.settings.semester, 2);
+  assert.deepEqual(mine().map(p => p.topicId), [topic1, b1]);
+  assert.deepEqual([planOf().semester, planOf().withoutTopic], [2, 0]);
+  assert.deepEqual(rows(planOf()), [[1, 1, '2026-09-01'], [1, 2, null], [1, 3, null], [2, 1, '2026-09-08'], [2, 2, null]]);
+  assert.equal(call('settings.save', { settings: S }, dean).data.settings.semester, 2);
+  assert.deepEqual(mine().map(p => p.topicId), [topic1, b1]);
+  call('settings.save', { settings: { ...S, semester: 1 } }, dean);
+  assert.deepEqual(mine().map(p => p.topicId), [topic1, topic2]);
+
+  state.now = Date.UTC(2026, 8, 12, 6);
+  const dean12 = call('auth.login', { login: 'dean', password: 'secret12' }).data.token;
+  assert.equal(call('settings.save', { settings: { semesterStart: '2026-09-14', semesterEnd: '2026-09-25', holidays: [], bells: DEFAULT_BELLS, semester: 2 } }, dean12).ok, true);
+  assert.equal(call('schedule.generate', {}, dean12).data.inserted, 6);
+  assert.deepEqual(mine().map(p => [p.date, p.topicId]), [['2026-09-01', topic1], ['2026-09-08', topic2],
+    ['2026-09-14', b1], ['2026-09-15', b2], ['2026-09-21', ''], ['2026-09-22', '']]);
+  assert.equal(call('topics.plan', { subjectId: sb1 }, dean12).data.withoutTopic, 2);
+});
+
+test('semester switch and topic writes read each sheet at most once', () => {
+  const { store, call, calls, reads, writes, reset, dean, sb1, topics: [, topic2] } = setup();
+  call('schedule.generate', {}, dean);
+  const check = (label, response) => {
+    assert.equal(response.ok, true, label);
+    for (const [table, n] of Object.entries(reads)) assert.ok(n <= 1, `${label}: ${table} read ${n} times`);
+    assert.ok((calls.update || 0) <= 1, label + ': update');
+    assert.ok((writes['updateMany:pairs'] || 0) <= 1, label + ': updateMany pairs');
+    reset();
+  };
+  reset();
+  check('switch', call('settings.save', { settings: { ...S, semester: 2 } }, dean));
+  const same = call('settings.save', { settings: { ...S, semester: 2 } }, dean);
+  assert.deepEqual([same.ok, reads.topics || 0, reads.pairs || 0], [true, 0, 0]);
+  reset();
+  check('generate', call('schedule.generate', {}, dean));
+  const moved = store.list('pairs').find(p => p.subjectId === sb1 && p.date === '2026-09-08').id;
+  check('move', call('schedule.changePair', { id: moved, date: '2026-09-10', slot: 2 }, dean));
+  check('cancel', call('schedule.cancelPair', { id: moved }, dean));
+  check('restore', call('schedule.restorePair', { id: moved }, dean));
+  check('topic save', call('dir.save', { table: 'topics', row: { subjectId: sb1, semester: 2, unit: 1, order: 9, name: 'Ещё', lessonType: 'lecture' } }, dean));
+  check('topic remove', call('dir.remove', { table: 'topics', id: topic2 }, dean));
+  check('import', call('import.apply', { table: 'topics', cells: [HEAD, ['Информатика', '01-1', 2, 1, 2, 'Переименована', 'лекция']] }, dean));
 });

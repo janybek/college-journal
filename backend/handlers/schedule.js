@@ -1,6 +1,8 @@
 import { AppError } from '../../core/errors.js';
 import { addDays, daysBetween, isDate, mondayOf } from '../../core/dates.js';
 import { checkPairChange, pairLock } from '../../core/schedule.js';
+import { semesterOf, inSemester } from '../../core/topics.js';
+import { FIXED_STATUSES } from '../../core/schema.js';
 import { generateSchedule, loadSettings, pairViews, relayout, todayOf } from '../scheduleData.js';
 
 const MANAGER_ROLES = ['admin', 'dean', 'prorector'];
@@ -21,15 +23,24 @@ function plan(data, ctx, user) {
 
   const group = store.get('groups', subject.groupId);
   const teacher = store.get('staff', subject.teacherId);
+  const settings = loadSettings(store);
   const pairs = store.list('pairs').filter((p) => p.subjectId === subject.id);
-  const byTopic = new Map(pairs.filter((p) => p.topicId !== '').map((p) => [p.topicId, p]));
+  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+  // A topic should stand on one pair; if old data holds it on several, show the held one or the one inside the semester.
+  const shown = (p) => FIXED_STATUSES.includes(p.status) || inSemester(p.date, settings);
+  const byTopic = new Map();
+  for (const p of [...pairs].sort((a, b) => cmp(a.date, b.date) || a.slot - b.slot)) {
+    if (p.topicId === '') continue;
+    const have = byTopic.get(p.topicId);
+    if (!have || (!shown(have) && shown(p))) byTopic.set(p.topicId, p);
+  }
   const topics = store.list('topics')
     .filter((t) => t.subjectId === subject.id)
-    .sort((a, b) => a.order - b.order)
+    .sort((a, b) => semesterOf(a) - semesterOf(b) || a.order - b.order)
     .map((t) => {
       const p = byTopic.get(t.id);
       return {
-        id: t.id, unit: t.unit, order: t.order, name: t.name, lessonType: t.lessonType,
+        id: t.id, semester: semesterOf(t), unit: t.unit, order: t.order, name: t.name, lessonType: t.lessonType,
         pair: p ? { id: p.id, date: p.date, slot: p.slot, startTime: p.startTime, status: p.status } : null,
       };
     });
@@ -38,8 +49,9 @@ function plan(data, ctx, user) {
       id: subject.id, name: subject.name, groupId: subject.groupId, groupName: group ? group.name : '',
       teacherId: subject.teacherId, teacherName: teacher ? teacher.fullName : '',
     },
+    semester: settings.semester,
     topics,
-    withoutTopic: pairs.filter((p) => p.status === 'planned' && p.topicId === '').length,
+    withoutTopic: pairs.filter((p) => p.status === 'planned' && p.topicId === '' && inSemester(p.date, settings)).length,
   };
 }
 
@@ -76,11 +88,11 @@ function findPair(pairs, id) {
 }
 
 // Saves one pair, lays the topics again when the pair's place may have changed, and answers with its view.
-function saved(store, pairs, id, patch, rows, relay) {
+function saved(store, pairs, id, patch, rows, relay, settings) {
   if (Object.keys(patch).length > 0) store.update('pairs', id, patch);
   const after = pairs.map((p) => (p.id === id ? { ...p, ...patch } : p));
   const pair = after.find((p) => p.id === id);
-  const result = relay ? relayout(store, [pair.subjectId], { pairs: after }) : { topics: undefined, pairs: after };
+  const result = relay ? relayout(store, [pair.subjectId], { pairs: after, settings }) : { topics: undefined, pairs: after };
   return { pair: pairViews(store, (p) => p.id === id, { ...rows, pairs: result.pairs, topics: result.topics })[0] };
 }
 
@@ -95,12 +107,13 @@ function changePair(data, ctx) {
   for (const key of PATCH_FIELDS) if (data[key] !== undefined) patch[key] = data[key];
   const staff = store.list('staff');
   const rooms = store.list('rooms');
-  const { next, errors } = checkPairChange(pair, patch, { settings: loadSettings(store), today, staff, rooms, pairs });
+  const settings = loadSettings(store);
+  const { next, errors } = checkPairChange(pair, patch, { settings, today, staff, rooms, pairs });
   if (errors.length > 0) throw new AppError('invalid', { fields: errors });
   const placeChanged = next.date !== pair.date || next.slot !== pair.slot;
   const changes = {};
   for (const key of Object.keys(next)) if (next[key] !== (pair[key] ?? '')) changes[key] = next[key];
-  return saved(store, pairs, pair.id, changes, { staff, rooms }, placeChanged);
+  return saved(store, pairs, pair.id, changes, { staff, rooms }, placeChanged, settings);
 }
 
 function cancelPair(data, ctx) {
@@ -128,9 +141,10 @@ function restorePair(data, ctx) {
   if (pair.date < today) throw new AppError('in_past');
   const staff = store.list('staff');
   const rooms = store.list('rooms');
-  const { errors } = checkPairChange(pair, {}, { settings: loadSettings(store), today, staff, rooms, pairs });
+  const settings = loadSettings(store);
+  const { errors } = checkPairChange(pair, {}, { settings, today, staff, rooms, pairs });
   if (errors.length > 0) throw new AppError('invalid', { fields: errors });
-  return saved(store, pairs, pair.id, { status: 'planned', note: '' }, { staff, rooms }, true);
+  return saved(store, pairs, pair.id, { status: 'planned', note: '' }, { staff, rooms }, true, settings);
 }
 
 export const scheduleHandlers = {

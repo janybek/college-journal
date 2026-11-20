@@ -3,7 +3,7 @@ import { AppError } from '../core/errors.js';
 import { localDate, addMinutes } from '../core/dates.js';
 import { readSettings, PAIR_MINUTES } from '../core/settings.js';
 import { planGeneration } from '../core/schedule.js';
-import { layoutTopics } from '../core/topics.js';
+import { layoutTopics, semesterScope } from '../core/topics.js';
 
 export function todayOf(platform) {
   return localDate(platform.now());
@@ -23,17 +23,21 @@ const groupBy = (rows) => {
 };
 
 // Lays the topics of the given subjects (null: all) over their pairs and saves the pairs whose topic changed.
+// Only the topics of the current semester are laid, over the pairs inside the semester dates (and the held ones).
 // `rows` holds sheets the request has already read, as they stand after its own write; those are not read again.
 export function relayout(store, subjectIds = null, rows = {}) {
   const topics = rows.topics ?? store.list('topics');
   const pairs = rows.pairs ?? store.list('pairs');
+  const settings = rows.settings ?? loadSettings(store);
   const topicsBySubject = groupBy(topics);
   const pairsBySubject = groupBy(pairs);
   const ids = subjectIds ?? [...new Set([...topicsBySubject.keys(), ...pairsBySubject.keys()])];
 
   const assigned = new Map();
   for (const subjectId of ids) {
-    const { assign } = layoutTopics(topicsBySubject.get(subjectId) || [], pairsBySubject.get(subjectId) || []);
+    const scope = semesterScope(topicsBySubject.get(subjectId) || [], pairsBySubject.get(subjectId) || [], settings);
+    for (const id of scope.clear) assigned.set(id, '');
+    const { assign } = layoutTopics(scope.topics, scope.pairs);
     for (const { id, topicId } of assign) assigned.set(id, topicId);
   }
   if (assigned.size === 0) return { changed: 0, topics, pairs };
@@ -70,7 +74,7 @@ export function generateSchedule(store, platform, { dryRun = false, restart = fa
   const gone = new Set(plan.toRemove);
   const patches = new Map(plan.toUpdate.map((u) => [u.id, u.patch]));
   const after = pairs.filter((p) => !gone.has(p.id)).map((p) => (patches.has(p.id) ? { ...p, ...patches.get(p.id) } : p));
-  relayout(store, null, { pairs: [...after, ...created] });
+  relayout(store, null, { pairs: [...after, ...created], settings });
   return result;
 }
 

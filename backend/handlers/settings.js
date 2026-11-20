@@ -1,4 +1,5 @@
 import { AppError } from '../../core/errors.js';
+import { relayout } from '../scheduleData.js';
 import { DEFAULT_BELLS, PAIR_MINUTES, readSettings, validateSettings, settingsToRows } from '../../core/settings.js';
 
 function get(data, ctx) {
@@ -10,8 +11,10 @@ function save(data, ctx) {
   const { store } = ctx;
   const { value, errors } = validateSettings(data.settings);
   if (errors.length > 0) throw new AppError('invalid', { fields: errors });
+  const rowsNow = store.list('settings');
+  const before = readSettings(rowsNow);
   const existing = new Map();
-  for (const row of store.list('settings')) if (!existing.has(row.key)) existing.set(row.key, row);
+  for (const row of rowsNow) if (!existing.has(row.key)) existing.set(row.key, row);
   const updates = [];
   const inserts = [];
   for (const { key, value: text } of settingsToRows(value)) {
@@ -21,7 +24,10 @@ function save(data, ctx) {
   }
   if (updates.length > 0) store.updateMany('settings', updates);
   if (inserts.length > 0) store.insertMany('settings', inserts);
-  return { settings: value };
+  const settings = { ...before, ...value };
+  const moved = ['semester', 'semesterStart', 'semesterEnd'].some((k) => before[k] !== settings[k]);
+  if (moved) relayout(store, null, { settings });
+  return { settings };
 }
 
 export const settingsHandlers = {

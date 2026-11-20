@@ -40,13 +40,23 @@ const TOPIC_PLAN = [
   [2, 'Модуль 2 — экзамен', ['control']],
 ];
 
-function topicRows(subjectId) {
+// Semester 2 of the same subject: 6 topics, laid over pairs only when the owner switches the semester.
+const TOPIC_PLAN_2 = [
+  [1, 'Электронные таблицы: учёт лекарств и расчёт доз', ['lecture', 'practice']],
+  [1, 'Презентация для пациента: памятка и санбюллетень', ['practice']],
+  [2, 'Электронная очередь и запись на приём', ['lecture', 'practice']],
+  [2, 'Модуль 2 — экзамен', ['control']],
+];
+
+function planRows(subjectId, plan, semester) {
   const rows = [];
-  for (const [unit, name, types] of TOPIC_PLAN) {
-    for (const lessonType of types) rows.push({ subjectId, unit, order: rows.length + 1, name, lessonType });
+  for (const [unit, name, types] of plan) {
+    for (const lessonType of types) rows.push({ subjectId, semester, unit, order: rows.length + 1, name, lessonType });
   }
   return rows;
 }
+
+const topicRows = (subjectId) => [...planRows(subjectId, TOPIC_PLAN, 1), ...planRows(subjectId, TOPIC_PLAN_2, 2)];
 
 // Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
 export function seed(store, platform) {
@@ -96,7 +106,7 @@ function seedPairs(store, platform) {
   const thisMonday = mondayOf(todayOf(platform));
   const start = addDays(thisMonday, -28);
   store.insertMany('settings', settingsToRows({
-    semesterStart: start, semesterEnd: addDays(start, 123), holidays: [addDays(start, 37)], bells: DEFAULT_BELLS,
+    semesterStart: start, semesterEnd: addDays(start, 123), holidays: [addDays(start, 37)], bells: DEFAULT_BELLS, semester: 1,
   }));
   generateSchedule(store, platform);
 

@@ -142,10 +142,15 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   assert.equal(store.list('staff').some((s) => s.mustChangePassword), false);
   assert.deepEqual(readSettings(store.list('settings')),
     { semesterStart: '2026-10-19', semesterEnd: '2027-02-19', holidays: ['2026-11-25'], bells: DEFAULT_BELLS, semester: 1 });
-  assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('topics').length, store.list('pairs').length], [6, 9, 54, 159]);
+  assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('topics').length, store.list('pairs').length], [6, 9, 72, 159]);
+  assert.equal(store.list('topics').filter((t) => t.semester === 2).length, 18);
+  const second = new Set(store.list('topics').filter((t) => t.semester === 2).map((t) => t.id));
   const pairs = store.list('pairs');
   assert.equal(pairs.filter((p) => p.status === 'cancelled').length, 1);
   assert.deepEqual(pairs.filter((p) => p.note === 'Замена').map((p) => p.date), ['2026-11-26']);
+
+  assert.equal(pairs.some((p) => second.has(p.topicId)), false);
+  assert.equal(readSettings(store.list('settings')).semester, 1);
 
   const groupByName = new Map(store.list('groups').map((g) => [g.name, g.id]));
   const subjects = store.list('subjects');

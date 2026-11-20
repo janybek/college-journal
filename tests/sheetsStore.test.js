@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SCHEMA } from '../core/schema.js';
+import { semesterOf } from '../core/topics.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createSheetsStore, ensureSheets } from '../backend/store/sheetsStore.js';
 import { createFakeSpreadsheet } from './fakes/fakeSpreadsheet.js';
@@ -235,4 +236,12 @@ test('sheetsStore: updateMany and removeMany run under the lock', () => {
   s.updateMany('groups', [{ id: 'g_1', patch: { course: 5 } }]);
   s.removeMany('groups', ['g_2']);
   assert.equal(locked, 2);
+});
+
+test('a Topics sheet made before the semester column gets it and reads as semester 1', () => {
+  const platform = createNodePlatform({ now: () => 1_000_000, secret: 'test-secret' });
+  const old = createFakeSpreadsheet({ 'Темы': [['id', 'предмет', 'юнит', '№ по порядку', 'название', 'тип пары'], ['tp_1', 'sb_1', 1, 1, 'Введение', 'lecture']] });
+  assert.ok(ensureSheets(SCHEMA, old).addedColumns.includes('Темы.семестр'));
+  const legacy = createSheetsStore(SCHEMA, platform, old).list('topics')[0];
+  assert.deepEqual([legacy.semester, semesterOf(legacy)], [null, 1]);
 });
