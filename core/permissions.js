@@ -2,19 +2,33 @@
 
 const ALL_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms'];
 const DEAN_TABLES = ['groups', 'students', 'subjects', 'rooms'];
+const SCHEDULE_TABLES = ['weekTemplate', 'topics'];
+const LIST_TABLES = [...ALL_TABLES, ...SCHEDULE_TABLES];
+const DEAN_EDIT_TABLES = [...DEAN_TABLES, ...SCHEDULE_TABLES];
+const IMPORT_TABLES = [...ALL_TABLES, 'topics'];
+const DEAN_IMPORT_TABLES = [...DEAN_TABLES, 'topics'];
 
 const PUBLIC_ACTIONS = ['auth.login', 'i18n.overrides'];
 const ANY_ACTIONS = ['auth.me', 'auth.changePassword', 'user.setLang'];
 
 // action -> role -> allowed tables (or true for actions without a table)
 const ROLE_ACTIONS = {
-  'dir.list': { admin: ALL_TABLES, dean: ALL_TABLES, prorector: ALL_TABLES },
-  'dir.save': { admin: ALL_TABLES, dean: DEAN_TABLES },
-  'dir.remove': { admin: ALL_TABLES, dean: DEAN_TABLES },
-  'import.preview': { admin: ALL_TABLES, dean: DEAN_TABLES },
-  'import.apply': { admin: ALL_TABLES, dean: DEAN_TABLES },
+  'dir.list': { admin: LIST_TABLES, dean: LIST_TABLES, prorector: LIST_TABLES },
+  'dir.save': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES },
+  'dir.remove': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES },
+  'import.preview': { admin: IMPORT_TABLES, dean: DEAN_IMPORT_TABLES },
+  'import.apply': { admin: IMPORT_TABLES, dean: DEAN_IMPORT_TABLES },
   'dir.resetPassword': { admin: ['students', 'staff'], dean: ['students'] },
   'teacher.mySubjects': { teacher: true },
+  'settings.get': { admin: true, dean: true, prorector: true },
+  'settings.save': { admin: true, dean: true },
+  'schedule.list': { admin: true, dean: true, prorector: true },
+  'schedule.generate': { admin: true, dean: true },
+  'schedule.changePair': { admin: true, dean: true },
+  'schedule.cancelPair': { admin: true, dean: true },
+  'schedule.restorePair': { admin: true, dean: true },
+  'topics.plan': { admin: true, dean: true, prorector: true, teacher: true },
+  'schedule.mine': { teacher: true, student: true },
 };
 
 const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);

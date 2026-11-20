@@ -1,6 +1,10 @@
 export const STAFF_ROLES = ['admin', 'dean', 'prorector', 'teacher'];
 export const LANGS = ['ky', 'ru', 'en'];
 export const DEFAULT_LANG = 'ky';
+export const PAIR_STATUSES = ['planned', 'running', 'closed', 'missed', 'cancelled'];
+export const FIXED_STATUSES = ['running', 'closed'];
+export const LESSON_TYPES = ['lecture', 'practice', 'control'];
+export const WEEKDAYS = [1, 2, 3, 4, 5];
 
 const col = (key, title, type = 'string') => ({ key, title, type });
 
@@ -46,6 +50,29 @@ export const SCHEMA = {
   settings: {
     sheet: 'Настройки', prefix: 'cfg',
     columns: [col('id', 'id'), col('key', 'ключ'), col('value', 'значение')],
+  },
+  weekTemplate: {
+    sheet: 'Шаблон недели', prefix: 'wt',
+    columns: [
+      col('id', 'id'), col('weekday', 'день недели', 'int'), col('slot', '№ пары', 'int'),
+      col('subjectId', 'предмет'), col('roomId', 'аудитория'),
+    ],
+  },
+  topics: {
+    sheet: 'Темы', prefix: 'tp',
+    columns: [
+      col('id', 'id'), col('subjectId', 'предмет'), col('unit', 'юнит', 'int'), col('order', '№ по порядку', 'int'),
+      col('name', 'название'), col('lessonType', 'тип пары'),
+    ],
+  },
+  pairs: {
+    sheet: 'Пары', prefix: 'p',
+    columns: [
+      col('id', 'id'), col('date', 'дата'), col('slot', '№ пары', 'int'), col('startTime', 'время начала'),
+      col('groupId', 'группа'), col('subjectId', 'предмет'), col('teacherId', 'преподаватель'), col('roomId', 'аудитория'),
+      col('topicId', 'тема'), col('status', 'статус'), col('planDate', 'дата по плану'),
+      col('planSlot', '№ пары по плану', 'int'), col('changed', 'изменена вручную', 'bool'), col('note', 'примечание'),
+    ],
   },
 };
 

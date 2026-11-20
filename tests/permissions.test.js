@@ -39,7 +39,7 @@ test('actionKind', () => {
 });
 
 test('listPermissions', () => {
-  assert.deepEqual(listPermissions(['student']), []);
+  assert.deepEqual(listPermissions(['student']), ['schedule.mine']);
   const dean = listPermissions(['dean']);
   assert.ok(dean.includes('import.apply:students'));
   assert.ok(!dean.includes('dir.save:staff'));
@@ -49,4 +49,21 @@ test('listPermissions', () => {
   assert.equal(new Set(both).size, both.length);
   assert.ok(listPermissions(['admin']).includes('dir.resetPassword:staff'));
   assert.ok(!listPermissions(['admin']).includes('auth.me'));
+});
+
+test('can: schedule actions', () => {
+  assert.equal(can(['dean'], 'dir.save', 'topics'), true);
+  assert.equal(can(['prorector'], 'dir.save', 'weekTemplate'), false);
+  assert.equal(can(['prorector'], 'dir.list', 'weekTemplate'), true);
+  assert.equal(can(['teacher'], 'dir.list', 'topics'), false);
+  assert.equal(can(['dean'], 'import.apply', 'topics'), true);
+  assert.equal(can(['dean'], 'import.apply', 'weekTemplate'), false);
+  assert.equal(can(['prorector'], 'schedule.list'), true);
+  assert.equal(can(['prorector'], 'schedule.changePair'), false);
+  assert.equal(can(['teacher'], 'schedule.changePair'), false);
+  assert.equal(can(['teacher'], 'topics.plan'), true);
+  assert.equal(can(['student'], 'schedule.mine'), true);
+  assert.equal(can(['student'], 'schedule.list'), false);
+  assert.equal(can(['dean'], 'schedule.mine'), false);
+  assert.ok(listPermissions(['dean']).includes('settings.save'));
 });
