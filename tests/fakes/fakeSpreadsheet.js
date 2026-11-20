@@ -1,8 +1,24 @@
 // Fake of the Apps Script Spreadsheet API: enough behaviour to catch mistakes in sheetsStore.
 const isBlank = (v) => v === '' || v === null || v === undefined;
 
-function createFakeSheet(name, rows) {
+const NUMERIC = /^-?\d+(\.\d+)?$/;
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+// A fake sheet with a finite grid (like real Sheets) and per-column text format.
+// Writing a numeric-looking or ISO-date string into a column that is not text-formatted
+// stores a number or a Date, as Google Sheets does.
+function createFakeSheet(name, rows, grid = {}) {
   const data = rows.map((r) => r.slice());
+  let maxRows = grid.maxRows ?? Math.max(data.length, 1);
+  let maxColumns = grid.maxColumns ?? Math.max(1, ...data.map((r) => r.length));
+  const textColumns = new Set();
+
+  const convert = (colIndex, v) => {
+    if (typeof v !== 'string' || textColumns.has(colIndex)) return v;
+    if (NUMERIC.test(v)) return Number(v);
+    if (ISO_DATE.test(v)) return new Date(`${v}T00:00:00Z`);
+    return v;
+  };
 
   const lastRow = () => {
     for (let i = data.length - 1; i >= 0; i--) if (data[i].some((v) => !isBlank(v))) return i + 1;
@@ -21,12 +37,29 @@ function createFakeSheet(name, rows) {
     if (![row, col, nr, nc].every(Number.isInteger) || row < 1 || col < 1 || nr < 1 || nc < 1) {
       throw new Error(`Invalid range: ${row},${col},${nr},${nc}`);
     }
+    if (row + nr - 1 > maxRows || col + nc - 1 > maxColumns) {
+      throw new Error(`The coordinates of the range are outside the dimensions of the sheet: ${row},${col},${nr},${nc}`);
+    }
   };
 
   return {
     getName: () => name,
     getLastRow: lastRow,
     getLastColumn: lastColumn,
+    getMaxRows: () => maxRows,
+    getMaxColumns: () => maxColumns,
+    insertRowsAfter(after, n) {
+      if (!Number.isInteger(after) || !Number.isInteger(n) || after < 0 || after > maxRows || n < 1) {
+        throw new Error(`Invalid insertRowsAfter: ${after},${n}`);
+      }
+      maxRows += n;
+    },
+    insertColumnsAfter(after, n) {
+      if (!Number.isInteger(after) || !Number.isInteger(n) || after < 0 || after > maxColumns || n < 1) {
+        throw new Error(`Invalid insertColumnsAfter: ${after},${n}`);
+      }
+      maxColumns += n;
+    },
     getRange(row, col, nr = 1, nc = 1) {
       checkRange(row, col, nr, nc);
       return {
@@ -42,6 +75,12 @@ function createFakeSheet(name, rows) {
           }
           return out;
         },
+        setNumberFormat(format) {
+          for (let c = 0; c < nc; c++) {
+            if (format === '@') textColumns.add(col - 1 + c); else textColumns.delete(col - 1 + c);
+          }
+        },
+        getNumberFormat: () => (textColumns.has(col - 1) ? '@' : 'General'),
         setValues(values) {
           const ok = Array.isArray(values) && values.length === nr
             && values.every((l) => Array.isArray(l) && l.length === nc);
@@ -50,7 +89,7 @@ function createFakeSheet(name, rows) {
             while (data.length < row + r) data.push([]);
             const line = data[row - 1 + r];
             while (line.length < col - 1 + nc) line.push('');
-            for (let c = 0; c < nc; c++) line[col - 1 + c] = values[r][c];
+            for (let c = 0; c < nc; c++) line[col - 1 + c] = convert(col - 1 + c, values[r][c]);
           }
         },
       };
@@ -58,7 +97,9 @@ function createFakeSheet(name, rows) {
     appendRow(arr) {
       const at = lastRow();
       data.splice(at, data.length - at);
-      data.push(arr.slice());
+      data.push(arr.map((v, c) => convert(c, v)));
+      maxRows = Math.max(maxRows, data.length);
+      maxColumns = Math.max(maxColumns, arr.length);
     },
     deleteRow(n) {
       if (!Number.isInteger(n) || n < 1 || n > data.length) throw new Error(`Invalid row: ${n}`);
@@ -68,13 +109,15 @@ function createFakeSheet(name, rows) {
   };
 }
 
-export function createFakeSpreadsheet(sheets = {}) {
-  const map = new Map(Object.entries(sheets).map(([n, rows]) => [n, createFakeSheet(n, rows)]));
+// grids: optional { [sheetName]: { maxRows, maxColumns } } for sheets passed in `sheets`
+// (default: the grid is sized to fit the given rows). Inserted sheets get 1000 x 26.
+export function createFakeSpreadsheet(sheets = {}, grids = {}) {
+  const map = new Map(Object.entries(sheets).map(([n, rows]) => [n, createFakeSheet(n, rows, grids[n])]));
   return {
     getSheetByName: (name) => map.get(name) || null,
     insertSheet(name) {
       if (map.has(name)) throw new Error(`Sheet already exists: ${name}`);
-      const sheet = createFakeSheet(name, []);
+      const sheet = createFakeSheet(name, [], { maxRows: 1000, maxColumns: 26 });
       map.set(name, sheet);
       return sheet;
     },

@@ -102,3 +102,50 @@ test('fakeSpreadsheet: mimics Apps Script limits', () => {
   assert.equal(empty.getLastColumn(), 0);
   assert.equal(ss.getSheetByName('nope'), null);
 });
+
+test('sheetsStore: insert and insertMany grow a full grid', () => {
+  const rows = [['id', 'название', 'курс'], ['g_1', 'a', 1]];
+  const mk = () => createFakeSpreadsheet({ 'Группы': rows }, { 'Группы': { maxRows: 4, maxColumns: 3 } });
+  const s = createSheetsStore(SCHEMA, platform, mk());
+  for (let i = 0; i < 3; i++) s.insert('groups', { name: `n${i}`, course: 1 });
+  assert.equal(s.list('groups').length, 4);
+  const ss2 = mk();
+  const s2 = createSheetsStore(SCHEMA, platform, ss2);
+  const many = s2.insertMany('groups', Array.from({ length: 5 }, (_, i) => ({ name: `m${i}`, course: 2 })));
+  assert.equal(many.length, 5);
+  assert.equal(s2.list('groups').length, 6);
+  assert.ok(ss2.getSheetByName('Группы').getMaxRows() >= 6);
+});
+
+test('fakeSpreadsheet: enforces the grid', () => {
+  const ss = createFakeSpreadsheet({ T: [['a'], ['b']] });
+  const sh = ss.getSheetByName('T');
+  const max = sh.getMaxRows();
+  assert.throws(() => sh.getRange(max + 1, 1, 1, 1).setValues([[1]]));
+  sh.insertRowsAfter(max, 1);
+  sh.getRange(max + 1, 1, 1, 1).setValues([[1]]);
+  assert.equal(ss.insertSheet('N').getMaxRows(), 1000);
+});
+
+test('ensureSheets keeps strings as text; a bare sheet loses them (fake models Sheets)', () => {
+  const ss = createFakeSpreadsheet({});
+  ensureSheets(SCHEMA, ss);
+  const s = createSheetsStore(SCHEMA, platform, ss);
+  const g = s.insert('groups', { name: '01-1', course: 1 });
+  const st = s.insert('students', { fullName: 'A', cardNo: '0012', groupId: g.id });
+  const [gm] = s.insertMany('groups', [{ name: '2025-09-01', course: 1 }]);
+  assert.equal(s.get('students', st.id).cardNo, '0012');
+  assert.equal(s.get('groups', g.id).name, '01-1');
+  assert.equal(s.get('groups', gm.id).name, '2025-09-01');
+  assert.ok(ss.dump('Студенты').flat().includes('0012'));
+  assert.equal(ss.getSheetByName('Студенты').getRange(1, 1, 1, 1).getNumberFormat(), '@');
+
+  const bare = createFakeSpreadsheet({ 'Группы': [['id', 'название', 'курс']] });
+  createSheetsStore(SCHEMA, platform, bare).insert('groups', { id: 'g_1', name: '0012', course: 1 });
+  assert.equal(bare.dump('Группы')[1][1], 12);
+});
+
+test('sheetsStore: a Date in a string column reads as YYYY-MM-DD', () => {
+  const ss = createFakeSpreadsheet({ 'Группы': [['id', 'название', 'курс'], ['g_1', new Date(Date.UTC(2026, 8, 1)), 1]] });
+  assert.equal(createSheetsStore(SCHEMA, platform, ss).list('groups')[0].name, '2026-09-01');
+});

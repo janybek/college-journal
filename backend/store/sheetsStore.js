@@ -7,6 +7,8 @@ import { getTable, generateId } from './memoryStore.js';
 
 const TRUE_STRINGS = ['true', 'да'];
 
+const isDate = (v) => Object.prototype.toString.call(v) === '[object Date]';
+
 function readValue(type, v) {
   if (type === 'bool') {
     if (v === true || v === 1) return true;
@@ -17,6 +19,8 @@ function readValue(type, v) {
     const text = String(v).trim();
     return /^-?\d+$/.test(text) ? parseInt(text, 10) : null;
   }
+  // Safety net for hand-edited cells that Sheets turned into dates.
+  if (isDate(v)) return v.toISOString().slice(0, 10);
   return String(v).trim();
 }
 
@@ -62,7 +66,7 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
     return cells;
   };
 
-  function insertRows(table, rows) {
+  function insertRows(table, rows, useAppend) {
     return withLock(() => {
       const { def, sheet, cols, lastRow, lastCol, entries } = load(table);
       const taken = new Set(entries.map((e) => e.row.id));
@@ -79,7 +83,14 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
       if (created.length > 0) {
         const width = Math.max(lastCol, 1);
         const block = created.map((r) => toCells(def, cols, width, r));
-        sheet.getRange(lastRow + 1, 1, block.length, width).setValues(block);
+        if (useAppend) {
+          sheet.appendRow(block[0]);
+        } else {
+          // setValues does not grow the grid (appendRow does), so add the missing rows first.
+          const missing = lastRow + block.length - sheet.getMaxRows();
+          if (missing > 0) sheet.insertRowsAfter(sheet.getMaxRows(), missing);
+          sheet.getRange(lastRow + 1, 1, block.length, width).setValues(block);
+        }
       }
       return created.map((r) => readBack(def, r));
     });
@@ -100,8 +111,8 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
       const hit = find(load(table), id);
       return hit ? hit.row : null;
     },
-    insert: (table, row) => insertRows(table, [row])[0],
-    insertMany: (table, rows) => insertRows(table, rows),
+    insert: (table, row) => insertRows(table, [row], true)[0],
+    insertMany: (table, rows) => insertRows(table, rows, false),
     update(table, id, patch) {
       return withLock(() => {
         const loaded = load(table);
@@ -126,6 +137,15 @@ export function createSheetsStore(schema, platform, spreadsheet, withLock = (fn)
   };
 }
 
+// Plain-text format on string columns, so Sheets does not turn '01-1' or '0012' into dates or numbers.
+function markTextColumns(def, sheet) {
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0].map((h) => String(h).trim());
+  for (const c of def.columns) {
+    const i = headers.indexOf(c.title);
+    if (c.type === 'string' && i >= 0) sheet.getRange(1, i + 1, sheet.getMaxRows(), 1).setNumberFormat('@');
+  }
+}
+
 // Creates missing sheets and appends missing header columns. Safe to run repeatedly.
 export function ensureSheets(schema, spreadsheet) {
   const created = [];
@@ -137,6 +157,7 @@ export function ensureSheets(schema, spreadsheet) {
       sheet = spreadsheet.insertSheet(def.sheet);
       sheet.appendRow(def.columns.map((c) => c.title));
       created.push(def.sheet);
+      markTextColumns(def, sheet);
       continue;
     }
     const width = sheet.getLastColumn();
@@ -145,9 +166,12 @@ export function ensureSheets(schema, spreadsheet) {
       : [];
     const missing = def.columns.filter((c) => !headers.includes(c.title));
     if (missing.length > 0) {
+      const lack = headers.length + missing.length - sheet.getMaxColumns();
+      if (lack > 0) sheet.insertColumnsAfter(sheet.getMaxColumns(), lack);
       sheet.getRange(1, headers.length + 1, 1, missing.length).setValues([missing.map((c) => c.title)]);
       for (const c of missing) addedColumns.push(`${def.sheet}.${c.title}`);
     }
+    markTextColumns(def, sheet);
   }
   return { created, addedColumns };
 }
