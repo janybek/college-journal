@@ -1,10 +1,12 @@
-import { STAFF_ROLES } from './schema.js';
+import { STAFF_ROLES, FIXED_STATUSES } from './schema.js';
 import { normalizeRow, validateRow } from './validate.js';
 
 export const MAX_IMPORT_ROWS = 2000;
 
 // `aliases`: other header titles accepted for the column (older template versions); never written to a template.
-const column = (key, ru, ky, en, required = false, aliases) => ({ key, titles: { ru, ky, en }, required, ...(aliases ? { aliases } : {}) });
+// `virtual`: checked like any column but never written to `records` (it only helps to resolve other cells of the row).
+const column = (key, ru, ky, en, required = false, aliases, virtual = false) =>
+  ({ key, titles: { ru, ky, en }, required, ...(aliases ? { aliases } : {}), ...(virtual ? { virtual: true } : {}) });
 const NAME = column('name', 'Название', 'Аталышы', 'Name', true);
 const FULL_NAME = column('fullName', 'ФИО', 'Аты-жөнү', 'Full name', true);
 const LANG = column('lang', 'Язык', 'Тил', 'Language');
@@ -30,6 +32,23 @@ export const IMPORT_SPECS = {
     uniqueBy: ['name', 'groupId'],
     columns: [NAME, column('teacherId', 'Преподаватель', 'Окутуучу', 'Teacher', true), GROUP],
   },
+  topics: {
+    uniqueBy: ['order', 'subjectId'],
+    columns: [
+      column('subjectId', 'Предмет', 'Сабак', 'Subject', true),
+      column('groupId', 'Группа', 'Топ', 'Group', true, ['Тайпа'], true),
+      column('unit', 'Юнит', 'Юнит', 'Unit', true, ['Модуль']),
+      column('order', '№', '№', 'No.', true, ['№ по порядку', '№ темы', 'No', 'N']),
+      column('name', 'Тема', 'Тема', 'Topic', true, ['Название']),
+      column('lessonType', 'Тип', 'Түрү', 'Type', true, ['Тип пары']),
+    ],
+    // A topic whose pair is already held keeps its name, type and unit.
+    check(existing, candidate, db) {
+      const held = (db.pairs || []).some(p => p.topicId === existing.id && FIXED_STATUSES.includes(p.status));
+      const changed = ['name', 'lessonType', 'unit'].some(k => String(existing[k]) !== String(candidate[k]));
+      return held && changed ? { field: 'name', code: 'held' } : null;
+    },
+  },
 };
 
 const ROLE_WORDS = {
@@ -43,6 +62,13 @@ const LANG_WORDS = {
   'ky': 'ky', 'кыргызский': 'ky', 'кыргызча': 'ky',
   'ru': 'ru', 'русский': 'ru', 'орусча': 'ru',
   'en': 'en', 'английский': 'en', 'англисче': 'en',
+};
+
+const LESSON_WORDS = {
+  'лекция': 'lecture', 'lecture': 'lecture',
+  'практика': 'practice', 'практическое': 'practice', 'practice': 'practice',
+  'рубежный': 'control', 'рубежный контроль': 'control', 'экзамен': 'control',
+  'аралык текшерүү': 'control', 'control': 'control', 'exam': 'control',
 };
 
 // Trimmed, lower-cased, whitespace runs collapsed: used for every comparison.
@@ -73,7 +99,15 @@ function mapHeaders(spec, headerRow) {
 }
 
 // Resolves one non-empty cell into a stored value, or returns { error }.
-function resolveCell(key, text, db) {
+function resolveCell(key, text, db, rowGroup) {
+  if (key === 'subjectId' && rowGroup !== undefined) {
+    const subject = (db.subjects || []).find(s => s.groupId === rowGroup && norm(s.name) === norm(text));
+    return subject ? { value: subject.id } : { error: 'bad_ref' };
+  }
+  if (key === 'lessonType') {
+    const type = LESSON_WORDS[norm(text)];
+    return type ? { value: type } : { error: 'bad_value' };
+  }
   if (key === 'groupId') {
     const group = (db.groups || []).find(g => norm(g.name) === norm(text));
     return group ? { value: group.id } : { error: 'bad_ref' };
@@ -112,7 +146,8 @@ export function parseSheet(table, cells, db) {
 
   // Working copy: accepted rows of the file are visible to the later ones.
   const work = {};
-  for (const t of ['groups', 'students', 'staff', 'subjects', 'rooms']) work[t] = [...(db[t] || [])];
+  for (const t of Object.keys(db)) if (Array.isArray(db[t])) work[t] = [...db[t]];
+  work[table] = work[table] || [];
   const seen = new Set();
   const keyOf = (fields) => spec.uniqueBy.map(k => norm(fields[k])).join('\u0000');
 
@@ -123,6 +158,16 @@ export function parseSheet(table, cells, db) {
     for (const c of spec.columns) if (c.key in index) texts[c.key] = cellText(cellsOfRow[index[c.key]]);
     if (Object.values(texts).every(t => t === '')) continue;
 
+    // A subject is looked up by name inside the group of the same row.
+    const hasGroupColumn = spec.columns.some(c => c.virtual && c.key === 'groupId');
+    let rowGroup;
+    let groupMissing = false;
+    if (hasGroupColumn) {
+      const g = resolveCell('groupId', texts.groupId || '', db);
+      if (g.error) groupMissing = true;
+      else rowGroup = g.value;
+    }
+
     const fields = {};
     const codes = {};
     for (const c of spec.columns) {
@@ -131,7 +176,8 @@ export function parseSheet(table, cells, db) {
         if (c.required) codes[c.key] = 'required';
         continue;
       }
-      const res = resolveCell(c.key, texts[c.key], db);
+      if (c.key === 'subjectId' && groupMissing) continue;
+      const res = resolveCell(c.key, texts[c.key], db, c.key === 'subjectId' ? rowGroup : undefined);
       if (res.error) codes[c.key] = res.error;
       else fields[c.key] = res.value;
     }
@@ -142,7 +188,12 @@ export function parseSheet(table, cells, db) {
     }
     const candidate = normalizeRow(table, { ...(existing || {}), ...fields });
     for (const { field, code } of validateRow(table, candidate, work)) {
+      if (field === 'subjectId' && groupMissing) continue;
       if (!(field in codes) && spec.columns.some(c => c.key === field)) codes[field] = code;
+    }
+    if (existing && spec.check && !Object.keys(codes).length) {
+      const found = spec.check(existing, candidate, db);
+      if (found && !(found.field in codes)) codes[found.field] = found.code;
     }
 
     const errorFields = spec.columns.filter(c => c.key in codes);
@@ -153,7 +204,9 @@ export function parseSheet(table, cells, db) {
     seen.add(keyOf(fields));
     if (existing) work[table] = work[table].map(r => (r.id === existing.id ? candidate : r));
     else work[table].push({ ...candidate, id: `import_row_${rowNo}` });
-    result.records.push({ row: rowNo, ...fields });
+    const stored = { ...fields };
+    for (const c of spec.columns) if (c.virtual) delete stored[c.key];
+    result.records.push({ row: rowNo, ...stored });
   }
   return result;
 }

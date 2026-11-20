@@ -61,3 +61,42 @@ test('subjects: teacher must have the teacher role', () => {
 test('students: a row is not a duplicate of itself', () => {
   assert.deepEqual(validateRow('students', { id: 'st_1', fullName: 'А', cardNo: 's1001', groupId: 'g_1', lang: 'ky' }, db), []);
 });
+
+const wdb = {
+  subjects: [{ id: 'sb_1', name: 'Информатика', teacherId: 'sf_1', groupId: 'g_1' }, { id: 'sb_2', name: 'Анатомия', teacherId: 'sf_2', groupId: 'g_1' },
+    { id: 'sb_3', name: 'Информатика', teacherId: 'sf_1', groupId: 'g_2' }, { id: 'sb_4', name: 'Анатомия', teacherId: 'sf_2', groupId: 'g_2' }],
+  rooms: [{ id: 'r_1', name: '204' }, { id: 'r_2', name: '101' }],
+  weekTemplate: [{ id: 'wt_1', weekday: 1, slot: 1, subjectId: 'sb_1', roomId: 'r_1' }],
+  slotCount: 6,
+};
+
+test('weekTemplate rules', () => {
+  const wt = (row) => validateRow('weekTemplate', row, wdb);
+  assert.deepEqual(wt({ weekday: 1, slot: 2, subjectId: 'sb_2', roomId: 'r_1' }), []);
+  assert.deepEqual(wt({ weekday: 2, slot: 1, subjectId: 'sb_1', roomId: '' }), []);
+  assert.deepEqual(wt({ id: 'wt_1', weekday: 1, slot: 1, subjectId: 'sb_1', roomId: 'r_1' }), []);
+  assert.deepEqual(wt({ weekday: 6, slot: 7, subjectId: 'sb_x', roomId: 'r_x' }), [{ field: 'weekday', code: 'bad_value' },
+    { field: 'slot', code: 'bad_value' }, { field: 'subjectId', code: 'bad_ref' }, { field: 'roomId', code: 'bad_ref' }]);
+  assert.deepEqual(wt({ weekday: 1, slot: 1, subjectId: 'sb_2', roomId: 'r_2' }), [{ field: 'slot', code: 'group_busy' }]);
+  assert.deepEqual(wt({ weekday: 1, slot: 1, subjectId: 'sb_3', roomId: 'r_2' }), [{ field: 'subjectId', code: 'teacher_busy' }]);
+  assert.deepEqual(wt({ weekday: 1, slot: 1, subjectId: 'sb_4', roomId: 'r_1' }), [{ field: 'roomId', code: 'room_busy' }]);
+});
+
+test('weekTemplate: slot limit follows slotCount, falls back to MAX_SLOTS', () => {
+  const row = { weekday: 1, slot: 7, subjectId: 'sb_2', roomId: '' };
+  assert.deepEqual(validateRow('weekTemplate', row, wdb), [{ field: 'slot', code: 'bad_value' }]);
+  const { slotCount, ...noCount } = wdb;
+  assert.deepEqual(validateRow('weekTemplate', row, noCount), []);
+});
+
+test('topics rules', () => {
+  const tdb = { subjects: wdb.subjects, topics: [{ id: 'tp_1', subjectId: 'sb_1', unit: 1, order: 1, name: 'Введение', lessonType: 'lecture' }] };
+  assert.deepEqual(validateRow('topics', { subjectId: 'sb_1', unit: 1, order: 2, name: 'Введение', lessonType: 'practice' }, tdb), []);
+  assert.deepEqual(validateRow('topics', { subjectId: 'sb_3', unit: 1, order: 1, name: 'В', lessonType: 'lecture' }, tdb), []);
+  assert.deepEqual(validateRow('topics', { subjectId: 'sb_x', unit: 0, order: 201, name: '', lessonType: 'семинар' }, tdb),
+    [{ field: 'subjectId', code: 'bad_ref' }, { field: 'unit', code: 'bad_value' }, { field: 'order', code: 'bad_value' },
+      { field: 'name', code: 'required' }, { field: 'lessonType', code: 'bad_value' }]);
+  assert.deepEqual(validateRow('topics', { subjectId: 'sb_1', unit: 1, order: 1, name: 'Дубль', lessonType: 'lecture' }, tdb), [{ field: 'order', code: 'duplicate' }]);
+  assert.deepEqual(validateRow('topics', { id: 'tp_1', subjectId: 'sb_1', unit: 1, order: 1, name: 'Введение', lessonType: 'lecture' }, tdb), []);
+  assert.deepEqual(validateRow('topics', { subjectId: 'sb_1', unit: 1, order: 3, name: 'x'.repeat(201), lessonType: 'lecture' }, tdb), [{ field: 'name', code: 'too_long' }]);
+});

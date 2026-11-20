@@ -19,6 +19,7 @@ export const IMPORT_COLUMNS = {
   students: [col('fullName', true), col('cardNo', true), col('groupId', true), col('lang', false)],
   staff: [col('fullName', true), col('login', true), col('roles', true), col('lang', false)],
   subjects: [col('name', true), col('teacherId', true), col('groupId', true)],
+  topics: [col('subjectId', true), col('groupId', true), col('unit', true), col('order', true), col('name', true), col('lessonType', true)],
 };
 
 // How a field is edited. A key means the same thing in every directory.

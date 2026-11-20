@@ -1,4 +1,6 @@
-import { SCHEMA, STAFF_ROLES, LANGS, DEFAULT_LANG } from './schema.js';
+import { SCHEMA, STAFF_ROLES, LANGS, DEFAULT_LANG, WEEKDAYS, LESSON_TYPES } from './schema.js';
+import { MAX_SLOTS } from './settings.js';
+import { templateSlots, busyCodes } from './busy.js';
 
 const MAX_LEN = 200;
 
@@ -117,6 +119,46 @@ const RULES = {
       if (!clean(row.name)) return 'required';
       if (taken(db.rooms, 'name', row.name, row.id)) return 'duplicate';
     });
+  },
+  weekTemplate(row, db, field) {
+    const slotLimit = db.slotCount || MAX_SLOTS;
+    const weekdayOk = WEEKDAYS.includes(row.weekday);
+    const slotOk = Number.isInteger(row.slot) && row.slot >= 1 && row.slot <= slotLimit;
+    const subject = (db.subjects || []).find(s => s.id === row.subjectId);
+    const roomOk = isEmpty(row.roomId) || exists(db.rooms, row.roomId);
+    let busy = [];
+    if (weekdayOk && slotOk) {
+      const cand = {
+        id: row.id || '', day: row.weekday, slot: row.slot,
+        groupId: subject ? subject.groupId : '', teacherId: subject ? subject.teacherId : '', roomId: row.roomId || '',
+      };
+      busy = busyCodes(templateSlots(db.weekTemplate, db.subjects), cand);
+    }
+    field('weekday', () => { if (!weekdayOk) return 'bad_value'; });
+    field('slot', () => {
+      if (!slotOk) return 'bad_value';
+      if (busy.includes('group_busy')) return 'group_busy';
+    });
+    field('subjectId', () => {
+      if (!subject) return 'bad_ref';
+      if (busy.includes('teacher_busy')) return 'teacher_busy';
+    });
+    field('roomId', () => {
+      if (!roomOk) return 'bad_ref';
+      if (busy.includes('room_busy')) return 'room_busy';
+    });
+  },
+  topics(row, db, field) {
+    const inRange = (v, max) => Number.isInteger(v) && v >= 1 && v <= max;
+    field('subjectId', () => { if (!exists(db.subjects, row.subjectId)) return 'bad_ref'; });
+    field('unit', () => { if (!inRange(row.unit, 12)) return 'bad_value'; });
+    field('order', () => {
+      if (!inRange(row.order, 200)) return 'bad_value';
+      const dup = (db.topics || []).some(t => t.id !== row.id && t.subjectId === row.subjectId && t.order === row.order);
+      if (dup) return 'duplicate';
+    });
+    field('name', () => { if (!clean(row.name)) return 'required'; });
+    field('lessonType', () => { if (!LESSON_TYPES.includes(row.lessonType)) return 'bad_value'; });
   },
 };
 
