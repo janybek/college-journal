@@ -4,7 +4,8 @@ import { translate, t, tCount, setLang, applyOverrides, pickLang } from '../site
 import ru from '../site/js/i18n/ru.js';
 import ky from '../site/js/i18n/ky.js';
 import en from '../site/js/i18n/en.js';
-import { IMPORT_SPECS } from '../core/import.js';
+import { IMPORT_SPECS, parseSheet } from '../core/import.js';
+import { LESSON_TYPES } from '../core/schema.js';
 import { IMPORT_COLUMNS, IMPORT_TABLES, FIELDS } from '../site/js/views/directoryConfig.js';
 
 test('template column titles in the dictionaries equal IMPORT_SPECS', () => {
@@ -26,6 +27,20 @@ test('topics can be imported: last in the order, with a field for every column a
   assert.deepEqual(IMPORT_COLUMNS.topics.filter(({ key }) => FIELDS[key].kind === 'number').map(({ key }) => key), ['unit', 'order']);
   for (const key of ['dir.topics', 'import.matchBy.topics', 'import.error.name.held', 'import.error.subjectId.bad_ref']) assert.ok(ru[key], key);
   for (const table of IMPORT_TABLES) assert.ok(ru['import.matchBy.' + table], table);
+});
+
+test('the lesson types the import hint names are words the importer reads; in English, the type codes themselves', () => {
+  const db = { groups: [{ id: 'g1', name: '01-1' }], subjects: [{ id: 'sb1', name: 'Анатомия', groupId: 'g1' }], topics: [], pairs: [] };
+  const words = (dict) => dict['import.colHint.topics.lessonType'].replace(/\.$/, '').split(/,\s*|\s+(?:или|or|же)\s+/);
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    const cells = [IMPORT_SPECS.topics.columns.map((col) => col.titles.ru),
+      ...words(dict).map((word, i) => ['Анатомия', '01-1', 1, i + 1, 'Тема', word])];
+    const { records, errors } = parseSheet('topics', cells, db);
+    assert.deepEqual(errors, [], lang);
+    assert.deepEqual(records.map((r) => r.lessonType), LESSON_TYPES, lang);
+  }
+  assert.deepEqual(words(en), LESSON_TYPES);
+  assert.match(en['import.error.lessonType.bad_value'], /lecture, practice or control/);
 });
 
 test('every directory that can be in use elsewhere explains why it cannot be removed', () => {

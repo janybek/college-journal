@@ -165,10 +165,29 @@ function planCard() {
 function warnings(plan) {
   const notPlaced = plan.topics.filter((topic) => topic.pair === null).length;
   const list = [
+    state.planErrorKey ? staleNote() : null,
     notPlaced > 0 ? note('warning', t('topics.notPlaced', { count: notPlaced })) : null,
     plan.withoutTopic > 0 ? note('warning', t('topics.withoutTopic', { count: plan.withoutTopic })) : null,
   ].filter(Boolean);
   return list.length > 0 ? el('div', { class: 'notes topics-warnings' }, list) : null;
+}
+
+// The plan could not be read again after a change: the table is the one from before it, so its dates may be old.
+function staleNote() {
+  const retry = el('button', { type: 'button', id: 'topics-reload', class: 'button button--secondary', onclick: reloadPlan }, t('common.retry'));
+  if (state.planPending) markBusy(retry, 'common.loading');
+  return el('div', { class: 'topics-stale', role: 'alert' },
+    note('warning', t('topics.stale', { reason: t(state.planErrorKey) })),
+    retry);
+}
+
+async function reloadPlan() {
+  if (state.planPending) return;
+  const owner = state;
+  const reading = loadPlan(owner);
+  refresh();
+  await reading;
+  if (state === owner) focusById('topics-reload', 'topics-subject');
 }
 
 function emptyBody() {

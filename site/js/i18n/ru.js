@@ -380,6 +380,7 @@ export default {
   'topics.count.other': '{count} темы',
   'topics.notPlaced': 'Не поместилось тем: {count} — в расписании не хватает пар.',
   'topics.withoutTopic': 'Пар без темы: {count}. Добавьте темы, чтобы у каждой пары была своя.',
+  'topics.stale': 'Не удалось заново прочитать план, поэтому даты тем могут быть устаревшими. {reason}',
   'topics.add': 'Добавить тему',
   'topics.import': 'Загрузить темы из Excel',
   'topics.pair': 'Пара',
