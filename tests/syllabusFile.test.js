@@ -119,3 +119,36 @@ test('titles in three languages and kind words', () => {
   assert.equal(one([[1, '', 'А', 2, '', ''], [1, '', 'Итог', '', '', ' Рубежный   контроль №1 ']]).doc.rows[1].kind, 'control');
   assert.deepEqual([HOURS_PER_PAIR, HOURS_ALLOWED], [2, [0, 2, 4]]);
 });
+
+test('hardening for real files', () => {
+  // 1. trailing blank rows do not count toward MAX_SHEET_ROWS
+  const blanks = Array.from({ length: 400 }, () => ['', '', '', '', '', '']);
+  const tail = one([[1, '', 'А', 2, '', ''], ...blanks]);
+  assert.deepEqual([tail.errors, tail.doc.rows.length], [[], 1]);
+  const tailInfo = parseSyllabus(book([['Семестр', 1], ...Array.from({ length: 400 }, () => ['', ''])], [SHORT, [1, '', 'А', 2, '', '']]));
+  assert.deepEqual(tailInfo.errors, []);
+  const middle = one([[1, '', 'А', 2, '', ''], ['', '', '', '', '', ''], [1, '', 'Б', '', '', '']]);
+  assert.deepEqual(codes(middle), [['plan', 4, 'lectureHours', 'no_hours']]);
+  // 2. en and em dash in a semester range
+  for (const range of ['1–2', '1—2']) {
+    const r = parseSyllabus(book([['Семестр', range]], [['Семестр', ...SHORT], [1, '', '', 'А', 2, '', ''], [2, '', '', 'Б', 2, '', '']]));
+    assert.deepEqual([r.errors, r.doc.info.semester], [[], null]);
+  }
+  // 3. a control row has 0 or 2 practice hours only
+  assert.deepEqual(codes(one([[1, '', 'А', 2, '', ''], [1, '', '', '', 4, 'модуль']])), [['plan', 3, 'practiceHours', 'bad_hours']]);
+  assert.deepEqual(one([[1, '', 'А', 2, '', ''], [1, '', '', '', 2, 'модуль']]).errors, []);
+  // 4. hour spellings
+  for (const spelled of ['2 ч', '2ч', '2 ч.', '2,0', '2.0', ' 2 Ч ']) assert.equal(one([[1, '', 'А', spelled, '', '']]).doc.rows[0].lectureHours, 2, spelled);
+  for (const spelled of ['4 ч', '4,0', '4.0']) assert.equal(one([[1, '', 'А', '', spelled, '']]).doc.rows[0].practiceHours, 4, spelled);
+  for (const spelled of ['3', '2,5', 'два', '2 часа', '-2']) assert.deepEqual(codes(one([[1, '', 'А', spelled, '', '']])), [['plan', 2, 'lectureHours', 'bad_hours']], spelled);
+  // 5. one error for a missing semester, not one per row
+  const lots = Array.from({ length: 50 }, (_, i) => [1, '', 'Т' + i, 2, '', '']);
+  assert.deepEqual(codes(parseSyllabus(book([['Курс', 1]], [SHORT, ...lots]))), [['info', 0, 'semester', 'required']]);
+  assert.deepEqual(codes(parseSyllabus(book([['Курс', 1], ['Семестр', '']], [SHORT, ...lots]))), [['info', 2, 'semester', 'required']]);
+  // 6. two semesters must lie in one academic year
+  for (const pair of [[2, 3], [1, 4]]) {
+    const r = parseSyllabus(book([], [['Семестр', ...SHORT], [pair[0], 1, '', 'А', 2, '', ''], [pair[1], 1, '', 'Б', 2, '', '']]));
+    assert.deepEqual(codes(r), [['plan', 0, 'semester', 'semester_clash']], pair.join());
+  }
+  assert.deepEqual(parseSyllabus(book([], [['Семестр', ...SHORT], [3, 1, '', 'А', 2, '', ''], [4, 1, '', 'Б', 2, '', '']])).errors, []);
+});
