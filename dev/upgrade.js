@@ -11,7 +11,7 @@ const isOldSyllabus = (s) => !s.status;
 
 // data: { syllabi, topics, pairs, units, ... } changed in place; newId(prefix, takenSet) -> a new id.
 export function upgradeData(data, newId) {
-  const report = { changed: false, versions: 0, split: 0, units: 0, skipped: [] };
+  const report = { changed: false, versions: 0, split: 0, units: 0, skipped: [], zeroHours: [] };
   const syllabi = data.syllabi || [];
   const migrated = new Set();
   for (const s of syllabi) {
@@ -35,11 +35,14 @@ export function upgradeData(data, newId) {
     touched.add(row.syllabusId);
     converted = true;
     let lessons = splitRow(row);
-    if (!lessons.length) lessons = [{ lessonKind: 'lecture', hours: 0, selfHours: row.selfHours ?? null, description: row.description ?? '' }];
+    if (!lessons.length) {
+      lessons = [{ lessonKind: 'lecture', hours: 0, selfHours: row.selfHours ?? null, description: row.description ?? '' }];
+      if (row.kind !== 'control') report.zeroHours.push(row.id);
+    }
     const rest = { ...row };
     for (const key of OLD_KEYS) delete rest[key];
     lessons.forEach((l, i) => {
-      const out = { ...rest, lessonKind: l.lessonKind, hours: l.hours, controlForms: '', selfHours: l.selfHours, description: l.description, sourceId: '' };
+      const out = { ...rest, lessonKind: l.lessonKind, hours: l.hours ?? 0, controlForms: '', selfHours: l.selfHours, description: l.description, sourceId: '' };
       if (i === 0) {
         for (const key of OLD_KEYS) delete row[key];
         Object.assign(row, out);
@@ -100,10 +103,16 @@ const randomId = (prefix, taken) => {
 
 // Reads the data file, carries it over and writes it back; before the first change a copy of the old file is put beside it (kept if it exists).
 export function upgradeFile(dataPath) {
-  const none = { changed: false, versions: 0, split: 0, units: 0, skipped: [] };
+  const none = { changed: false, versions: 0, split: 0, units: 0, skipped: [], zeroHours: [] };
   if (!fs.existsSync(dataPath)) return none;
   const text = fs.readFileSync(dataPath, 'utf8');
-  const data = JSON.parse(text);
+  let data;
+  try {
+    data = JSON.parse(text);
+  } catch (error) {
+    data = null;
+  }
+  if (data === null || typeof data !== 'object' || Array.isArray(data)) throw new Error(`файл ${dataPath} повреждён, перенос не сделан, файл не тронут`);
   const report = upgradeData(data, randomId);
   if (!report.changed) return report;
   const copy = dataPath + '.before-addendum-3.bak';

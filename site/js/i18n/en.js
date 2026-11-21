@@ -728,4 +728,5 @@ export default {
   'error.out_of_semester': 'This date is outside the semester.',
   'error.day_off': 'There are no classes on this day: it is a weekend or a day off.',
   'error.bad_request': 'The journal did not understand the request. Reload the page and try again.',
+  'error.syllabus_locked': 'This syllabus version cannot be edited now: it is under review or already approved.',
 };

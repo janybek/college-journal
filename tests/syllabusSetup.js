@@ -6,6 +6,7 @@ import { SCHEMA } from '../core/schema.js';
 import { DEFAULT_BELLS } from '../core/settings.js';
 import { hashPassword } from '../core/auth.js';
 import { handleRequest } from '../backend/api.js';
+import { DOC_TABLES } from '../core/syllabusDoc.js';
 
 export const INFO = [['Семестр', 1], ['Специальность', 'Сестринское дело'], ['Кредиты', 1], ['Всего часов', 10], ['Аудиторных часов', 6], ['СРС, часов', 4]];
 export const HEAD = ['Юнит', '№', 'Тема', 'Лекция, ч', 'Практика, ч', 'Вид занятия', 'Описание'];
@@ -80,8 +81,28 @@ export function setup() {
       .map((p) => [p.date, names.get(p.topicId) ?? '', p.lessonType, p.part]);
   };
   const snapshot = () => JSON.stringify([store.list('topics'), store.list('syllabi'), store.list('pairs')]);
+  // a draft of «the subject's discipline + its teacher» for a half of the year -> the id of the version
+  const draft = (subjectId, semester, token = tokens.dean) => call('syllabus.startDraft', { subjectId, semester }, token).data.syllabusId;
+  const save = (syllabusId, section, data, token = tokens.dean) => call('syllabus.saveSection', { syllabusId, section, data }, token);
+  // writes what a version needs to be submitted and has not got yet: the department, the year, the course, the credits, the goal and, with an empty plan, the lessons of A
+  const fill = (syllabusId, token = tokens.dean) => {
+    const form = call('syllabus.form', { syllabusId }, token).data;
+    const title = { ...form.doc.title };
+    if (!title.department) title.department = 'Кафедра информатики';
+    if (!title.academicYear) title.academicYear = '2026–2027';
+    if (!title.course) title.course = 1;
+    if (!title.credits) title.credits = 1;
+    save(syllabusId, 'title', title, token);
+    save(syllabusId, 'goals', { ...form.doc.goals, goal: form.doc.goals.goal || 'Цель курса' }, token);
+    if (!form.doc.plan.units.some((u) => ['lecture', 'practice', 'seminar', 'lab'].some((k) => u[k].length))) {
+      save(syllabusId, 'plan', { units: [{ title: '', lecture: [{ name: 'Введение', hours: 2 }], practice: [{ name: 'Введение', hours: 2 }, { name: 'Практикум', hours: 2 }], control: [{ name: '', hours: 0 }] }] }, token);
+    }
+    return call('syllabus.form', { syllabusId }, token);
+  };
+  // every sheet of the syllabi and the pairs as one text: a failed request must leave it as it was
+  const snapshotAll = () => JSON.stringify([store.list('syllabi'), ...DOC_TABLES.map((name) => store.list(name)), store.list('pairs')]);
   return {
-    store, spy: spied.spy, call, send, publish, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, reset: spied.reset,
+    store, spy: spied.spy, call, send, publish, draft, save, fill, snapshotAll, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, reset: spied.reset,
     ...tokens, staff, ds1, ds2, g1, g2, sb1, sb2, sb3, S,
   };
 }

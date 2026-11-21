@@ -102,7 +102,7 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   const fresh = !fs.existsSync(dataPath);
   const upgraded = upgradeFile(dataPath);
   if (upgraded.changed) {
-    console.log(`stand file carried over: versions ${upgraded.versions}, split rows ${upgraded.split}, units ${upgraded.units}, untouched rows ${upgraded.skipped.length}; copy: ${path.basename(dataPath)}.before-addendum-3.bak`);
+    console.log(`stand file carried over: versions ${upgraded.versions}, split rows ${upgraded.split}, units ${upgraded.units}, untouched rows ${upgraded.skipped.length}, zero-hour rows ${upgraded.zeroHours.length}; copy: ${path.basename(dataPath)}.before-addendum-3.bak`);
   }
   const store = createFileStore(SCHEMA, platform, dataPath);
   if (fresh) seederFor(dataPath, mode)(store, platform);

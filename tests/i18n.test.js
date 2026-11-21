@@ -173,7 +173,7 @@ test('the syllabus page has its texts: a part of the course is a unit, the contr
 });
 
 test('every schedule error code has a text', () => {
-  for (const code of ['group_busy', 'teacher_busy', 'room_busy', 'in_past', 'pair_locked', 'empty_template', 'held', 'out_of_semester', 'day_off', 'bad_request'])
+  for (const code of ['group_busy', 'teacher_busy', 'room_busy', 'in_past', 'pair_locked', 'empty_template', 'held', 'out_of_semester', 'day_off', 'bad_request', 'syllabus_locked'])
     assert.ok(ru['error.' + code], code);
 });
 
