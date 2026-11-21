@@ -307,3 +307,110 @@
 - Addendum 2 fix wave: complete (commits a6a6554..44f1c45: 56069eb, 8f5ba70, 44f1c45). Final review of addendum 2 closed: 0 Critical, 0 Important open.
 - Addendum 2: minor (deferred → unit 3 list in aidlc-state.md): «Замена» on past pairs of the former teacher after a teacher change; N5 «2 курс 1 семестр» reads as semester 1; «Итого» in the «№»/«Юнит» column with an empty topic is an error; a year file whose declared hours do not match its plan downloads as the shown semester only; M8, M9, M11, M14; 18 Kyrgyz texts of the wave need a native reading.
 - State: aidlc-state.md, CLAUDE.md (domain rules → 22.11 model), sdd/addendum2-review-findings.md and the ledger snapshot updated; unit 2 waits for the owner's acceptance on the stand (journal-dev-reset, port 5273).
+- Owner's stand started by the controller (journal-dev-reset on 5273, signed in as dean, «Предметы» opens, console clean) for the acceptance of unit 2 — agents must not start, stop or reset a stand until told. Docs commit cc60cc9.
+
+## Addendum 3 (tasks 32-45): syllabus form on the site, deanery approval
+- Spec: aidlc-docs/construction/unit-2-raspisanie/design-syllabus-form.md (approved by the owner 22.11.2026). Plan: tasks 32-45 in plan.md (commit 36ff0d7, written by fable). Owner approved the plan with all six defaults of owner-summary-4.md.
+- Ruling: work continues on main, as every earlier task of this plan — owner's standing practice — none.
+- Ruling: after task 41 the controller sends the owner screenshots of the form and STOPS until the owner answers (plan and owner-summary-4 say so) — none.
+- Pre-flight of addendum 3 (journal-reviewer/fable): .superpowers/sdd/plan-unit-2-raspisanie/preflight-addendum3.md — 0 Critical, 6 Important, 30 Minor; npm test 352/352; probes in scratchpad/preflight3/. The 10 real syllabus files parse under the new rules (numbers and codes only).
+  - Ruling: I1, I2, I4, I5 — taken as proposed in the report — none.
+  - Ruling: I3 — step 3 of the stand migration touches only versions migrated by step 1 in the same call; test: a freshly seeded stand is unchanged on the second start and no copy appears — smaller than making task 34 write «Юниты» — a stand without units shows unit numbers without titles.
+  - Ruling: I6 — one function «the copy of an approved row» used by checkHeld and approvalPlan: by sourceId first, else a row without sourceId of the same lesson type with the same name (case and spaces ignored); the error text tells the teacher to put the topic back under the same name; test in task 38 as proposed — keeps the owner's «no delete-draft button» and avoids a locked key — a renamed held topic still needs the dean.
+  - Ruling: Minors — the plan fixer applies every proposal of the report that does not contradict the design or the owner's decisions, and lists any it skipped with the reason — none.
+- Plan fixed by the pre-flight: commit e0391eb (all 6 Important, all 30 Minor; new names: copiesOf in core/syllabusFlow.js, splitRow in core/syllabusPlan.js, versionsOf and syllabusFlow.js created in task 34, upgradeData report `skipped`, SECTION_TABLES.plan = topics+units+literature, syllabus.queue {countOnly}, control_first, units_removed, openReturnDialog, approvedNote, fill moved to task 37).
+  - Ruling: the plan's table «Решения плана дополнения 3» counts as approved with the plan (owner: «да, по умолчанию» to owner-summary-4); it goes into aidlc-state at task 13 step 2 as the plan says — none.
+  - Note for the owner (M28): any draft, even empty, blocks deleting the discipline and the teacher — tell the owner with the task-41 screenshots.
+  - Ruling: shared sections of addendum 3 (plan lines 4161-4288) saved as addendum3-shared.md and given to every implementer and reviewer of tasks 32-45, next to the unit contracts — none.
+- Task 32: dispatched (BASE e0391eb, journal-logic/sonnet)
+- Task 32: implementer DONE_WITH_CONCERNS, commit b7e1b58, 360/360, build:gas ok, git status clean. Concerns: brief self-contradiction — an empty book is dropped in section `literature` but `required` in a unit's literature (both brief tests followed); unspecified error codes chosen (listed in task-32-report.md); tests/schema.test.js syllabi titles assertion now slice(0,11).
+  - Ruling: kept as built — both brief tests pass; the form (tasks 41-42) sends no empty rows, so the difference shows only on hand-made requests — a dean may see «required» on an empty unit book instead of silent drop.
+- Task 32: review dispatched (journal-reviewer/sonnet)
+- Task 32: review (sonnet) — spec names/columns/rights match; Important: I1 textOf/shortOf/longOf turn an array/object/bool in a text field into '' silently (a save would erase text); I2 a plan row id of spaces passes as '' (new row). Probe: scratchpad/review32/probe.mjs.
+  - Task 32: minor (deferred → task 33 dispatch, same agent): M3 an all-empty unit item with `literature: []` gives `unit required` instead of being dropped; M4 a non-object list item gives bad_value without `field` and, in plan rows, two extra errors.
+  - Task 32: minor (deferred → task 36 dispatch): M5 duplicate non-empty ids in plan rows are not caught — task 36 must check or not assume unique ids.
+  - Task 32: minor (deferred → final review): M6 `https://` and `https://a b` pass the link check; M7 the error list is unbounded (200001 errors for 100000 empty rows).
+  - Ruling: empty-book contradiction is plan-mandated, kept as built; the task-41 dispatch says the form never sends empty unit books — none.
+- Task 32: fix round 1 dispatched to the same implementer (I1, I2)
+- Task 32: fix round 1 — implementer DONE, commit 216604d (scalar() for text fields → bad_value; plan row id empty only for undefined/null/''), 362/362. Controller accepted the tiny round itself (project rule): read the diff, npm test 362/362, build:gas ok, reviewer's probe review32/probe.mjs — arrays in title/goal give bad_value, a spaces id gives bad_value.
+- Task 32: fix round 1/5 (2 addressed, 0 open; commits b7e1b58..216604d)
+- Task 32: complete (commits e0391eb..216604d, review clean after round 1)
+- Task 33: dispatched (BASE 216604d, journal-logic/sonnet), carries task-32 minors M3, M4
+- Task 33: implementer DONE_WITH_CONCERNS, commit acd9e2e, 368/368, git status clean; M3, M4 fixed with tests (RED shown). Concerns: brief says both «unitTitle of an inserted row ''» and «unitTitle = the unit's title» — built the unit's title; no separate RED run for syllabusPlan (tests and code written together).
+  - Ruling: unitTitle = the unit's title — the column exists for the Excel round trip and the current page, an empty title would lose it — one line in planWrites if wrong.
+- Task 33: review dispatched (journal-reviewer/sonnet)
+- Task 33: review (sonnet) — Approved, 0 Critical, 0 Important. Probes review33/probe.mjs, probe2.mjs: unequal L/P, seminars, labs, mid-plan module, Kyrgyz kind words, manual order — no silent skip.
+  - Task 33: minor (deferred → task 34 dispatch): M1 a row with an unknown lessonKind silently drops out of autoOrder (and goes to `remove` in planWrites) — make it loud; M2 add a test: an inserted row in a unit with a title gets that title; M4 extra tests: more lectures than practices, manual order after a kind change, control mid-plan in docLessons.
+  - Task 33: carry to task 39 dispatch (M3): planWrites(..., true) on an empty `stored` gives the AUTO order (L1 P1 L2 M); an Excel upload must keep the FILE order (docLessons().rows in file order, manual order on) — say it in the task-39 dispatch and test «A, Mod, B» there.
+- Task 33: complete (commits 216604d..acd9e2e, review clean)
+- Task 34: dispatched (BASE acd9e2e, journal-logic/sonnet), carries task-33 minors M1, M2, M4
+- Task 34: implementer DONE, commit a639596, 377/377, build:gas ok, git status clean; M1 (unknown kind stays at the end of its unit; `unknown_kind` when its unit is gone), M2, M4 done with tests.
+  - Ruling: held lecture with all lecture hours removed but the name kept → `held_hours` (as before), not `held_missing` — the advice in the check window stays right — none.
+  - Ruling: syllabus.get half list and student.subjects hasSyllabus count approved versions only — follows from «pairs and students get the approved version» — none (tasks 40/43 add «обновляется»).
+  - Ruling: re-upload does not compare or erase controlForms (not in the file) — none.
+  - Note: do not start the stand on the old dev/data/db.json or dev:real before task 35 (old-style «Темы»).
+- Task 34: review dispatched (journal-reviewer/sonnet)
+- Task 34: review (sonnet) — Approved, 0 Critical, 0 Important. Probe review34/probe.mjs: draft/review/returned never reach pairs; a running pair keeps its topic; a two-semester clash file writes nothing.
+  - Task 34: carry to task 39 dispatch: M1 backend/subjectData.js:129 `otherSemester` counts any version (add status === 'approved'); M2 writePlan always sets version: 1 — task 39 must number after versionsOf(...).last.
+  - Task 34: minor (deferred → final review): M3 a hand-edited row of an unknown kind gives no lesson but counts in totals and a re-upload removes it silently; odd hours (1, 3) round down — only after manual sheet edits.
+- Task 34: complete (commits acd9e2e..a639596, review clean)
+- Task 35: dispatched (BASE a639596, journal-server/sonnet)
+- Task 35: implementer DONE, commit 980e7b3, 384/384, build:gas ok, git status clean, real.json and port 5273 untouched; new tests/devUpgrade.test.js (5 tests, RED = module not found). Deviations: an old «Темы» row with neither lecture nor practice becomes a 0-hour lecture (not dropped); `skipped` lists only rows of versions changed in this call.
+  - Ruling: both deviations accepted — a kept 0-hour row is visible, a dropped one would be a silent loss — the reviewer checks them.
+- Task 35: review dispatched (journal-reviewer/sonnet)
+- Task 35: review (sonnet) — Approved, 0 Critical, 0 Important. Probe review35/probe.mjs: split rows keep pair links and dates, copy written once, new-shape file untouched, broken files stay byte-identical, setup only appends.
+  - Task 35: carry to task 37 dispatch (same zone dev/): M1 a non-module row with 0/no hours becomes a 0-hour lecture silently — list such ids (`zeroHours`) in the report and the console line; M2 a module with practiceHours null gets hours null — use 0; M3 an empty/broken stand file throws a bare SyntaxError — say «файл X повреждён, перенос не сделан, файл не тронут».
+  - Task 35: minor (deferred → final review): M4 an existing truncated copy is not rewritten; M5 the file write is not atomic (copy exists, same as fileStore).
+  - Note: before the first `dev:real` start the controller reads the migration console line (counts, zeroHours).
+- Task 35: complete (commits a639596..980e7b3, review clean)
+- Task 36: dispatched (BASE 980e7b3, journal-logic/sonnet), carries task-32 M5 (duplicate plan row ids)
+- Task 36: implementer DONE_WITH_CONCERNS, commit 17b326f, 405/405, build:gas ok, git status clean. No separate RED run (tests written first, first run after the code). M5: planWrites already gives `duplicate` (also across kinds); sectionWrites('plan') passes it and writes nothing; tests added. Deviations: a unit is known if it is in «Юниты» or has topics; buildDoc plan.units runs 1..max with empty gaps; unit title only from «Юниты»; section `order` sets manualOrder even when unchanged; `unit_empty` only when the plan has lessons (else `empty`); rightsOn strict (roles array, teaches === true, non-empty viewer id).
+  - Ruling: deviations accepted for review — each keeps the doc and the saved section consistent; stand migration step 3 fills «Юниты» from unitTitle, so titles are not lost — reviewer checks.
+- Task 36: review dispatched (journal-reviewer/sonnet)
+- Task 36: review (sonnet) — rights probes all closed (arrays/spaces/odd roles, student, prorector, self-approve, dean who teaches approves, no edit in review/approved); copiesOf keeps a re-typed held topic, held_missing when removed. Important I1: a topic with an invalid `unit` (empty, 0, 'abc', 1.5, '2') is shown in doc.lessons but not in plan.units, and saving the plan section silently puts it into topics.remove (probe review36/t2.mjs).
+  - Ruling: I1 → fix round 1 to the same implementer: saving the plan section (and checkSubmit) gives a loud error `bad_unit` naming such rows and writes nothing — loudest and smallest; a hand-edited sheet needs the dean to fix the cell — none.
+  - Ruling (Minor 1): when the plan has no lessons at all, checkSubmit gives `empty` and no `unit_empty`; the task-42 dispatch says so to the screen — none.
+  - Task 36: carry to tasks 37/39 acceptance: server-side bypass tests (foreign syllabus, array/spaces ids, student asks a draft) must exist there.
+- Task 36: fix round 1 dispatched to the same implementer (I1)
+- Task 36: fix round 1 — implementer DONE, commit 8db22b0, 406/406. Controller accepted the tiny round itself: read the diff (sectionWrites('plan') fails with bad_unit before planWrites; checkSubmit flags lessons with a non-integer unit), npm test 406/406, build:gas ok, probe review36/t2.mjs — every bad value gives bad_unit, remove [].
+- Task 36: fix round 1/5 (1 addressed, 0 open; commits 17b326f..8db22b0)
+- Task 36: complete (commits 980e7b3..8db22b0, review clean after round 1)
+- Task 37: dispatched (BASE 8db22b0, journal-server/sonnet), carries task-35 M1-M3 (dev/upgrade.js) and the server bypass tests
+- Task 37: implementer DONE_WITH_CONCERNS, commit d98eb6a, 421/421, build:gas ok, git status clean; 13 tests in tests/syllabusDraftApi.test.js (bypass, speed, no write on error), task-35 M1-M3 done with 2 tests in devUpgrade.test.js (RED shown for those). Concerns: section `units` reads units+literature, and only on bad_ref reads «Темы» once more and retries (a unit without a «Юниты» row); saveSection for `order` returns doc = lessons; no RED run kept for the task-37 tests; ky/en texts of error.syllabus_locked are the agent's.
+  - Ruling: the units-section retry is accepted — «Темы» is still read at most once per request; the cleaner fix (plan section always writes a unit row) is left to the final review — none.
+  - Note for task 42 dispatch: saveSection('order') returns doc = the lessons list. Note for task 13: error.syllabus_locked (ky) goes to the native-reading list.
+- Task 37: review dispatched (journal-reviewer/sonnet)
+- Task 37: review (sonnet) — Approved, 0 Critical, 0 Important. Probes review37/t.mjs, t2.mjs: foreign teacher/student/prorector forbidden, locked versions refused, foreign topic id → bad_ref with no write, bad ids/sections/semester → bad_request, title injection blocked, no passwordHash, «Темы» read once even on the units retry.
+  - Task 37: note for tasks 41-42 dispatch: saveSection('order') returns doc = lessons list; `copyOfApproved` is true for the approved version itself too.
+  - Task 37: minor (deferred → final review): the plan section does not create a «Юниты» row for an untitled unit (root of the units retry) — clean fix in core/syllabusDoc.js.
+- Task 37: complete (commits 8db22b0..d98eb6a, review clean)
+- Task 38: dispatched (BASE d98eb6a, journal-server/sonnet)
+- Task 38: implementer DONE, commit b46f2e4, 430/430, build:gas ok, git status clean. Notes: no separate RED run; the third brief test filters the status check by discipline ds1 (shared ready() also has an Anatomy draft); syllabus.return checks types → rights → remark (a teacher with an empty remark gets forbidden); versionOf exported from backend/syllabusDraft.js.
+  - Ruling: rights-before-remark order accepted — never tell an outsider anything about the version — none.
+- Task 38: review dispatched (journal-reviewer/sonnet)
+- Task 38: review (sonnet) — Approved, 0 Critical, 0 Important. Probe review38/probe.mjs: no rights bypass; approve archives the old version, lays both groups, a running pair keeps its topic (topicId moved to the copy), held_missing blocks with identical snapshot, one read per sheet, one updateMany each for syllabi and pairs.
+  - Task 38: carry to task 39 dispatch: approveSyllabus reads «Настройки» after the first write — read settings before any write.
+  - Task 38: note (known limit, task 13 list): two versions «на утверждении» for one key (race of two «Заполнить») both stay in the queue; approving one leaves the other.
+- Task 38: complete (commits d98eb6a..b46f2e4, review clean)
+- Task 39: dispatched (BASE b46f2e4, journal-server/sonnet), carries task-33 M3 (file order), task-34 M1/M2, task-38 settings-before-write
+- Task 39: implementer DONE_WITH_CONCERNS, commit b98419a, 440/440, build:gas ok, git status clean, saveSyllabusDoc gone. Carried points 1-4 done with tests (2 and 4 shown red on revert). Concerns: the upload writes a «Юниты» row for every unit of the file, even untitled (the brief's «fewer units» test needs it; task-37 startDraft test adjusted); upload onto an approved version without a draft makes two insertMany on topics, a year file without approved versions two on syllabi; older tests changed with the behaviour (publish = upload+fill+approve, ' sb1 ' → bad_request, «only deanery» rewritten); 2 new ky texts → reading list.
+  - Ruling: all accepted — the unit row for every unit also closes the task-37 deferred minor (untitled unit retry) for uploaded files; two inserts on one sheet are two appendRows, still one read per sheet — none.
+- Task 39: review dispatched (journal-reviewer/sonnet)
+- Task 39: review (sonnet) — Approved, 0 Critical, 0 Important. Probes review39/probe*.mjs: rights refused (foreign, lost subject, student, prorector), in_review refuses the whole file with identical snapshot, file order kept (L+P, module, L+seminar, lab, Kyrgyz words), other sections untouched, approved version and pairs untouched until approve, download→upload→approve round trip loses nothing, held_missing creates no draft, one read per sheet. Changed old tests follow the new behaviour.
+  - Task 39: carry to task 40 dispatch: a test that an upload into a `returned` version works (same as draft) and keeps the remark.
+- Task 39: complete (commits b46f2e4..b98419a, review clean)
+- Task 40: dispatched (BASE b98419a, journal-server/sonnet)
+- Task 40: implementer DONE_WITH_CONCERNS, commit 3dfebad, 447/447, build:gas ok, git status clean; temp dev server: dean and teacher1 get the page, S1001 gets syllabus null + hidden true (Anatomy under review). Concerns: brief contradicts itself on `semesters` — kept objects {semester, planSemester} (old test and site need them), new test maps .semester; «every section» test checks what `fill` writes instead of goals ['знать МИС']; old summary test strips the 7 new keys; seed half 2 still via publishSyllabusDoc. Extra tests: upload into `returned` keeps the remark; draft/remark never reach a student.
+  - Ruling: semesters stay objects — the site already reads them and nothing gains from a format change — none. Other concerns accepted for review.
+- Task 40: review dispatched (journal-reviewer/sonnet)
+- Task 40: review (sonnet) — Approved, 0 Critical, 0 Important. Probes review40/probe.mjs, stand.mjs: a unique draft topic, department and remark never reach a student in any answer and any status; under review the student gets syllabus null + hidden; draft/returned → the approved one; prorector never sees a draft; teacher2 sees only approved; no passwordHash; one read per sheet; stand has every state with invented names.
+  - Task 40: minor (deferred → final review): the «every section» test checks `key in` instead of exactly 7 keys; the report's stand line about S1001/Anatomy says hidden true (it is false: nothing approved to hide — the code is right).
+- Task 40: complete (commits b98419a..3dfebad, review clean)
+- Task 41: dispatched (BASE 3dfebad, journal-screens/opus); stand on 5273 not running. After task 41: screenshots to the owner and STOP.
+- Task 41: implementer DONE_WITH_CONCERNS, commit 35e635d, 458/458, build:gas ok, git status clean, stand stopped (5273 free). 16 shots in task-41-shots. Deviations: site/js/shell.js touched (breadcrumbs); exports withoutBlankRows, PLAN_KINDS; screen exports keepsHold (main.js) so switching tabs of one form does not ask «leave?»; «СРС и описание» folded by default (plan > 5000 px otherwise); narrow shot at 375 px. 153 new ky keys → reading list (disputed: «ЛИ», «Долбоор», «Көндүмдөр»). The first stand did not stop with npm; the agent killed it by PID after checking it was dev/server.js.
+  - Ruling: deviations accepted for review — each serves the brief's behaviour — none.
+  - Controller viewed 01-титул-тёмная and 03-тематические-планы-тёмная: Nexus look, remark on top, tabs, units with tables by kind, totals — fine.
+- Task 41: review dispatched (journal-reviewer/sonnet); screenshots sent to the owner — STOP before task 42 until the owner answers.
+- Task 41: review (sonnet) — Approved, 0 Critical, 0 Important. No innerHTML/oklch/external URLs in the diff; 864 keys in ru/ky/en, same sets; empty rows never sent; save double-click guarded; tab switch keeps data; review version read-only.
+  - Task 41: carry to task 42 dispatch (same agent zone): M1 errorMap keeps only the first error without a place (several bad_unit → one name) — show the whole list; M2 «Не сохранено: исправьте…» stays after all marked fields are fixed; M3 error keys by row index are not re-mapped after delete/move — clear the section's errors on structural change; M4 isDirty via JSON.stringify depends on key order; M5 blank items removed from state before a failed save vanish from the screen.
+- Task 41: complete (commits 3dfebad..35e635d, review clean). Waiting for the owner's answer on the screenshots before task 42.
