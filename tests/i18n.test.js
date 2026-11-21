@@ -89,7 +89,16 @@ test('every code of the syllabus check has a text; the old texts of the syllabus
 });
 
 test('every directory that can be in use elsewhere explains why it cannot be removed', () => {
-  for (const table of ['groups', 'staff', 'subjects', 'rooms']) assert.ok(ru['dir.inUse.' + table], table);
+  for (const table of ['groups', 'staff', 'subjects', 'rooms', 'disciplines']) assert.ok(ru['dir.inUse.' + table], table);
+});
+
+test('the subjects screen and the disciplines directory have their texts; the subjects directory form is gone', () => {
+  for (const key of ['subjects.title', 'subjects.syllabus.none', 'subjects.add', 'dir.disciplines.hint', 'dir.inUse.disciplines', 'error.subjects.disciplineId.duplicate']) assert.ok(ru[key], key);
+  for (const dict of [ru, ky, en]) for (const gone of ['dir.subjects.add', 'dir.subjects.new', 'error.subjects.name.duplicate']) assert.equal(gone in dict, false, gone);
+  for (const key of ['dir.disciplines.add', 'dir.disciplines.new', 'error.disciplines.name.duplicate', 'error.subjects.disciplineId.bad_ref', 'error.subjects.disciplineId.in_use',
+    'subjects.hint', 'subjects.lead', 'subjects.syllabus.uploaded', 'subjects.syllabus.other', 'subjects.pairsDiffer', 'subjects.empty', 'subjects.edit.saved']) assert.ok(ru[key], key);
+  assert.equal(ru['subjects.col.syllabus'], 'Силлабус ({n} семестр)');
+  assert.equal(ru['syllabus.check.renamed'], 'Переименованная тема считается новой: даты её пар сохранятся.');
 });
 
 test('a subject whose group cannot be changed has its own error text in every language', () => {

@@ -77,6 +77,14 @@ test('resolveRoute: the syllabus page of a subject needs syllabus.get; the topic
   }
 });
 
+test('resolveRoute: «Предметы» of the deanery is a screen of its own; «Дисциплины» is a directory, subjects are not', () => {
+  const office = { mustChangePassword: false, permissions: ['subjects.overview', 'dir.list:subjects', 'dir.list:disciplines'] };
+  assert.deepEqual(resolveRoute('#/subjects', office), { view: 'subjects', params: {} });
+  assert.equal(resolveRoute('#/dir/subjects', office).view, 'home');
+  assert.deepEqual(resolveRoute('#/dir/disciplines', office), { view: 'directory', params: { table: 'disciplines' } });
+  assert.equal(resolveRoute('#/subjects', { mustChangePassword: false, permissions: ['teacher.mySubjects'] }).view, 'home');
+});
+
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {
   assert.deepEqual(resolveRoute('', dean), { view: 'home', params: {} });
   assert.equal(resolveRoute('#/dir/groups', { mustChangePassword: false }).view, 'home');

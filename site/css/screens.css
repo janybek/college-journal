@@ -1043,13 +1043,13 @@
 
 .week-toolbar > .field { flex: 0 1 10rem; }
 
-/* The colour of a subject: the tones of the initials avatars. */
-.legend__item[data-tone="0"], .lesson[data-tone="0"], .pair[data-tone="0"] { --lesson: var(--tone-0); --lesson-bg: var(--tone-0-bg); }
-.legend__item[data-tone="1"], .lesson[data-tone="1"], .pair[data-tone="1"] { --lesson: var(--tone-1); --lesson-bg: var(--tone-1-bg); }
-.legend__item[data-tone="2"], .lesson[data-tone="2"], .pair[data-tone="2"] { --lesson: var(--tone-2); --lesson-bg: var(--tone-2-bg); }
-.legend__item[data-tone="3"], .lesson[data-tone="3"], .pair[data-tone="3"] { --lesson: var(--tone-3); --lesson-bg: var(--tone-3-bg); }
-.legend__item[data-tone="4"], .lesson[data-tone="4"], .pair[data-tone="4"] { --lesson: var(--tone-4); --lesson-bg: var(--tone-4-bg); }
-.legend__item[data-tone="5"], .lesson[data-tone="5"], .pair[data-tone="5"] { --lesson: var(--tone-5); --lesson-bg: var(--tone-5-bg); }
+/* The colour of a subject (and of a discipline on «Предметы»): the tones of the initials avatars. */
+.legend__item[data-tone="0"], .lesson[data-tone="0"], .pair[data-tone="0"], .discipline[data-tone="0"] { --lesson: var(--tone-0); --lesson-bg: var(--tone-0-bg); }
+.legend__item[data-tone="1"], .lesson[data-tone="1"], .pair[data-tone="1"], .discipline[data-tone="1"] { --lesson: var(--tone-1); --lesson-bg: var(--tone-1-bg); }
+.legend__item[data-tone="2"], .lesson[data-tone="2"], .pair[data-tone="2"], .discipline[data-tone="2"] { --lesson: var(--tone-2); --lesson-bg: var(--tone-2-bg); }
+.legend__item[data-tone="3"], .lesson[data-tone="3"], .pair[data-tone="3"], .discipline[data-tone="3"] { --lesson: var(--tone-3); --lesson-bg: var(--tone-3-bg); }
+.legend__item[data-tone="4"], .lesson[data-tone="4"], .pair[data-tone="4"], .discipline[data-tone="4"] { --lesson: var(--tone-4); --lesson-bg: var(--tone-4-bg); }
+.legend__item[data-tone="5"], .lesson[data-tone="5"], .pair[data-tone="5"], .discipline[data-tone="5"] { --lesson: var(--tone-5); --lesson-bg: var(--tone-5-bg); }
 
 /* Each subject of the group and how many pairs it has a week; a subject not in the week yet is dashed. */
 .legend {
@@ -2536,6 +2536,381 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   .week-nav { margin-left: 0; }
 
   .schedule-day__label { margin-left: 0; }
+}
+
+/* Screens: «Предметы» of the deanery — a discipline once, its teachers in the rows beside it; each group a chip that
+   opens it; the syllabus of the teacher as a status. A discipline carries the colour its pairs have in the schedule. */
+
+.subjects-table { min-width: 34rem; }
+
+/* The discipline spans the rows of its teachers; a stronger rule starts the next discipline. */
+.subjects-table .subjects-block + .subjects-block { border-top: 1px solid var(--border-strong); }
+
+.table.subjects-table th.subjects-table__discipline {
+  width: 17%;
+  height: auto;
+  padding: calc(var(--space-3) + 0.4rem) var(--space-2) var(--space-3) var(--space-4);
+  border-bottom: 0;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: normal;
+  vertical-align: top;
+}
+
+.subjects-table .subjects-table__discipline-col { width: 17%; }
+
+/* Room for three groups side by side, and for the line under one of them. */
+.subjects-table .subjects-table__groups { min-width: 8rem; }
+
+/* The teacher's cell is the first of a row only under the first teacher: the same inset under every one. */
+.table.subjects-table td.subjects-table__teacher { padding-left: var(--space-2); }
+
+.subjects-table .person { min-width: 0; }
+
+/* The row just added or given another teacher: the primary bar on the teacher, where the row begins. */
+.table.subjects-table tr.is-fresh td.subjects-table__teacher { box-shadow: inset 3px 0 0 var(--primary); }
+
+.discipline {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.discipline__swatch {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 3px;
+  background: var(--lesson, var(--primary));
+  box-shadow: 0 0 0 3px var(--lesson-bg, var(--primary-wash));
+}
+
+/* The groups of a row: a chip each, then a line for each group whose schedule differs from the plan. */
+.groups {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.group-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.group-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3125rem;
+  min-height: 1.75rem;
+  padding: 0 0.625rem;
+  border: 1px solid var(--primary-line);
+  border-radius: 999px;
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+
+button.group-chip {
+  cursor: pointer;
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+}
+
+button.group-chip:hover {
+  border-color: var(--primary);
+  background: var(--accent);
+}
+
+.group-chip__icon {
+  width: 0.8125rem;
+  height: 0.8125rem;
+  opacity: 0.5;
+  transition: opacity 0.15s ease-out;
+}
+
+button.group-chip:hover .group-chip__icon,
+button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
+
+.group-chip--small {
+  min-height: 1.375rem;
+  padding: 0 var(--space-2);
+  font-size: 0.75rem;
+}
+
+.groups__note {
+  color: var(--warning);
+  font-size: 0.75rem;
+  line-height: 1.35;
+}
+
+.groups__note-group {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.syllabus-state {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+}
+
+.syllabus-state__actions .button {
+  padding-inline: var(--space-3);
+  white-space: nowrap;
+}
+
+.syllabus-state__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.syllabus-state__open {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.125rem;
+  border-radius: 6px;
+  color: var(--primary-ink);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.syllabus-state__open:hover { text-decoration: underline; }
+
+.syllabus-state__open .icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.reload-failed {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.reload-failed > .note { flex: 1 1 18rem; }
+
+/* «Добавить предмет»: the steps of the window, the discipline, the rows «группа — преподаватель». */
+.dialog--subject { width: min(calc(100% - 2rem), 38rem); }
+
+.stepper {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: calc(-1 * var(--space-2));
+}
+
+.stepper__step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-weight: 500;
+}
+
+/* The line that joins the two steps. */
+.stepper__step + .stepper__step::before {
+  content: "";
+  width: 1.75rem;
+  height: 1px;
+  background: var(--border-strong);
+}
+
+.stepper__number {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.stepper__number .icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  stroke-width: 2.25;
+}
+
+.stepper__step.is-current { color: var(--text); }
+
+.stepper__step.is-current .stepper__number {
+  border-color: var(--primary-fill);
+  background: var(--primary-fill);
+  color: var(--on-primary);
+}
+
+.stepper__step.is-done .stepper__number {
+  border-color: var(--success-line);
+  background: var(--success-wash);
+  color: var(--success);
+}
+
+.pick-discipline {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.field-link {
+  justify-self: start;
+  border-radius: 4px;
+  color: var(--primary-ink);
+  font-size: var(--hint-fs);
+  font-weight: 500;
+  text-decoration: underline;
+  text-decoration-color: var(--primary-line);
+  text-underline-offset: 0.2em;
+}
+
+.field-link:hover { text-decoration-color: currentColor; }
+
+.pick {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pick__rows {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.pick__head,
+.pick-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) var(--control-h);
+  gap: var(--space-2);
+  align-items: start;
+}
+
+.pick__head {
+  font-size: var(--control-fs);
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* A row's cross sits in the third column; a lone row keeps the column empty. */
+.pick-row__remove { grid-column: 3; }
+
+/* «Ещё группа»: the place of the next row, drawn dashed. */
+.pick-more {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: calc(100% - var(--control-h) - var(--space-2));
+  min-height: var(--control-h);
+  padding: var(--space-1) var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--control-fs);
+  font-weight: 500;
+}
+
+.pick-more .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.pick-more:hover:not(:disabled) {
+  border-color: var(--primary);
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+}
+
+.pick-more:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Step 2: the discipline on top, each teacher with their groups, the state of the syllabus and its buttons. */
+.added {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+}
+
+.added__head {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  background: var(--muted);
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.added__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+}
+
+.added__item + .added__item { border-top: 1px solid var(--border); }
+
+.added__item .person { min-width: 0; }
+
+.added__groups {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-top: 0.25rem;
+}
+
+.added__side {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+}
+
+.added__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+/* The check window of a syllabus file: a file that adds and removes rows says what happens to a renamed topic. */
+.check-renamed {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--primary-ink);
+  font-size: var(--hint-fs);
+  line-height: 1.4;
+}
+
+.check-renamed__icon {
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.1em;
+}
+
+/* A window beside the sidebar that is short of room (up to 1200 px): the table drops the initials, not a column. */
+@media (min-width: 900px) and (max-width: 75rem) {
+  .subjects-table .person .avatar { display: none; }
+}
+
+@media (max-width: 36rem) {
+  .added__side { justify-items: start; }
+
+  .added__buttons { justify-content: flex-start; }
 }
 
 /* Print: black on white in either theme. The passwords of an import print alone, as strips to cut apart

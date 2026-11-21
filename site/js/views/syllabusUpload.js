@@ -14,7 +14,7 @@ import { dayMonth } from './pairParts.js';
 // the check window: whose syllabus it is, what each semester holds and what it changes, remarks, errors with their
 // sheet and Excel row. «Загрузить» is there only when the file has no errors; nothing is written before it.
 // The host screen draws the window by calling renderUpload(root) at the end of its render, and leaveUpload() when
-// it is left.
+// it is left. Two screens host it: the syllabus page and the deanery's «Предметы» (from its table and its add window).
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_ERRORS_SHOWN = 200;
@@ -32,6 +32,11 @@ let picker = null;
 
 export function leaveUpload() {
   state = blank();
+}
+
+// «Силлабус загружен.» belongs to the page it was uploaded on: another semester or group of the page drops it.
+export function forgetUploadNote() {
+  state.done = null;
 }
 
 // The buttons for the head of the syllabus page. view: the answer of syllabus.get; onDone(): read it again.
@@ -68,6 +73,11 @@ function helpPanel() {
 }
 
 async function download(view) {
+  // A file taken now is the newest word on this syllabus; the note about the upload before it is history.
+  if (state.done !== null) {
+    state.done = null;
+    refresh();
+  }
   let XLSX;
   try {
     XLSX = await loadXlsx();
@@ -84,14 +94,16 @@ async function download(view) {
 }
 
 // Choose a file and check it. subject: { subjectId, disciplineName, teacherName, groupNames }; onDone(): after the upload.
-export function startUpload(subject, onDone) {
+// returnId: the button (or ids to try in turn) focus goes back to when the window closes; a screen with several
+// upload buttons names its own.
+export function startUpload(subject, onDone, returnId = 'syllabus-upload') {
   if (state.check) return;
   if (!picker) {
     picker = el('input', { type: 'file', accept: '.xlsx,.xls', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true' });
     document.body.append(picker);
   }
   picker.value = '';
-  picker.onchange = () => { if (picker.files[0]) readFile(subject, onDone, picker.files[0]); };
+  picker.onchange = () => { if (picker.files[0]) readFile(subject, onDone, returnId, picker.files[0]); };
   picker.click();
 }
 
@@ -101,9 +113,9 @@ export function renderUpload(root) {
 
 // Reading the file
 
-async function readFile(subject, onDone, file) {
+async function readFile(subject, onDone, returnId, file) {
   const check = {
-    subject, onDone, file: { name: file.name, size: file.size },
+    subject, onDone, returnId, file: { name: file.name, size: file.size },
     phase: 'reading',      // reading | checking | shown | failed (the file was not read or not checked)
     sheets: null,          // [{ name, cells, firstRow }] as sent
     fileError: null,       // { key, params }: the site did not send the file
@@ -180,7 +192,7 @@ async function apply(check) {
       state.done = check.subject.subjectId;
       check.onDone();
       refresh();
-      focusById('syllabus-upload');
+      focusById(...[check.returnId].flat());
       return;
     }
     // Someone changed the syllabus or its pairs since the check: the window shows why the file is refused now.
@@ -197,7 +209,7 @@ function close(check) {
   if (state.check !== check) return;
   state.check = null;
   refresh();
-  focusById('syllabus-upload');
+  focusById(...[check.returnId].flat());
 }
 
 // The check window
@@ -241,16 +253,19 @@ function actions(check, ready, closeDialog) {
   return [closing, upload];
 }
 
-// Each semester of the file: what it holds, and whether it is new or replaces the uploaded one.
+// Each semester of the file: what it holds, and whether it is new or replaces the uploaded one. When a file both adds
+// and removes rows, a renamed topic is among them: one line says what happens to it.
 function summaries(list) {
-  return el('ul', { class: 'check-semesters' }, list.map((s) => el('li', { class: 'check-semester' },
+  const renamed = list.some((s) => s.replaces && s.added > 0 && s.removed > 0);
+  return [el('ul', { class: 'check-semesters' }, list.map((s) => el('li', { class: 'check-semester' },
     el('p', { class: 'check-semester__figures' }, t('syllabus.check.summary', {
       semester: s.planSemester, topics: s.topics, units: s.units, lecture: s.lectureHours,
       practice: s.practiceHours + s.controlHours, pairs: tCount('syllabus.pairsCount', s.pairs),
     })),
     el('p', { class: 'check-semester__change' + (s.replaces ? '' : ' is-first') }, s.replaces
       ? t('syllabus.check.replace', { added: s.added, changed: s.changed, removed: s.removed })
-      : t('syllabus.check.first')))));
+      : t('syllabus.check.first'))))),
+  renamed ? el('p', { class: 'check-renamed' }, icon('info', 'check-renamed__icon'), el('span', {}, t('syllabus.check.renamed'))) : null];
 }
 
 function warnings(answer) {

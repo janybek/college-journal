@@ -2,7 +2,8 @@
 // so tests can read it in Node.
 
 // Directories in menu order.
-export const DIR_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms'];
+// Subjects have a screen of their own (#/subjects): a discipline is picked from «Дисциплины», never typed.
+export const DIR_TABLES = ['groups', 'students', 'staff', 'disciplines', 'rooms'];
 
 // Import choices in the order they should be filled: a list can only refer to directories loaded before it.
 export const IMPORT_TABLES = ['groups', 'rooms', 'staff', 'students', 'disciplines', 'subjects', 'topics'];
@@ -63,10 +64,6 @@ export const DIRECTORIES = {
     columns: ['fullName', 'login', 'roles', 'lang'],
     form: ['fullName', 'login', 'roles', 'lang', 'active'],
   },
-  subjects: {
-    label: 'name', refs: ['staff', 'groups'],
-    columns: ['name', 'teacherId', 'groupId'],
-    form: ['name', 'teacherId', 'groupId'],
-  },
+  disciplines: { label: 'name', columns: ['name'], form: ['name'], refs: [] },
   rooms: { label: 'name', columns: ['name'], form: ['name'], refs: [] },
 };

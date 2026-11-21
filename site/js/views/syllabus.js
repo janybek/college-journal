@@ -6,7 +6,7 @@ import { icon } from '../icons.js';
 import { activeRole, menuParts } from '../shell.js';
 import { shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes } from '../syllabus.js';
 import { lessonTypeKey } from '../pairs.js';
-import { uploadControls, renderUpload, leaveUpload } from './syllabusUpload.js';
+import { uploadControls, renderUpload, leaveUpload, forgetUploadNote } from './syllabusUpload.js';
 
 // The syllabus of a subject (#/syllabus/<subjectId>, #/syllabus/<subjectId>/<1|2>), the same page for the deanery,
 // the teacher and the student; nothing is edited on the page itself. The staff download the file (the template
@@ -42,7 +42,10 @@ export function render(root, params) {
   const { subjectId, semester = null } = params;
   const user = getUser();
   const key = subjectId + '|' + (semester ?? '');
-  if (state.key !== key) Object.assign(state, { key, errorKey: null, errorCode: null });
+  if (state.key !== key) {
+    Object.assign(state, { key, errorKey: null, errorCode: null });
+    forgetUploadNote();
+  }
   if (state.shownKey !== key && state.loadingKey !== key && state.errorKey === null) load(state, subjectId, semester);
 
   root.append(backLink(user), body(user, key, semester));

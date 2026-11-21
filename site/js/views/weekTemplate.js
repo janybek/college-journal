@@ -452,7 +452,7 @@ function cellDialog(d) {
       el('h2', { class: 'dialog__title', id: 'template-dialog-title' }, t('template.newPair')),
       note('info', t('template.noSubjects', { group: group.name })),
       el('div', { class: 'dialog__actions' },
-        can('dir.list:subjects') ? el('a', { class: 'button button--secondary', href: '#/dir/subjects' }, icon('book'), t('dir.subjects')) : null,
+        can('subjects.overview') ? el('a', { class: 'button button--secondary', href: '#/subjects' }, icon('book'), t('subjects.title')) : null,
         el('button', { type: 'button', class: 'button button--primary', onclick: () => close(dialog) }, t('common.close'))));
     return dialog;
   }

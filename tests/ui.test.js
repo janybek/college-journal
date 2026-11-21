@@ -44,7 +44,7 @@ const outline = (groups) => groups.map((group) => [group.titleKey, group.items.m
 test('navFor: the office roles see the directories they may list and the import screen', () => {
   assert.deepEqual(outline(navFor(DEAN, 'dean')), [
     [null, ['home']],
-    ['home.directories', ['groups', 'students', 'staff', 'subjects', 'rooms']],
+    ['home.directories', ['groups', 'students', 'staff', 'rooms']],
     ['nav.data', ['import']],
   ]);
   assert.deepEqual(outline(navFor(['dir.list:groups', 'dir.list:rooms'], 'prorector')), [
@@ -60,7 +60,7 @@ test('navFor: the office roles with settings.get get a schedule group between ho
   assert.deepEqual(outline(navFor([...DEAN, 'settings.get'], 'dean')), [
     [null, ['home']],
     ['nav.schedule', ['settings']],
-    ['home.directories', ['groups', 'students', 'staff', 'subjects', 'rooms']],
+    ['home.directories', ['groups', 'students', 'staff', 'rooms']],
     ['nav.data', ['import']],
   ]);
   assert.deepEqual(navFor([...DEAN, 'settings.get'], 'dean')[1].items[0],
@@ -74,6 +74,15 @@ test('navFor: the week template comes before the settings in the schedule group'
   assert.deepEqual(navFor([...DEAN, 'settings.get', 'dir.list:weekTemplate'], 'dean')[1].items[0],
     { name: 'weekTemplate', href: '#/template', textKey: 'template.title', icon: 'grid', hintKey: 'template.hint' });
   assert.deepEqual(outline(navFor([...DEAN, 'dir.list:weekTemplate'], 'dean'))[1], ['nav.schedule', ['weekTemplate']]);
+});
+
+test('navFor: «Предметы» of the deanery is in the schedule group, «Дисциплины» in the directories, subjects are no directory', () => {
+  const nav = navFor(['schedule.list', 'dir.list:weekTemplate', 'subjects.overview', 'settings.get', 'dir.list:groups', 'dir.list:disciplines', 'dir.list:subjects'], 'dean');
+  assert.deepEqual(nav.find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['schedule', 'weekTemplate', 'subjects', 'settings']);
+  assert.deepEqual(nav.find((g) => g.titleKey === 'home.directories').items.map((i) => i.name), ['groups', 'disciplines']);
+  assert.deepEqual(nav.find((g) => g.titleKey === 'nav.schedule').items[2],
+    { name: 'subjects', href: '#/subjects', textKey: 'subjects.title', icon: 'book', hintKey: 'subjects.hint' });
+  assert.equal(navFor(['subjects.overview'], 'teacher').flatMap((g) => g.items).some((i) => i.name === 'subjects'), false);
 });
 
 test('navFor: the deanery menu has no «Темы» any more', () => {

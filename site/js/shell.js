@@ -9,7 +9,7 @@ import { DIR_TABLES } from './views/directoryConfig.js';
 // with a sidebar (a drawer on narrow screens) and a top bar. The server checks every right itself; the
 // navigation only leaves out what the person's `permissions` do not allow.
 
-const DIR_ICONS = { groups: 'layers', students: 'cap', staff: 'briefcase', subjects: 'book', rooms: 'door' };
+const DIR_ICONS = { groups: 'layers', students: 'cap', staff: 'briefcase', disciplines: 'list', rooms: 'door' };
 // Menu parts each staff role works with; inside a part only what `permissions` allow is shown.
 const MENU_BY_ROLE = new Map([['admin', ['office']], ['dean', ['office']], ['prorector', ['office']], ['teacher', ['subjects']]]);
 const HOME = { name: 'home', href: '#/', textKey: 'nav.home', icon: 'home' };
@@ -51,6 +51,9 @@ export function navFor(permissionList, role) {
   }
   if (list.includes('dir.list:weekTemplate')) {
     schedule.push({ name: 'weekTemplate', href: '#/template', textKey: 'template.title', icon: 'grid', hintKey: 'template.hint' });
+  }
+  if (list.includes('subjects.overview')) {
+    schedule.push({ name: 'subjects', href: '#/subjects', textKey: 'subjects.title', icon: 'book', hintKey: 'subjects.hint' });
   }
   if (list.includes('settings.get')) {
     schedule.push({ name: 'settings', href: '#/settings', textKey: 'settings.title', icon: 'settings', hintKey: 'settings.hint' });
@@ -243,6 +246,7 @@ function crumbs(groups, view, params, current, role) {
     else if (view === 'schedule') [groupKey, pageKey] = ['nav.schedule', 'schedule.title'];
     else if (view === 'settings') [groupKey, pageKey] = ['nav.schedule', 'settings.title'];
     else if (view === 'weekTemplate') [groupKey, pageKey] = ['nav.schedule', 'template.title'];
+    else if (view === 'subjects') [groupKey, pageKey] = ['nav.schedule', 'subjects.title'];
     else if (view === 'mySchedule') [groupKey, pageKey] = ['nav.teaching', 'my.title'];
     else pageKey = 'nav.home';
   }
