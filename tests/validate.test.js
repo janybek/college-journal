@@ -130,3 +130,11 @@ test('topics: semester', () => {
   assert.deepEqual(topic({ semester: 3 }), [{ field: 'semester', code: 'bad_value' }]);
   assert.deepEqual(topic({ semester: 0, order: 1 }), [{ field: 'semester', code: 'bad_value' }]);
 });
+
+test('disciplines rules', () => {
+  const ddb = { disciplines: [{ id: 'ds_1', name: 'Информатика' }] };
+  assert.deepEqual(validateRow('disciplines', { name: '' }, ddb), [{ field: 'name', code: 'required' }]);
+  assert.deepEqual(validateRow('disciplines', { name: ' информатика ' }, ddb), [{ field: 'name', code: 'duplicate' }]);
+  assert.deepEqual(validateRow('disciplines', { id: 'ds_1', name: 'Информатика и ИТ' }, ddb), []);
+  assert.deepEqual(validateRow('disciplines', { name: 'x'.repeat(201) }, ddb), [{ field: 'name', code: 'too_long' }]);
+});

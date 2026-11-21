@@ -128,7 +128,7 @@ test('too many rows', () => {
 test('duplicate header and specs', () => {
   const r = parseSheet('rooms', [['Название', 'Name', ''], ['101', 'x', '']], makeDb());
   assert.deepEqual(r.unknownColumns, ['Name']);
-  assert.deepEqual(Object.keys(IMPORT_SPECS).sort(), ['groups', 'rooms', 'staff', 'students', 'subjects', 'syllabus', 'topics']);
+  assert.deepEqual(Object.keys(IMPORT_SPECS).sort(), ['disciplines', 'groups', 'rooms', 'staff', 'students', 'subjects', 'syllabus', 'topics']);
 });
 
 const topicsDb = () => ({
@@ -237,4 +237,11 @@ test('syllabus import: the fixed subject is checked; semester text is read as a 
   const text = parseSheet('syllabus', [rows[0], ['01', 1, 1, 'Цифровой пост медсестры', 'лекция']], db, { subjectId: 'sb_1' });
   assert.deepEqual(text.errors, []);
   assert.deepEqual(planImport('syllabus', text.records, db).toUpdate.map(u => u.id), ['tp_1']);
+});
+
+test('disciplines import', () => {
+  const ddb = { disciplines: [{ id: 'ds_1', name: 'Информатика' }] };
+  const d = parseSheet('disciplines', [['Название'], ['Анатомия'], ['информатика'], ['']], ddb);
+  assert.deepEqual([d.errors, d.records], [[], [{ row: 2, name: 'Анатомия' }, { row: 3, name: 'информатика' }]]);
+  assert.deepEqual([planImport('disciplines', d.records, ddb).toInsert.length, planImport('disciplines', d.records, ddb).toUpdate.map(u => u.id)], [1, ['ds_1']]);
 });

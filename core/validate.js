@@ -124,6 +124,12 @@ const RULES = {
     });
     field('groupId', () => { if (!exists(db.groups, row.groupId)) return 'bad_ref'; });
   },
+  disciplines(row, db, field) {
+    field('name', () => {
+      if (!clean(row.name)) return 'required';
+      if (taken(db.disciplines, 'name', row.name, row.id)) return 'duplicate';
+    });
+  },
   rooms(row, db, field) {
     field('name', () => {
       if (!clean(row.name)) return 'required';

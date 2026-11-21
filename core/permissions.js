@@ -1,7 +1,7 @@
 // Permission matrix. Pure data plus lookups; roles come from the user's row.
 
-const ALL_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms'];
-const DEAN_TABLES = ['groups', 'students', 'subjects', 'rooms'];
+const ALL_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms'];
+const DEAN_TABLES = ['groups', 'students', 'disciplines', 'subjects', 'rooms'];
 const SCHEDULE_TABLES = ['weekTemplate', 'topics'];
 const LIST_TABLES = [...ALL_TABLES, ...SCHEDULE_TABLES];
 const DEAN_EDIT_TABLES = [...DEAN_TABLES, ...SCHEDULE_TABLES];
@@ -21,6 +21,8 @@ const ROLE_ACTIONS = {
   'import.preview': { admin: IMPORT_TABLES, dean: DEAN_IMPORT_TABLES },
   'import.apply': { admin: IMPORT_TABLES, dean: DEAN_IMPORT_TABLES },
   'dir.resetPassword': { admin: ['students', 'staff'], dean: ['students'] },
+  'subjects.add': { admin: true, dean: true },
+  'subjects.overview': { admin: true, dean: true, prorector: true },
   'teacher.mySubjects': { teacher: true },
   'settings.get': { admin: true, dean: true, prorector: true },
   'settings.save': { admin: true, dean: true },

@@ -82,3 +82,9 @@ test('teacher edits topics and the syllabus of own subjects', () => {
   assert.deepEqual(listPermissions(['teacher']),
     ['dir.remove:topics', 'dir.save:topics', 'schedule.mine', 'syllabus.apply', 'syllabus.preview', 'teacher.mySubjects', 'topics.plan']);
 });
+
+test('disciplines and subjects actions', () => {
+  assert.deepEqual([can(['dean'], 'dir.save', 'disciplines'), can(['prorector'], 'dir.list', 'disciplines'), can(['prorector'], 'dir.save', 'disciplines'),
+    can(['teacher'], 'dir.list', 'disciplines'), can(['dean'], 'import.apply', 'disciplines')], [true, true, false, false, true]);
+  assert.deepEqual([can(['dean'], 'subjects.add'), can(['prorector'], 'subjects.add'), can(['prorector'], 'subjects.overview'), can(['teacher'], 'subjects.overview')], [true, false, true, false]);
+});

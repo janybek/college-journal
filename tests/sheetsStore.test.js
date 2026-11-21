@@ -86,7 +86,7 @@ test('ensureSheets: creates sheets, adds missing columns, is repeatable', () => 
   const ss = createFakeSpreadsheet({ 'Группы': [['id', 'название']] });
   const made = ensureSheets(SCHEMA, ss);
   assert.deepEqual(made.addedColumns, ['Группы.курс']);
-  assert.equal(made.created.length, 9);
+  assert.equal(made.created.length, 10);
   assert.deepEqual(ss.dump('Группы')[0], ['id', 'название', 'курс']);
   assert.deepEqual(ss.dump('Аудитории')[0], ['id', 'название']);
   assert.deepEqual(ensureSheets(SCHEMA, ss), { created: [], addedColumns: [] });

@@ -5,7 +5,7 @@
 export const DIR_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms'];
 
 // Import choices in the order they should be filled: a list can only refer to directories loaded before it.
-export const IMPORT_TABLES = ['groups', 'rooms', 'staff', 'students', 'subjects', 'topics'];
+export const IMPORT_TABLES = ['groups', 'rooms', 'staff', 'students', 'disciplines', 'subjects', 'topics'];
 
 export const STAFF_ROLES = ['admin', 'dean', 'prorector', 'teacher'];
 
@@ -18,6 +18,7 @@ export const IMPORT_COLUMNS = {
   rooms: [col('name', true)],
   students: [col('fullName', true), col('cardNo', true), col('groupId', true), col('lang', false)],
   staff: [col('fullName', true), col('login', true), col('roles', true), col('lang', false)],
+  disciplines: [col('name', true)],
   subjects: [col('name', true), col('teacherId', true), col('groupId', true)],
   topics: [col('subjectId', true), col('groupId', true), col('semester', true), col('unit', true), col('order', true), col('name', true), col('lessonType', true)],
   // The teacher's own file of a subject: the subject is chosen on the screen, not named in the file.

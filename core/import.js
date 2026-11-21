@@ -33,6 +33,7 @@ function topicHeld(existing, candidate, db) {
 export const IMPORT_SPECS = {
   groups: { uniqueBy: ['name'], columns: [NAME, column('course', 'Курс', 'Курс', 'Year', true)] },
   rooms: { uniqueBy: ['name'], columns: [NAME] },
+  disciplines: { uniqueBy: ['name'], columns: [NAME] },
   students: {
     uniqueBy: ['cardNo'],
     columns: [

@@ -30,11 +30,15 @@ export const SCHEMA = {
       col('mustChangePassword', 'сменить пароль', 'bool'), col('active', 'активен', 'bool'),
     ],
   },
+  disciplines: {
+    sheet: 'Дисциплины', prefix: 'ds',
+    columns: [col('id', 'id'), col('name', 'название')],
+  },
   subjects: {
     sheet: 'Предметы', prefix: 'sb',
     columns: [
       col('id', 'id'), col('name', 'название'), col('teacherId', 'преподаватель'),
-      col('groupId', 'группа'), col('scheme', 'схема оценивания'),
+      col('groupId', 'группа'), col('scheme', 'схема оценивания'), col('disciplineId', 'дисциплина'),
     ],
   },
   rooms: {
