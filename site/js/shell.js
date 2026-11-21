@@ -162,7 +162,6 @@ function studentFrame(main, { onLang, onLogout }) {
 // teacher's «Мои предметы» (their home).
 function currentName(view, params, role) {
   if (view === 'directory') return params.table;
-  if (view === 'import' && params.subjectId) return 'topics';
   if (view === 'syllabus') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;
 }
@@ -232,8 +231,6 @@ function crumbs(groups, view, params, current, role) {
   // The syllabus of a subject: under «Расписание» for the deanery, under the teacher's own subjects otherwise.
   if (view === 'syllabus') {
     [groupKey, pageKey] = [menuParts(role).includes('office') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
-  } else if (view === 'import' && params.subjectId) {
-    [groupKey, pageKey] = [permissions().includes('dir.list:topics') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
   } else {
     for (const group of groups) {
       const item = group.items.find((candidate) => candidate.name === current);

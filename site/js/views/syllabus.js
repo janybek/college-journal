@@ -6,11 +6,14 @@ import { icon } from '../icons.js';
 import { activeRole, menuParts } from '../shell.js';
 import { shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes } from '../syllabus.js';
 import { lessonTypeKey } from '../pairs.js';
+import { uploadControls, renderUpload, leaveUpload } from './syllabusUpload.js';
 
 // The syllabus of a subject (#/syllabus/<subjectId>, #/syllabus/<subjectId>/<1|2>), the same page for the deanery,
-// the teacher and the student; nothing is edited here. The syllabus belongs to the discipline and the teacher, so
-// a teacher of several groups switches between them and only the dates change. The plan goes in the order of the
-// pairs: rows grouped by unit, the module (рубежный контроль) closing a unit stands out, the last row sums it up.
+// the teacher and the student; nothing is edited on the page itself. The staff download the file (the template
+// while there is no syllabus), the deanery uploads it (syllabusUpload.js). The syllabus belongs to the discipline
+// and the teacher, so a teacher of several groups switches between them and only the dates change. The plan goes
+// in the order of the pairs: rows grouped by unit, the module (рубежный контроль) closing a unit stands out, the
+// last row sums it up.
 // On a narrow screen the same table reads as a list: a row is the topic, its hours and its dates under it.
 // The server decides who may see what; `forbidden` and `not_found` are explained with a way back.
 
@@ -32,6 +35,7 @@ const present = (value) => value !== null && value !== undefined && value !== ''
 
 export function leave() {
   state = blank();
+  leaveUpload();
 }
 
 export function render(root, params) {
@@ -41,19 +45,22 @@ export function render(root, params) {
   if (state.key !== key) Object.assign(state, { key, errorKey: null, errorCode: null });
   if (state.shownKey !== key && state.loadingKey !== key && state.errorKey === null) load(state, subjectId, semester);
 
-  root.append(backLink(user));
-  if (state.errorKey) {
-    root.append(failure());
-    return;
-  }
-  if (!state.view) {
-    root.append(el('p', { class: 'loading' }, t('common.loading')));
-    return;
-  }
-  // Another group or semester is on its way: the page shown stays, dimmed, until it comes.
+  root.append(backLink(user), body(user, key, semester));
+  renderUpload(root);
+}
+
+function body(user, key, semester) {
+  if (state.errorKey) return failure();
+  if (!state.view) return el('p', { class: 'loading' }, t('common.loading'));
+  // Another group or semester (or the syllabus just uploaded) is on its way: the page shown stays, dimmed, until it comes.
   const stale = state.shownKey !== key;
-  root.append(el('div', { class: 'syllabus' + (stale ? ' is-stale' : ''), 'aria-busy': stale ? 'true' : null },
-    page(state.view, user, semester !== null)));
+  return el('div', { class: 'syllabus' + (stale ? ' is-stale' : ''), 'aria-busy': stale ? 'true' : null },
+    page(state.view, user, semester !== null));
+}
+
+// After an upload the page is read again; the old one stays on screen until the new one comes.
+function reload() {
+  state.shownKey = null;
 }
 
 async function load(owner, subjectId, semester) {
@@ -66,7 +73,8 @@ async function load(owner, subjectId, semester) {
     Object.assign(owner, { view, shownKey: key, errorKey: null, errorCode: null });
   } catch (error) {
     if (state !== owner || owner.ticket !== ticket) return;
-    Object.assign(owner, { errorKey: FINAL_ERRORS[error.code] ?? errorKey(error.code), errorCode: error.code });
+    // The view kept is no longer known to be current: going back to its address reads it again.
+    Object.assign(owner, { errorKey: FINAL_ERRORS[error.code] ?? errorKey(error.code), errorCode: error.code, shownKey: null });
   } finally {
     if (state === owner && owner.ticket === ticket) owner.loadingKey = null;
   }
@@ -106,14 +114,17 @@ function page(view, user, semesterAsked) {
   ];
 }
 
+// The title, and for the staff the buttons of the file on its right.
 function head(view) {
   const { subject } = view;
   return el('header', { class: 'syllabus-head' },
-    el('p', { class: 'syllabus-head__kicker' }, t('syllabus.title')),
-    el('h1', { class: 'page-title', id: 'syllabus-title' }, subject.name),
-    subject.groupName || subject.teacherName ? el('p', { class: 'syllabus-head__who' },
-      subject.groupName ? badge(subject.groupName, 'primary') : null,
-      subject.teacherName ? el('span', { class: 'syllabus-head__teacher' }, icon('briefcase'), subject.teacherName) : null) : null);
+    el('div', { class: 'syllabus-head__text' },
+      el('p', { class: 'syllabus-head__kicker' }, t('syllabus.title')),
+      el('h1', { class: 'page-title', id: 'syllabus-title' }, subject.name),
+      subject.groupName || subject.teacherName ? el('p', { class: 'syllabus-head__who' },
+        subject.groupName ? badge(subject.groupName, 'primary') : null,
+        subject.teacherName ? el('span', { class: 'syllabus-head__teacher' }, icon('briefcase'), subject.teacherName) : null) : null),
+    uploadControls(view, reload));
 }
 
 // The group (when the teacher has the discipline in several) and the semester of the year (when both have a syllabus).

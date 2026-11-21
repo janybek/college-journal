@@ -44,3 +44,33 @@ export function scheduleNotes(view) {
   if (schedule.withoutTopic > 0) notes.push({ tone: 'info', key: 'syllabus.spare', params: { count: schedule.withoutTopic } });
   return notes.length > 0 ? notes : [{ tone: 'success', key: 'syllabus.fits', params: { pairs: schedule.pairs } }];
 }
+
+// ---- The Excel file of a syllabus (syllabusBook in excel.js) ----
+
+// The names core/syllabusFile.js reads: tests/i18n.test.js checks that the dictionaries repeat them in every language.
+const FILE_INFO = ['discipline', 'teacher', 'course', 'semester', 'audience', 'credits', 'totalHours', 'classHours', 'selfHours'];
+const FILE_PLAN = ['semester', 'unit', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description'];
+const FILE_KINDS = ['seminar', 'lab', 'control'];
+
+const textsOf = (text, prefix, keys) => Object.fromEntries(keys.map((key) => [key, text(prefix + key)]));
+
+// text(key) -> the text of the dictionary. The labels of the file in the language of the screen.
+export function fileLabels(text) {
+  return {
+    sheets: { info: text('syllabus.file.sheet.info'), plan: text('syllabus.file.sheet.plan') },
+    info: textsOf(text, 'syllabus.file.info.', FILE_INFO),
+    plan: textsOf(text, 'syllabus.file.plan.', FILE_PLAN),
+    kinds: textsOf(text, 'syllabus.file.kind.', FILE_KINDS),
+  };
+}
+
+// The answer of syllabus.get -> what the file holds. No syllabus: the template with the discipline, the teacher and
+// the course written in. A syllabus: the one shown, with the semester of the curriculum (planSemester, 1–8) — not the
+// semester of the year — so that the downloaded file, uploaded again, stays the same semester.
+export function fileData(view) {
+  const { subject, syllabus } = view;
+  const who = { discipline: subject.name, teacher: subject.teacherName, course: subject.course };
+  if (syllabus === null) return { info: who, rows: [] };
+  const { planSemester, audience, credits, totalHours, classHours, selfHours, rows } = syllabus;
+  return { info: { ...who, semester: planSemester, audience, credits, totalHours, classHours, selfHours }, rows };
+}

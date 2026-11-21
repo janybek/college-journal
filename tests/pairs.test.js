@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref, topicText, lessonTypeKey, lessonParts } from '../site/js/pairs.js';
+import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref, topicText, lessonTypeKey, lessonParts, controlLine } from '../site/js/pairs.js';
 import { pairLock } from '../core/schedule.js';
 import { SCHEMA } from '../core/schema.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
@@ -95,4 +95,17 @@ test('lessonTypeKey: a practice is named by its kind; a lecture and a module by 
 
 test('lessonParts: only when the row has more than one pair of this type', () => {
   assert.deepEqual([lessonParts(lesson()), lessonParts(lesson({ parts: 1 }))], [{ part: 1, parts: 2 }, null]);
+});
+
+test('controlLine: the modules marked on a lesson; the «Модуль» badge only for a mark without a name', () => {
+  // «[Модуль] Модуль 1 (рубежный контроль)» said the same twice: two named marks are their names alone
+  assert.deepEqual(controlLine([{ name: 'Модуль 1 (рубежный контроль)', unit: 1 }, { name: 'Зачёт', unit: 2 }]), {
+    badge: false, names: [{ key: 'pairs.topicPlain', params: { name: 'Модуль 1 (рубежный контроль)' } }, { key: 'pairs.topicPlain', params: { name: 'Зачёт' } }],
+  });
+  // a mark without a name is the badge
+  assert.deepEqual(controlLine([{ name: '', unit: 1 }]), { badge: true, names: [] });
+  assert.deepEqual(controlLine([{ name: 'Зачёт', unit: 1 }, { name: '', unit: 2 }]), { badge: true, names: [{ key: 'pairs.topicPlain', params: { name: 'Зачёт' } }] });
+  // no marks: an empty array, or anything that is not an array
+  for (const none of [[], undefined, null, 'модуль', { name: 'x', unit: 1 }]) assert.deepEqual(controlLine(none), { badge: false, names: [] }, String(none));
+  assert.deepEqual(controlLine([null, 'x', { name: 'Зачёт', unit: 1 }]), { badge: false, names: [{ key: 'pairs.topicPlain', params: { name: 'Зачёт' } }] });
 });

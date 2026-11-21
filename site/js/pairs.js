@@ -69,3 +69,16 @@ export function lessonTypeKey(topic) {
 export function lessonParts(topic) {
   return topic.parts > 1 ? { part: topic.part, parts: topic.parts } : null;
 }
+
+// The modules (рубежный контроль) without hours marked on a lesson (`controls` of a pair view): the names of those
+// that have one, for t(), and whether the «Модуль» badge stands for those that have none. A named mark goes without
+// the badge, since its name is what the syllabus calls it («Модуль 1 (рубежный контроль)» next to «Модуль» said the
+// same twice); a mark without a name is the badge alone. Anything but an array: no marks.
+export function controlLine(controls) {
+  const marks = Array.isArray(controls) ? controls.filter((mark) => mark !== null && typeof mark === 'object') : [];
+  const named = marks.filter((mark) => typeof mark.name === 'string' && mark.name !== '');
+  return {
+    badge: named.length < marks.length,
+    names: named.map((mark) => ({ key: 'pairs.topicPlain', params: { name: mark.name } })),
+  };
+}

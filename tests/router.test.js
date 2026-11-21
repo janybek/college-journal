@@ -51,17 +51,19 @@ test('resolveRoute: my own schedule needs schedule.mine', () => {
   const student = { mustChangePassword: false, permissions: ['schedule.mine'] };
   assert.equal(resolveRoute('#/my', student).view, 'mySchedule');
   assert.equal(resolveRoute('#/my', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'home');
-  assert.equal(resolveRoute('#/plan/sb_12ab34cd', { mustChangePassword: false, permissions: ['topics.plan'] }).view, 'home');
   assert.equal(resolveRoute('#/plan/sb_12ab34cd', student).view, 'home');
 });
 
-test('resolveRoute: the syllabus without a subject and the import screen', () => {
-  const teacher = { mustChangePassword: false, permissions: ['dir.save:topics', 'syllabus.apply', 'syllabus.preview', 'topics.plan'] };
-  const dean = { mustChangePassword: false, permissions: ['dir.list:topics', 'import.apply:topics', 'import.preview:topics', 'syllabus.apply'] };
-  assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', teacher).view, 'home');                 // без syllabus.get страницы силлабуса нет
+test('resolveRoute: the syllabus is uploaded on its own page, the import screen has no syllabus mode', () => {
+  const teacher = { mustChangePassword: false, permissions: ['syllabus.get', 'schedule.mine', 'teacher.mySubjects'] };
+  const dean = { mustChangePassword: false, permissions: ['syllabus.get', 'syllabus.preview', 'syllabus.apply', 'import.preview:groups', 'import.apply:groups'] };
   assert.equal(resolveRoute('#/syllabus', teacher).view, 'home');
   assert.equal(resolveRoute('#/import', teacher).view, 'home');                                // общий импорт преподавателю не открывается
   assert.deepEqual(resolveRoute('#/import', dean), { view: 'import', params: {} });
+  // the address of a subject's syllabus opens the syllabus page (where the file is uploaded), never the import screen
+  assert.deepEqual(resolveRoute('#/syllabus/sb_12ab34cd', dean), { view: 'syllabus', params: { subjectId: 'sb_12ab34cd' } });
+  assert.equal(resolveRoute('#/import/sb_12ab34cd', dean).view, 'home');
+  assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', { mustChangePassword: false, permissions: ['syllabus.preview', 'syllabus.apply', 'import.apply:groups'] }).view, 'home');
 });
 
 test('resolveRoute: the syllabus page of a subject needs syllabus.get; the topics screen and the plan page are gone', () => {
@@ -71,7 +73,7 @@ test('resolveRoute: the syllabus page of a subject needs syllabus.get; the topic
   assert.equal(resolveRoute('#/syllabus/sb_12ab34cd/3', viewer).view, 'home');
   assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', { mustChangePassword: false, permissions: ['syllabus.apply'] }).view, 'home');
   for (const old of ['#/topics', '#/topics/sb_1', '#/plan/sb_1']) {
-    assert.equal(resolveRoute(old, { mustChangePassword: false, permissions: ['dir.list:topics', 'topics.plan', 'syllabus.get'] }).view, 'home', old);
+    assert.equal(resolveRoute(old, { mustChangePassword: false, permissions: ['dir.list:topics', 'syllabus.get'] }).view, 'home', old);
   }
 });
 

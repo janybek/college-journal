@@ -6,6 +6,7 @@ import ky from '../site/js/i18n/ky.js';
 import en from '../site/js/i18n/en.js';
 import { IMPORT_SPECS, parseSheet } from '../core/import.js';
 import { LESSON_TYPES } from '../core/schema.js';
+import { SYLLABUS_SHEETS, INFO_ROWS, PLAN_COLUMNS, KIND_WORDS } from '../core/syllabusFile.js';
 import { IMPORT_COLUMNS, IMPORT_TABLES, FIELDS } from '../site/js/views/directoryConfig.js';
 
 test('template column titles in the dictionaries equal IMPORT_SPECS', () => {
@@ -60,11 +61,31 @@ test('the lesson types the syllabus hint names are words the syllabus file reads
   assert.deepEqual(words(en), LESSON_TYPES);                                       // en: «lecture, practice or control»
 });
 
-test('the syllabus is uploaded from the subject page; the old link to the topics import is gone', () => {
-  for (const key of ['syllabus.title', 'syllabus.upload', 'syllabus.back', 'syllabus.forbidden', 'syllabus.sheet', 'import.matchBy.syllabus',
-    'import.error.order.duplicate']) assert.ok(ru[key], key);
-  for (const key of ['semester', 'unit', 'order', 'lessonType']) assert.ok(ru['import.colHint.syllabus.' + key], key);
-  for (const dict of [ru, ky, en]) assert.equal('topics.import' in dict, false);
+test('the sheets, lines, columns and kinds of the syllabus template are the names core/syllabusFile.js reads, in every language', () => {
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    for (const [key, titles] of Object.entries(SYLLABUS_SHEETS)) assert.equal(dict['syllabus.file.sheet.' + key], titles[lang], lang + ' ' + key);
+    for (const item of INFO_ROWS) assert.equal(dict['syllabus.file.info.' + item.key], item.titles[lang], lang + ' ' + item.key);
+    for (const column of PLAN_COLUMNS) assert.equal(dict['syllabus.file.plan.' + column.key], column.titles[lang], lang + ' ' + column.key);
+    for (const kind of ['seminar', 'lab', 'control']) assert.equal(KIND_WORDS[dict['syllabus.file.kind.' + kind].toLowerCase()], kind, lang + ' ' + kind);
+  }
+});
+
+test('every code of the syllabus check has a text; the old texts of the syllabus import are gone', () => {
+  for (const code of ['missing_sheet', 'missing_column', 'too_many_rows', 'empty', 'required', 'bad_value', 'too_long', 'bad_hours', 'no_hours', 'unit_order', 'semester_order', 'semester_clash', 'held_missing', 'held_hours']) {
+    assert.ok(ru['syllabus.error.' + code], code);
+  }
+  for (const code of ['ignored_sheets', 'ignored', 'info_empty', 'total_mismatch', 'class_mismatch', 'self_mismatch', 'no_control', 'discipline_differs', 'teacher_differs', 'held_renamed']) {
+    assert.ok(ru['syllabus.warning.' + code], code);
+  }
+  assert.ok(ru['syllabus.error.bad_hours'].includes('1 пара = 2 часа'));
+  for (const key of ['syllabus.upload', 'syllabus.template', 'syllabus.download', 'syllabus.check.title', 'syllabus.check.whose', 'syllabus.check.summary',
+    'syllabus.check.first', 'syllabus.check.replace', 'syllabus.check.failed', 'syllabus.check.apply', 'syllabus.done', 'syllabus.where', 'syllabus.whereSheet',
+    'syllabus.fileError.dateCell', 'syllabus.fileError.tooMany', 'syllabus.help.title']) assert.ok(ru[key], key);
+  for (const key of ['order', 'hours', 'control', 'columns', 'self']) assert.ok(ru['syllabus.help.' + key], key);
+  assert.equal(ru['syllabus.upload'], 'Загрузить (Excel)');
+  for (const dict of [ru, ky, en]) {
+    for (const gone of ['syllabus.lead', 'syllabus.step.subject', 'syllabus.subjectHint', 'syllabus.sheet', 'syllabus.back', 'topics.import']) assert.equal(gone in dict, false, gone);
+  }
 });
 
 test('every directory that can be in use elsewhere explains why it cannot be removed', () => {

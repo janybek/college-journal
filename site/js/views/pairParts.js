@@ -2,7 +2,7 @@ import { t } from '../i18n.js';
 import { el, badge, iconButton, avatarTone } from '../ui.js';
 import { icon } from '../icons.js';
 import { addDays, dayParts, isTime } from '../dates.js';
-import { pairFlags, topicText, lessonTypeKey, lessonParts } from '../pairs.js';
+import { pairFlags, topicText, lessonTypeKey, lessonParts, controlLine } from '../pairs.js';
 
 // Parts shared by the schedule screens: the deanery's «Расписание» and the teacher's and student's own week.
 // Everything from the server goes in as text.
@@ -45,20 +45,21 @@ export function weekNav({ from, onChange }) {
 }
 
 // The lesson on a pair (`topic` of a pair view), as pieces to put in a line: its text, its type («Практика 1 из 2»
-// when the row has more than one pair of this type) and, when modules without hours are marked on it, «Модуль»
-// with their names (two can stand after one lesson).
+// when the row has more than one pair of this type) and, when modules without hours are marked on it, their names
+// (two can stand after one lesson); a module without a name is the «Модуль» badge (controlLine).
 export function lessonPieces(topic) {
   const { key, params } = topicText(topic);
   const type = t(lessonTypeKey(topic));
   const parts = lessonParts(topic);
-  const controls = Array.isArray(topic.controls) ? topic.controls : [];
+  const controls = controlLine(topic.controls);
   return [
     el('span', { class: 'lesson-text' }, t(key, params)),
     LESSON_TYPES.includes(topic.lessonType)
       ? badge(parts ? t('pairs.lessonPart', { type, part: parts.part, parts: parts.parts }) : type, TYPE_TONES[topic.lessonType]) : null,
-    controls.length > 0 ? el('span', { class: 'lesson-controls' },
-      badge(t('pairs.unitControl'), 'warning'),
-      el('span', { class: 'lesson-controls__names' }, controls.map((mark) => mark.name || t('syllabus.controlN', { n: mark.unit })).join(' · '))) : null,
+    controls.badge || controls.names.length > 0 ? el('span', { class: 'lesson-controls' },
+      controls.badge ? badge(t('pairs.unitControl'), 'warning') : null,
+      controls.names.length > 0
+        ? el('span', { class: 'lesson-controls__names' }, controls.names.map((name) => t(name.key, name.params)).join(' · ')) : null) : null,
   ];
 }
 
