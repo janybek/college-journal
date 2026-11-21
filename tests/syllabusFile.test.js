@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   parseSyllabus, MAX_SHEET_ROWS, HOURS_ALLOWED, DESCRIPTION_MAX, SYLLABUS_SHEETS, INFO_ROWS, PLAN_COLUMNS, KIND_WORDS,
 } from '../core/syllabusFile.js';
-import { HOURS_PER_PAIR } from '../core/topics.js';
+import { HOURS_PER_PAIR, lessonsOf } from '../core/topics.js';
 
 const INFO = [['Дисциплина', 'Информатика'], ['Преподаватель', 'Teacher One'], ['Курс', 1], ['Семестр', 1], ['Специальность', 'Сестринское дело'],
   ['Кредиты', 2], ['Всего часов', 60], ['Аудиторных часов', 36], ['СРС, часов', 24]];
@@ -200,17 +200,32 @@ test('«Итого» rows are skipped and named in the remark, not read as a top
   assert.deepEqual(totals.doc.rows.map((r) => r.name), ['А', 'Б']);
   assert.equal(totals.doc.rows.reduce((n, r) => n + (r.lectureHours + r.practiceHours) / HOURS_PER_PAIR, 0), 4);
   assert.deepEqual(totals.warnings[0], { code: 'ignored', sheet: 'plan', titles: ['Итого'] });
-  // the first whole word decides (N4): a colon, numbers or more words may follow
-  for (const word of ['ИТОГО:', ' Всего ', 'Итого  часов', 'Жалпы', 'жыйынтыгы:', 'Total', 'Итого по курсу', 'Всего за семестр', 'Итого 36', 'Итого:',
-    'Итог', 'ИТОГО ЧАСОВ:', 'Всего по юниту 1', 'Total:', 'жалпы саат:', 'Итого: 36 ч']) {
-    const r = one([[1, '', 'А', 2, '', ''], ['', '', word, 2, '', '']]);
-    assert.deepEqual([r.errors, r.doc && r.doc.rows.length], [[], 1], word);
+  // a totals row has no «№» and no «Вид занятия»; «итого» / «всего» may be followed by anything (N4) ...
+  const skipped = (name) => {
+    const r = one([[1, '', 'А', 2, '', ''], ['', '', name, 2, '', '']]);
+    return r.errors.length === 0 && r.doc.rows.length === 1 && r.warnings.some((w) => w.code === 'ignored' && w.titles.includes(name.trim()));
+  };
+  for (const name of ['ИТОГО:', ' Всего ', 'Итого  часов', 'Итого по курсу', 'Всего за семестр', 'Итого 36', 'Итого:', 'ИТОГО ЧАСОВ:', 'Всего по юниту 1',
+    'Итого: 36 ч', 'Всего понемногу']) assert.equal(skipped(name), true, name);
+  // ... «жалпы», «жыйынтыгы», «итог», «total» only alone or with numbers, a colon or a dash and words of hours (R2-1)
+  for (const name of ['Жалпы', 'Жалпы: 36', 'Жалпы саат: 36', 'жалпы саат:', 'Жалпы — 36 саат', 'жыйынтыгы:', 'Жыйынтыгы 36 ч', 'Итог', 'Итог: 36 часов',
+    'Total', 'Total:', 'Total: 36 h', 'Total hours: 36']) assert.equal(skipped(name), true, name);
+  // everything else is a topic, and so is every row with a «№»
+  const kept = (label, name) => {
+    const r = one([[1, '1.1', 'А', 2, '', ''], [1, label, name, 2, '', '']]);
+    return [r.errors, r.doc && r.doc.rows.map((row) => row.name), r.warnings.filter((w) => w.code === 'ignored')];
+  };
+  for (const name of ['Жалпы маалымат', 'Жалпы патология', 'Жалпы анатомия', 'Жалпы түшүнүктөр', 'Итог курса: защита проектов', 'Total quality management',
+    'Итоговое занятие', 'Итоговое тестирование', 'Итоги года', 'Всеобщая история', 'Totally new', 'Жалпылоо']) {
+    assert.deepEqual(kept('', name), [[], ['А', name], []], name);
   }
-  // a topic that only starts with the letters of the word stays a topic
-  for (const name of ['Итоговое тестирование', 'Итоговое занятие', 'Итоги года', 'Всеобщая история', 'Totally new', 'Жалпылоо']) {
-    const r = one([[1, '', name, 2, '', '']]);
-    assert.deepEqual([r.errors, r.doc && r.doc.rows.map((row) => row.name)], [[], [name]], name);
+  for (const [label, name] of [['1.2', 'Жалпы маалымат'], ['5', 'Итого по курсу'], ['1', 'Всего понемногу'], ['3', 'Итог'], ['Л2', 'Total']]) {
+    assert.deepEqual(kept(label, name), [[], ['А', name], []], label + ' ' + name);
   }
+  // a kept «Жалпы маалымат» takes its pairs in its place: nothing after it shifts
+  const general = one([[1, '1.1', 'Введение', 2, '', ''], [1, '1.2', 'Жалпы маалымат', 2, 2, ''], [1, '1.3', 'Сети', 2, '', '']]);
+  const ids = general.doc.rows.map((row, i) => ({ ...row, id: row.label, order: i + 1 }));
+  assert.deepEqual(lessonsOf(ids).map((l) => l.topicId + ' ' + l.lessonType), ['1.1 lecture', '1.2 lecture', '1.2 practice', '1.3 lecture']);
 });
 
 test('class type: more spellings; an unknown word and a kind without practice hours have their own codes', () => {   // M2

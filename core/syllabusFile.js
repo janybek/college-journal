@@ -68,13 +68,19 @@ for (const [kind, words] of [['', ORDINARY], ['seminar', SEMINAR], ['lab', LAB],
 
 const normTitle = (value) => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/\s*:$/, '');
 
-// A row that sums the plan up: the first whole word of its topic cell is one of these («Итого», «Итого по курсу»,
-// «Всего за семестр», «Итого 36», «Итого:»). «Итоговое занятие» and «Всеобщая история» stay topics. The row is skipped
-// and named in the remark.
-const TOTAL_WORDS = new Set(['итого', 'всего', 'жалпы', 'жыйынтыгы', 'итог', 'total']);
+// The topic cell of a row that sums the plan up (the row is skipped and named in the remark; readPlan also wants its
+// «№» and «Вид занятия» empty). «Итого» and «Всего» as the first whole word, whatever follows: «Итого по курсу»,
+// «Всего за семестр», «Итого 36». «Жалпы» (also «general» in Kyrgyz: «Жалпы маалымат»), «Жыйынтыгы», «Итог» and «Total»
+// only alone or with numbers, a colon or a dash and words of hours: «Жалпы саат: 36», «Total: 36 h». «Итоговое занятие»,
+// «Всеобщая история», «Итог курса: защита проектов» stay topics.
+const TOTAL_LEADS = new Set(['итого', 'всего']);
+const TOTAL_ALONE = new Set(['жалпы', 'жыйынтыгы', 'итог', 'total']);
+const HOURS_TAIL = /^[\s\d:.,–—-]*(?:(?:часов|часа|час|ч|саат|hours|h)\.?[\s\d:.,–—-]*)*$/i;
 const isTotal = (value) => {
-  const first = typeof value === 'string' ? /^\s*([a-zа-яёөүң]+)/i.exec(value) : null;
-  return first !== null && TOTAL_WORDS.has(first[1].toLowerCase());
+  const first = typeof value === 'string' ? /^\s*([a-zа-яёөүң]+)(.*)$/is.exec(value) : null;
+  if (first === null) return false;
+  const word = first[1].toLowerCase();
+  return TOTAL_LEADS.has(word) || (TOTAL_ALONE.has(word) && HOURS_TAIL.test(first[2]));
 };
 
 function titleIndex(items) {
@@ -222,8 +228,8 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
     const line = Array.isArray(sheet.cells[i]) ? sheet.cells[i] : [];
     const cell = (key) => (key in at ? line[at[key]] : undefined);
     if (PLAN_COLUMNS.every((c) => isEmpty(cell(c.key)))) continue;
-    // A totals row has no class type; a module called «Итог» (with «модуль» in «Вид занятия») is a module.
-    if (isTotal(cell('name')) && isEmpty(cell('practiceKind'))) { ignored.push(toText(cell('name'))); continue; }
+    // A totals row has no «№» (a numbered row is a topic) and no class type (a module called «Итог» is a module).
+    if (isTotal(cell('name')) && isEmpty(cell('label')) && isEmpty(cell('practiceKind'))) { ignored.push(toText(cell('name'))); continue; }
     const row = i + 1;
     const found = [];
     const fail = (field, code) => found.push({ sheet: 'plan', row, field, code });
