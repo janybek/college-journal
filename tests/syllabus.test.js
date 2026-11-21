@@ -1,27 +1,36 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { semesterTopics, nextTopic, planWarnings } from '../site/js/syllabus.js';
+import { shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes } from '../site/js/syllabus.js';
 
-const topic = (semester, order, unit, pair = null) => ({ id: `t${semester}_${order}`, semester, order, unit, name: 'Т', lessonType: 'lecture', pair });
-const plan = { semester: 1, withoutTopic: 2,
-  topics: [topic(1, 1, 1, { date: '2026-09-01' }), topic(1, 2, 2), topic(2, 1, 1), topic(2, 2, 1), topic(2, 5, 2)] };
+// A row of the syllabus page as syllabus.get gives it.
+const R = (over) => ({ id: 'tp_1', kind: 'topic', unit: 1, label: '', name: 'Т', lectureHours: 2, practiceHours: 0, practiceKind: '', selfHours: null, description: '', planned: 1, pairs: [], ...over });
 
-test('semesterTopics: the topics of one semester, in order', () => {
-  assert.deepEqual(semesterTopics(plan, 1).map((t) => t.id), ['t1_1', 't1_2']);
-  assert.deepEqual(semesterTopics(plan, 2).map((t) => t.order), [1, 2, 5]);
-  // The server sorts them already; the screen does not rely on it.
-  const shuffled = { ...plan, topics: [topic(2, 5, 2), topic(1, 2, 2), topic(2, 1, 1)] };
-  assert.deepEqual(semesterTopics(shuffled, 2).map((t) => t.order), [1, 5]);
+test('shortDate: day and month', () => {
+  assert.equal(shortDate('2026-09-01'), '01.09');
 });
 
-test('nextTopic: the number after the largest and the module of the last topic', () => {
-  assert.deepEqual(nextTopic(semesterTopics(plan, 2)), { order: 6, unit: 2 });
-  assert.deepEqual(nextTopic([]), { order: 1, unit: 1 });
-  // № 200 is the largest number a topic may have: after it the number is left for the person to fill.
-  assert.deepEqual(nextTopic([topic(1, 200, 4)]), { order: null, unit: 4 });
+test('unitGroups: rows of one unit in a row', () => {
+  assert.deepEqual(unitGroups([R({ id: 'a' }), R({ id: 'b' }), R({ id: 'c', unit: 2 })]).map((g) => [g.unit, g.rows.map((r) => r.id)]), [[1, ['a', 'b']], [2, ['c']]]);
+  assert.equal(unitGroups([R({}), R({})]).length, 1);
 });
 
-test('planWarnings: only the current semester warns', () => {
-  assert.deepEqual(planWarnings(plan, 1), { notPlaced: 1, withoutTopic: 2 });
-  assert.deepEqual(planWarnings(plan, 2), { notPlaced: 0, withoutTopic: 0 });     // не текущий семестр: предупреждений нет
+test('describedRows: topics with a description, modules left out', () => {
+  assert.deepEqual(describedRows([R({ id: 'a', description: 'О теме' }), R({ id: 'b' }), R({ id: 'c', kind: 'control', description: 'мимо' })]).map((r) => r.id), ['a']);
+});
+
+test('hasSelfHours: a number at any row, zero included', () => {
+  assert.deepEqual([hasSelfHours([R({})]), hasSelfHours([R({}), R({ selfHours: 0 })])], [false, true]);
+});
+
+test('undated: pairs of the row still without a date, only in the current semester', () => {
+  assert.deepEqual([undated(R({ planned: 2, pairs: [{}] }), true), undated(R({ planned: 2, pairs: [{}] }), false), undated(R({ planned: 1, pairs: [{}, {}] }), true)], [1, 0, 0]);
+});
+
+test('scheduleNotes: how the plan fits the schedule of the semester', () => {
+  const view = (schedule, pairs = 18) => ({ syllabus: { totals: { pairs }, schedule } });
+  assert.deepEqual(scheduleNotes(view(null)), [{ tone: 'info', key: 'syllabus.otherSemester' }]);
+  assert.deepEqual(scheduleNotes(view({ pairs: 0, unplaced: 18, withoutTopic: 0 })), [{ tone: 'info', key: 'syllabus.noSchedule' }]);
+  assert.deepEqual(scheduleNotes(view({ pairs: 18, unplaced: 0, withoutTopic: 0 })), [{ tone: 'success', key: 'syllabus.fits', params: { pairs: 18 } }]);
+  assert.deepEqual(scheduleNotes(view({ pairs: 17, unplaced: 1, withoutTopic: 0 })), [{ tone: 'warning', key: 'syllabus.unplaced', params: { count: 1, planned: 18, scheduled: 17 } }]);
+  assert.deepEqual(scheduleNotes(view({ pairs: 20, unplaced: 0, withoutTopic: 2 })), [{ tone: 'info', key: 'syllabus.spare', params: { count: 2 } }]);
 });

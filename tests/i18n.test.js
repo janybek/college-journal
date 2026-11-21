@@ -122,10 +122,13 @@ test('every server error code has a text', () => {
     assert.ok(ru['error.' + code], code);
 });
 
-test('topics by semester and the semester switch have their texts; the unit is called a module', () => {
-  for (const key of ['topics.semesterN', 'topics.semesterNow', 'topics.otherSemester', 'topics.notNow', 'plan.readOnly', 'home.syllabus',
-    'settings.semesterNo', 'settings.savedSemester', 'settings.error.semester.bad_value']) assert.ok(ru[key], key);
-  for (const dict of [ru, ky, en]) assert.doesNotMatch(dict['topics.field.unit'], /Юнит|Unit/);
+test('the syllabus page has its texts: a part of the course is a unit, the control lesson a module; «Темы» and the plan page are gone', () => {
+  assert.deepEqual([ru['syllabus.unitN'], ru['syllabus.controlN'], ky['syllabus.unitN'], en['syllabus.unitN']], ['Юнит {n}', 'Модуль {n} (рубежный контроль)', 'Юнит {n}', 'Unit {n}']);
+  for (const key of ['syllabus.title', 'syllabus.descriptions', 'home.subjects', 'lessonType.seminar', 'lessonType.lab', 'pairs.lessonPart', 'pairs.unitControl']) assert.ok(ru[key], key);
+  for (const dict of [ru, ky, en]) assert.equal(Object.keys(dict).some((k) => k.startsWith('topics.') || k.startsWith('plan.')), false);
+  // переключатель «Сейчас идёт» в «Настройках семестра» берёт подпись отсюда — тексты прежних topics.semesterN
+  assert.deepEqual([ru['syllabus.semesterN'], ky['syllabus.semesterN'], en['syllabus.semesterN']], ['{n} семестр', '{n}-семестр', 'Semester {n}']);
+  for (const key of ['home.syllabus', 'settings.semesterNo', 'settings.savedSemester', 'settings.error.semester.bad_value']) assert.ok(ru[key], key);
 });
 
 test('every schedule error code has a text', () => {

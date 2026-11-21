@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref } from '../site/js/pairs.js';
+import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref, topicText, lessonTypeKey, lessonParts } from '../site/js/pairs.js';
 import { pairLock } from '../core/schedule.js';
 import { SCHEMA } from '../core/schema.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
@@ -76,4 +76,23 @@ test('templateHref: a weekday of the schedule opens that day of the week templat
   assert.equal(templateHref('g_12ab34cd', '2026-11-21'), null);       // суббота: в шаблоне её нет
   assert.equal(templateHref('g_12ab34cd', '2026-11-22'), null);
   assert.equal(templateHref('', '2026-11-16'), null);
+});
+
+// The topic of a pair view (backend/scheduleData.js pairViews): a lesson of a syllabus row; `controls` — the modules without hours marked on it.
+const lesson = (over) => ({ unit: 2, label: '2.3', name: 'Документооборот', kind: 'topic', lessonType: 'practice', part: 1, parts: 2, practiceKind: '', controls: [], ...over });
+
+test('topicText: «№. name», the name alone, or the module of the unit when it has no name', () => {
+  assert.deepEqual(topicText(lesson()), { key: 'pairs.topicLabel', params: { label: '2.3', name: 'Документооборот' } });
+  assert.deepEqual(topicText(lesson({ label: '' })), { key: 'pairs.topicPlain', params: { name: 'Документооборот' } });
+  assert.deepEqual(topicText(lesson({ kind: 'control', label: '', name: 'Экзамен' })), { key: 'pairs.topicPlain', params: { name: 'Экзамен' } });
+  assert.deepEqual(topicText(lesson({ kind: 'control', label: '', name: '' })), { key: 'syllabus.controlN', params: { n: 2 } });
+});
+
+test('lessonTypeKey: a practice is named by its kind; a lecture and a module by their type', () => {
+  assert.deepEqual([lesson(), lesson({ practiceKind: 'seminar' }), lesson({ practiceKind: 'lab' }), lesson({ lessonType: 'lecture', practiceKind: 'seminar' }), lesson({ lessonType: 'control' })].map(lessonTypeKey),
+    ['lessonType.practice', 'lessonType.seminar', 'lessonType.lab', 'lessonType.lecture', 'lessonType.control']);
+});
+
+test('lessonParts: only when the row has more than one pair of this type', () => {
+  assert.deepEqual([lessonParts(lesson()), lessonParts(lesson({ parts: 1 }))], [{ part: 1, parts: 2 }, null]);
 });

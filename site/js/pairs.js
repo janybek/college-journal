@@ -48,3 +48,24 @@ export function pairPatch(values, pair) {
   if (values.note.trim() !== (pair.note ?? '')) patch.note = values.note.trim();
   return patch;
 }
+
+// ---- The lesson on a pair: `topic` of a pair view, a lesson of a syllabus row (no DOM) ----
+
+// What to write about the lesson, for t(): «№. name», the name alone, or «Модуль N (рубежный контроль)» for a
+// module without a name.
+export function topicText(topic) {
+  if (topic.kind === 'control' && !topic.name) return { key: 'syllabus.controlN', params: { n: topic.unit } };
+  return topic.label ? { key: 'pairs.topicLabel', params: { label: topic.label, name: topic.name } } : { key: 'pairs.topicPlain', params: { name: topic.name } };
+}
+
+// The name of the type of the lesson: a practice is called after its kind (seminar, laboratory) when it has one.
+const PRACTICE_KINDS = ['seminar', 'lab'];
+export function lessonTypeKey(topic) {
+  if (topic.lessonType === 'practice' && PRACTICE_KINDS.includes(topic.practiceKind)) return 'lessonType.' + topic.practiceKind;
+  return 'lessonType.' + topic.lessonType;
+}
+
+// «Практика 1 из 2»: only when the row has more than one pair of this type.
+export function lessonParts(topic) {
+  return topic.parts > 1 ? { part: topic.part, parts: topic.parts } : null;
+}

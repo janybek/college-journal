@@ -76,15 +76,13 @@ test('navFor: the week template comes before the settings in the schedule group'
   assert.deepEqual(outline(navFor([...DEAN, 'dir.list:weekTemplate'], 'dean'))[1], ['nav.schedule', ['weekTemplate']]);
 });
 
-test('navFor: the topics come between the week template and the settings', () => {
-  assert.deepEqual(outline(navFor([...DEAN, 'settings.get', 'dir.list:weekTemplate', 'dir.list:topics'], 'dean'))[1], ['nav.schedule', ['weekTemplate', 'topics', 'settings']]);
-  assert.deepEqual(navFor([...DEAN, 'dir.list:topics'], 'dean')[1].items[0],
-    { name: 'topics', href: '#/topics', textKey: 'topics.title', icon: 'clipboard', hintKey: 'topics.hint' });
+test('navFor: the deanery menu has no «Темы» any more', () => {
+  assert.equal(navFor(['schedule.list', 'dir.list:weekTemplate', 'dir.list:topics', 'settings.get'], 'dean').flatMap((g) => g.items).some((i) => i.name === 'topics'), false);
 });
 
 test('navFor: the schedule itself comes first in the schedule group', () => {
   assert.deepEqual(outline(navFor([...DEAN, 'settings.get', 'dir.list:weekTemplate', 'dir.list:topics', 'schedule.list'], 'dean'))[1],
-    ['nav.schedule', ['schedule', 'weekTemplate', 'topics', 'settings']]);
+    ['nav.schedule', ['schedule', 'weekTemplate', 'settings']]);
   assert.deepEqual(navFor([...DEAN, 'schedule.list'], 'dean')[1].items[0],
     { name: 'schedule', href: '#/schedule', textKey: 'schedule.title', icon: 'calendar', hintKey: 'schedule.hint' });
   assert.deepEqual(outline(navFor(['schedule.list'], 'teacher')), [[null, ['home']]]);

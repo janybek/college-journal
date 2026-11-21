@@ -171,6 +171,58 @@
 
 .today__week { justify-content: center; }
 
+/* «Предметы» on the student's home: the subjects of the group. A subject with a syllabus is a whole row to tap,
+   with an arrow; one without says so and leads nowhere. */
+.courses {
+  display: grid;
+  gap: var(--space-3);
+  overflow: hidden;
+  padding: var(--space-4);
+}
+
+.courses__icon {
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+}
+
+.courses__list { margin: 0 calc(-1 * var(--space-4)) calc(-1 * var(--space-4)); }
+
+.courses__list > li + li { border-top: 1px solid var(--border); }
+
+.course {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3.5rem;
+  padding: var(--space-3) var(--space-4);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.course.is-link:hover { background: var(--row-hover); }
+
+.course.is-link:focus-visible { outline-offset: -2px; }
+
+.course__text {
+  display: grid;
+  flex: 1;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.course__name { font-weight: 600; }
+
+.course__teacher,
+.course__none { color: var(--text-muted); }
+
+.course__none { font-style: italic; }
+
+.course__go {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--primary-ink);
+}
+
 /* The student's way back from a screen of their own: the bar has no menu. */
 .back-link {
   display: inline-flex;
@@ -1308,31 +1360,7 @@ button.lesson:hover { box-shadow: inset 0 0 0 1px var(--lesson); }
   to { box-shadow: 0 0 0 3px transparent; }
 }
 
-/* Screens: topics — the topic plan of a subject; each topic carries the calendar page of the pair it landed on */
-
-.topics-notes,
-.topics-warnings {
-  display: grid;
-  gap: var(--space-2);
-}
-
-/* The plan could not be read again: the warning and the button to try again on one line. */
-.topics-stale {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: var(--space-2) var(--space-3);
-}
-
-.topics-stale > .note { flex: 1 1 20rem; }
-
-.topics-card { overflow: hidden; }
-
-.topics-toolbar { border-bottom: 1px solid var(--border); }
-
-.topics-toolbar > .field { flex: 0 1 20rem; }
-
-/* Who teaches the subject, next to the subject itself. */
+/* Who teaches the subject, next to the subject itself (the syllabus step of the import screen). */
 .topics-teacher {
   display: flex;
   align-items: center;
@@ -1353,114 +1381,8 @@ button.lesson:hover { box-shadow: inset 0 0 0 1px var(--lesson); }
 
 .topics-teacher__name { font-weight: 500; }
 
-.topics-wait { padding: var(--space-4); }
-
-.topics-table { min-width: 46rem; }
-
-.topics-table .table__num { width: 3.5rem; }
-
-.topics-table .topics__unit { width: 4.5rem; }
-
-/* A unit opens with a stronger line and its number; the topics after it in the same unit keep the number for
-   screen readers only. */
-.topics-table tbody tr.is-unit-start:not(:first-child) td { border-top: 1px solid var(--border-strong); }
-
-.unit {
-  display: inline-grid;
-  place-items: center;
-  min-width: 1.75rem;
-  height: 1.5rem;
-  padding: 0 var(--space-2);
-  border: 1px solid var(--primary-line);
-  border-radius: 999px;
-  background: var(--primary-wash);
-  color: var(--primary-ink);
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-/* The pair a topic stands on: a page of a tear-off calendar in the accent colour (days off are red ones). */
-.when {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  min-width: 10rem;
-}
-
-.when__leaf {
-  display: grid;
-  flex: none;
-  width: 2.5rem;
-  min-height: 2.625rem;
-  overflow: hidden;
-  border: 1px solid var(--primary-line);
-  border-radius: var(--radius-inner);
-  background: var(--surface-raised);
-  text-align: center;
-}
-
-.when__weekday {
-  padding: 0.0625rem 0;
-  background: var(--primary-wash);
-  color: var(--primary-ink);
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-}
-
-.when__day {
-  padding: 0.0625rem 0 0.125rem;
-  font-size: 1rem;
-  font-weight: 700;
-  line-height: 1.25;
-}
-
-/* No pair for this topic: an empty page, dashed. */
-.when__leaf--empty {
-  border: 1px dashed var(--border-strong);
-  background: transparent;
-}
-
-.when__text {
-  display: grid;
-  min-width: 0;
-  line-height: 1.3;
-}
-
-.when__date { font-weight: 500; }
-
-.when__slot {
-  color: var(--text-muted);
-  font-size: var(--hint-fs);
-}
-
-.topics-table tr.is-unplaced .table__label { color: var(--text-muted); }
-
-/* №, unit: two short numbers side by side in the topic dialog. Their hints differ in length, so the two fields
-   share the rows of label, hint, input and error line, and the inputs stay level (a browser without subgrid
-   simply stacks each field from the top). */
-.topics-numbers {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
-  gap: var(--space-4);
-}
-
-.topics-numbers > .field {
-  grid-row: span 4;
-  grid-template-rows: subgrid;
-  row-gap: var(--space-2);
-}
-
-/* A tab per semester under the subject. The semester that is on carries a green light and «идёт сейчас», as a
+/* A semester of the year to switch to. The semester that is on carries a green light and «идёт сейчас», as a
    lamp over a door says the room is in session. */
-.semester-tabs {
-  padding: var(--space-3) var(--space-4);
-  border-bottom: 1px solid var(--border);
-}
-
-.semester-tabs__switch { max-width: 100%; }
-
 .semester-tab {
   display: inline-flex;
   align-items: center;
@@ -1489,13 +1411,6 @@ button.lesson:hover { box-shadow: inset 0 0 0 1px var(--lesson); }
   border-radius: 50%;
   background: currentColor;
   box-shadow: 0 0 0 3px var(--success-wash);
-}
-
-/* A topic of another semester without a pair is not late, just not due yet: a quiet line, no warning. */
-.when__later {
-  color: var(--text-muted);
-  font-size: var(--hint-fs);
-  font-style: italic;
 }
 
 /* «Сейчас идёт» in the semester settings: two buttons under the dates. Read-only, the chosen one stays plain. */
@@ -1828,6 +1743,20 @@ button.pair:hover {
 
 .pair__topic.is-none { color: var(--text-muted); }
 
+/* The modules without hours marked on a lesson (one or two): «Модуль» and their names, on a line of their own. */
+.lesson-controls {
+  display: inline-flex;
+  flex: 1 1 100%;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem var(--space-2);
+}
+
+.lesson-controls__names {
+  color: var(--warning);
+  font-weight: 500;
+}
+
 .pair__flags {
   display: flex;
   flex-wrap: wrap;
@@ -1986,14 +1915,427 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   .student .week-nav__this { flex: none; }
 }
 
-/* The syllabus page of one subject: its name in the toolbar. */
-.plan-subject {
-  font-size: 1.0625rem;
-  font-weight: 600;
-  letter-spacing: -0.015em;
+.subject__plan { flex: none; }
+
+/* Screens: the syllabus of a subject — the title page as a strip of facts, the thematic plan by units with the
+   dates of the group, the descriptions of the topics. A date carries the letter of its lesson type in the colour
+   the pair cards use for that type (lecture blue, practice green, module amber), so the plan reads like the week. */
+
+.syllabus {
+  display: grid;
+  gap: var(--space-5);
+  transition: opacity 0.15s ease-out;
 }
 
-.subject__plan { flex: none; }
+.syllabus > * { min-width: 0; }
+
+.syllabus.is-stale { opacity: 0.55; }
+
+.syllabus-head {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.syllabus-head__kicker {
+  color: var(--primary-ink);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.syllabus-head__who {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+}
+
+.syllabus-head__teacher {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.syllabus-head__teacher .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* The group and the semester: links drawn as a segmented control; the page shown is the pressed one. */
+.syllabus-switches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-6);
+}
+
+.syllabus-switch {
+  display: grid;
+  justify-items: start;
+  gap: var(--space-2);
+  max-width: 100%;
+}
+
+.syllabus-switch__links {
+  flex-wrap: wrap;
+  max-width: 100%;
+}
+
+.syllabus-switch__links .segmented__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+
+.syllabus-switch__links .segmented__button[aria-current="page"] {
+  background: var(--seg-active);
+  box-shadow: var(--seg-shadow);
+  color: var(--text);
+}
+
+.syllabus-switch__hint {
+  max-width: 34rem;
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.syllabus-card__title {
+  padding: var(--space-4) var(--space-5) 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+/* «Сведения»: a strip of five facts, each under a hairline; a row of the strip stretches to the edge. */
+.syllabus-info { overflow: hidden; }
+
+.facts {
+  display: flex;
+  flex-wrap: wrap;
+  margin: var(--space-3) 0 0 -1px;
+}
+
+.fact {
+  display: grid;
+  flex: 1 1 11rem;
+  align-content: start;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+}
+
+.fact__label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.fact__value {
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.fact__value.is-empty { color: var(--text-muted); }
+
+.syllabus-notes {
+  display: grid;
+  gap: var(--space-2);
+}
+
+/* «Тематический план» */
+.syllabus-plan { overflow: hidden; }
+
+.syllabus-plan .syllabus-card__title { padding-bottom: var(--space-3); }
+
+.plan-table {
+  min-width: 42rem;
+  border-top: 1px solid var(--border);
+}
+
+.plan-table .num {
+  width: 1%;
+  padding-inline: var(--space-4);
+  text-align: right;
+}
+
+.plan-table .plan-table__pairs { width: 25%; }
+
+.plan-table td { vertical-align: top; }
+
+.plan-table td.num { padding-top: calc(var(--space-3) + 0.0625rem); }
+
+/* «Юнит 1»: a line of small capitals over its rows; the next unit also gets a stronger rule. */
+.plan-unit__head th {
+  height: auto;
+  padding-block: var(--space-4) var(--space-2);
+  color: var(--primary-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.plan-unit + .plan-unit .plan-unit__head th { border-top: 1px solid var(--border-strong); }
+
+.plan-row__title { line-height: 1.4; }
+
+.plan-row__label {
+  margin-right: var(--space-2);
+  color: var(--text-muted);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.plan-row__name { font-weight: 500; }
+
+.plan-row__kind {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* The hours as a line under the topic: only where the columns are not shown. */
+.plan-row__summary { display: none; }
+
+.plan-row__planned { color: var(--text-muted); }
+
+.plan-none { color: var(--text-muted); }
+
+/* The module (рубежный контроль) that closes a unit: an amber band with a bar on its left. */
+.syllabus-plan .plan-row.is-control td { background: var(--warning-wash); }
+
+.syllabus-plan .plan-row.is-control td:first-child { box-shadow: inset 3px 0 0 var(--warning); }
+
+.plan-row.is-control .plan-row__name {
+  color: var(--warning);
+  font-weight: 600;
+}
+
+/* The dates of the group's pairs: a tab with the letter of the lesson type, then the day. */
+.dates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-2);
+}
+
+.date {
+  display: inline-flex;
+  align-items: stretch;
+  min-height: 1.5rem;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-raised);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.date__type {
+  display: grid;
+  place-items: center;
+  min-width: 1.375rem;
+  padding: 0 0.25rem;
+  background: var(--muted);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: help;
+}
+
+.date[data-type="lecture"] .date__type { background: var(--primary-wash); color: var(--primary-ink); }
+.date[data-type="practice"] .date__type { background: var(--success-wash); color: var(--success); }
+.date[data-type="control"] .date__type { background: var(--warning-wash); color: var(--warning); }
+
+.date__day {
+  display: flex;
+  align-items: center;
+  padding: 0 0.4375rem;
+}
+
+.date.is-held { border-color: var(--success-line); }
+
+.date__held {
+  align-self: center;
+  width: 0.875rem;
+  height: 0.875rem;
+  margin-right: 0.375rem;
+  color: var(--success);
+}
+
+.date.is-missing {
+  align-items: center;
+  padding: 0 var(--space-2);
+  border-style: dashed;
+  border-color: var(--warning-line);
+  background: transparent;
+  color: var(--warning);
+}
+
+/* «Итого» */
+.syllabus-plan .plan-total th,
+.syllabus-plan .plan-total td {
+  height: auto;
+  padding-block: var(--space-3);
+  border-top: 1px solid var(--border-strong);
+  border-bottom: 0;
+  background: var(--muted);
+  color: var(--text);
+  font-size: inherit;
+  font-weight: 700;
+}
+
+/* «Описание тем»: the topic on the left, what it is about on the right, as in a glossary. */
+.about { padding: 0 var(--space-5) var(--space-2); }
+
+.about__item {
+  display: grid;
+  grid-template-columns: minmax(0, 17rem) minmax(0, 1fr);
+  gap: var(--space-1) var(--space-6);
+  padding: var(--space-4) 0;
+  border-top: 1px solid var(--border);
+}
+
+.about__item:first-child { border-top: 0; }
+
+.about__topic { font-weight: 600; }
+
+.about__text {
+  max-width: 44rem;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+
+@media (max-width: 48rem) {
+  .about__item { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* On the student's phone nothing is smaller than 16 px. */
+.student .syllabus-head__kicker,
+.student .fact__label,
+.student .semester-tab__now,
+.student .plan-table,
+.student .plan-unit__head th,
+.student .plan-row__kind,
+.student .date,
+.student .date__type { font-size: 1rem; }
+
+.student .fact__value { font-size: 1rem; }
+
+.student .semester-tab { min-height: var(--seg-h); }
+
+.student .date { min-height: 2rem; }
+
+.student .date__type { min-width: 1.75rem; }
+
+/* A narrow screen: the switches take the whole width, the facts read as «label — value» lines, and the plan
+   becomes a list (the same table, laid out by these rules only): the topic, its hours under it, then its dates. */
+@media (max-width: 36rem) {
+  .syllabus-switch,
+  .syllabus-switch__links { width: 100%; }
+
+  .syllabus-switch__links .segmented__button {
+    flex: 1 1 0;
+    flex-wrap: wrap;
+    gap: 0 var(--space-2);
+    min-width: 0;
+    padding-block: var(--space-1);
+  }
+
+  .syllabus-card__title { padding-inline: var(--space-4); }
+
+  .fact {
+    flex-basis: 100%;
+    gap: 0.125rem;
+    padding: var(--space-2) var(--space-4) var(--space-3);
+    border-left: 0;
+  }
+
+  .syllabus-plan .table-scroll { overflow: visible; }
+
+  .plan-table,
+  .plan-table tbody,
+  .plan-table tfoot { display: block; }
+
+  .plan-table { min-width: 0; }
+
+  .plan-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .plan-table tr {
+    display: grid;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .syllabus-plan .plan-table th,
+  .syllabus-plan .plan-table td {
+    display: block;
+    width: auto;
+    height: auto;
+    padding: 0;
+    border: 0;
+    background: none;
+    white-space: normal;
+  }
+
+  .syllabus-plan .plan-table .num { display: none; }
+
+  .plan-row__summary {
+    display: block;
+    margin-top: var(--space-1);
+    color: var(--text-muted);
+    font-size: var(--hint-fs);
+  }
+
+  .plan-row__hours { white-space: nowrap; }
+
+  .plan-unit__head { border-bottom: 0; }
+
+  .syllabus-plan .plan-unit__head th { padding-top: var(--space-2); }
+
+  .plan-unit + .plan-unit .plan-unit__head { border-top: 1px solid var(--border-strong); }
+
+  .syllabus-plan .plan-unit + .plan-unit .plan-unit__head th { border-top: 0; }
+
+  .plan-row.is-control {
+    background: var(--warning-wash);
+    box-shadow: inset 3px 0 0 var(--warning);
+  }
+
+  .syllabus-plan .plan-row.is-control td,
+  .syllabus-plan .plan-row.is-control td:first-child { background: none; box-shadow: none; }
+
+  .syllabus-plan .plan-total {
+    border-top: 1px solid var(--border-strong);
+    border-bottom: 0;
+    background: var(--muted);
+  }
+
+  .syllabus-plan .plan-total th,
+  .syllabus-plan .plan-total td { border: 0; background: none; }
+
+  .plan-total .plan-row__summary {
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .about { padding-inline: var(--space-4); }
+}
 
 @media (max-width: 36rem) {
   .week-nav { margin-left: 0; }

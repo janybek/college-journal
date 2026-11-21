@@ -17,6 +17,8 @@ const STUDENT_SECTIONS = [
 const subjects = { owner: null, list: null, errorKey: null, pending: null };
 // The student's pairs of «today» (the server says which day that is), kept the same way.
 const today = { owner: null, date: null, pairs: null, errorKey: null, pending: null };
+// The subjects of the student's group, kept the same way.
+const groupSubjects = { owner: null, list: null, errorKey: null, pending: null };
 
 export function render(root) {
   const user = getUser();
@@ -35,6 +37,7 @@ function renderStudent(root, user) {
           el('span', { class: 'muted' }, t('home.group')),
           user.groupName ? badge(user.groupName, 'primary') : el('span', { class: 'muted' }, t('home.noGroup'))))),
     todaySection(user),
+    studentSubjectsSection(user),
     el('ul', { class: 'soon-list' }, STUDENT_SECTIONS.map(([title, text, iconName]) => el('li', { class: 'card soon' },
       el('span', { class: 'soon__icon' }, icon(iconName)),
       el('div', { class: 'soon__body' },
@@ -96,6 +99,58 @@ function loadToday(user) {
   return today.pending;
 }
 
+// «Предметы»: the subjects of the group and who teaches them; a subject with a syllabus opens its page.
+function studentSubjectsSection(user) {
+  const body = el('div', { class: 'courses__body', 'aria-live': 'polite' });
+  const draw = () => body.replaceChildren(studentSubjectsBody(user, draw));
+  draw();
+  loadGroupSubjects(user).then(draw);
+  return el('section', { class: 'card courses', 'aria-labelledby': 'home-courses' },
+    el('header', { class: 'today__head' },
+      el('span', { class: 'soon__icon courses__icon' }, icon('book')),
+      el('h2', { class: 'soon__title', id: 'home-courses' }, t('home.subjects'))),
+    body);
+}
+
+function studentSubjectsBody(user, redraw) {
+  if (groupSubjects.list) {
+    if (groupSubjects.list.length === 0) return el('p', { class: 'today__none' }, t('home.subjectsNone'));
+    return el('ul', { class: 'courses__list' }, groupSubjects.list.map((subject) => {
+      const text = el('span', { class: 'course__text' },
+        el('span', { class: 'course__name' }, subject.name),
+        subject.teacherName ? el('span', { class: 'course__teacher' }, subject.teacherName) : null,
+        subject.hasSyllabus ? null : el('span', { class: 'course__none' }, t('home.noSyllabus')));
+      return el('li', {}, subject.hasSyllabus
+        ? el('a', { class: 'course is-link', href: '#/syllabus/' + subject.id }, text, icon('chevron', 'course__go'))
+        : el('div', { class: 'course' }, text));
+    }));
+  }
+  if (groupSubjects.errorKey && !groupSubjects.pending) {
+    return el('div', { class: 'today__failed', role: 'alert' },
+      el('p', {}, t(groupSubjects.errorKey)),
+      el('button', {
+        type: 'button', class: 'button button--secondary',
+        onclick: () => { loadGroupSubjects(user).then(redraw); redraw(); },
+      }, t('common.retry')));
+  }
+  return el('p', { class: 'loading' }, t('common.loading'));
+}
+
+function loadGroupSubjects(user) {
+  if (groupSubjects.owner !== user.id) Object.assign(groupSubjects, { owner: user.id, list: null, errorKey: null, pending: null });
+  if (!groupSubjects.pending) {
+    const owner = user.id;
+    const mine = () => groupSubjects.owner === owner;
+    groupSubjects.pending = call('student.subjects', {})
+      .then(
+        (data) => { if (mine()) Object.assign(groupSubjects, { list: data.subjects, errorKey: null }); },
+        (error) => { if (mine()) groupSubjects.errorKey = errorKey(error.code); },
+      )
+      .finally(() => { if (mine()) groupSubjects.pending = null; });
+  }
+  return groupSubjects.pending;
+}
+
 // Staff: an overview of what the active role works with. The role is switched in the sidebar.
 function renderStaff(root, user) {
   const role = activeRole(user);
@@ -137,14 +192,14 @@ function subjectsSection(user) {
 function subjectsBody(user, redraw) {
   if (subjects.list) {
     if (subjects.list.length === 0) return emptyState('book', el('p', {}, t('home.noSubjects')));
-    const plans = (Array.isArray(user.permissions) ? user.permissions : []).includes('topics.plan');
+    const plans = (Array.isArray(user.permissions) ? user.permissions : []).includes('syllabus.get');
     return el('ul', { class: 'card list' }, subjects.list.map((subject) => el('li', { class: 'list__row subject' },
       el('span', { class: 'list__icon' }, icon('book')),
       el('span', { class: 'subject__name', id: 'subject-' + subject.id }, subject.name),
       subject.groupName ? badge(subject.groupName, 'primary') : null,
       el('span', { class: 'subject__count' }, t('home.studentCount', { count: subject.studentCount })),
       plans ? el('a', {
-        class: 'button button--secondary subject__plan', href: '#/plan/' + subject.id, 'aria-describedby': 'subject-' + subject.id,
+        class: 'button button--secondary subject__plan', href: '#/syllabus/' + subject.id, 'aria-describedby': 'subject-' + subject.id,
       }, icon('clipboard'), t('home.syllabus')) : null)));
   }
   if (subjects.errorKey && !subjects.pending) {

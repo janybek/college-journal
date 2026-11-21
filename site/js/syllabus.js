@@ -1,27 +1,46 @@
-import { FIELDS } from './views/directoryConfig.js';
+// The syllabus page of a subject (#/syllabus/<subjectId>) without the DOM: the rows are those of syllabus.get,
+// in the order of the plan, which is the order of the pairs.
 
-// The topic plan of a subject split into semesters (no DOM). Each semester has its own numbers and modules;
-// the server lays only the topics of the current semester (`plan.semester`) on pairs.
-
-// The topics of one semester, by number.
-export function semesterTopics(plan, semester) {
-  return plan.topics.filter((topic) => topic.semester === semester).sort((a, b) => a.order - b.order);
+// '2026-09-01' -> '01.09'
+export function shortDate(date) {
+  return date.slice(8, 10) + '.' + date.slice(5, 7);
 }
 
-// Number and module for a new topic of a semester: the number after the largest one, the module of the last topic.
-// After the largest number a topic may have there is none to offer: `order` is null and the person types one.
-export function nextTopic(topics) {
-  if (topics.length === 0) return { order: 1, unit: 1 };
-  const last = topics.reduce((a, b) => (b.order > a.order ? b : a));
-  return { order: last.order < FIELDS.order.max ? last.order + 1 : null, unit: last.unit };
+// Rows of one unit that stand together: [{ unit, rows }].
+export function unitGroups(rows) {
+  const groups = [];
+  for (const row of rows) {
+    const last = groups[groups.length - 1];
+    if (last && last.unit === row.unit) last.rows.push(row);
+    else groups.push({ unit: row.unit, rows: [row] });
+  }
+  return groups;
 }
 
-// What to warn about on the tab of a semester. Only the current semester stands on pairs, so another one has
-// nothing to warn about: its topics wait for the switch of the semester.
-export function planWarnings(plan, semester) {
-  if (semester !== plan.semester) return { notPlaced: 0, withoutTopic: 0 };
-  return {
-    notPlaced: semesterTopics(plan, semester).filter((topic) => topic.pair === null).length,
-    withoutTopic: plan.withoutTopic,
-  };
+// Topics (not modules) that have a description, in the order of the plan.
+export function describedRows(rows) {
+  return rows.filter((row) => row.kind !== 'control' && typeof row.description === 'string' && row.description.trim() !== '');
+}
+
+// The plan has a column «СРС»: at least one row has a number there (zero is a number too).
+export function hasSelfHours(rows) {
+  return rows.some((row) => typeof row.selfHours === 'number');
+}
+
+// How many pairs of the row are still without a date. Only the current semester has dates at all.
+export function undated(row, isCurrent) {
+  return isCurrent ? Math.max(0, row.planned - row.pairs.length) : 0;
+}
+
+// What the page says about the plan and the schedule of the semester: [{ tone, key, params }].
+export function scheduleNotes(view) {
+  const { schedule, totals } = view.syllabus;
+  if (schedule === null) return [{ tone: 'info', key: 'syllabus.otherSemester' }];
+  if (schedule.pairs === 0) return [{ tone: 'info', key: 'syllabus.noSchedule' }];
+  const notes = [];
+  if (schedule.unplaced > 0) {
+    notes.push({ tone: 'warning', key: 'syllabus.unplaced', params: { count: schedule.unplaced, planned: totals.pairs, scheduled: schedule.pairs } });
+  }
+  if (schedule.withoutTopic > 0) notes.push({ tone: 'info', key: 'syllabus.spare', params: { count: schedule.withoutTopic } });
+  return notes.length > 0 ? notes : [{ tone: 'success', key: 'syllabus.fits', params: { pairs: schedule.pairs } }];
 }

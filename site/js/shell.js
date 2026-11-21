@@ -52,9 +52,6 @@ export function navFor(permissionList, role) {
   if (list.includes('dir.list:weekTemplate')) {
     schedule.push({ name: 'weekTemplate', href: '#/template', textKey: 'template.title', icon: 'grid', hintKey: 'template.hint' });
   }
-  if (list.includes('dir.list:topics')) {
-    schedule.push({ name: 'topics', href: '#/topics', textKey: 'topics.title', icon: 'clipboard', hintKey: 'topics.hint' });
-  }
   if (list.includes('settings.get')) {
     schedule.push({ name: 'settings', href: '#/settings', textKey: 'settings.title', icon: 'settings', hintKey: 'settings.hint' });
   }
@@ -161,18 +158,20 @@ function studentFrame(main, { onLang, onLogout }) {
 
 // Staff
 
-// The menu item of a screen. The syllabus of a subject is part of «Темы».
-function currentName(view, params) {
+// The menu item of a screen. The syllabus page of a subject belongs to the deanery's «Предметы», and to the
+// teacher's «Мои предметы» (their home).
+function currentName(view, params, role) {
   if (view === 'directory') return params.table;
   if (view === 'import' && params.subjectId) return 'topics';
+  if (view === 'syllabus') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;
 }
 
 function staffFrame(user, view, params, main, { onLang, onLogout }) {
   const role = activeRole(user);
   const groups = navFor(user.permissions, role);
-  const current = currentName(view, params);
-  const body = el('div', { class: 'shell__body' }, topbar(groups, view, params, current, onLang), main);
+  const current = currentName(view, params, role);
+  const body = el('div', { class: 'shell__body' }, topbar(groups, view, params, current, role, onLang), main);
   body.inert = drawerOpen;
   return el('div', { class: 'shell' + (drawerOpen ? ' is-drawer-open' : '') },
     el('a', { class: 'skip-link', href: '#app', onclick: (event) => { event.preventDefault(); main.focus(); } }, t('nav.skip')),
@@ -216,22 +215,24 @@ function userBlock(user, role, onLogout) {
     logoutButton(onLogout, 'user__logout'));
 }
 
-function topbar(groups, view, params, current, onLang) {
+function topbar(groups, view, params, current, role, onLang) {
   return el('header', { class: 'topbar' },
     iconButton({
       id: 'menu-open', iconName: 'menu', label: t('nav.menu'), className: 'topbar__menu',
       onClick: () => setDrawer(true, false), attrs: { 'aria-controls': 'sidebar', 'aria-expanded': String(drawerOpen) },
     }),
-    crumbs(groups, view, params, current),
+    crumbs(groups, view, params, current, role),
     el('div', { class: 'topbar__tools' }, langSwitch(onLang), themeToggle()));
 }
 
 // Where the person is: the menu group and the page. A page opened by its address may be outside this role's menu.
-function crumbs(groups, view, params, current) {
+function crumbs(groups, view, params, current, role) {
   let groupKey = null;
   let pageKey = null;
   // The syllabus of a subject: under «Расписание» for the deanery, under the teacher's own subjects otherwise.
-  if (view === 'import' && params.subjectId) {
+  if (view === 'syllabus') {
+    [groupKey, pageKey] = [menuParts(role).includes('office') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
+  } else if (view === 'import' && params.subjectId) {
     [groupKey, pageKey] = [permissions().includes('dir.list:topics') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
   } else {
     for (const group of groups) {
@@ -245,9 +246,7 @@ function crumbs(groups, view, params, current) {
     else if (view === 'schedule') [groupKey, pageKey] = ['nav.schedule', 'schedule.title'];
     else if (view === 'settings') [groupKey, pageKey] = ['nav.schedule', 'settings.title'];
     else if (view === 'weekTemplate') [groupKey, pageKey] = ['nav.schedule', 'template.title'];
-    else if (view === 'topics') [groupKey, pageKey] = ['nav.schedule', 'topics.title'];
     else if (view === 'mySchedule') [groupKey, pageKey] = ['nav.teaching', 'my.title'];
-    else if (view === 'plan') [groupKey, pageKey] = ['home.mySubjects', 'plan.title'];
     else pageKey = 'nav.home';
   }
   // «Расписание › Расписание»: a page named like its group is one crumb.

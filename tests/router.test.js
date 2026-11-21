@@ -40,12 +40,6 @@ test('resolveRoute: the week template of a group and its weekday', () => {
   assert.equal(resolveRoute('#/template/g_12ab34cd/3', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'home');
 });
 
-test('resolveRoute: the topics screen needs dir.list:topics', () => {
-  const office = { mustChangePassword: false, permissions: ['settings.get', 'dir.list:groups', 'dir.list:topics', 'dir.list:weekTemplate'] };
-  assert.equal(resolveRoute('#/topics', office).view, 'topics');
-  assert.deepEqual(resolveRoute('#/topics', office).params, {});
-  assert.equal(resolveRoute('#/topics', { mustChangePassword: false, permissions: ['dir.list:weekTemplate'] }).view, 'home');
-});
 
 test('resolveRoute: the deanery schedule needs schedule.list', () => {
   assert.equal(resolveRoute('#/schedule', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'schedule');
@@ -53,26 +47,32 @@ test('resolveRoute: the deanery schedule needs schedule.list', () => {
   assert.equal(resolveRoute('#/schedule', { mustChangePassword: false, permissions: ['schedule.mine'] }).view, 'home');
 });
 
-test('resolveRoute: my own schedule needs schedule.mine; the topic plan of a subject needs topics.plan', () => {
+test('resolveRoute: my own schedule needs schedule.mine', () => {
   const student = { mustChangePassword: false, permissions: ['schedule.mine'] };
   assert.equal(resolveRoute('#/my', student).view, 'mySchedule');
   assert.equal(resolveRoute('#/my', { mustChangePassword: false, permissions: ['schedule.list'] }).view, 'home');
-  assert.deepEqual(resolveRoute('#/plan/sb_12ab34cd', { mustChangePassword: false, permissions: ['topics.plan'] }), { view: 'plan', params: { subjectId: 'sb_12ab34cd' } });
+  assert.equal(resolveRoute('#/plan/sb_12ab34cd', { mustChangePassword: false, permissions: ['topics.plan'] }).view, 'home');
   assert.equal(resolveRoute('#/plan/sb_12ab34cd', student).view, 'home');
 });
 
-test('resolveRoute: the syllabus upload and the topics screen with a subject', () => {
+test('resolveRoute: the syllabus without a subject and the import screen', () => {
   const teacher = { mustChangePassword: false, permissions: ['dir.save:topics', 'syllabus.apply', 'syllabus.preview', 'topics.plan'] };
   const dean = { mustChangePassword: false, permissions: ['dir.list:topics', 'import.apply:topics', 'import.preview:topics', 'syllabus.apply'] };
-  assert.deepEqual(resolveRoute('#/syllabus/sb_12ab34cd', teacher), { view: 'import', params: { subjectId: 'sb_12ab34cd' } });
-  assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', { mustChangePassword: false, permissions: ['topics.plan'] }).view, 'home');
+  assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', teacher).view, 'home');                 // без syllabus.get страницы силлабуса нет
   assert.equal(resolveRoute('#/syllabus', teacher).view, 'home');
   assert.equal(resolveRoute('#/import', teacher).view, 'home');                                // общий импорт преподавателю не открывается
   assert.deepEqual(resolveRoute('#/import', dean), { view: 'import', params: {} });
-  const office = { mustChangePassword: false, permissions: ['dir.list:topics'] };
-  assert.deepEqual(resolveRoute('#/topics', office), { view: 'topics', params: {} });
-  assert.deepEqual(resolveRoute('#/topics/sb_12ab34cd', office), { view: 'topics', params: { subjectId: 'sb_12ab34cd' } });
-  assert.equal(resolveRoute('#/topics/sb_12ab34cd', teacher).view, 'home');
+});
+
+test('resolveRoute: the syllabus page of a subject needs syllabus.get; the topics screen and the plan page are gone', () => {
+  const viewer = { mustChangePassword: false, permissions: ['syllabus.get'] };
+  assert.deepEqual(resolveRoute('#/syllabus/sb_12ab34cd', viewer), { view: 'syllabus', params: { subjectId: 'sb_12ab34cd' } });
+  assert.deepEqual(resolveRoute('#/syllabus/sb_12ab34cd/2', viewer), { view: 'syllabus', params: { subjectId: 'sb_12ab34cd', semester: 2 } });
+  assert.equal(resolveRoute('#/syllabus/sb_12ab34cd/3', viewer).view, 'home');
+  assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', { mustChangePassword: false, permissions: ['syllabus.apply'] }).view, 'home');
+  for (const old of ['#/topics', '#/topics/sb_1', '#/plan/sb_1']) {
+    assert.equal(resolveRoute(old, { mustChangePassword: false, permissions: ['dir.list:topics', 'topics.plan', 'syllabus.get'] }).view, 'home', old);
+  }
 });
 
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {

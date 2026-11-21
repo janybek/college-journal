@@ -2,7 +2,7 @@ import { t } from '../i18n.js';
 import { el, badge, iconButton, avatarTone } from '../ui.js';
 import { icon } from '../icons.js';
 import { addDays, dayParts, isTime } from '../dates.js';
-import { pairFlags } from '../pairs.js';
+import { pairFlags, topicText, lessonTypeKey, lessonParts } from '../pairs.js';
 
 // Parts shared by the schedule screens: the deanery's «Расписание» and the teacher's and student's own week.
 // Everything from the server goes in as text.
@@ -44,8 +44,22 @@ export function weekNav({ from, onChange }) {
     el('button', { type: 'button', id: 'week-this', class: 'button button--secondary week-nav__this', onclick: () => onChange(null) }, t('pairs.thisWeek')));
 }
 
-export function typeBadge(type) {
-  return LESSON_TYPES.includes(type) ? badge(t('lessonType.' + type), TYPE_TONES[type]) : null;
+// The lesson on a pair (`topic` of a pair view), as pieces to put in a line: its text, its type («Практика 1 из 2»
+// when the row has more than one pair of this type) and, when modules without hours are marked on it, «Модуль»
+// with their names (two can stand after one lesson).
+export function lessonPieces(topic) {
+  const { key, params } = topicText(topic);
+  const type = t(lessonTypeKey(topic));
+  const parts = lessonParts(topic);
+  const controls = Array.isArray(topic.controls) ? topic.controls : [];
+  return [
+    el('span', { class: 'lesson-text' }, t(key, params)),
+    LESSON_TYPES.includes(topic.lessonType)
+      ? badge(parts ? t('pairs.lessonPart', { type, part: parts.part, parts: parts.parts }) : type, TYPE_TONES[topic.lessonType]) : null,
+    controls.length > 0 ? el('span', { class: 'lesson-controls' },
+      badge(t('pairs.unitControl'), 'warning'),
+      el('span', { class: 'lesson-controls__names' }, controls.map((mark) => mark.name || t('syllabus.controlN', { n: mark.unit })).join(' · '))) : null,
+  ];
 }
 
 // One pair. show: which of ['group', 'teacher'] to name; onOpen(pair): the card becomes a button.
@@ -77,9 +91,7 @@ export function pairCard(pair, { show = [], onOpen = null } = {}) {
 
 function topicLine(topic) {
   if (!topic) return el('span', { class: 'pair__topic is-none' }, t('pairs.noTopic'));
-  return el('span', { class: 'pair__topic' },
-    el('span', {}, t('pairs.topic', { n: topic.order, name: topic.name })),
-    typeBadge(topic.lessonType));
+  return el('span', { class: 'pair__topic' }, lessonPieces(topic));
 }
 
 // The badge of a flag; a moved pair also says where it was by the plan.

@@ -9,7 +9,7 @@ import { permissions } from '../shell.js';
 import { getToken } from '../session.js';
 import { addDays, addMinutes, isDate, isTime, mondayOf } from '../dates.js';
 import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref } from '../pairs.js';
-import { weekNav, dayList, pairCardId, pairTime, weekdayDate, typeBadge, flagBadge } from './pairParts.js';
+import { weekNav, dayList, pairCardId, pairTime, weekdayDate, lessonPieces, flagBadge } from './pairParts.js';
 
 // The deanery's schedule (#/schedule): the week of a group or of a teacher, or one day across all groups. A pair
 // that may still change opens a dialog to substitute the teacher, move the pair, change the room or cancel it;
@@ -330,7 +330,7 @@ function dayTable(pairs) {
 
 function topicCell(topic) {
   if (!topic) return el('span', { class: 'muted' }, t('pairs.noTopic'));
-  return el('span', { class: 'schedule-table__topic' }, el('span', {}, t('pairs.topic', { n: topic.order, name: topic.name })), typeBadge(topic.lessonType));
+  return el('span', { class: 'schedule-table__topic' }, lessonPieces(topic));
 }
 
 function statusCell(pair) {

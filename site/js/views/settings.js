@@ -137,7 +137,7 @@ function semesterPanel(editable) {
     semesterSwitch(editable));
 }
 
-// «Сейчас идёт: 1 семестр / 2 семестр»: the topics of this semester go on the pairs. Read-only, the chosen one
+// «Сейчас идёт: 1 семестр / 2 семестр»: the syllabi of this semester go on the pairs. Read-only, the chosen one
 // stays plain to read and nothing can be pressed.
 function semesterSwitch(editable) {
   const error = state.errors.semester;
@@ -150,7 +150,7 @@ function semesterSwitch(editable) {
     }, SEMESTERS.map((n) => el('button', {
       type: 'button', id: 'settings-semester-' + n, class: 'segmented__button', 'aria-pressed': String(state.values.semester === n),
       disabled: !editable, onclick: () => chooseSemester(n),
-    }, t('topics.semesterN', { n })))),
+    }, t('syllabus.semesterN', { n })))),
     error ? fieldLine('settings-semester-error', t(error.key, error.params)) : null);
 }
 
