@@ -1,6 +1,7 @@
 import { FIXED_STATUSES } from './schema.js';
 
 export const DEFAULT_SEMESTER = 1;
+export const HOURS_PER_PAIR = 2;
 
 // A row without a semester (or with a wrong one) belongs to semester 1.
 export const semesterOf = (topic) => (topic && topic.semester === 2 ? 2 : DEFAULT_SEMESTER);
