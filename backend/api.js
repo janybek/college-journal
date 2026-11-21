@@ -7,6 +7,7 @@ import { dirHandlers } from './handlers/dir.js';
 import { importHandlers } from './handlers/import.js';
 import { settingsHandlers } from './handlers/settings.js';
 import { scheduleHandlers } from './handlers/schedule.js';
+import { subjectHandlers } from './handlers/subjects.js';
 
 // Single entry point of the server. No Node-only APIs: this file is bundled for Apps Script.
 export { publicUser } from './users.js';
@@ -22,6 +23,7 @@ registerHandlers(dirHandlers);
 registerHandlers(importHandlers);
 registerHandlers(settingsHandlers);
 registerHandlers(scheduleHandlers);
+registerHandlers(subjectHandlers);
 
 // Test seam: runs `fn` with `map` applied (a null value removes that action), then restores the registry.
 export function withHandlers(map, fn) {

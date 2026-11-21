@@ -10,7 +10,8 @@ const makeDb = () => ({
     { id: 'sf_2', fullName: 'Двойной Тёзка', login: 'twin1', roles: 'teacher', lang: 'ru', active: true },
     { id: 'sf_3', fullName: 'Двойной Тёзка', login: 'twin2', roles: 'teacher', lang: 'ru', active: true },
   ],
-  subjects: [{ id: 'sb_1', name: 'Математика', teacherId: 'sf_1', groupId: 'g_1', scheme: 'A' }],
+  disciplines: [{ id: 'ds_1', name: 'Математика' }, { id: 'ds_2', name: 'Физика' }, { id: 'ds_3', name: 'Химия' }, { id: 'ds_4', name: 'Музыка' }, { id: 'ds_5', name: 'Спорт' }],
+  subjects: [{ id: 'sb_1', name: 'Математика', disciplineId: 'ds_1', teacherId: 'sf_1', groupId: 'g_1', scheme: 'A' }],
   rooms: [],
 });
 
@@ -97,11 +98,26 @@ test('subjects: teacher by login, by full name, ambiguous name, unknown', () => 
   assert.deepEqual(r.records.map(x => [x.row, x.teacherId]), [[2, 'sf_1'], [3, 'sf_1']]);
 });
 
-test('subjects: (name, group) pair is the key', () => {
-  const db = makeDb();
-  const r = parseSheet('subjects', [['Название', 'Преподаватель', 'Группа'], ['математика', 'ivanov', '01-1']], db);
-  assert.deepEqual(r.errors, []);
-  assert.deepEqual(planImport('subjects', r.records, db).toUpdate, [{ id: 'sb_1', patch: { teacherId: 'sf_1' } }]);
+test('subjects: (discipline, group) pair is the key', () => {
+  const same = parseSheet('subjects', [['Название', 'Преподаватель', 'Группа'], ['математика', 'ivanov', '01-1']], makeDb());
+  assert.deepEqual([same.errors, planImport('subjects', same.records, makeDb()).toUpdate], [[], [{ id: 'sb_1', patch: { teacherId: 'sf_1', name: 'Математика' } }]]);
+});
+
+test('subjects: the discipline comes from the directory', () => {
+  const idb = {
+    ...makeDb(),
+    groups: [{ id: 'g_1', name: '01-1', course: 1 }, { id: 'g_2', name: '02-1', course: 2 }],
+    disciplines: [{ id: 'ds_1', name: 'Математика' }],
+    subjects: [{ id: 'sb_1', name: 'Математика', disciplineId: 'ds_1', teacherId: 'sf_2', groupId: 'g_1', scheme: 'A' }],      // sf_1 — ivanov, sf_2 — twin1
+  };
+  const r = parseSheet('subjects', [['Дисциплина', 'Преподаватель', 'Группа'], [' математика ', 'ivanov', '01-1'], ['Физика', 'ivanov', '01-1'], ['Математика', 'ivanov', '02-1']], idb);
+  assert.deepEqual(r.errors, [{ row: 3, field: 'disciplineId', code: 'bad_ref' }]);
+  assert.deepEqual(r.records.map((x) => [x.row, x.disciplineId, x.name, x.groupId]), [[2, 'ds_1', 'Математика', 'g_1'], [4, 'ds_1', 'Математика', 'g_2']]);
+  const plan = planImport('subjects', r.records, idb);
+  assert.deepEqual([plan.toUpdate, plan.toInsert.map((x) => [x.disciplineId, x.name, x.groupId])], [[{ id: 'sb_1', patch: { teacherId: 'sf_1', name: 'Математика' } }], [['ds_1', 'Математика', 'g_2']]]);
+  for (const title of ['Название', 'Аталышы', 'Name', 'Предмет', 'Discipline']) {
+    assert.deepEqual(parseSheet('subjects', [[title, 'Преподаватель', 'Группа'], ['Математика', 'ivanov', '02-1']], idb).missingColumns, [], title);
+  }
 });
 
 test('groups: course coerced, bad course reported, repeat in file is duplicate', () => {

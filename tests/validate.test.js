@@ -6,7 +6,7 @@ const db = {
   groups: [{ id: 'g_1', name: '01-1', course: 1 }],
   students: [{ id: 'st_1', fullName: 'А', cardNo: 'S1001', groupId: 'g_1', lang: 'ky', active: true }],
   staff: [{ id: 'sf_1', fullName: 'Б', login: 'admin', roles: 'admin', lang: 'ru', active: true }],
-  subjects: [], rooms: [],
+  subjects: [], rooms: [], disciplines: [{ id: 'ds_1', name: 'Информатика' }],
 };
 
 test('normalizeRow trims, collapses spaces, coerces types and applies defaults', () => {
@@ -54,8 +54,23 @@ test('staff: cannot deactivate the last active admin', () => {
 });
 
 test('subjects: teacher must have the teacher role', () => {
-  assert.deepEqual(validateRow('subjects', { name: 'Информатика', teacherId: 'sf_1', groupId: 'g_1', scheme: 'A' }, db),
+  assert.deepEqual(validateRow('subjects', { name: 'Информатика', disciplineId: 'ds_1', teacherId: 'sf_1', groupId: 'g_1', scheme: 'A' }, db),
     [{ field: 'teacherId', code: 'bad_value' }]);
+});
+
+test('subjects: the discipline is a reference, once per group', () => {
+  const sdb = {
+    groups: [{ id: 'g_1', name: '01-1', course: 1 }, { id: 'g_2', name: '02-1', course: 2 }],
+    staff: [{ id: 'sf_1', fullName: 'Иванов Иван', login: 'ivanov', roles: 'teacher', lang: 'ru', active: true }],
+    disciplines: [{ id: 'ds_1', name: 'Информатика' }],
+    subjects: [{ id: 'sb_1', name: 'Информатика', disciplineId: 'ds_1', teacherId: 'sf_1', groupId: 'g_1', scheme: 'A' }],
+  };
+  const subject = (patch) => validateRow('subjects', { name: '', disciplineId: 'ds_1', teacherId: 'sf_1', groupId: 'g_2', scheme: 'A', ...patch }, sdb);
+  assert.deepEqual(subject({}), []);                                                       // the name is not checked
+  assert.deepEqual(subject({ disciplineId: '' }), [{ field: 'disciplineId', code: 'bad_ref' }]);
+  assert.deepEqual(subject({ disciplineId: 'ds_x' }), [{ field: 'disciplineId', code: 'bad_ref' }]);
+  assert.deepEqual(subject({ groupId: 'g_1' }), [{ field: 'disciplineId', code: 'duplicate' }]);
+  assert.deepEqual(subject({ id: 'sb_1', groupId: 'g_1' }), []);
 });
 
 test('students: a row is not a duplicate of itself', () => {
@@ -105,10 +120,11 @@ test('subjects: a new teacher must be free at every template slot of the subject
   const sdb = {
     groups: [{ id: 'g_1' }, { id: 'g_2' }],
     staff: [{ id: 'sf_1', roles: 'teacher' }, { id: 'sf_2', roles: 'teacher' }],
-    subjects: [{ id: 'sb_1', name: 'Информатика', teacherId: 'sf_1', groupId: 'g_1' }, { id: 'sb_2', name: 'Анатомия', teacherId: 'sf_2', groupId: 'g_2' }],
+    disciplines: [{ id: 'ds_1', name: 'Информатика' }, { id: 'ds_2', name: 'Анатомия' }],
+    subjects: [{ id: 'sb_1', name: 'Информатика', disciplineId: 'ds_1', teacherId: 'sf_1', groupId: 'g_1' }, { id: 'sb_2', name: 'Анатомия', disciplineId: 'ds_2', teacherId: 'sf_2', groupId: 'g_2' }],
     weekTemplate: [{ id: 'wt_1', weekday: 1, slot: 1, subjectId: 'sb_1', roomId: '' }, { id: 'wt_2', weekday: 1, slot: 1, subjectId: 'sb_2', roomId: '' }],
   };
-  const row = { id: 'sb_2', name: 'Анатомия', groupId: 'g_2', scheme: 'A' };
+  const row = { id: 'sb_2', name: 'Анатомия', disciplineId: 'ds_2', groupId: 'g_2', scheme: 'A' };
   assert.deepEqual(validateRow('subjects', { ...row, teacherId: 'sf_1' }, sdb), [{ field: 'teacherId', code: 'teacher_busy' }]);
   assert.deepEqual(validateRow('subjects', { ...row, teacherId: 'sf_2' }, sdb), []);
   assert.deepEqual(validateRow('subjects', { ...row, teacherId: 'sf_1' }, { ...sdb, weekTemplate: undefined }), []);

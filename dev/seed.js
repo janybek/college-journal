@@ -68,6 +68,8 @@ export function seed(store, platform) {
   const staff = STAFF.map((person) => store.insert('staff', { ...person, ...common, lang: 'ru' }));
   const teacher1 = staff.find((person) => person.login === 'teacher1');
   const teacher2 = staff.find((person) => person.login === 'teacher2');
+  const teacher3 = staff.find((person) => person.login === 'teacher3');
+  const disciplines = Object.fromEntries(['Информатика', 'Анатомия'].map((name) => [name, store.insert('disciplines', { name })]));
   const rooms = {};
   for (const name of ['101', '204', '305']) rooms[name] = store.insert('rooms', { name });
 
@@ -87,8 +89,12 @@ export function seed(store, platform) {
       });
     }
     store.insertMany('students', students);
-    const informatics = store.insert('subjects', { name: 'Информатика', teacherId: teacher1.id, groupId: group.id, scheme: 'A' });
-    const anatomy = store.insert('subjects', { name: 'Анатомия', teacherId: teacher2.id, groupId: group.id, scheme: 'A' });
+    // Informatics: teacher1 in 01-1 and 02-1, teacher3 in 03-1; anatomy: teacher2 everywhere.
+    const subject = (discipline, teacher) => store.insert('subjects', {
+      name: discipline.name, disciplineId: discipline.id, teacherId: teacher.id, groupId: group.id, scheme: 'A',
+    });
+    const informatics = subject(disciplines['Информатика'], g < 2 ? teacher1 : teacher3);
+    const anatomy = subject(disciplines['Анатомия'], teacher2);
     store.insertMany('topics', topicRows(informatics.id));
     // Monday: informatics in room 204; Wednesday and Thursday: anatomy in room 101. The pair number is the group number.
     store.insertMany('weekTemplate', [

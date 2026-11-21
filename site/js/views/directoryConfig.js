@@ -19,7 +19,7 @@ export const IMPORT_COLUMNS = {
   students: [col('fullName', true), col('cardNo', true), col('groupId', true), col('lang', false)],
   staff: [col('fullName', true), col('login', true), col('roles', true), col('lang', false)],
   disciplines: [col('name', true)],
-  subjects: [col('name', true), col('teacherId', true), col('groupId', true)],
+  subjects: [col('disciplineId', true), col('teacherId', true), col('groupId', true)],
   topics: [col('subjectId', true), col('groupId', true), col('semester', true), col('unit', true), col('order', true), col('name', true), col('lessonType', true)],
   // The teacher's own file of a subject: the subject is chosen on the screen, not named in the file.
   syllabus: [col('semester', true), col('unit', true), col('order', true), col('name', true), col('lessonType', true)],
@@ -37,6 +37,7 @@ export const FIELDS = {
   login: { kind: 'text', required: true, maxLength: 40, id: true },
   groupId: { kind: 'group', required: true },
   teacherId: { kind: 'teacher', required: true },
+  disciplineId: { kind: 'text', required: true },
   lang: { kind: 'lang' },
   roles: { kind: 'roles' },
   active: { kind: 'active', existingOnly: true },

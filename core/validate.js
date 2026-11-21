@@ -103,12 +103,6 @@ const RULES = {
     field('active', () => { if (lastAdmin === 'active') return 'last_admin'; });
   },
   subjects(row, db, field) {
-    field('name', () => {
-      if (!clean(row.name)) return 'required';
-      const pairTaken = (db.subjects || []).some(s =>
-        s.id !== row.id && norm(s.name) === norm(row.name) && s.groupId === row.groupId);
-      if (pairTaken) return 'duplicate';
-    });
     field('teacherId', () => {
       const teacher = (db.staff || []).find(s => s.id === row.teacherId);
       if (!teacher) return 'bad_ref';
@@ -123,6 +117,12 @@ const RULES = {
       }
     });
     field('groupId', () => { if (!exists(db.groups, row.groupId)) return 'bad_ref'; });
+    // The name is the discipline's: the server copies it, nobody types it.
+    field('disciplineId', () => {
+      if (!exists(db.disciplines, row.disciplineId)) return 'bad_ref';
+      const again = (db.subjects || []).some(s => s.id !== row.id && s.groupId === row.groupId && s.disciplineId === row.disciplineId);
+      if (again) return 'duplicate';
+    });
   },
   disciplines(row, db, field) {
     field('name', () => {

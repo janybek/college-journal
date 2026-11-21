@@ -22,7 +22,8 @@ function setup() {
     tokens[login] = call('auth.login', { login, password: 'secret12' }).data.token;
   }
   const g = ['g1', 'g2', 'g3'].map((name) => store.insert('groups', { name, course: 1 }).id);
-  const subj = (name, groupId, teacherId) => store.insert('subjects', { name, groupId, teacherId, scheme: 'A' }).id;
+  const ds = new Map(['Информатика', 'Анатомия', 'Химия'].map((name) => [name, store.insert('disciplines', { name }).id]));
+  const subj = (name, groupId, teacherId) => store.insert('subjects', { name, disciplineId: ds.get(name), groupId, teacherId, scheme: 'A' }).id;
   const sb = [subj('Информатика', g[0], staff.teacher1), subj('Анатомия', g[0], staff.teacher2), subj('Химия', g[1], staff.teacher1)];
   const r = ['r1', 'r2', 'r3'].map((name) => store.insert('rooms', { name }).id);
   call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-12-25', holidays: [], bells: ['08:00', '09:40'] } }, tokens.dean);
@@ -76,7 +77,7 @@ test('directories read only the sheets they need, each once', () => {
   call('dir.save', { table: 'groups', row: { name: '09-9', course: 3 } }, dean);
   assert.deepEqual(reads, ['groups']);
   call('dir.save', { table: 'subjects', row: { id: sb[1], name: 'Анатомия' } }, dean);
-  assert.deepEqual([...reads].sort(), ['groups', 'pairs', 'staff', 'subjects', 'weekTemplate']);
+  assert.deepEqual([...reads].sort(), ['disciplines', 'groups', 'pairs', 'staff', 'subjects', 'weekTemplate']);
   call('dir.remove', { table: 'rooms', id: r[1] }, dean);
   assert.equal(reads.includes('students'), false);
   assert.equal(new Set(reads).size, reads.length);

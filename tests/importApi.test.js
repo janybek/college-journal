@@ -99,16 +99,30 @@ test('subjects import refuses a teacher who is busy in the week template, other 
   const g2 = store.insert('groups', { name: '02-1', course: 1 }).id;
   const teacher = (login) => store.insert('staff', { fullName: login, login, passwordHash: 'x', roles: 'teacher', lang: 'ky', mustChangePassword: false, active: true }).id;
   const [t1, t2, t3] = ['tea1', 'tea2', 'tea3'].map(teacher);
-  const sb1 = store.insert('subjects', { name: 'Информатика', groupId: g1, teacherId: t1, scheme: 'A' }).id;
-  const sb2 = store.insert('subjects', { name: 'Анатомия', groupId: g2, teacherId: t2, scheme: 'A' }).id;
-  const sb3 = store.insert('subjects', { name: 'Химия', groupId: g2, teacherId: t2, scheme: 'A' }).id;
+  const disc = Object.fromEntries(['Информатика', 'Анатомия', 'Химия'].map((name) => [name, store.insert('disciplines', { name }).id]));
+  const subject = (name, groupId, teacherId) => store.insert('subjects', { name, disciplineId: disc[name], groupId, teacherId, scheme: 'A' }).id;
+  const sb1 = subject('Информатика', g1, t1);
+  const sb2 = subject('Анатомия', g2, t2);
+  const sb3 = subject('Химия', g2, t2);
   store.insert('weekTemplate', { weekday: 1, slot: 1, subjectId: sb1, roomId: '' });
   store.insert('weekTemplate', { weekday: 1, slot: 1, subjectId: sb2, roomId: '' });
-  const sheet = [['Название', 'Преподаватель', 'Группа'], ['Анатомия', 'tea1', '02-1'], ['Химия', 'tea3', '02-1']];
+  const sheet = [['Дисциплина', 'Преподаватель', 'Группа'], ['Анатомия', 'tea1', '02-1'], ['Химия', 'tea3', '02-1'], ['Физика', 'tea3', '02-1'], [' информатика ', 'tea3', '02-1']];
   const pre = call('import.preview', { table: 'subjects', cells: sheet }, dean).data;
-  assert.deepEqual(pre.errors, [{ row: 2, field: 'teacherId', code: 'teacher_busy' }]);
+  assert.deepEqual(pre.errors, [{ row: 2, field: 'teacherId', code: 'teacher_busy' }, { row: 4, field: 'disciplineId', code: 'bad_ref' }]);
   const done = call('import.apply', { table: 'subjects', cells: sheet }, dean).data;
-  assert.deepEqual([done.updated, done.skipped, done.errors], [1, 1, [{ row: 2, field: 'teacherId', code: 'teacher_busy' }]]);
+  assert.deepEqual([done.inserted, done.updated, done.skipped, done.errors], [1, 1, 2, pre.errors]);
   assert.equal(store.get('subjects', sb2).teacherId, t2);
   assert.equal(store.get('subjects', sb3).teacherId, t3);
+  assert.deepEqual(store.list('disciplines').map((d) => d.name), ['Информатика', 'Анатомия', 'Химия']);       // the log does not create disciplines
+  const added = store.list('subjects').find((s) => s.groupId === g2 && s.disciplineId === disc['Информатика']);
+  assert.equal(added.name, 'Информатика');                                                                    // name === the discipline's name
+});
+
+test('disciplines import: the deanery loads the list, a known name is not added twice', () => {
+  const { store, call, dean } = setup();
+  const file = [['Название'], ['Анатомия'], ['Информатика'], [' анатомия ']];
+  const first = call('import.apply', { table: 'disciplines', cells: file }, dean).data;
+  assert.deepEqual([first.inserted, first.updated, first.skipped, first.errors], [2, 0, 1, [{ row: 4, field: 'name', code: 'duplicate' }]]);
+  assert.deepEqual(store.list('disciplines').map((x) => x.name), ['Анатомия', 'Информатика']);
+  assert.deepEqual([call('import.apply', { table: 'disciplines', cells: file.slice(0, 3) }, dean).data.inserted, store.list('disciplines').length], [0, 2]);
 });

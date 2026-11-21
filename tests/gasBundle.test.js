@@ -109,6 +109,31 @@ test('setup is idempotent: default sheet gone once, same spreadsheet, one admin 
   assert.equal(spreadsheet.dump('Сотрудники').length, 2);
 });
 
+test('setup links the subjects of a unit 1 spreadsheet to disciplines, and a second setup changes nothing', () => {
+  const { gas, sandbox } = load();
+  const old = gas.globals.SpreadsheetApp.create('unit 1');
+  const sheet = old.insertSheet('Предметы');
+  sheet.appendRow(['id', 'название', 'преподаватель', 'группа', 'схема оценивания']);
+  sheet.appendRow(['sb_a', 'Информатика', 'sf_x', 'g_1', 'A']);
+  sheet.appendRow(['sb_b', ' информатика ', 'sf_x', 'g_2', 'A']);
+  sheet.appendRow(['sb_c', '', 'sf_x', 'g_3', 'A']);
+  gas.properties.set('SPREADSHEET_ID', old.getId());
+  const first = sandbox.setup();
+  const header = () => old.dump('Предметы')[0];
+  assert.equal(header().includes('дисциплина'), true);
+  const column = (title) => old.dump('Предметы').slice(1).map((r) => r[header().indexOf(title)]);
+  const links = column('дисциплина');
+  assert.equal(links[0] !== '' && links[0] === links[1] && !links[2], true);
+  assert.deepEqual(column('название'), ['Информатика', 'Информатика', '']);
+  assert.deepEqual(old.dump('Дисциплины').slice(1).map((r) => r[1]), ['Информатика']);
+  assert.equal(old.dump('Дисциплины')[1][0], links[0]);
+  const before = old.dump('Предметы');
+  const second = sandbox.setup();
+  assert.deepEqual(old.dump('Предметы'), before);
+  assert.equal(old.dump('Дисциплины').length, 2);
+  assert.deepEqual([first.unlinkedSubjects, JSON.parse(gas.logs[0]).unlinkedSubjects, second.unlinkedSubjects], [1, 1, 1]);   // the row without a name is visible in the log
+});
+
 test('every waitLock has a matching releaseLock, also when the store throws', () => {
   const { gas, sandbox, call } = load();
   const { adminTempPassword } = sandbox.setup();

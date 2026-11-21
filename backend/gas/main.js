@@ -4,6 +4,7 @@ import { normalizeRow } from '../../core/validate.js';
 import { handleRequest } from '../api.js';
 import { createSheetsStore, ensureSheets } from '../store/sheetsStore.js';
 import { createGasPlatform } from '../platform/gasPlatform.js';
+import { linkSubjects } from '../subjectData.js';
 
 // Apps Script entry points. Apps Script globals (SpreadsheetApp, ContentService, ...) are used directly.
 
@@ -100,7 +101,10 @@ export function setup() {
     }));
   }
 
-  const result = { spreadsheetUrl: spreadsheet.getUrl(), adminLogin: 'admin', adminTempPassword };
+  // Subjects made before the disciplines directory get their discipline; nameless ones stay and are counted.
+  const { unlinked } = linkSubjects(store);
+
+  const result = { spreadsheetUrl: spreadsheet.getUrl(), adminLogin: 'admin', adminTempPassword, unlinkedSubjects: unlinked };
   Logger.log(JSON.stringify(result));
   return result;
 }

@@ -7,7 +7,7 @@ import { semesterOf } from '../../core/topics.js';
 import { USER_TABLES, canEditSubjectTopics } from '../users.js';
 import { relayout } from '../scheduleData.js';
 
-const DIR_TABLES = ['groups', 'students', 'staff', 'subjects', 'rooms', 'weekTemplate', 'topics'];
+const DIR_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'weekTemplate', 'topics'];
 const LOGIN_TABLES = ['students', 'staff'];
 
 function tableOf(data, allowed = DIR_TABLES) {
@@ -26,7 +26,8 @@ const DB_SHEETS = {
   groups: ['groups'],
   students: ['groups', 'students', 'staff'],
   staff: ['staff', 'students'],
-  subjects: ['subjects', 'staff', 'groups'],
+  disciplines: ['disciplines'],
+  subjects: ['subjects', 'staff', 'groups', 'disciplines'],
   rooms: ['rooms'],
   weekTemplate: ['weekTemplate', 'subjects', 'rooms'],
   topics: ['topics', 'subjects'],
@@ -58,10 +59,20 @@ function list(data, ctx) {
 
 const isId = (v) => typeof v === 'string' && v !== '';
 
-function checkSubjectGroup(old, row, db) {
-  if (row.groupId === old.groupId) return;
+// A subject that stands in the week template or in the pairs keeps its group and its discipline.
+function checkSubjectKeys(old, row, db) {
+  const fields = ['groupId', 'disciplineId'].filter((field) => row[field] !== old[field]).map((field) => ({ field, code: 'in_use' }));
+  if (fields.length === 0) return;
   const used = db.weekTemplate.some((r) => r.subjectId === old.id) || db.pairs.some((p) => p.subjectId === old.id);
-  if (used) throw new AppError('invalid', { fields: [{ field: 'groupId', code: 'in_use' }] });
+  if (used) throw new AppError('invalid', { fields });
+}
+
+// Renaming a discipline renames its subjects: one read of the sheet, one batch write.
+function renameSubjects(store, saved) {
+  const patches = store.list('subjects')
+    .filter((s) => s.disciplineId === saved.id && s.name !== saved.name)
+    .map((s) => ({ id: s.id, patch: { name: saved.name } }));
+  if (patches.length > 0) store.updateMany('subjects', patches);
 }
 
 function save(data, ctx, user) {
@@ -80,7 +91,12 @@ function save(data, ctx, user) {
     // A new topic of an unknown subject is left to validateRow (bad_ref); an existing orphan is staff-only.
     if ((subject || old) && !canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
   }
-  if (old && table === 'subjects') checkSubjectGroup(old, row, db);
+  if (table === 'subjects') {
+    // The name belongs to the discipline: whatever the request says, the server sets it.
+    const discipline = db.disciplines.find((d) => d.id === row.disciplineId);
+    row.name = discipline ? discipline.name : '';
+    if (old) checkSubjectKeys(old, row, db);
+  }
   if (old && table === 'topics' && row.subjectId !== old.subjectId) {
     throw new AppError('invalid', { fields: [{ field: 'subjectId', code: 'bad_value' }] });
   }
@@ -92,6 +108,7 @@ function save(data, ctx, user) {
 
   if (old) {
     const saved = store.update(table, old.id, row);
+    if (table === 'disciplines' && saved.name !== old.name) renameSubjects(store, saved);
     if (table === 'topics') relayout(store, [saved.subjectId], { topics: db.topics.map((t) => (t.id === saved.id ? saved : t)), pairs: db.pairs });
     return { row: withoutHash(saved) };
   }
@@ -109,6 +126,7 @@ function save(data, ctx, user) {
 
 // What blocks deleting a row: [sheet, test(row)] pairs, each sheet read once.
 const BLOCKERS = {
+  disciplines: (id) => [['subjects', (r) => r.disciplineId === id]],
   groups: (id) => [['students', (r) => r.groupId === id], ['subjects', (r) => r.groupId === id], ['pairs', (r) => r.groupId === id]],
   staff: (id) => [['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id]],
   subjects: (id) => [['topics', (r) => r.subjectId === id], ['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id]],

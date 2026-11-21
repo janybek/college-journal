@@ -11,6 +11,7 @@ const column = (key, ru, ky, en, required = false, aliases, virtual = false) =>
 const NAME = column('name', 'Название', 'Аталышы', 'Name', true);
 const FULL_NAME = column('fullName', 'ФИО', 'Аты-жөнү', 'Full name', true);
 const LANG = column('lang', 'Язык', 'Тил', 'Language');
+const DISCIPLINE = column('disciplineId', 'Дисциплина', 'Дисциплина', 'Discipline', true, ['Название', 'Аталышы', 'Name', 'Предмет']);
 const GROUP = column('groupId', 'Группа', 'Топ', 'Group', true, ['Тайпа']);
 
 const TOPIC_KEY = ['order', 'semester', 'subjectId'];
@@ -48,8 +49,8 @@ export const IMPORT_SPECS = {
     columns: [FULL_NAME, column('login', 'Логин', 'Логин', 'Login', true), column('roles', 'Роли', 'Ролдор', 'Roles', true), LANG],
   },
   subjects: {
-    uniqueBy: ['name', 'groupId'],
-    columns: [NAME, column('teacherId', 'Преподаватель', 'Окутуучу', 'Teacher', true), GROUP],
+    uniqueBy: ['disciplineId', 'groupId'],
+    columns: [DISCIPLINE, column('teacherId', 'Преподаватель', 'Окутуучу', 'Teacher', true), GROUP],
   },
   topics: {
     uniqueBy: TOPIC_KEY,
@@ -124,6 +125,10 @@ function resolveCell(key, text, db, rowGroup) {
   if (key === 'lessonType') {
     const type = LESSON_WORDS[norm(text)];
     return type ? { value: type } : { error: 'bad_value' };
+  }
+  if (key === 'disciplineId') {
+    const discipline = (db.disciplines || []).find(d => norm(d.name) === norm(text));
+    return discipline ? { value: discipline.id, extra: { name: discipline.name } } : { error: 'bad_ref' };
   }
   if (key === 'groupId') {
     const group = (db.groups || []).find(g => norm(g.name) === norm(text));
@@ -205,7 +210,10 @@ export function parseSheet(table, cells, db, fixed = {}) {
       if (c.key === 'subjectId' && groupMissing) continue;
       const res = resolveCell(c.key, texts[c.key], db, c.key === 'subjectId' ? rowGroup : undefined);
       if (res.error) codes[c.key] = res.error;
-      else fields[c.key] = res.value;
+      else {
+        fields[c.key] = res.value;
+        if (res.extra) Object.assign(fields, res.extra);
+      }
     }
 
     const existing = findByKey(spec, db[storage], fields);
