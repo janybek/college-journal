@@ -2,6 +2,7 @@
 import { addDays, daysBetween, isDate, weekday } from './dates.js';
 import { pairSlots, busyCodes } from './busy.js';
 import { AppError } from './errors.js';
+import { NO_LESSON } from './topics.js';
 
 const NOTE_MAX = 200;
 const BUSY_FIELD = { group_busy: 'slot', teacher_busy: 'teacherId', room_busy: 'roomId' };
@@ -38,7 +39,7 @@ export function planGeneration({ template, subjects, settings, pairs, from, rest
       if (needed.has(key)) continue;
       needed.set(key, {
         date, slot: row.slot, startTime: settings.bells[row.slot - 1], groupId: subject.groupId, subjectId: row.subjectId,
-        teacherId: subject.teacherId, roomId: row.roomId || '', topicId: '', status: 'planned',
+        teacherId: subject.teacherId, roomId: row.roomId || '', ...NO_LESSON, status: 'planned',
         planDate: date, planSlot: row.slot, changed: false, note: '',
       });
     }
@@ -69,7 +70,7 @@ export function planGeneration({ template, subjects, settings, pairs, from, rest
     for (const field of ['subjectId', 'teacherId', 'roomId', 'startTime']) {
       if (pair[field] !== want[field]) patch[field] = want[field];
     }
-    if (patch.subjectId !== undefined) patch.topicId = '';
+    if (patch.subjectId !== undefined) Object.assign(patch, NO_LESSON);
     if (!Object.keys(patch).length) { kept++; continue; }
     if ((patch.teacherId !== undefined || patch.roomId !== undefined)
       && busyCodes(fixedSlots, { id: pair.id, day: want.date, slot: want.slot, groupId: want.groupId, teacherId: want.teacherId, roomId: want.roomId }).length) {

@@ -21,7 +21,8 @@ test('planGeneration: first run and repeat', () => {
   assert.deepEqual(first.toInsert.map(p => [p.date, p.slot, p.groupId, p.subjectId]),
     [['2026-09-01', 1, 'g_1', 'sb_1'], ['2026-09-04', 1, 'g_2', 'sb_2'], ['2026-09-08', 1, 'g_1', 'sb_1'], ['2026-09-11', 1, 'g_2', 'sb_2']]);
   assert.deepEqual(first.toInsert[0], { date: '2026-09-01', slot: 1, startTime: '08:00', groupId: 'g_1', subjectId: 'sb_1', teacherId: 'sf_1',
-    roomId: 'r_1', topicId: '', status: 'planned', planDate: '2026-09-01', planSlot: 1, changed: false, note: '' });
+    roomId: 'r_1', topicId: '', lessonType: '', part: null, status: 'planned', planDate: '2026-09-01', planSlot: 1, changed: false, note: '' });
+  assert.equal(first.toInsert.every((p) => p.topicId === '' && p.lessonType === '' && p.part === null), true);
   assert.deepEqual(planGeneration({ template: T, subjects, settings: S, pairs: E, from: '2026-09-01' }),
     { toInsert: [], toUpdate: [], toRemove: [], kept: 4, conflicts: 0 });
 });
@@ -40,6 +41,13 @@ test('planGeneration: changes, removals, locked pairs', () => {
     { toInsert: [], toUpdate: [], toRemove: ['p2'], kept: 3, conflicts: 0 });
   const E4 = E.map(p => (p.id === 'p1' ? { ...p, status: 'closed' } : p));
   assert.deepEqual(planGeneration({ template: T2, subjects, settings: S, pairs: E4, from: '2026-09-01' }).toUpdate, [{ id: 'p3', patch: { roomId: 'r_2' } }]);
+});
+
+test('planGeneration: a changed subject empties the whole lesson', () => {
+  const T6 = T.map((r) => (r.id === 'wt_1' ? { ...r, subjectId: 'sb_3' } : r));
+  const E6 = E.map((p) => (p.id === 'p1' ? { ...p, topicId: 'tp_1', lessonType: 'lecture', part: 1 } : p));
+  assert.deepEqual(planGeneration({ template: T6, subjects, settings: S, pairs: E6, from: '2026-09-01' }).toUpdate.find((u) => u.id === 'p1').patch,
+    { subjectId: 'sb_3', teacherId: 'sf_2', topicId: '', lessonType: '', part: null });
 });
 
 test('planGeneration: busy places', () => {
