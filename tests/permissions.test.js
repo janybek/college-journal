@@ -39,7 +39,7 @@ test('actionKind', () => {
 });
 
 test('listPermissions', () => {
-  assert.deepEqual(listPermissions(['student']), ['schedule.mine']);
+  assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.subjects', 'syllabus.get']);
   const dean = listPermissions(['dean']);
   assert.ok(dean.includes('import.apply:students'));
   assert.ok(!dean.includes('dir.save:staff'));
@@ -60,7 +60,7 @@ test('can: schedule actions', () => {
   assert.equal(can(['prorector'], 'schedule.list'), true);
   assert.equal(can(['prorector'], 'schedule.changePair'), false);
   assert.equal(can(['teacher'], 'schedule.changePair'), false);
-  assert.equal(can(['teacher'], 'topics.plan'), true);
+  assert.equal(can(['teacher'], 'syllabus.get'), true);
   assert.equal(can(['student'], 'schedule.mine'), true);
   assert.equal(can(['student'], 'schedule.list'), false);
   assert.equal(can(['dean'], 'schedule.mine'), false);
@@ -74,7 +74,12 @@ test('the syllabus is uploaded by the deanery and the administrator; topics have
   for (const role of ['teacher', 'prorector', 'student']) assert.equal(can([role], 'syllabus.preview'), false);
   for (const role of ['admin', 'dean', 'teacher']) for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.apply']) assert.equal(can([role], action, 'topics'), false);
   assert.equal(can(['teacher'], 'dir.save', 'weekTemplate'), false);
-  assert.deepEqual(listPermissions(['teacher']), ['schedule.mine', 'teacher.mySubjects', 'topics.plan']);
+  assert.deepEqual(listPermissions(['teacher']), ['schedule.mine', 'syllabus.get', 'teacher.mySubjects']);
+  assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.subjects', 'syllabus.get']);
+  assert.equal(can(['dean'], 'topics.plan'), false);
+  assert.equal(can(['student'], 'student.subjects'), true);
+  assert.equal(can(['teacher'], 'student.subjects'), false);
+  for (const role of ['admin', 'dean', 'prorector', 'teacher', 'student']) assert.equal(can([role], 'syllabus.get'), true);
 });
 
 test('disciplines and subjects actions', () => {

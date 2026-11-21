@@ -87,6 +87,11 @@ export function standArgs(argv, root = ROOT) {
   return real ? { mode: 'real', dataFile: DATA_FILES.real } : { mode: 'demo', dataFile: DATA_FILES.demo };
 }
 
+// What fills a missing data file. The real data file never gets the fictional people, whatever the mode.
+export function seederFor(dataPath, mode) {
+  return mode === 'real' || path.resolve(dataPath) === path.resolve(ROOT, DATA_FILES.real) ? seedAdmin : seed;
+}
+
 // mode 'demo': a missing data file is filled with the fictional stand. mode 'real': a missing file gets an empty base and one admin;
 // the fictional seed is never called, so no invented people, subjects or pairs get in.
 export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, siteDir = 'site', maxBodyBytes = MAX_BODY_BYTES, mode = 'demo' } = {}) {
@@ -95,7 +100,7 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   const platform = createNodePlatform();
   const fresh = !fs.existsSync(dataPath);
   const store = createFileStore(SCHEMA, platform, dataPath);
-  if (fresh) (mode === 'real' ? seedAdmin : seed)(store, platform);
+  if (fresh) seederFor(dataPath, mode)(store, platform);
   const ctx = { store, platform, log: (error) => console.error(error) };
 
   const server = http.createServer(async (req, res) => {

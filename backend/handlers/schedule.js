@@ -1,61 +1,15 @@
 import { AppError } from '../../core/errors.js';
 import { addDays, daysBetween, isDate, mondayOf } from '../../core/dates.js';
 import { checkPairChange, pairLock } from '../../core/schedule.js';
-import { semesterOf, inSemester, NO_LESSON } from '../../core/topics.js';
-import { FIXED_STATUSES } from '../../core/schema.js';
-import { canEditSubjectTopics } from '../users.js';
-import { can } from '../../core/permissions.js';
+import { NO_LESSON } from '../../core/topics.js';
 import { generateSchedule, loadSettings, pairViews, relayout, todayOf } from '../scheduleData.js';
 
-const MANAGER_ROLES = ['admin', 'dean', 'prorector'];
 const MAX_RANGE_DAYS = 30;
 const NOTE_MAX = 200;
 const PATCH_FIELDS = ['teacherId', 'date', 'slot', 'roomId', 'note'];
 
 function generate(data, ctx) {
   return generateSchedule(ctx.store, ctx.platform, { dryRun: data.dryRun === true, restart: data.restart === true });
-}
-
-// Topics of one subject in order, each with the pair it stands on.
-function plan(data, ctx, user) {
-  const { store } = ctx;
-  const subject = typeof data.subjectId === 'string' ? store.get('subjects', data.subjectId) : null;
-  if (!subject) throw new AppError('not_found');
-  if (!user.roles.some((r) => MANAGER_ROLES.includes(r)) && subject.teacherId !== user.id) throw new AppError('forbidden');
-
-  const group = store.get('groups', subject.groupId);
-  const teacher = store.get('staff', subject.teacherId);
-  const settings = loadSettings(store);
-  const pairs = store.list('pairs').filter((p) => p.subjectId === subject.id);
-  const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-  // A topic should stand on one pair; if old data holds it on several, show the held one or the one inside the semester.
-  const shown = (p) => FIXED_STATUSES.includes(p.status) || inSemester(p.date, settings);
-  const byTopic = new Map();
-  for (const p of [...pairs].sort((a, b) => cmp(a.date, b.date) || a.slot - b.slot)) {
-    if (p.topicId === '') continue;
-    const have = byTopic.get(p.topicId);
-    if (!have || (!shown(have) && shown(p))) byTopic.set(p.topicId, p);
-  }
-  const topics = store.list('topics')
-    .filter((t) => t.subjectId === subject.id)
-    .sort((a, b) => semesterOf(a) - semesterOf(b) || a.order - b.order)
-    .map((t) => {
-      const p = byTopic.get(t.id);
-      return {
-        id: t.id, semester: semesterOf(t), unit: t.unit, order: t.order, name: t.name, lessonType: t.lessonType,
-        pair: p ? { id: p.id, date: p.date, slot: p.slot, startTime: p.startTime, status: p.status } : null,
-      };
-    });
-  return {
-    subject: {
-      id: subject.id, name: subject.name, groupId: subject.groupId, groupName: group ? group.name : '',
-      teacherId: subject.teacherId, teacherName: teacher ? teacher.fullName : '',
-    },
-    semester: settings.semester,
-    canEdit: can(user.roles, 'dir.save', 'topics') && canEditSubjectTopics(user, subject),
-    topics,
-    withoutTopic: pairs.filter((p) => p.status === 'planned' && p.topicId === '' && inSemester(p.date, settings)).length,
-  };
 }
 
 function list(data, ctx) {
@@ -157,5 +111,4 @@ export const scheduleHandlers = {
   'schedule.cancelPair': cancelPair,
   'schedule.restorePair': restorePair,
   'schedule.generate': generate,
-  'topics.plan': plan,
 };

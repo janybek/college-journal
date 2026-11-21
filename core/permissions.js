@@ -31,7 +31,8 @@ const ROLE_ACTIONS = {
   'schedule.changePair': { admin: true, dean: true },
   'schedule.cancelPair': { admin: true, dean: true },
   'schedule.restorePair': { admin: true, dean: true },
-  'topics.plan': { admin: true, dean: true, prorector: true, teacher: true },
+  'syllabus.get': { admin: true, dean: true, prorector: true, teacher: true, student: true },
+  'student.subjects': { student: true },
   'schedule.mine': { teacher: true, student: true },
 };
 

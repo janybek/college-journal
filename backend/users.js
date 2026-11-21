@@ -43,9 +43,3 @@ export function publicUser(row, kind, store) {
     permissions: listPermissions(roles),
   };
 }
-
-// Topics of a subject may be edited by admin and dean, and by the subject's own teacher.
-// A missing subject (`undefined`) leaves only admin and dean.
-export function canEditSubjectTopics(user, subject) {
-  return user.roles.some((r) => r === 'admin' || r === 'dean') || (!!subject && subject.teacherId === user.id);
-}

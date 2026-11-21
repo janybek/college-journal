@@ -82,7 +82,7 @@ test('schedule views: mine, list, filters, limits and permissions', () => {
     [['2026-09-08', 'Информатика', 'teacher1', x.r1Name, 'Тема 2', '08:00', '09:30']]);
   assert.equal(JSON.stringify(week).includes('passwordHash'), false);
   assert.deepEqual(call('schedule.list', { from: '2026-09-01', to: '2026-09-01', groupId: x.g1 }, x.dean).data.pairs[0].topic,
-    { id: x.topicIds[0], unit: 1, label: '', name: 'Тема 1', kind: 'topic', lessonType: 'lecture', part: 1, parts: 1, practiceKind: '', control: null });
+    { id: x.topicIds[0], unit: 1, label: '', name: 'Тема 1', kind: 'topic', lessonType: 'lecture', part: 1, parts: 1, practiceKind: '', controls: [] });
   assert.deepEqual([call('schedule.mine', {}, x.S1).data.from, call('schedule.mine', {}, x.S1).data.to], ['2026-08-31', '2026-09-06']);
   assert.deepEqual(call('schedule.mine', { from: 'мусор' }, x.S1).error, { code: 'bad_request' });
 

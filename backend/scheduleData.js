@@ -99,10 +99,10 @@ export function pairViews(store, keep, rows = {}) {
     rowsOfSyllabus.get(t.syllabusId).push(t);
   }
   const marksOf = new Map();
-  const markOn = (topic, pair) => {
+  // All the marks of the pair (several modules without hours can stand after one lesson), in row order; [] when there are none.
+  const marksOn = (topic, pair) => {
     if (!marksOf.has(topic.syllabusId)) marksOf.set(topic.syllabusId, controlMarks(rowsOfSyllabus.get(topic.syllabusId)));
-    const [mark] = marksOf.get(topic.syllabusId).get(lessonKey(pair)) || [];
-    return mark ? { name: mark.name, unit: mark.unit } : null;
+    return (marksOf.get(topic.syllabusId).get(lessonKey(pair)) || []).map((mark) => ({ name: mark.name, unit: mark.unit }));
   };
 
   const views = pairs.filter(keep).map((p) => {
@@ -116,7 +116,7 @@ export function pairViews(store, keep, rows = {}) {
       roomId: p.roomId, roomName: nameOf(rooms, p.roomId, 'name'),
       topic: topic ? {
         id: topic.id, unit: topic.unit, label: topic.label, name: topic.name, kind: topic.kind, lessonType: p.lessonType, part: p.part,
-        parts: partsOf(topic, p.lessonType), practiceKind: topic.practiceKind, control: markOn(topic, p),
+        parts: partsOf(topic, p.lessonType), practiceKind: topic.practiceKind, controls: marksOn(topic, p),
       } : null,
       substitution: subject ? subject.teacherId !== p.teacherId : false,
       moved: p.date !== p.planDate || p.slot !== p.planSlot,

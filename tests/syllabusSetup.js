@@ -38,7 +38,7 @@ function spyOn(store) {
   return { spy, lists, calls, writes, reset };
 }
 
-// A fresh store for every test: dean, prorector, teacher1, teacher2; disciplines «Информатика» (ds1) and «Анатомия» (ds2);
+// A fresh store for every test: dean, prorector, teacher1, teacher2; students s1 (01-1) and s2 (02-1); disciplines «Информатика» (ds1) and «Анатомия» (ds2);
 // sb1 = ds1 + 01-1 + teacher1 (Tuesday, pair 1: 2026-09-01 and 09-08), sb3 = ds1 + 02-1 + teacher1 (Wednesday: 09-02 and 09-09),
 // sb2 = ds2 + 02-1 + teacher2 (Friday); semester 1, the schedule is made.
 export function setup() {
@@ -55,6 +55,10 @@ export function setup() {
   }
   const g1 = store.insert('groups', { name: '01-1', course: 1 }).id;
   const g2 = store.insert('groups', { name: '02-1', course: 1 }).id;
+  for (const [cardNo, groupId] of [['s1', g1], ['s2', g2]]) {
+    store.insert('students', { fullName: cardNo, groupId, cardNo, passwordHash: hashPassword(platform, 'secret12'), lang: 'ky', mustChangePassword: false, active: true });
+    tokens[cardNo] = call('auth.login', { login: cardNo, password: 'secret12' }).data.token;
+  }
   const ds1 = store.insert('disciplines', { name: 'Информатика' }).id;
   const ds2 = store.insert('disciplines', { name: 'Анатомия' }).id;
   const subject = (name, disciplineId, groupId, teacherId) => store.insert('subjects', { name, disciplineId, groupId, teacherId, scheme: 'A' }).id;

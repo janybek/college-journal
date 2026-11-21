@@ -7,7 +7,8 @@ import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { SCHEMA } from '../core/schema.js';
 import http from 'node:http';
-import { startDevServer, MAX_BODY_BYTES, DATA_FILES, standArgs } from '../dev/server.js';
+import { fileURLToPath } from 'node:url';
+import { startDevServer, MAX_BODY_BYTES, DATA_FILES, standArgs, seederFor } from '../dev/server.js';
 import { seed, seedAdmin, DEV_PASSWORD } from '../dev/seed.js';
 import { createFileStore } from '../backend/store/fileStore.js';
 import { pairViews } from '../backend/scheduleData.js';
@@ -164,7 +165,7 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   assert.deepEqual([lessonsOfGroup('01-1').length, new Set(lessonsOfGroup('01-1').map(String)).size, lessonsOfGroup('01-1')[17]], [18, 18, ['2.5', 'practice', 1]]);
   // the last pair of 01-1 (2.5, practice) carries the mark of the module
   const last = pairsOf(subjectOf('Информатика', '01-1')).at(-1);
-  assert.deepEqual(pairViews(store, (p) => p.id === last.id)[0].topic.control, { name: 'Модуль 2 (рубежный контроль)', unit: 2 });
+  assert.deepEqual(pairViews(store, (p) => p.id === last.id)[0].topic.controls, [{ name: 'Модуль 2 (рубежный контроль)', unit: 2 }]);
   // 02-1 (same teacher, same syllabus): one pair is cancelled — 17 lessons stand on their dates, the last one (2.5, practice) did not fit
   const of02 = pairsOf(subjectOf('Информатика', '02-1'));
   assert.deepEqual([of02.length, of02.filter((p) => p.status === 'cancelled').length, lessonsOfGroup('02-1')], [18, 1, lessonsOfGroup('01-1').slice(0, 17)]);
@@ -202,6 +203,16 @@ test('the real-data stand: its own file, one admin, never seeded with fictional 
   await again.close();
   const reopened = createFileStore(SCHEMA, platform, dataFile);
   assert.deepEqual([reopened.list('groups').map((g) => g.name), reopened.list('staff').length, reopened.list('students').length], [['СД-11'], 1, 0]);
+});
+
+test('the fictional seed is never used for the real data file, whatever the mode', () => {
+  const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+  const real = path.resolve(root, DATA_FILES.real);
+  assert.equal(seederFor(real, 'demo'), seedAdmin);
+  assert.equal(seederFor(real, 'real'), seedAdmin);
+  assert.equal(seederFor(path.join(root, 'dev', 'data', '..', 'data', 'real.json'), 'demo'), seedAdmin);       // the same file by another spelling
+  assert.equal(seederFor(path.resolve(root, DATA_FILES.demo), 'demo'), seed);
+  assert.equal(seederFor(path.join(os.tmpdir(), 'other.json'), 'real'), seedAdmin);
 });
 
 test('--reset deletes only the fictional data file; with --real it is refused', (t) => {

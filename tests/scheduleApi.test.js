@@ -143,16 +143,6 @@ test('relayout: nothing to change writes nothing and uses the rows it is given',
   assert.deepEqual(calls, {});
 });
 
-test('topics.plan: access and not found', () => {
-  const { call, dean, teacher1, sb1, sb2 } = setup();
-  call('schedule.generate', {}, dean);
-  assert.equal(call('topics.plan', { subjectId: sb1 }, teacher1).ok, true);
-  assert.deepEqual(call('topics.plan', { subjectId: sb2 }, teacher1).error, { code: 'forbidden' });
-  assert.equal(call('topics.plan', { subjectId: sb2 }, dean).ok, true);
-  assert.deepEqual(call('topics.plan', { subjectId: 'sb_nope' }, dean).error, { code: 'not_found' });
-  assert.equal(call('topics.plan', { subjectId: sb2 }, dean).data.withoutTopic, 2);
-});
-
 test('generate: pairs between today and a later semester start are removed, held ones stay', () => {
   const { store, call, dean, sb1, topics } = setup();
   assert.equal(call('schedule.generate', {}, dean).ok, true);
@@ -177,14 +167,15 @@ test('semester: only topics of the current semester are laid, switching moves th
   const b2 = topicRow(store, spring, 2, 'Второй семестр 2');
   call('schedule.generate', {}, dean);
   const mine = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
-  const planOf = () => call('topics.plan', { subjectId: sb1 }, dean).data;
+  const withoutTopic = () => mine().filter((p) => p.status === 'planned' && p.topicId === '' && p.date >= settings().semesterStart && p.date <= settings().semesterEnd).length;
+  const settings = () => call('settings.get', {}, dean).data.settings;
   assert.deepEqual(mine().map(p => p.topicId), [topic1, topic2]);
-  assert.equal(planOf().semester, 1);
+  assert.equal(settings().semester, 1);
 
   store.update('pairs', mine()[0].id, { status: 'closed' });
   assert.equal(call('settings.save', { settings: { ...S, semester: 2 } }, dean).data.settings.semester, 2);
   assert.deepEqual(mine().map(p => p.topicId), [topic1, b1]);
-  assert.deepEqual([planOf().semester, planOf().withoutTopic], [2, 0]);
+  assert.deepEqual([settings().semester, withoutTopic()], [2, 0]);
   assert.equal(call('settings.save', { settings: S }, dean).data.settings.semester, 2);
   assert.deepEqual(mine().map(p => p.topicId), [topic1, b1]);
   call('settings.save', { settings: { ...S, semester: 1 } }, dean);
@@ -196,7 +187,7 @@ test('semester: only topics of the current semester are laid, switching moves th
   assert.equal(call('schedule.generate', {}, dean12).data.inserted, 6);
   assert.deepEqual(mine().map(p => [p.date, p.topicId]), [['2026-09-01', topic1], ['2026-09-08', topic2],
     ['2026-09-14', b1], ['2026-09-15', b2], ['2026-09-21', ''], ['2026-09-22', '']]);
-  assert.equal(call('topics.plan', { subjectId: sb1 }, dean12).data.withoutTopic, 2);
+  assert.deepEqual([mine().filter((p) => p.date >= '2026-09-14' && p.topicId === '').length, call('topics.plan', { subjectId: sb1 }, dean12).error], [2, { code: 'bad_request' }]);
 });
 
 test('semester switch and pair changes read each sheet at most once', () => {

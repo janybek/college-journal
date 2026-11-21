@@ -58,10 +58,10 @@ test('syllabus upload: one syllabus of a teacher, laid over every group of that 
 test('a module without hours marks the last pair of its unit; a module with hours is a pair of its own', () => {
   const { send, call, dean, g1, sb1 } = setup();
   send('syllabus.apply', sb1, file([T('Введение', 2, ''), T('Практикум', '', 2), M]), dean);
-  const view = () => call('schedule.list', { from: '2026-09-01', to: '2026-09-11', groupId: g1 }, dean).data.pairs.map((p) => [p.topic.name, p.topic.kind, p.topic.lessonType, p.topic.control]);
-  assert.deepEqual(view(), [['Введение', 'topic', 'lecture', null], ['Практикум', 'topic', 'practice', { name: '', unit: 1 }]]);
+  const view = () => call('schedule.list', { from: '2026-09-01', to: '2026-09-11', groupId: g1 }, dean).data.pairs.map((p) => [p.topic.name, p.topic.kind, p.topic.lessonType, p.topic.controls]);
+  assert.deepEqual(view(), [['Введение', 'topic', 'lecture', []], ['Практикум', 'topic', 'practice', [{ name: '', unit: 1 }]]]);
   send('syllabus.apply', sb1, file([T('Введение', 2, ''), [1, '', 'Сдача модуля', '', 2, 'модуль', '']]), dean);
-  assert.deepEqual(view(), [['Введение', 'topic', 'lecture', null], ['Сдача модуля', 'control', 'control', null]]);
+  assert.deepEqual(view(), [['Введение', 'topic', 'lecture', []], ['Сдача модуля', 'control', 'control', []]]);
 });
 
 test('syllabus upload: a file with an error writes nothing', () => {               // Review Focus 14
@@ -147,7 +147,7 @@ test('syllabus upload: one file for the whole year writes both semesters in one 
 });
 
 test('syllabus upload: only the deanery and the administrator; bad requests; the old ways are closed', () => {   // Review Focus 15
-  const { store, send, call, dean, prorector, teacher1, staff, g1, sb1 } = setup();
+  const { store, send, call, snapshot, dean, prorector, teacher1, staff, g1, sb1 } = setup();
   for (const token of [teacher1, prorector]) {
     for (const action of ['syllabus.preview', 'syllabus.apply']) assert.deepEqual(send(action, sb1, A, token).error, { code: 'forbidden' });
   }
@@ -157,6 +157,14 @@ test('syllabus upload: only the deanery and the administrator; bad requests; the
   for (const sheets of ['x', [], Array(11).fill(A[0]), [{ name: 5, cells: [] }], [{ name: 'Сведения', cells: 'x' }], [{ name: 'Сведения', cells: [5] }]]) {
     assert.deepEqual(send('syllabus.apply', sb1, sheets, dean).error, { code: 'bad_request' });
   }
+  // a cell is text, a number, a boolean or empty: an object or an array would be stored as «[object Object]» or «a,b»
+  const before = snapshot();
+  for (const bad of [{ a: 1 }, ['a', 'b'], [], [[1]]]) {
+    const cells = [{ name: 'Сведения', cells: [['Семестр', 1]] }, { name: 'Тематический план', cells: [HEAD, [1, '', bad, 2, '', '', '']] }];
+    for (const action of ['syllabus.preview', 'syllabus.apply']) assert.deepEqual(send(action, sb1, cells, dean).error, { code: 'bad_request' });
+  }
+  assert.equal(snapshot(), before);
+  assert.equal(send('syllabus.preview', sb1, [{ name: 'Сведения', cells: [['Семестр', 1, true, null]] }, A[1]], dean).ok, true);   // boolean and empty cells are cells
   const orphan = store.insert('subjects', { name: 'Старый предмет', groupId: g1, teacherId: staff.teacher1, scheme: 'A' }).id;      // без дисциплины
   assert.deepEqual(send('syllabus.apply', orphan, A, dean).error, { code: 'invalid', fields: [{ field: 'disciplineId', code: 'bad_ref' }] });
   assert.equal(store.list('topics').length, 0);
