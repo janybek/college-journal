@@ -77,3 +77,22 @@ test('selfWork, literature, policies', () => {
       { list: 'grading', index: 1, field: 'criteriaGood', code: 'too_long' }, { list: 'ethics', code: 'too_many' }]);
   assert.deepEqual(errorsOf('units', { units: [{ unit: 2, literature: [{ title: '' }] }] }), [{ unit: 2, list: 'literature', index: 0, field: 'title', code: 'required' }]);
 });
+
+test('non-text values in text fields are bad_value, not silently emptied', () => {
+  assert.deepEqual(errorsOf('title', { department: ['x'], contacts: { a: 1 }, academicYear: ['2026–2027'], place: true }, { half: 1 }),
+    [{ field: 'department', code: 'bad_value' }, { field: 'academicYear', code: 'bad_value' }, { field: 'contacts', code: 'bad_value' },
+      { field: 'place', code: 'bad_value' }]);
+  assert.deepEqual(errorsOf('goals', { goal: ['текст'] }), [{ field: 'goal', code: 'bad_value' }]);
+  assert.deepEqual(errorsOf('software', { items: [{ name: 'МИС', link: ['https://a'] }] }), [{ list: 'items', index: 0, field: 'link', code: 'bad_value' }]);
+  assert.deepEqual(errorsOf('plan', { units: [{ title: {}, lecture: [{ name: ['a'], hours: 2, description: true }] }] }),
+    [{ unit: 1, field: 'title', code: 'bad_value' }, { unit: 1, list: 'lecture', index: 0, field: 'name', code: 'bad_value' },
+      { unit: 1, list: 'lecture', index: 0, field: 'name', code: 'required' }, { unit: 1, list: 'lecture', index: 0, field: 'description', code: 'bad_value' }]);
+  assert.deepEqual(errorsOf('title', { department: 5, credits: 2 }, { half: 1 }), []);
+});
+
+test('plan row id: only undefined, null and exactly empty string mean a new row', () => {
+  const idErrors = (id) => errorsOf('plan', { units: [{ lecture: [{ name: 'a', hours: 2, id }] }] });
+  assert.deepEqual(idErrors('  '), [{ unit: 1, list: 'lecture', index: 0, field: 'id', code: 'bad_value' }]);
+  assert.deepEqual([idErrors(undefined), idErrors(null), idErrors(''), idErrors('tp_1')], [[], [], [], []]);
+  assert.equal(checkSection('plan', { units: [{ lecture: [{ name: 'a', hours: 2, id: '  ' }] }] }).value.units[0].lecture[0].id, '');
+});

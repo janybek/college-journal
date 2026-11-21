@@ -23,6 +23,15 @@ export function plainId(value) {
   return typeof value === 'string' && value !== '' && value === value.trim() ? value : null;
 }
 
+// Текст поля: пусто, строка или число; массив, объект и булево — bad_value (иначе сохранение молча стёрло бы прежний текст).
+function scalar(raw, add, field) {
+  if (!blank(raw) && typeof raw !== 'string' && typeof raw !== 'number') {
+    add({ field, code: 'bad_value' });
+    return '';
+  }
+  return textOf(raw);
+}
+
 // Целое: число или строка из цифр; пустое -> null без ошибки.
 function intOf(v) {
   if (blank(v)) return { value: null, bad: false };
@@ -33,7 +42,7 @@ function intOf(v) {
 
 // Строка не длиннее max; add получает ошибку поля.
 function limited(raw, max, add, field) {
-  const value = textOf(raw);
+  const value = scalar(raw, add, field);
   if (value.length > max) add({ field, code: 'too_long' });
   return value;
 }
@@ -122,7 +131,7 @@ function titleSection(data, ctx) {
 }
 
 function academicYear(raw, add) {
-  const text = textOf(raw).replace(/\s*[-‐‑‒–—−]\s*/g, '–');
+  const text = scalar(raw, add, 'academicYear').replace(/\s*[-‐‑‒–—−]\s*/g, '–');
   if (text === '') return '';
   const m = /^(\d{4})–(\d{4})$/.exec(text);
   if (!m || Number(m[2]) !== Number(m[1]) + 1) {
@@ -146,7 +155,7 @@ function planRow(kind) {
     const o = isObject(item) ? item : {};
     if (!isObject(item) && !blank(item)) add({ code: 'bad_value' });
     const row = {};
-    if (blank(o.id)) row.id = '';
+    if (o.id === undefined || o.id === null || o.id === '') row.id = '';
     else {
       const id = plainId(o.id);
       if (id === null) add({ field: 'id', code: 'bad_value' });
@@ -215,7 +224,7 @@ function literatureSection(data) {
 }
 
 function linkOf(o, add) {
-  const link = textOf(o.link);
+  const link = scalar(o.link, add, 'link');
   if (link !== '' && (!/^https?:\/\//.test(link) || link.length > LINK_MAX)) add({ field: 'link', code: 'bad_value' });
   return link;
 }
