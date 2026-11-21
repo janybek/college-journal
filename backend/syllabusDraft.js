@@ -67,7 +67,7 @@ export function startDraft(store, platform, data, user) {
 }
 
 // The version of a request: the id is a plain string (else bad_request), the row exists (else not_found).
-function versionOf(syllabi, id) {
+export function versionOf(syllabi, id) {
   const syllabusId = plainId(id);
   if (syllabusId === null) throw new AppError('bad_request');
   const version = syllabi.find((s) => s.id === syllabusId);
