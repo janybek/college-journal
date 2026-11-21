@@ -252,3 +252,11 @@ test('seedAdmin: one admin on an empty store, nothing when staff exist', () => {
   assert.deepEqual(store.list('staff').map((s) => [s.login, s.fullName, s.roles, s.active, s.mustChangePassword]), [['admin', 'Admin Demo', 'admin', true, false]]);
   assert.equal(verifyPassword(platform, DEV_PASSWORD, store.list('staff')[0].passwordHash), true);
 });
+
+test('a freshly seeded stand is not upgraded on the second start: same bytes, no copy', async (t) => {
+  const { dataFile, siteDir } = tempDirs(t);
+  await (await startDevServer({ port: 0, dataFile, siteDir })).close();
+  const saved = fs.readFileSync(dataFile, 'utf8');
+  await (await startDevServer({ port: 0, dataFile, siteDir })).close();
+  assert.deepEqual([fs.readFileSync(dataFile, 'utf8'), fs.existsSync(dataFile + '.before-addendum-3.bak')], [saved, false]);
+});

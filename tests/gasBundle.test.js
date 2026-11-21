@@ -6,6 +6,7 @@ import { buildGas } from '../scripts/build-gas.js';
 import { createFakeGas } from './fakes/fakeGas.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { hashPassword } from '../core/auth.js';
+import { SCHEMA } from '../core/schema.js';
 
 let codeFile;
 let code;
@@ -180,4 +181,33 @@ test('hashes made inside the Apps Script bundle verify with the Node platform', 
   call('auth.changePassword', { oldPassword: adminTempPassword, newPassword: 'Пароль-Ёж-2026' }, session.data.token);
   assert.equal(sameHash('Пароль-Ёж-2026'), true);
   assert.equal(sameHash('Пароль-Еж-2026'), false);
+});
+
+const SECTION_SHEETS = ['Юниты', 'Результаты обучения', 'СРС', 'Литература', 'Программное обеспечение', 'Оценивание', 'Правила'];
+
+test('setup creates all 19 sheets, adds sixteen columns to an old syllabus sheet and a second setup changes nothing', () => {
+  const { gas, sandbox } = load();
+  sandbox.setup();
+  const [fresh] = gas.spreadsheets.values();
+  assert.equal(Object.keys(SCHEMA).length, 19);
+  for (const def of Object.values(SCHEMA)) assert.ok(fresh.getSheetByName(def.sheet), def.sheet);
+  for (const name of SECTION_SHEETS) assert.ok(fresh.getSheetByName(name), name);
+
+  const old = gas.globals.SpreadsheetApp.create('unit 2 before addendum 3');
+  const sheet = old.insertSheet('Силлабусы');
+  const oldHeader = SCHEMA.syllabi.columns.slice(0, 11).map((c) => c.title);
+  sheet.appendRow(oldHeader);
+  sheet.appendRow(['sy_old', 'ds_1', 'sf_1', 1, 1, 'ИС', 3, 90, 60, 30, 'вчера']);
+  gas.properties.set('SPREADSHEET_ID', old.getId());
+  sandbox.setup();
+  for (const name of SECTION_SHEETS) assert.ok(old.getSheetByName(name), name);
+  const rows = old.dump('Силлабусы');
+  assert.deepEqual(rows[0], SCHEMA.syllabi.columns.map((c) => c.title));
+  assert.equal(rows[0].length, 27);
+  assert.deepEqual(rows[1].slice(0, 11), ['sy_old', 'ds_1', 'sf_1', 1, 1, 'ИС', 3, 90, 60, 30, 'вчера']);
+  assert.equal(rows[1].slice(11).every((v) => v === ''), true);
+  const names = old.getSheets().map((s) => s.getName());
+  const snapshot = JSON.stringify(names.map((n) => [n, old.dump(n)]));
+  sandbox.setup();
+  assert.equal(JSON.stringify(old.getSheets().map((s) => s.getName()).map((n) => [n, old.dump(n)])), snapshot);
 });

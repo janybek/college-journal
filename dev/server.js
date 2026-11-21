@@ -7,6 +7,7 @@ import { createFileStore } from '../backend/store/fileStore.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { handleRequest } from '../backend/api.js';
 import { seed, seedAdmin } from './seed.js';
+import { upgradeFile } from './upgrade.js';
 
 // Local stand: serves the static site and answers the production API from a JSON file. Node only.
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
@@ -99,6 +100,10 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   const sitePath = path.resolve(ROOT, siteDir);
   const platform = createNodePlatform();
   const fresh = !fs.existsSync(dataPath);
+  const upgraded = upgradeFile(dataPath);
+  if (upgraded.changed) {
+    console.log(`stand file carried over: versions ${upgraded.versions}, split rows ${upgraded.split}, units ${upgraded.units}, untouched rows ${upgraded.skipped.length}; copy: ${path.basename(dataPath)}.before-addendum-3.bak`);
+  }
   const store = createFileStore(SCHEMA, platform, dataPath);
   if (fresh) seederFor(dataPath, mode)(store, platform);
   const ctx = { store, platform, log: (error) => console.error(error) };
