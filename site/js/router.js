@@ -1,4 +1,5 @@
 import { DIR_TABLES } from './views/directoryConfig.js';
+import { tabOf } from './syllabusForm.js';
 
 // Maps the address (#/...) and the signed-in user to a screen. Pure: no DOM, no storage.
 // Tables such as weekTemplate are listed through dir.* too, but have screens of their own:
@@ -18,6 +19,9 @@ export function resolveRoute(hash, user) {
     if (syllabus[2]) params.semester = Number(syllabus[2]);
     return { view: 'syllabus', params };
   }
+  // #/syllabus-form/<syllabusId>, #/syllabus-form/<syllabusId>/<tab>: the form of a syllabus version, on that tab.
+  const form = /^\/syllabus-form\/([^/]+)(?:\/([^/]+))?$/.exec(path);
+  if (form && permissions.includes('syllabus.form')) return { view: 'syllabusForm', params: { syllabusId: form[1], tab: tabOf(form[2]) } };
   if (path === '/schedule' && permissions.includes('schedule.list')) return { view: 'schedule', params: {} };
   // «Предметы» of the deanery: who teaches what and whose syllabus. Subjects are no longer an ordinary directory.
   if (path === '/subjects' && permissions.includes('subjects.overview')) return { view: 'subjects', params: {} };

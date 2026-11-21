@@ -3190,6 +3190,813 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
   .added__buttons { justify-content: flex-start; }
 }
 
+/* The way into the syllabus form on the syllabus page: beside the buttons of the file; an error under both. */
+.syllabus-head__form { margin-left: auto; }
+
+.syllabus-head__note { flex: 1 1 100%; }
+
+/* Screens: the syllabus form — a document in sections. The tabs are the numbered sections of the reference
+   syllabus; the lessons of the plan carry the letter and colour of their kind, as the dates on the syllabus page
+   do (lecture blue, the practical kinds green, the module amber), so a unit reads as the week it will become. */
+
+.sform {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.sform > * { min-width: 0; }
+
+.sform .back-link { margin-bottom: calc(-1 * var(--space-3)); }
+
+.sform-head {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.sform-head__kicker {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.sform-head__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  color: var(--text-muted);
+}
+
+.sform-head__version {
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sform-head__who {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}
+
+.sform-head__who .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+/* The remark of the deanery: a note pinned on top, on an amber ground with a bar on its left. */
+.sform-remark {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--warning-line);
+  border-radius: var(--radius-card);
+  background: var(--warning-wash);
+  box-shadow: inset 4px 0 0 var(--warning);
+}
+
+.sform-remark__icon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 50%;
+  background: var(--warning);
+  color: #1a1300;
+}
+
+.sform-remark__icon .icon {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.sform-remark__body {
+  display: grid;
+  gap: var(--space-1);
+  min-width: 0;
+}
+
+.sform-remark__title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-3);
+  color: var(--warning);
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.sform-remark__when {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-weight: 500;
+}
+
+.sform-remark__text {
+  max-width: 60rem;
+  color: var(--text);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+/* The tabs: the sections as pills on one track, wrapping onto a second line on a laptop; on a narrow window
+   the track scrolls sideways instead. The tab shown is raised with its number filled in the accent; a tab with
+   unsaved changes carries an amber dot. */
+.sform-tabs {
+  overflow-x: auto;
+  border-radius: var(--radius-control);
+  background: var(--seg-track);
+  scrollbar-width: thin;
+}
+
+.sform-tabs__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin: 0;
+  padding: 3px;
+  list-style: none;
+}
+
+.sform-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 2.5rem;
+  padding: 0 var(--space-3) 0 var(--space-2);
+  border-radius: var(--radius-inner);
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.sform-tab:hover { color: var(--text); }
+
+.sform-tab[aria-current="page"] {
+  background: var(--seg-active);
+  box-shadow: var(--seg-shadow);
+  color: var(--text);
+}
+
+.sform-tab__no {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border-radius: 6px;
+  background: var(--secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.sform-tab[aria-current="page"] .sform-tab__no {
+  background: var(--primary-fill);
+  color: var(--on-primary);
+}
+
+.sform-tab__dot {
+  display: none;
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 50%;
+  background: var(--warning);
+}
+
+.sform-tab.is-dirty .sform-tab__dot { display: block; }
+
+@media (max-width: 48rem) {
+  .sform-tabs__list {
+    flex-wrap: nowrap;
+    width: max-content;
+  }
+}
+
+.sform-panel { overflow: hidden; }
+
+.sform-panel__title {
+  padding: var(--space-5) var(--space-6) 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+}
+
+.sform-panel__body {
+  display: grid;
+  gap: var(--space-6);
+  padding: var(--space-5) var(--space-6) var(--space-6);
+}
+
+.sform-panel__body > .empty { margin: var(--space-4) 0; }
+
+/* Fields of the form */
+
+.field__textarea {
+  min-height: 4.5rem;
+  font: inherit;
+  color: inherit;
+  letter-spacing: inherit;
+  padding: var(--space-2) var(--space-3);
+  line-height: 1.5;
+  resize: vertical;
+}
+
+/* A version that is not edited: the values stay readable, nothing looks like it can be typed into. */
+.sform .field__input:disabled {
+  border-color: var(--border);
+  background: transparent;
+  color: var(--text);
+  opacity: 1;
+  cursor: default;
+}
+
+.sform select.field__input:disabled { appearance: none; }
+
+.sform-readonly { max-width: 60rem; }
+
+/* «Титул»: what the journal knows itself, then four blocks of fields, two side by side on a wide window. */
+.sform-fixed {
+  display: grid;
+  gap: var(--space-2);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--muted);
+}
+
+.sform-fixed__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-5) 0;
+}
+
+.sform-fixed__hint {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.sform-fixed__facts { margin-top: 0; }
+
+.sform-fixed__facts .fact { padding-top: var(--space-3); }
+
+.sform-blocks {
+  display: grid;
+  gap: var(--space-6) var(--space-7);
+}
+
+@media (min-width: 64rem) {
+  .sform-blocks { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.sform-block {
+  display: grid;
+  align-content: start;
+  gap: var(--space-4);
+  min-width: 0;
+}
+
+.sform-block__title {
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--border);
+  color: var(--primary-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.sform-fixed .sform-block__title {
+  padding: 0;
+  border: 0;
+}
+
+.sform-block__fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 11rem), 1fr));
+  align-items: start;
+  gap: var(--space-4);
+}
+
+.sform-block__fields > .field:not(.field--short) { grid-column: 1 / -1; }
+
+/* A choice of a few values across the block, so its hint has room; the list itself stays short. */
+.field--choice .field__input { max-width: 11rem; }
+
+/* «Цель и результаты»: the aim across, then the five lists, two side by side on a wide window. */
+.sform-goal { max-width: 60rem; }
+
+.sform-outcomes {
+  display: grid;
+  gap: var(--space-5);
+}
+
+@media (min-width: 72rem) {
+  .sform-outcomes { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.points {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.points__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.points__title {
+  font-size: 0.9375rem;
+  font-weight: 600;
+}
+
+.points__count {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.points__count.is-full { color: var(--warning); }
+
+.points__hint,
+.points__empty {
+  margin-top: calc(-1 * var(--space-2));
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.points__empty { margin-top: 0; }
+
+.points__list {
+  display: grid;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.point {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-2);
+}
+
+.point__number {
+  display: grid;
+  place-items: center;
+  height: var(--control-h);
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.point__field .field__textarea { min-height: var(--control-h); }
+
+.points__add { justify-self: start; }
+
+/* Up, down and remove of a point or a lesson: the chevron turned to point up and down. */
+.row-tools {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.row-tools .icon-button { width: 2rem; }
+
+.row-tools__up .icon { transform: rotate(-90deg); }
+
+.row-tools__down .icon { transform: rotate(90deg); }
+
+.row-tools__remove:hover {
+  background: var(--danger-wash);
+  color: var(--danger);
+}
+
+.row-tools .icon-button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+
+.row-tools .icon-button:disabled:hover {
+  background: transparent;
+  color: var(--text-muted);
+}
+
+/* «Тематические планы» */
+.units-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+}
+
+.units-bar__count {
+  margin-right: auto;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.units-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.units-bar .field__error { flex: 1 1 100%; }
+
+.unit-card {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+}
+
+.unit-card__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-4);
+}
+
+.unit-card__name {
+  flex: none;
+  padding: 0.25rem var(--space-3);
+  border-radius: 999px;
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.unit-card__title {
+  flex: 1 1 16rem;
+  max-width: 40rem;
+}
+
+.unit-card__title .field__input { font-weight: 600; }
+
+.unit-card__tables {
+  display: grid;
+  gap: var(--space-4);
+}
+
+/* A table of one kind of lesson: a bar of its colour on the left. */
+.ltable {
+  --kind: var(--primary);
+  --kind-wash: var(--primary-wash);
+  --kind-ink: var(--primary-ink);
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--kind);
+}
+
+.ltable[data-kind="practice"],
+.ltable[data-kind="seminar"],
+.ltable[data-kind="lab"],
+.ltable-fold[data-kind="seminar"],
+.ltable-fold[data-kind="lab"] {
+  --kind: var(--success);
+  --kind-wash: var(--success-wash);
+  --kind-ink: var(--success);
+}
+
+.ltable[data-kind="control"] {
+  --kind: var(--warning);
+  --kind-wash: var(--warning-wash);
+  --kind-ink: var(--warning);
+}
+
+.ltable__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+}
+
+.ltable__title {
+  color: var(--kind-ink);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.ltable__sum {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-variant-numeric: tabular-nums;
+}
+
+.ltable__hint {
+  flex: 1 1 100%;
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.ltable__rows {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* The grid of a row and of the column titles: №, topic, hours, (forms of control), tools. */
+.ltable__cols,
+.lrow {
+  display: grid;
+  grid-template-columns: 3rem minmax(0, 1fr) 6.5rem 6.5rem;
+  grid-template-areas:
+    "no name hours tools"
+    ". more more more"
+    ". details details details";
+  column-gap: var(--space-3);
+}
+
+.ltable--forms .ltable__cols,
+.lrow--forms {
+  grid-template-columns: 3rem minmax(0, 1fr) 6.5rem minmax(0, 13rem) 6.5rem;
+  grid-template-areas:
+    "no name hours forms tools"
+    ". more more more more"
+    ". details details details details";
+}
+
+.ltable__cols {
+  grid-template-areas: none;
+  padding-bottom: var(--space-1);
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.lrow {
+  align-items: start;
+  padding: var(--space-2) 0;
+  border-top: 1px solid var(--border);
+}
+
+.lrow__no {
+  grid-area: no;
+  display: grid;
+  place-items: center;
+  height: var(--control-h);
+  border-radius: var(--radius-inner);
+  background: var(--kind-wash);
+  color: var(--kind-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  cursor: default;
+}
+
+.lrow__name { grid-area: name; }
+
+.lrow__hours { grid-area: hours; }
+
+.lrow__forms { grid-area: forms; }
+
+.lrow > .row-tools {
+  grid-area: tools;
+  height: var(--control-h);
+}
+
+/* The column titles name the fields on a wide window; their own labels are read out only. */
+.lrow__name > .field__label,
+.lrow__hours > .field__label,
+.lrow__forms > .field__label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.lrow__more {
+  grid-area: more;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: 1.75rem;
+  margin-top: var(--space-1);
+  padding: 0 var(--space-2) 0 var(--space-1);
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: none;
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-weight: 500;
+}
+
+.lrow__more:hover {
+  background: var(--secondary);
+  color: var(--text);
+}
+
+.lrow__summary {
+  margin-left: var(--space-1);
+  padding: 0 var(--space-2);
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--text-muted);
+}
+
+.lrow__chevron {
+  width: 0.875rem;
+  height: 0.875rem;
+  transition: transform 0.15s ease-out;
+}
+
+.lrow__more[aria-expanded="true"] .lrow__chevron { transform: rotate(90deg); }
+
+.lrow__details {
+  grid-area: details;
+  display: grid;
+  grid-template-columns: 7rem minmax(0, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-2) 0 var(--space-1);
+}
+
+.lrow__details[hidden] { display: none; }
+
+.lrow__details .field__label,
+.lrow__details .field__error { font-size: var(--hint-fs); }
+
+.ltable__add { justify-self: start; }
+
+/* An empty table of seminars or labs: only a quiet dashed button. */
+.ltable-fold {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: var(--space-2);
+  min-height: var(--control-h);
+  padding: 0 var(--space-3);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: var(--control-fs);
+  font-weight: 500;
+}
+
+.ltable-fold .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+.ltable-fold:hover {
+  border-color: var(--kind);
+  color: var(--kind-ink);
+}
+
+/* Under the cards: the hours of the plan by kind, each with its colour, and the pairs. */
+.plan-sum {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-control);
+  background: var(--muted);
+}
+
+.plan-sum__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.plan-sum__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3) var(--space-7);
+}
+
+.plan-sum__item {
+  display: grid;
+  gap: 0.125rem;
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--primary);
+}
+
+.plan-sum__item[data-kind="practice"] { border-left-color: var(--success); }
+
+.plan-sum__item[data-kind="control"] { border-left-color: var(--warning); }
+
+.plan-sum__item--pairs { border-left-color: var(--text-muted); }
+
+.plan-sum__item dt {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.plan-sum__item dd {
+  font-size: 1.125rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+/* Save: the bar of the settings screen; the line beside the button says where the tab stands. */
+.sform-unplaced {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.savebar__status.is-saved { color: var(--success); }
+
+.savebar__status.is-error { color: var(--danger); }
+
+.savebar__status .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
+@media (max-width: 48rem) {
+  .sform-panel__title { padding: var(--space-4) var(--space-4) 0; }
+
+  .sform-panel__body { padding: var(--space-4); }
+
+  .unit-card { padding: var(--space-3) var(--space-3) var(--space-4); }
+
+  .ltable { padding-left: var(--space-3); }
+
+  .ltable__cols { display: none; }
+
+  .lrow {
+    grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "no name name"
+      "no hours tools"
+      "no more more"
+      "no details details";
+    row-gap: var(--space-2);
+    column-gap: var(--space-2);
+  }
+
+  .lrow--forms {
+    grid-template-columns: 2.75rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "no name name"
+      "no hours tools"
+      "no forms forms"
+      "no more more"
+      "no details details";
+  }
+
+  .lrow > .row-tools { align-self: end; }
+
+  .lrow__no { align-self: start; }
+
+  /* No column titles here: every field shows its label. */
+  .lrow__name > .field__label,
+  .lrow__hours > .field__label,
+  .lrow__forms > .field__label {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip: auto;
+    white-space: normal;
+    color: var(--text-muted);
+    font-size: var(--hint-fs);
+  }
+
+  .lrow__hours { max-width: 9rem; }
+
+  .lrow__more {
+    flex-wrap: wrap;
+    margin-top: 0;
+    text-align: left;
+  }
+
+  .lrow__details { grid-template-columns: minmax(0, 1fr); }
+
+  .sform-remark { padding: var(--space-3) var(--space-4); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .lrow__chevron { transition: none; }
+}
+
 /* Print: black on white in either theme. The passwords of an import print alone, as strips to cut apart
    along the dashed lines; any other screen prints without the sidebar and the bars. */
 

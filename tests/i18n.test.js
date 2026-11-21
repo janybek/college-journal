@@ -7,6 +7,7 @@ import en from '../site/js/i18n/en.js';
 import { IMPORT_SPECS } from '../core/import.js';
 import { SYLLABUS_SHEETS, INFO_ROWS, PLAN_COLUMNS, KIND_WORDS } from '../core/syllabusFile.js';
 import { IMPORT_COLUMNS, IMPORT_TABLES, FIELDS } from '../site/js/views/directoryConfig.js';
+import { TABS } from '../site/js/syllabusForm.js';
 
 test('template column titles in the dictionaries equal IMPORT_SPECS', () => {
   for (const [table, spec] of Object.entries(IMPORT_SPECS)) for (const col of spec.columns)
@@ -200,4 +201,12 @@ test('overrides replace texts; empty values are ignored for that language', () =
   applyOverrides([{ key: 'login.submit', ky: '  ', ru: 'Войти!', en: '' }]);
   assert.equal(t('login.submit'), ky['login.submit']);
   applyOverrides([]);
+});
+
+test('the syllabus form has its texts: the tabs, the statuses, the errors of a section', () => {
+  for (const tab of TABS) assert.ok(ru['sform.tab.' + tab], tab);
+  for (const status of ['draft', 'review', 'returned', 'approved']) assert.ok(ru['syllabus.status.' + status], status);
+  for (const code of ['required', 'too_long', 'too_many', 'too_many_rows', 'bad_value', 'bad_hours', 'semester_half', 'duplicate', 'bad_ref', 'bad_order', 'unit_order', 'control_first']) assert.ok(ru['sform.error.' + code], code);
+  assert.deepEqual([ru['lessonType.short.seminar'], ru['lessonType.short.lab'], ru['sform.error.bad_hours'].includes('1 пара = 2 часа')], ['С', 'ЛР', true]);
+  assert.deepEqual([ru['syllabus.status.review'], ru['syllabus.status.returned']], ['На утверждении', 'Возвращён']);
 });

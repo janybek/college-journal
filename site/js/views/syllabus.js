@@ -1,7 +1,7 @@
 import { call } from '../api.js';
 import { getUser } from '../session.js';
 import { t, tCount } from '../i18n.js';
-import { el, errorKey, badge, emptyState, note, refresh } from '../ui.js';
+import { el, errorKey, badge, emptyState, markBusy, note, refresh } from '../ui.js';
 import { icon } from '../icons.js';
 import { activeRole, menuParts } from '../shell.js';
 import { shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes } from '../syllabus.js';
@@ -28,6 +28,8 @@ const blank = () => ({
   errorKey: null,
   errorCode: null,
   ticket: 0,
+  starting: false,     // syllabus.startDraft is on its way
+  startErrorKey: null,
 });
 let state = blank();
 
@@ -43,7 +45,7 @@ export function render(root, params) {
   const user = getUser();
   const key = subjectId + '|' + (semester ?? '');
   if (state.key !== key) {
-    Object.assign(state, { key, errorKey: null, errorCode: null });
+    Object.assign(state, { key, errorKey: null, errorCode: null, startErrorKey: null });
     forgetUploadNote();
   }
   if (state.shownKey !== key && state.loadingKey !== key && state.errorKey === null) load(state, subjectId, semester);
@@ -127,7 +129,39 @@ function head(view) {
       subject.groupName || subject.teacherName ? el('p', { class: 'syllabus-head__who' },
         subject.groupName ? badge(subject.groupName, 'primary') : null,
         subject.teacherName ? el('span', { class: 'syllabus-head__teacher' }, icon('briefcase'), subject.teacherName) : null) : null),
-    uploadControls(view, reload));
+    formButton(view),
+    uploadControls(view, reload),
+    state.startErrorKey ? note('error', t(state.startErrorKey), { role: 'alert', class: 'syllabus-head__note' }) : null);
+}
+
+// The way into the form (until the page gets its own buttons): «Заполнить» while there is no version, «Продолжить
+// черновик» while one is open, «Изменить» on an approved one (a new version, a copy of it, is made).
+function formButton(view) {
+  if (!view.can || view.can.edit !== true) return null;
+  const label = view.can.fill ? 'sform.fill' : view.state && view.state.open ? 'sform.continue' : 'sform.change';
+  const button = el('button', { type: 'button', id: 'syllabus-form-open', class: 'button button--primary syllabus-head__form', onclick: () => openForm(view) },
+    icon('pencil'), t(label));
+  if (state.starting) markBusy(button, 'sform.opening');
+  return button;
+}
+
+async function openForm(view) {
+  if (state.starting) return;
+  const owner = state;
+  owner.starting = true;
+  owner.startErrorKey = null;
+  refresh();
+  try {
+    const { syllabusId } = await call('syllabus.startDraft', { subjectId: view.subject.id, semester: view.semester });
+    if (state !== owner) return;
+    owner.starting = false;
+    location.hash = '#/syllabus-form/' + syllabusId;
+  } catch (error) {
+    if (state !== owner) return;
+    owner.starting = false;
+    owner.startErrorKey = errorKey(error.code);
+    refresh();
+  }
 }
 
 // The group (when the teacher has the discipline in several) and the semester of the year (when both have a syllabus).

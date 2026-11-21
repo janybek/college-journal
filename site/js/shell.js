@@ -161,11 +161,11 @@ function studentFrame(main, { onLang, onLogout }) {
 
 // Staff
 
-// The menu item of a screen. The syllabus page of a subject belongs to the deanery's «Предметы», and to the
+// The menu item of a screen. The syllabus page of a subject and its form belong to the deanery's «Предметы», and to the
 // teacher's «Мои предметы» (their home).
 function currentName(view, params, role) {
   if (view === 'directory') return params.table;
-  if (view === 'syllabus') return menuParts(role).includes('office') ? 'subjects' : 'home';
+  if (view === 'syllabus' || view === 'syllabusForm') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;
 }
 
@@ -231,8 +231,8 @@ function topbar(groups, view, params, current, role, onLang) {
 function crumbs(groups, view, params, current, role) {
   let groupKey = null;
   let pageKey = null;
-  // The syllabus of a subject: under «Расписание» for the deanery, under the teacher's own subjects otherwise.
-  if (view === 'syllabus') {
+  // The syllabus of a subject and its form: under «Расписание» for the deanery, under the teacher's own subjects otherwise.
+  if (view === 'syllabus' || view === 'syllabusForm') {
     [groupKey, pageKey] = [menuParts(role).includes('office') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
   } else {
     for (const group of groups) {

@@ -16,10 +16,11 @@ import * as schedule from './views/schedule.js';
 import * as mySchedule from './views/mySchedule.js';
 import * as syllabus from './views/syllabus.js';
 import * as subjects from './views/subjects.js';
+import * as syllabusForm from './views/syllabusForm.js';
 
 // Puts the screen chosen by the router into its frame (shell.js: sign-in card, student bar or staff sidebar).
 // A screen may export leave(): it is called when another screen replaces it, to drop what it held.
-const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects };
+const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm };
 const page = document.getElementById('page');
 let shownView = null;
 let shownHash = location.hash;
@@ -86,15 +87,21 @@ function sessionEnded() {
 }
 
 // A link or the Back button changed the address. If the screen holds something it cannot show again, the
-// address goes back while it asks; after "leave" the person goes where they were heading.
+// address goes back while it asks; after "leave" the person goes where they were heading. A screen that stays on
+// the same work at the new address (another tab of the same syllabus form: keepsHold) is not left.
 async function hashChanged() {
-  if (!isLeaveHeld() || location.hash === shownHash) {
+  if (!isLeaveHeld() || location.hash === shownHash || staysOnWork()) {
     renderCurrent();
     return;
   }
   const target = location.hash;
   history.replaceState(null, '', shownHash);
   if (await mayLeave()) location.hash = target;
+}
+
+function staysOnWork() {
+  const next = resolveRoute(location.hash, currentUser());
+  return next.view === shownView && typeof VIEWS[shownView].keepsHold === 'function' && VIEWS[shownView].keepsHold(next.params);
 }
 
 async function logout() {

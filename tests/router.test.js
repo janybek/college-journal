@@ -89,3 +89,12 @@ test('resolveRoute tolerates an empty hash and a user without permissions', () =
   assert.deepEqual(resolveRoute('', dean), { view: 'home', params: {} });
   assert.equal(resolveRoute('#/dir/groups', { mustChangePassword: false }).view, 'home');
 });
+
+test('resolveRoute: the syllabus form of a version and its tab need syllabus.form', () => {
+  const teacher = { mustChangePassword: false, permissions: ['syllabus.get', 'syllabus.form'] };
+  assert.deepEqual(resolveRoute('#/syllabus-form/sy_1', teacher), { view: 'syllabusForm', params: { syllabusId: 'sy_1', tab: 'title' } });
+  assert.deepEqual(resolveRoute('#/syllabus-form/sy_1/plan', teacher), { view: 'syllabusForm', params: { syllabusId: 'sy_1', tab: 'plan' } });
+  assert.deepEqual(resolveRoute('#/syllabus-form/sy_1/grades', teacher), { view: 'syllabusForm', params: { syllabusId: 'sy_1', tab: 'title' } });
+  assert.equal(resolveRoute('#/syllabus-form/sy_1', { mustChangePassword: false, permissions: ['syllabus.get'] }).view, 'home');      // студент
+  assert.equal(resolveRoute('#/syllabus-form', teacher).view, 'home');
+});
