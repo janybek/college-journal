@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SCHEMA } from '../core/schema.js';
-import { semesterOf } from '../core/topics.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createSheetsStore, ensureSheets } from '../backend/store/sheetsStore.js';
 import { createFakeSpreadsheet } from './fakes/fakeSpreadsheet.js';
@@ -238,10 +237,11 @@ test('sheetsStore: updateMany and removeMany run under the lock', () => {
   assert.equal(locked, 2);
 });
 
-test('a Topics sheet made before the semester column gets it and reads as semester 1', () => {
+test('a Topics sheet made before the syllabus columns gets them; the old columns are not read', () => {
   const platform = createNodePlatform({ now: () => 1_000_000, secret: 'test-secret' });
-  const old = createFakeSpreadsheet({ 'Темы': [['id', 'предмет', 'юнит', '№ по порядку', 'название', 'тип пары'], ['tp_1', 'sb_1', 1, 1, 'Введение', 'lecture']] });
-  assert.ok(ensureSheets(SCHEMA, old).addedColumns.includes('Темы.семестр'));
-  const legacy = createSheetsStore(SCHEMA, platform, old).list('topics')[0];
-  assert.deepEqual([legacy.semester, semesterOf(legacy)], [null, 1]);
+  const old = createFakeSpreadsheet({ 'Темы': [['id', 'предмет', 'юнит', '№ по порядку', 'название', 'тип пары', 'семестр'], ['tp_1', 'sb_1', 1, 1, 'Введение', 'lecture', 1]] });
+  assert.deepEqual(ensureSheets(SCHEMA, old).addedColumns,
+    ['Темы.силлабус', 'Темы.№ в силлабусе', 'Темы.лекция, ч', 'Темы.практика, ч', 'Темы.вид практики', 'Темы.СРС, ч', 'Темы.описание', 'Темы.вид строки']);
+  const row = createSheetsStore(SCHEMA, platform, old).list('topics')[0];
+  assert.deepEqual([row.id, row.name, row.order, row.syllabusId, row.lectureHours, 'subjectId' in row, 'semester' in row], ['tp_1', 'Введение', 1, '', null, false, false]);
 });

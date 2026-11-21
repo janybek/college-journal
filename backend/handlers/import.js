@@ -8,7 +8,7 @@ function checkCells(cells) {
 }
 
 function parseAgainst(table, cells, db) {
-  const parsed = parseSheet(table, cells, db, {});
+  const parsed = parseSheet(table, cells, db);
   const badRows = new Set(parsed.errors.map((e) => e.row)).size;
   return { spec: table, table, db, parsed, badRows };
 }
@@ -17,8 +17,6 @@ function parseAgainst(table, cells, db) {
 function analyse(data, store) {
   const { table, cells } = data;
   if (typeof table !== 'string' || !Object.prototype.hasOwnProperty.call(IMPORT_SPECS, table)) throw new AppError('bad_request');
-  // A spec with its own storage table is a syllabus: it goes only through syllabus.* (kept until the old specs are removed).
-  if (IMPORT_SPECS[table].table !== undefined) throw new AppError('bad_request');
   checkCells(cells);
   const db = loadDb(store, table, table === 'subjects' ? ['weekTemplate'] : []);
   return parseAgainst(table, cells, db);

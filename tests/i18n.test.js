@@ -4,8 +4,7 @@ import { translate, t, tCount, setLang, applyOverrides, pickLang } from '../site
 import ru from '../site/js/i18n/ru.js';
 import ky from '../site/js/i18n/ky.js';
 import en from '../site/js/i18n/en.js';
-import { IMPORT_SPECS, parseSheet } from '../core/import.js';
-import { LESSON_TYPES } from '../core/schema.js';
+import { IMPORT_SPECS } from '../core/import.js';
 import { SYLLABUS_SHEETS, INFO_ROWS, PLAN_COLUMNS, KIND_WORDS } from '../core/syllabusFile.js';
 import { IMPORT_COLUMNS, IMPORT_TABLES, FIELDS } from '../site/js/views/directoryConfig.js';
 
@@ -21,44 +20,14 @@ test('the site lists the same template columns as IMPORT_SPECS', () => {
   assert.deepEqual(IMPORT_COLUMNS, fromSpecs);
 });
 
-test('topics can be imported: last in the order, with a field for every column and the texts of the screen', () => {
-  assert.equal(IMPORT_TABLES[IMPORT_TABLES.length - 1], 'topics');
-  for (const { key } of IMPORT_COLUMNS.topics) assert.ok(FIELDS[key], key);
-  // The template formats every column but the numbers as Text.
-  assert.deepEqual(IMPORT_COLUMNS.topics.filter(({ key }) => FIELDS[key].kind === 'number').map(({ key }) => key), ['semester', 'unit', 'order']);
-  for (const { key } of IMPORT_COLUMNS.syllabus) assert.ok(FIELDS[key], key);
-  assert.deepEqual(IMPORT_COLUMNS.syllabus.filter(({ key }) => FIELDS[key].kind === 'number').map(({ key }) => key), ['semester', 'unit', 'order']);
-  assert.equal(IMPORT_TABLES.includes('syllabus'), false);                        // силлабус загружается со страницы предмета, не из общего импорта
-  for (const key of ['import.colHint.topics.semester', 'import.error.semester.bad_value']) assert.ok(ru[key], key);
-  for (const key of ['dir.topics', 'import.matchBy.topics', 'import.error.name.held', 'import.error.subjectId.bad_ref']) assert.ok(ru[key], key);
+test('the old topic import is gone: the site lists no topics or syllabus import, and no texts for them', () => {
+  assert.deepEqual(IMPORT_TABLES, ['groups', 'rooms', 'staff', 'students', 'disciplines', 'subjects']);
+  assert.deepEqual(Object.keys(IMPORT_COLUMNS).sort(), Object.keys(IMPORT_SPECS).sort());
+  for (const key of ['subjectId', 'lessonType', 'semester', 'unit', 'order']) assert.equal(key in FIELDS, false, key);
+  for (const dict of [ru, ky, en]) for (const key of Object.keys(dict)) {
+    assert.equal(/^import\.(col|colHint|matchBy)\.(topics|syllabus)/.test(key) || key.startsWith('dir.topics'), false, key);
+  }
   for (const table of IMPORT_TABLES) assert.ok(ru['import.matchBy.' + table], table);
-});
-
-test('the lesson types the import hint names are words the importer reads; in English, the type codes themselves', () => {
-  const db = { groups: [{ id: 'g1', name: '01-1' }], subjects: [{ id: 'sb1', name: 'Анатомия', groupId: 'g1' }], topics: [], pairs: [] };
-  const words = (dict) => dict['import.colHint.topics.lessonType'].replace(/\.$/, '').split(/,\s*|\s+(?:или|or|же)\s+/);
-  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
-    const cells = [IMPORT_SPECS.topics.columns.map((col) => col.titles.ru),
-      ...words(dict).map((word, i) => ['Анатомия', '01-1', 1, 1, i + 1, 'Тема', word])];
-    const { records, errors } = parseSheet('topics', cells, db);
-    assert.deepEqual(errors, [], lang);
-    assert.deepEqual(records.map((r) => r.lessonType), LESSON_TYPES, lang);
-  }
-  assert.deepEqual(words(en), LESSON_TYPES);
-  assert.match(en['import.error.lessonType.bad_value'], /lecture, practice or control/);
-});
-
-test('the lesson types the syllabus hint names are words the syllabus file reads', () => {
-  const db = { groups: [{ id: 'g1', name: '01-1' }], subjects: [{ id: 'sb1', name: 'Анатомия', groupId: 'g1' }], topics: [], pairs: [] };
-  const words = (dict) => dict['import.colHint.syllabus.lessonType'].replace(/\.$/, '').split(/,\s*|\s+(?:или|or|же)\s+/);
-  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
-    const cells = [IMPORT_SPECS.syllabus.columns.map((col) => col.titles.ru),
-      ...words(dict).map((word, i) => [1, 1, i + 1, 'Тема', word])];               // Семестр, Модуль, №, Тема, Тип
-    const { records, errors } = parseSheet('syllabus', cells, db, { subjectId: 'sb1' });
-    assert.deepEqual(errors, [], lang);
-    assert.deepEqual(records.map((r) => r.lessonType), LESSON_TYPES, lang);
-  }
-  assert.deepEqual(words(en), LESSON_TYPES);                                       // en: «lecture, practice or control»
 });
 
 test('the sheets, lines, columns and kinds of the syllabus template are the names core/syllabusFile.js reads, in every language', () => {

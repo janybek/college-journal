@@ -77,9 +77,8 @@ export const SCHEMA = {
   topics: {
     sheet: 'Темы', prefix: 'tp',
     columns: [
-      col('id', 'id'), col('subjectId', 'предмет'), col('unit', 'юнит', 'int'), col('order', '№ по порядку', 'int'),
-      col('name', 'название'), col('lessonType', 'тип пары'), col('semester', 'семестр', 'int'),
-      col('syllabusId', 'силлабус'), col('label', '№ в силлабусе'), col('lectureHours', 'лекция, ч', 'int'),
+      col('id', 'id'), col('syllabusId', 'силлабус'), col('order', '№ по порядку', 'int'), col('unit', 'юнит', 'int'),
+      col('label', '№ в силлабусе'), col('name', 'название'), col('lectureHours', 'лекция, ч', 'int'),
       col('practiceHours', 'практика, ч', 'int'), col('practiceKind', 'вид практики'), col('selfHours', 'СРС, ч', 'int'),
       col('description', 'описание'), col('kind', 'вид строки'),
     ],
