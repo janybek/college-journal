@@ -2,11 +2,11 @@
 
 const ALL_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms'];
 const DEAN_TABLES = ['groups', 'students', 'disciplines', 'subjects', 'rooms'];
-const SCHEDULE_TABLES = ['weekTemplate', 'topics'];
+const SCHEDULE_TABLES = ['weekTemplate'];
 const LIST_TABLES = [...ALL_TABLES, ...SCHEDULE_TABLES];
 const DEAN_EDIT_TABLES = [...DEAN_TABLES, ...SCHEDULE_TABLES];
-const IMPORT_TABLES = [...ALL_TABLES, 'topics'];
-const DEAN_IMPORT_TABLES = [...DEAN_TABLES, 'topics'];
+const IMPORT_TABLES = ALL_TABLES;
+const DEAN_IMPORT_TABLES = DEAN_TABLES;
 
 const PUBLIC_ACTIONS = ['auth.login', 'i18n.overrides'];
 const ANY_ACTIONS = ['auth.me', 'auth.changePassword', 'user.setLang'];
@@ -14,10 +14,10 @@ const ANY_ACTIONS = ['auth.me', 'auth.changePassword', 'user.setLang'];
 // action -> role -> allowed tables (or true for actions without a table)
 const ROLE_ACTIONS = {
   'dir.list': { admin: LIST_TABLES, dean: LIST_TABLES, prorector: LIST_TABLES },
-  'dir.save': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES, teacher: ['topics'] },
-  'dir.remove': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES, teacher: ['topics'] },
-  'syllabus.preview': { admin: true, dean: true, teacher: true },
-  'syllabus.apply': { admin: true, dean: true, teacher: true },
+  'dir.save': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES },
+  'dir.remove': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES },
+  'syllabus.preview': { admin: true, dean: true },
+  'syllabus.apply': { admin: true, dean: true },
   'import.preview': { admin: IMPORT_TABLES, dean: DEAN_IMPORT_TABLES },
   'import.apply': { admin: IMPORT_TABLES, dean: DEAN_IMPORT_TABLES },
   'dir.resetPassword': { admin: ['students', 'staff'], dean: ['students'] },

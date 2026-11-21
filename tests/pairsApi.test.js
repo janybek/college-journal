@@ -51,18 +51,23 @@ function setup() {
     store.insert('students', { fullName: cardNo, groupId, cardNo, passwordHash: hash, lang: 'ky', mustChangePassword: false, active: true });
     t[cardNo] = call('auth.login', { login: cardNo, password: 'secret12' }).data.token;
   }
-  const sb1 = store.insert('subjects', { name: 'Информатика', groupId: g1, teacherId: ids.teacher1, scheme: 'A' }).id;
-  const sb2 = store.insert('subjects', { name: 'Анатомия', groupId: g2, teacherId: ids.teacher2, scheme: 'A' }).id;
+  const ds1 = store.insert('disciplines', { name: 'Информатика' }).id;
+  const ds2 = store.insert('disciplines', { name: 'Анатомия' }).id;
+  const sb1 = store.insert('subjects', { name: 'Информатика', disciplineId: ds1, groupId: g1, teacherId: ids.teacher1, scheme: 'A' }).id;
+  const sb2 = store.insert('subjects', { name: 'Анатомия', disciplineId: ds2, groupId: g2, teacherId: ids.teacher2, scheme: 'A' }).id;
   const r1 = store.insert('rooms', { name: '101' });
   const r2 = store.insert('rooms', { name: '102' });
-  for (const order of [1, 2, 3, 4]) store.insert('topics', { subjectId: sb1, unit: 1, order, name: 'Тема ' + order, lessonType: 'lecture' });
+  const syllabusId = store.insert('syllabi', { disciplineId: ds1, teacherId: ids.teacher1, semester: 1, planSemester: 1 }).id;
+  const topicIds = [1, 2, 3, 4].map((order) => store.insert('topics', {
+    syllabusId, order, unit: 1, label: '', name: 'Тема ' + order, lectureHours: 2, practiceHours: 0, practiceKind: '', description: '', kind: 'topic',
+  }).id);
   call('settings.save', { settings: S }, t.dean);
   store.insert('weekTemplate', { weekday: 2, slot: 1, subjectId: sb1, roomId: r1.id });
   store.insert('weekTemplate', { weekday: 5, slot: 1, subjectId: sb2, roomId: r2.id });
   assert.equal(call('schedule.generate', {}, t.dean).ok, true);
   const idAt = (subjectId, date) => store.list('pairs').find((p) => p.subjectId === subjectId && p.date === date).id;
   return {
-    store, spy: spied.spy, state, call, calls: spied.calls, reads: spied.reads, updates: spied.updates, reset: spied.reset, ...t, ids, g1, g2, sb1, sb2, r1Name: r1.name, r2Id: r2.id,
+    store, spy: spied.spy, state, call, calls: spied.calls, reads: spied.reads, updates: spied.updates, reset: spied.reset, ...t, ids, g1, g2, sb1, sb2, topicIds, r1Name: r1.name, r2Id: r2.id,
     pair1: idAt(sb1, '2026-09-01'), pair8: idAt(sb1, '2026-09-08'), pair15: idAt(sb1, '2026-09-15'), pair22: idAt(sb1, '2026-09-22'),
   };
 }
@@ -73,9 +78,11 @@ test('schedule views: mine, list, filters, limits and permissions', () => {
   state.now = Date.UTC(2026, 8, 1, 18, 30); // 00:30 on 2 September in Bishkek
   const week = call('schedule.mine', { from: '2026-09-10' }, x.S1).data;
   assert.deepEqual([week.today, week.from, week.to], ['2026-09-02', '2026-09-07', '2026-09-13']);
-  assert.deepEqual(week.pairs.map(p => [p.date, p.subjectName, p.teacherName, p.roomName, p.topic.order, p.startTime, p.endTime]),
-    [['2026-09-08', 'Информатика', 'teacher1', x.r1Name, 2, '08:00', '09:30']]);
+  assert.deepEqual(week.pairs.map(p => [p.date, p.subjectName, p.teacherName, p.roomName, p.topic.name, p.startTime, p.endTime]),
+    [['2026-09-08', 'Информатика', 'teacher1', x.r1Name, 'Тема 2', '08:00', '09:30']]);
   assert.equal(JSON.stringify(week).includes('passwordHash'), false);
+  assert.deepEqual(call('schedule.list', { from: '2026-09-01', to: '2026-09-01', groupId: x.g1 }, x.dean).data.pairs[0].topic,
+    { id: x.topicIds[0], unit: 1, label: '', name: 'Тема 1', kind: 'topic', lessonType: 'lecture', part: 1, parts: 1, practiceKind: '', control: null });
   assert.deepEqual([call('schedule.mine', {}, x.S1).data.from, call('schedule.mine', {}, x.S1).data.to], ['2026-08-31', '2026-09-06']);
   assert.deepEqual(call('schedule.mine', { from: 'мусор' }, x.S1).error, { code: 'bad_request' });
 
@@ -120,17 +127,19 @@ test('cancel, restore, move and substitute one pair; topics follow', () => {
   state.now = Date.UTC(2026, 8, 1, 18, 30);
   store.update('pairs', x.pair1, { status: 'closed' });
   const topicsByDate = () => Object.fromEntries(call('schedule.list', { from: '2026-09-01', to: '2026-09-25', groupId: x.g1 }, x.dean).data.pairs
-    .map(p => [p.date, p.topic ? p.topic.order : null]));
+    .map(p => [p.date, p.topic ? p.topic.name : null]));
   const cancelled = call('schedule.cancelPair', { id: x.pair8, note: '  Преподаватель на конференции ' }, x.dean).data.pair;
   assert.deepEqual([cancelled.status, cancelled.note, cancelled.topic], ['cancelled', 'Преподаватель на конференции', null]);
-  assert.deepEqual(topicsByDate(), { '2026-09-01': 1, '2026-09-08': null, '2026-09-15': 2, '2026-09-22': 3 });
+  const row = store.get('pairs', x.pair8);
+  assert.deepEqual([row.topicId, row.lessonType, row.part], ['', '', null]);
+  assert.deepEqual(topicsByDate(), { '2026-09-01': 'Тема 1', '2026-09-08': null, '2026-09-15': 'Тема 2', '2026-09-22': 'Тема 3' });
   assert.equal(call('schedule.restorePair', { id: x.pair8 }, x.dean).data.pair.status, 'planned');
-  assert.deepEqual(topicsByDate(), { '2026-09-01': 1, '2026-09-08': 2, '2026-09-15': 3, '2026-09-22': 4 });
+  assert.deepEqual(topicsByDate(), { '2026-09-01': 'Тема 1', '2026-09-08': 'Тема 2', '2026-09-15': 'Тема 3', '2026-09-22': 'Тема 4' });
   assert.equal(store.get('pairs', x.pair8).note, '');
 
   const moved = call('schedule.changePair', { id: x.pair22, date: '2026-09-10', slot: 2 }, x.dean).data.pair;
   assert.deepEqual([moved.date, moved.startTime, moved.moved, moved.planDate, moved.planSlot], ['2026-09-10', '09:40', true, '2026-09-22', 1]);
-  assert.deepEqual(topicsByDate(), { '2026-09-01': 1, '2026-09-08': 2, '2026-09-10': 3, '2026-09-15': 4 });
+  assert.deepEqual(topicsByDate(), { '2026-09-01': 'Тема 1', '2026-09-08': 'Тема 2', '2026-09-10': 'Тема 3', '2026-09-15': 'Тема 4' });
 
   const sub = call('schedule.changePair', { id: x.pair15, teacherId: x.ids.teacher3, note: 'Болезнь' }, x.dean).data.pair;
   assert.deepEqual([sub.teacherName, sub.substitution, sub.moved, sub.note], ['teacher3', true, false, 'Болезнь']);

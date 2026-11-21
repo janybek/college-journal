@@ -7,8 +7,11 @@ import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { SCHEMA } from '../core/schema.js';
 import http from 'node:http';
-import { startDevServer, MAX_BODY_BYTES } from '../dev/server.js';
-import { seed, DEV_PASSWORD } from '../dev/seed.js';
+import { startDevServer, MAX_BODY_BYTES, DATA_FILES, standArgs } from '../dev/server.js';
+import { seed, seedAdmin, DEV_PASSWORD } from '../dev/seed.js';
+import { createFileStore } from '../backend/store/fileStore.js';
+import { pairViews } from '../backend/scheduleData.js';
+import { verifyPassword } from '../core/auth.js';
 import { readSettings, DEFAULT_BELLS } from '../core/settings.js';
 
 function tempDirs(t) {
@@ -149,29 +152,86 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   assert.deepEqual(store.list('subjects').map((s) => `${s.name}:${groupName.get(s.groupId)}:${staffLogin.get(s.teacherId)}`).sort(),
     ['Анатомия:01-1:teacher2', 'Анатомия:02-1:teacher2', 'Анатомия:03-1:teacher2',
       'Информатика:01-1:teacher1', 'Информатика:02-1:teacher1', 'Информатика:03-1:teacher3']);
-  assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('topics').length, store.list('pairs').length], [6, 9, 72, 159]);
-  assert.equal(store.list('topics').filter((t) => t.semester === 2).length, 18);
-  const second = new Set(store.list('topics').filter((t) => t.semester === 2).map((t) => t.id));
+  assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('disciplines').length, store.list('syllabi').length,
+    store.list('topics').length, store.list('pairs').length], [6, 9, 2, 2, 17, 159]);
+  const groupByName = new Map(store.list('groups').map((g) => [g.name, g.id]));
+  const subjectOf = (name, group) => store.list('subjects').find((s) => s.name === name && s.groupId === groupByName.get(group));
+  const pairsOf = (subject) => store.list('pairs').filter((p) => p.subjectId === subject.id).sort((a, b) => a.date.localeCompare(b.date) || a.slot - b.slot);
+  const labelOf = new Map(store.list('topics').map((t) => [t.id, t.label]));
+  // lessonsOfGroup(group): the pairs of the group's «Информатика» that carry a lesson, by date -> [row label, type, part]
+  const lessonsOfGroup = (group) => pairsOf(subjectOf('Информатика', group)).filter((p) => p.topicId !== '').map((p) => [labelOf.get(p.topicId), p.lessonType, p.part]);
+  assert.deepEqual(lessonsOfGroup('01-1').slice(0, 3), [['1.1', 'lecture', 1], ['1.2', 'lecture', 1], ['1.2', 'practice', 1]]);
+  assert.deepEqual([lessonsOfGroup('01-1').length, new Set(lessonsOfGroup('01-1').map(String)).size, lessonsOfGroup('01-1')[17]], [18, 18, ['2.5', 'practice', 1]]);
+  // the last pair of 01-1 (2.5, practice) carries the mark of the module
+  const last = pairsOf(subjectOf('Информатика', '01-1')).at(-1);
+  assert.deepEqual(pairViews(store, (p) => p.id === last.id)[0].topic.control, { name: 'Модуль 2 (рубежный контроль)', unit: 2 });
+  // 02-1 (same teacher, same syllabus): one pair is cancelled — 17 lessons stand on their dates, the last one (2.5, practice) did not fit
+  const of02 = pairsOf(subjectOf('Информатика', '02-1'));
+  assert.deepEqual([of02.length, of02.filter((p) => p.status === 'cancelled').length, lessonsOfGroup('02-1')], [18, 1, lessonsOfGroup('01-1').slice(0, 17)]);
+  // 03-1 (teacher3, no syllabus) and «Анатомия»: no pair has a lesson
+  const bare = new Set([subjectOf('Информатика', '03-1').id, ...store.list('subjects').filter((s) => s.name === 'Анатомия').map((s) => s.id)]);
+  assert.equal(store.list('pairs').filter((p) => bare.has(p.subjectId)).every((p) => p.topicId === '' && p.lessonType === '' && p.part === null), true);
+  // no pair holds a topic of the second-semester syllabus
+  const spring = new Set(store.list('syllabi').filter((s) => s.semester === 2).map((s) => s.id));
+  const springTopics = new Set(store.list('topics').filter((t) => spring.has(t.syllabusId)).map((t) => t.id));
+  assert.deepEqual([spring.size, store.list('pairs').some((p) => springTopics.has(p.topicId))], [1, false]);
   const pairs = store.list('pairs');
   assert.equal(pairs.filter((p) => p.status === 'cancelled').length, 1);
   assert.deepEqual(pairs.filter((p) => p.note === 'Замена').map((p) => p.date), ['2026-11-26']);
-
-  assert.equal(pairs.some((p) => second.has(p.topicId)), false);
   assert.equal(readSettings(store.list('settings')).semester, 1);
-
-  const groupByName = new Map(store.list('groups').map((g) => [g.name, g.id]));
-  const subjects = store.list('subjects');
-  for (const [group, planned] of [['01-1', 18], ['02-1', 17]]) {
-    const subject = subjects.find((s) => s.name === 'Информатика' && s.groupId === groupByName.get(group));
-    const mine = pairs.filter((p) => p.subjectId === subject.id);
-    assert.equal(mine.length, 18, group);
-    const withTopic = mine.filter((p) => p.topicId !== '');
-    assert.equal(withTopic.length, planned, group);
-    assert.equal(new Set(withTopic.map((p) => p.topicId)).size, planned, group);
-  }
-  assert.equal(subjects.filter((s) => s.name === 'Анатомия').every((s) => store.list('topics').every((t) => t.subjectId !== s.id)), true);
 
   seed(store, platform);
   assert.equal(store.list('students').length, 66);
   assert.equal(store.list('pairs').length, 159);
+});
+
+test('the real-data stand: its own file, one admin, never seeded with fictional people', async (t) => {
+  const { dir, siteDir } = tempDirs(t);
+  const dataFile = path.join(dir, 'data', 'real.json');
+  const first = await startDevServer({ port: 0, dataFile, siteDir, mode: 'real' });
+  const login = await fetch(first.url + '/api', { method: 'POST', body: JSON.stringify({ action: 'auth.login', data: { login: 'admin', password: DEV_PASSWORD } }) }).then((r) => r.json());
+  await first.close();
+  assert.equal(login.ok, true);
+  const platform = createNodePlatform();
+  const saved = createFileStore(SCHEMA, platform, dataFile);
+  assert.deepEqual(saved.list('staff').map((s) => [s.login, s.roles, s.mustChangePassword]), [['admin', 'admin', false]]);
+  for (const table of ['groups', 'students', 'disciplines', 'subjects', 'syllabi', 'topics', 'weekTemplate', 'settings', 'pairs']) assert.equal(saved.list(table).length, 0, table);
+  // a real group entered by hand survives a restart; the seed is not called on the restart either
+  saved.insert('groups', { name: 'СД-11', course: 1 });
+  const again = await startDevServer({ port: 0, dataFile, siteDir, mode: 'real' });
+  await again.close();
+  const reopened = createFileStore(SCHEMA, platform, dataFile);
+  assert.deepEqual([reopened.list('groups').map((g) => g.name), reopened.list('staff').length, reopened.list('students').length], [['СД-11'], 1, 0]);
+});
+
+test('--reset deletes only the fictional data file; with --real it is refused', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'journal-args-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const data = path.join(root, 'dev', 'data');
+  fs.mkdirSync(data, { recursive: true });
+  const exists = () => ['db.json', 'real.json'].map((name) => fs.existsSync(path.join(data, name)));
+  for (const name of ['db.json', 'real.json']) fs.writeFileSync(path.join(data, name), '{}');
+  assert.deepEqual(DATA_FILES, { demo: 'dev/data/db.json', real: 'dev/data/real.json' });
+  assert.deepEqual(standArgs(['--real', '--reset'], root), { error: 'reset_refused' });
+  assert.deepEqual(standArgs(['--reset', '--real'], root), { error: 'reset_refused' });
+  assert.deepEqual(exists(), [true, true]);                                        // the refusal deleted nothing
+  assert.deepEqual(standArgs(['--real'], root), { mode: 'real', dataFile: DATA_FILES.real });
+  assert.deepEqual(standArgs([], root), { mode: 'demo', dataFile: DATA_FILES.demo });
+  assert.deepEqual(exists(), [true, true]);
+  assert.deepEqual(standArgs(['--reset'], root), { mode: 'demo', dataFile: DATA_FILES.demo });
+  assert.deepEqual(exists(), [false, true]);                                       // --reset does not touch real.json
+  const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'package.json'), 'utf8'));
+  const launch = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', '.claude', 'launch.json'), 'utf8'));
+  assert.equal(pkg.scripts['dev:real'], 'node dev/server.js --real');
+  assert.deepEqual(launch.configurations.find((c) => c.name === 'journal-dev-real'),
+    { name: 'journal-dev-real', runtimeExecutable: 'node', runtimeArgs: ['dev/server.js', '--real'], port: 5273 });
+});
+
+test('seedAdmin: one admin on an empty store, nothing when staff exist', () => {
+  const platform = createNodePlatform({ now: () => Date.UTC(2026, 10, 21, 6) });
+  const store = createMemoryStore(SCHEMA, platform);
+  seedAdmin(store, platform);
+  seedAdmin(store, platform);
+  assert.deepEqual(store.list('staff').map((s) => [s.login, s.fullName, s.roles, s.active, s.mustChangePassword]), [['admin', 'Admin Demo', 'admin', true, false]]);
+  assert.equal(verifyPassword(platform, DEV_PASSWORD, store.list('staff')[0].passwordHash), true);
 });

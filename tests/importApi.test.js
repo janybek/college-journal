@@ -126,3 +126,28 @@ test('disciplines import: the deanery loads the list, a known name is not added 
   assert.deepEqual(store.list('disciplines').map((x) => x.name), ['Анатомия', 'Информатика']);
   assert.deepEqual([call('import.apply', { table: 'disciplines', cells: file.slice(0, 3) }, dean).data.inserted, store.list('disciplines').length], [0, 2]);
 });
+
+test('a subjects import that changes the teacher re-lays the group; every sheet is read once', () => {
+  const { store, call, dean } = setup();
+  const g1 = store.list('groups')[0].id;
+  const teacher = (login) => store.insert('staff', { fullName: login, login, passwordHash: 'x', roles: 'teacher', lang: 'ky', mustChangePassword: false, active: true }).id;
+  const t1 = teacher('tea1');
+  teacher('tea2');                                                                // tea2 has no syllabus
+  const ds = store.insert('disciplines', { name: 'Информатика' }).id;
+  const sb = store.insert('subjects', { name: 'Информатика', disciplineId: ds, groupId: g1, teacherId: t1, scheme: 'A' }).id;
+  const sy = store.insert('syllabi', { disciplineId: ds, teacherId: t1, semester: 1, planSemester: 1 }).id;
+  store.insert('topics', { syllabusId: sy, order: 1, unit: 1, label: '', name: 'Введение', lectureHours: 2, practiceHours: 2, practiceKind: '', description: '', kind: 'topic' });
+  assert.equal(call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-09-25', holidays: [], bells: ['08:00', '09:40'], semester: 1 } }, dean).ok, true);
+  store.insert('weekTemplate', { weekday: 2, slot: 1, subjectId: sb, roomId: '' });
+  assert.equal(call('schedule.generate', {}, dean).ok, true);                     // four Tuesdays: 1, 8, 15, 22 September
+  const lessons = () => store.list('pairs').map((p) => [p.topicId !== '', p.lessonType, p.part]);
+  assert.deepEqual(lessons(), [[true, 'lecture', 1], [true, 'practice', 1], [false, '', null], [false, '', null]]);
+  const lists = {};
+  const list = store.list;
+  store.list = (table) => { lists[table] = (lists[table] || 0) + 1; return list(table); };
+  const done = call('import.apply', { table: 'subjects', cells: [['Дисциплина', 'Преподаватель', 'Группа'], ['Информатика', 'tea2', '01-1']] }, dean).data;
+  store.list = list;
+  assert.deepEqual([done.updated, done.errors], [1, []]);
+  for (const [table, n] of Object.entries(lists)) assert.equal(n, 1, table);
+  assert.deepEqual(lessons(), [[false, '', null], [false, '', null], [false, '', null], [false, '', null]]);   // NO_LESSON on every pair that is not held
+});

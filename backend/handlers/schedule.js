@@ -1,7 +1,7 @@
 import { AppError } from '../../core/errors.js';
 import { addDays, daysBetween, isDate, mondayOf } from '../../core/dates.js';
 import { checkPairChange, pairLock } from '../../core/schedule.js';
-import { semesterOf, inSemester } from '../../core/topics.js';
+import { semesterOf, inSemester, NO_LESSON } from '../../core/topics.js';
 import { FIXED_STATUSES } from '../../core/schema.js';
 import { canEditSubjectTopics } from '../users.js';
 import { can } from '../../core/permissions.js';
@@ -95,8 +95,8 @@ function saved(store, pairs, id, patch, rows, relay, settings) {
   if (Object.keys(patch).length > 0) store.update('pairs', id, patch);
   const after = pairs.map((p) => (p.id === id ? { ...p, ...patch } : p));
   const pair = after.find((p) => p.id === id);
-  const result = relay ? relayout(store, [pair.subjectId], { pairs: after, settings }) : { topics: undefined, pairs: after };
-  return { pair: pairViews(store, (p) => p.id === id, { ...rows, pairs: result.pairs, topics: result.topics })[0] };
+  const result = relay ? relayout(store, [pair.subjectId], { pairs: after, settings }) : { subjects: undefined, topics: undefined, pairs: after };
+  return { pair: pairViews(store, (p) => p.id === id, { ...rows, pairs: result.pairs, topics: result.topics, subjects: result.subjects })[0] };
 }
 
 function changePair(data, ctx) {
@@ -125,7 +125,7 @@ function cancelPair(data, ctx) {
   const pair = findPair(pairs, data.id);
   const lock = pairLock(pair, todayOf(platform));
   if (lock) throw new AppError(lock);
-  const patch = { status: 'cancelled', topicId: '', changed: true };
+  const patch = { status: 'cancelled', ...NO_LESSON, changed: true };
   if (data.note !== undefined) {
     const note = typeof data.note === 'string' ? data.note.trim() : null;
     if (note === null) throw new AppError('invalid', { fields: [{ field: 'note', code: 'bad_value' }] });

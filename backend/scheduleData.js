@@ -3,7 +3,8 @@ import { AppError } from '../core/errors.js';
 import { localDate, addMinutes } from '../core/dates.js';
 import { readSettings, PAIR_MINUTES } from '../core/settings.js';
 import { planGeneration } from '../core/schedule.js';
-import { layoutTopics, semesterScope } from '../core/topics.js';
+import { NO_LESSON, controlMarks, layoutLessons, lessonKey, partsOf } from '../core/topics.js';
+import { subjectScope, syllabusIndex } from '../core/syllabus.js';
 
 export function todayOf(platform) {
   return localDate(platform.now());
@@ -22,27 +23,30 @@ const groupBy = (rows) => {
   return map;
 };
 
-// Lays the topics of the given subjects (null: all) over their pairs and saves the pairs whose topic changed.
-// Only the topics of the current semester are laid, over the pairs inside the semester dates (and the held ones).
+// Lays the lessons of the syllabus each given subject follows (null: all subjects) over that subject's pairs; saves the pairs whose lesson changed.
+// Only the syllabus of the current semester is laid, over the pairs inside the semester dates (and the held ones).
 // `rows` holds sheets the request has already read, as they stand after its own write; those are not read again.
+// -> { changed, subjects, syllabi, topics, pairs }: the sheets as they are now, so the caller need not read them a second time.
 export function relayout(store, subjectIds = null, rows = {}) {
+  const subjects = rows.subjects ?? store.list('subjects');
+  const syllabi = rows.syllabi ?? store.list('syllabi');
   const topics = rows.topics ?? store.list('topics');
   const pairs = rows.pairs ?? store.list('pairs');
   const settings = rows.settings ?? loadSettings(store);
-  const topicsBySubject = groupBy(topics);
+  const index = syllabusIndex(syllabi, topics);
   const pairsBySubject = groupBy(pairs);
-  const ids = subjectIds ?? [...new Set([...topicsBySubject.keys(), ...pairsBySubject.keys()])];
+  const wanted = subjectIds === null ? null : new Set(subjectIds);
 
-  const assigned = new Map();
-  for (const subjectId of ids) {
-    const scope = semesterScope(topicsBySubject.get(subjectId) || [], pairsBySubject.get(subjectId) || [], settings);
-    for (const id of scope.clear) assigned.set(id, '');
-    const { assign } = layoutTopics(scope.topics, scope.pairs);
-    for (const { id, topicId } of assign) assigned.set(id, topicId);
+  const assigned = new Map();                                          // pair id -> { topicId, lessonType, part }
+  for (const subject of subjects) {
+    if (wanted !== null && !wanted.has(subject.id)) continue;
+    const scope = subjectScope(subject, pairsBySubject.get(subject.id) || [], index, settings);
+    for (const id of scope.clear) assigned.set(id, { ...NO_LESSON });
+    for (const { id, patch } of layoutLessons(scope.topics, scope.pairs, scope.skip).assign) assigned.set(id, patch);
   }
-  if (assigned.size === 0) return { changed: 0, topics, pairs };
-  store.updateMany('pairs', [...assigned].map(([id, topicId]) => ({ id, patch: { topicId } })));
-  return { changed: assigned.size, topics, pairs: pairs.map((p) => (assigned.has(p.id) ? { ...p, topicId: assigned.get(p.id) } : p)) };
+  if (assigned.size === 0) return { changed: 0, subjects, syllabi, topics, pairs };
+  store.updateMany('pairs', [...assigned].map(([id, patch]) => ({ id, patch })));
+  return { changed: assigned.size, subjects, syllabi, topics, pairs: pairs.map((p) => (assigned.has(p.id) ? { ...p, ...assigned.get(p.id) } : p)) };
 }
 
 export function generateSchedule(store, platform, { dryRun = false, restart = false } = {}) {
@@ -74,7 +78,7 @@ export function generateSchedule(store, platform, { dryRun = false, restart = fa
   const gone = new Set(plan.toRemove);
   const patches = new Map(plan.toUpdate.map((u) => [u.id, u.patch]));
   const after = pairs.filter((p) => !gone.has(p.id)).map((p) => (patches.has(p.id) ? { ...p, ...patches.get(p.id) } : p));
-  relayout(store, null, { pairs: [...after, ...created], settings });
+  relayout(store, null, { subjects, pairs: [...after, ...created], settings });
   return result;
 }
 
@@ -88,6 +92,18 @@ export function pairViews(store, keep, rows = {}) {
   const staff = new Map((rows.staff ?? store.list('staff')).map((s) => [s.id, s]));
   const rooms = new Map((rows.rooms ?? store.list('rooms')).map((r) => [r.id, r]));
   const nameOf = (map, id, field) => (map.has(id) ? map.get(id)[field] : '');
+  // The marks of modules without hours, by syllabus: computed once for each syllabus the views touch.
+  const rowsOfSyllabus = new Map();
+  for (const t of topics.values()) {
+    if (!rowsOfSyllabus.has(t.syllabusId)) rowsOfSyllabus.set(t.syllabusId, []);
+    rowsOfSyllabus.get(t.syllabusId).push(t);
+  }
+  const marksOf = new Map();
+  const markOn = (topic, pair) => {
+    if (!marksOf.has(topic.syllabusId)) marksOf.set(topic.syllabusId, controlMarks(rowsOfSyllabus.get(topic.syllabusId)));
+    const [mark] = marksOf.get(topic.syllabusId).get(lessonKey(pair)) || [];
+    return mark ? { name: mark.name, unit: mark.unit } : null;
+  };
 
   const views = pairs.filter(keep).map((p) => {
     const topic = topics.get(p.topicId);
@@ -98,7 +114,10 @@ export function pairViews(store, keep, rows = {}) {
       subjectId: p.subjectId, subjectName: subject ? subject.name : '',
       teacherId: p.teacherId, teacherName: nameOf(staff, p.teacherId, 'fullName'),
       roomId: p.roomId, roomName: nameOf(rooms, p.roomId, 'name'),
-      topic: topic ? { id: topic.id, unit: topic.unit, order: topic.order, name: topic.name, lessonType: topic.lessonType } : null,
+      topic: topic ? {
+        id: topic.id, unit: topic.unit, label: topic.label, name: topic.name, kind: topic.kind, lessonType: p.lessonType, part: p.part,
+        parts: partsOf(topic, p.lessonType), practiceKind: topic.practiceKind, control: markOn(topic, p),
+      } : null,
       substitution: subject ? subject.teacherId !== p.teacherId : false,
       moved: p.date !== p.planDate || p.slot !== p.planSlot,
       planDate: p.planDate, planSlot: p.planSlot, note: p.note,

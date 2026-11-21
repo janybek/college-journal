@@ -52,11 +52,10 @@ test('listPermissions', () => {
 });
 
 test('can: schedule actions', () => {
-  assert.equal(can(['dean'], 'dir.save', 'topics'), true);
+  assert.equal(can(['dean'], 'dir.save', 'weekTemplate'), true);
   assert.equal(can(['prorector'], 'dir.save', 'weekTemplate'), false);
   assert.equal(can(['prorector'], 'dir.list', 'weekTemplate'), true);
   assert.equal(can(['teacher'], 'dir.list', 'topics'), false);
-  assert.equal(can(['dean'], 'import.apply', 'topics'), true);
   assert.equal(can(['dean'], 'import.apply', 'weekTemplate'), false);
   assert.equal(can(['prorector'], 'schedule.list'), true);
   assert.equal(can(['prorector'], 'schedule.changePair'), false);
@@ -68,19 +67,14 @@ test('can: schedule actions', () => {
   assert.ok(listPermissions(['dean']).includes('settings.save'));
 });
 
-test('teacher edits topics and the syllabus of own subjects', () => {
-  assert.equal(can(['teacher'], 'dir.save', 'topics'), true);
-  assert.equal(can(['teacher'], 'dir.remove', 'topics'), true);
+test('the syllabus is uploaded by the deanery and the administrator; topics have no directory', () => {
+  for (const role of ['admin', 'dean']) assert.equal(can([role], 'syllabus.apply'), true);
+  for (const role of ['admin', 'dean']) assert.equal(can([role], 'syllabus.preview'), true);
+  for (const role of ['teacher', 'prorector', 'student']) assert.equal(can([role], 'syllabus.apply'), false);
+  for (const role of ['teacher', 'prorector', 'student']) assert.equal(can([role], 'syllabus.preview'), false);
+  for (const role of ['admin', 'dean', 'teacher']) for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.apply']) assert.equal(can([role], action, 'topics'), false);
   assert.equal(can(['teacher'], 'dir.save', 'weekTemplate'), false);
-  assert.equal(can(['teacher'], 'dir.list', 'topics'), false);
-  assert.equal(can(['teacher'], 'import.apply', 'topics'), false);
-  assert.equal(can(['teacher'], 'syllabus.apply'), true);
-  assert.equal(can(['dean'], 'syllabus.preview'), true);
-  assert.equal(can(['prorector'], 'syllabus.apply'), false);
-  assert.equal(can(['prorector'], 'dir.save', 'topics'), false);
-  assert.equal(can(['student'], 'syllabus.apply'), false);
-  assert.deepEqual(listPermissions(['teacher']),
-    ['dir.remove:topics', 'dir.save:topics', 'schedule.mine', 'syllabus.apply', 'syllabus.preview', 'teacher.mySubjects', 'topics.plan']);
+  assert.deepEqual(listPermissions(['teacher']), ['schedule.mine', 'teacher.mySubjects', 'topics.plan']);
 });
 
 test('disciplines and subjects actions', () => {

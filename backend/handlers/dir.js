@@ -2,12 +2,10 @@ import { AppError } from '../../core/errors.js';
 import { normalizeRow, validateRow } from '../../core/validate.js';
 import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { readSettings } from '../../core/settings.js';
-import { FIXED_STATUSES } from '../../core/schema.js';
-import { semesterOf } from '../../core/topics.js';
-import { USER_TABLES, canEditSubjectTopics } from '../users.js';
+import { USER_TABLES } from '../users.js';
 import { relayout } from '../scheduleData.js';
 
-const DIR_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'weekTemplate', 'topics'];
+const DIR_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'weekTemplate'];
 const LOGIN_TABLES = ['students', 'staff'];
 
 function tableOf(data, allowed = DIR_TABLES) {
@@ -30,7 +28,6 @@ const DB_SHEETS = {
   subjects: ['subjects', 'staff', 'groups', 'disciplines'],
   rooms: ['rooms'],
   weekTemplate: ['weekTemplate', 'subjects', 'rooms'],
-  topics: ['topics', 'subjects'],
 };
 
 // Reads only the sheets `table` needs plus `extra`, each once.
@@ -75,33 +72,21 @@ function renameSubjects(store, saved) {
   if (patches.length > 0) store.updateMany('subjects', patches);
 }
 
-function save(data, ctx, user) {
+function save(data, ctx) {
   const table = tableOf(data);
   const { store, platform } = ctx;
   const input = data.row !== null && typeof data.row === 'object' && !Array.isArray(data.row) ? data.row : {};
-  const extra = table === 'subjects' ? ['weekTemplate', 'pairs'] : table === 'topics' ? ['pairs'] : [];
+  const extra = table === 'subjects' ? ['weekTemplate', 'pairs'] : [];
   const db = loadDb(store, table, extra);
   const old = isId(input.id) ? db[table].find((r) => r.id === input.id) ?? null : null;
   if (isId(input.id) && !old) throw new AppError('not_found');
 
   const row = normalizeRow(table, { ...old, ...input, id: old ? old.id : undefined, passwordHash: old ? old.passwordHash : undefined });
-  if (table === 'topics') {
-    // Checked on the cleaned value that is validated and stored, so ' sb2 ' or ['sb2'] cannot slip past.
-    const subject = db.subjects.find((r) => r.id === (old ? old.subjectId : row.subjectId));
-    // A new topic of an unknown subject is left to validateRow (bad_ref); an existing orphan is staff-only.
-    if ((subject || old) && !canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
-  }
   if (table === 'subjects') {
     // The name belongs to the discipline: whatever the request says, the server sets it.
     const discipline = db.disciplines.find((d) => d.id === row.disciplineId);
     row.name = discipline ? discipline.name : '';
     if (old) checkSubjectKeys(old, row, db);
-  }
-  if (old && table === 'topics' && row.subjectId !== old.subjectId) {
-    throw new AppError('invalid', { fields: [{ field: 'subjectId', code: 'bad_value' }] });
-  }
-  if (old && table === 'topics' && row.semester !== semesterOf(old)) {
-    throw new AppError('invalid', { fields: [{ field: 'semester', code: 'bad_value' }] });
   }
   const fields = validateRow(table, row, db);
   if (fields.length > 0) throw new AppError('invalid', { fields });
@@ -109,15 +94,13 @@ function save(data, ctx, user) {
   if (old) {
     const saved = store.update(table, old.id, row);
     if (table === 'disciplines' && saved.name !== old.name) renameSubjects(store, saved);
-    if (table === 'topics') relayout(store, [saved.subjectId], { topics: db.topics.map((t) => (t.id === saved.id ? saved : t)), pairs: db.pairs });
+    // A new teacher of a group follows the syllabus of that teacher: the lessons are laid again.
+    if (table === 'subjects' && saved.teacherId !== old.teacherId) {
+      relayout(store, [saved.id], { subjects: db.subjects.map((s) => (s.id === saved.id ? saved : s)), pairs: db.pairs });
+    }
     return { row: withoutHash(saved) };
   }
 
-  if (table === 'topics') {
-    const created = store.insert(table, row);
-    relayout(store, [created.subjectId], { topics: [...db.topics, created], pairs: db.pairs });
-    return { row: created };
-  }
   if (!LOGIN_TABLES.includes(table)) return { row: withoutHash(store.insert(table, row)) };
   const { tempPassword, stored } = issueTempPassword(platform);
   const created = store.insert(table, { ...row, ...stored });
@@ -129,9 +112,8 @@ const BLOCKERS = {
   disciplines: (id) => [['subjects', (r) => r.disciplineId === id]],
   groups: (id) => [['students', (r) => r.groupId === id], ['subjects', (r) => r.groupId === id], ['pairs', (r) => r.groupId === id]],
   staff: (id) => [['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id]],
-  subjects: (id) => [['topics', (r) => r.subjectId === id], ['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id]],
+  subjects: (id) => [['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id]],
   rooms: (id) => [['weekTemplate', (r) => r.roomId === id], ['pairs', (r) => r.roomId === id]],
-  topics: (id) => [['pairs', (r) => r.topicId === id && FIXED_STATUSES.includes(r.status)]],
 };
 
 // `read` returns a sheet's rows and reads each sheet once per request.
@@ -152,18 +134,11 @@ function remove(data, ctx, user) {
   const rows = read(table);
   const row = rows.find((r) => r.id === data.id);
   if (!row) throw new AppError('not_found');
-  if (table === 'topics') {
-    const subject = read('subjects').find((r) => r.id === row.subjectId);
-    if (!canEditSubjectTopics(user, subject)) throw new AppError('forbidden');
-  }
   if (usedBy(read, table, row.id)) throw new AppError('in_use');
   if (table === 'staff' && isActiveAdmin(row) && !rows.some((s) => s.id !== row.id && isActiveAdmin(s))) {
     throw new AppError('invalid', { fields: [{ field: 'roles', code: 'last_admin' }] });
   }
   store.remove(table, row.id);
-  if (table === 'topics') {
-    relayout(store, [row.subjectId], { topics: rows.filter((r) => r.id !== row.id), pairs: read('pairs') });
-  }
   return {};
 }
 

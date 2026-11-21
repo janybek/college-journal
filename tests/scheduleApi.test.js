@@ -9,7 +9,6 @@ import { handleRequest } from '../backend/api.js';
 import { relayout, todayOf } from '../backend/scheduleData.js';
 
 const S = { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: ['2026-09-07'], bells: DEFAULT_BELLS };
-const HEAD = ['Предмет', 'Группа', 'Семестр', 'Юнит', '№', 'Тема', 'Тип'];
 
 // A spy over the store: counts every call by method and every list by table.
 function spyOn(store) {
@@ -33,6 +32,11 @@ function spyOn(store) {
   return { spy, calls, reads, writes, reset };
 }
 
+// One plan row, one lecture pair: the row gives one lesson.
+const topicRow = (store, syllabusId, order, name) => store.insert('topics', {
+  syllabusId, order, unit: 1, label: '', name, lectureHours: 2, practiceHours: 0, practiceKind: '', description: '', kind: 'topic',
+}).id;
+
 function setup({ withSettings = true, withTemplate = true } = {}) {
   const state = { now: Date.UTC(2026, 7, 31, 6) };
   const platform = createNodePlatform({ now: () => state.now, secret: 'test-secret' });
@@ -49,17 +53,20 @@ function setup({ withSettings = true, withTemplate = true } = {}) {
   }
   const g1 = store.insert('groups', { name: '01-1', course: 1 }).id;
   const g2 = store.insert('groups', { name: '02-1', course: 1 }).id;
-  const sb1 = store.insert('subjects', { name: 'Информатика', groupId: g1, teacherId: staff.teacher1, scheme: 'A' }).id;
-  const sb2 = store.insert('subjects', { name: 'Анатомия', groupId: g2, teacherId: staff.teacher2, scheme: 'A' }).id;
+  const ds1 = store.insert('disciplines', { name: 'Информатика' }).id;
+  const ds2 = store.insert('disciplines', { name: 'Анатомия' }).id;
+  const sb1 = store.insert('subjects', { name: 'Информатика', disciplineId: ds1, groupId: g1, teacherId: staff.teacher1, scheme: 'A' }).id;
+  const sb2 = store.insert('subjects', { name: 'Анатомия', disciplineId: ds2, groupId: g2, teacherId: staff.teacher2, scheme: 'A' }).id;
   const r1 = store.insert('rooms', { name: '101' }).id;
   const r2 = store.insert('rooms', { name: '102' }).id;
-  const topics = [1, 2, 3].map((order) => store.insert('topics', { subjectId: sb1, unit: 1, order, name: 'Тема ' + order, lessonType: 'lecture' }).id);
+  const syllabus1 = store.insert('syllabi', { disciplineId: ds1, teacherId: staff.teacher1, semester: 1, planSemester: 1 }).id;
+  const topics = [1, 2, 3].map((order) => topicRow(store, syllabus1, order, 'Тема ' + order));
   if (withSettings) call('settings.save', { settings: S }, tokens.dean);
   const wt = withTemplate
     ? [[2, 1, sb1, r1], [1, 2, sb1, r1], [5, 1, sb2, '']].map(([weekday, slot, subjectId, roomId]) =>
       store.insert('weekTemplate', { weekday, slot, subjectId, roomId }).id)
     : [];
-  return { store, state, call, calls: spied.calls, reads: spied.reads, writes: spied.writes, reset: spied.reset, ...tokens, staff, g1, g2, sb1, sb2, r1, r2, topics, wt };
+  return { store, state, call, calls: spied.calls, reads: spied.reads, writes: spied.writes, reset: spied.reset, ...tokens, staff, g1, g2, ds1, sb1, sb2, r1, r2, topics, wt };
 }
 
 test('generate: dry run, real run, repeat, later start, topics laid over pairs', () => {
@@ -71,13 +78,7 @@ test('generate: dry run, real run, repeat, later start, topics laid over pairs',
   assert.deepEqual(call('schedule.generate', {}, dean).data, dry);
   const mine = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
   assert.deepEqual(mine().map(p => [p.date, p.topicId]), [['2026-09-01', topic1], ['2026-09-08', topic2]]);
-  const plan = call('topics.plan', { subjectId: sb1 }, dean).data;
-  assert.deepEqual(plan.topics.map(t => [t.order, t.pair && t.pair.date]), [[1, '2026-09-01'], [2, '2026-09-08'], [3, null]]);
-  assert.equal(plan.withoutTopic, 0);
-  assert.equal(JSON.stringify(plan).includes('passwordHash'), false);
-  assert.deepEqual(plan.subject, { id: sb1, name: 'Информатика', groupId: plan.subject.groupId, groupName: '01-1', teacherId: plan.subject.teacherId, teacherName: 'teacher1' });
-  assert.deepEqual(Object.keys(plan.topics[0]), ['id', 'semester', 'unit', 'order', 'name', 'lessonType', 'pair']);
-  assert.deepEqual(plan.topics[0].pair, { id: mine()[0].id, date: '2026-09-01', slot: 1, startTime: '08:00', status: 'planned' });
+  assert.deepEqual(mine().map(p => [p.lessonType, p.part]), [['lecture', 1], ['lecture', 1]]);
 
   assert.deepEqual(call('schedule.generate', {}, dean).data, { ...dry, inserted: 0, kept: 4 });
   assert.equal(store.list('pairs').length, 4);
@@ -131,60 +132,14 @@ test('generate: restart', () => {
   assert.equal(store.list('pairs').length, 4);
 });
 
-test('topics are laid over pairs after directory edits and imports', () => {
-  const { store, call, dean, sb1, sb2, topics: [topic1, topic2, topic3] } = setup();
-  call('schedule.generate', {}, dean);
-  const mine = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
-  call('dir.remove', { table: 'topics', id: topic1 }, dean);
-  assert.deepEqual(mine().map(p => p.topicId), [topic2, topic3]);
-
-  call('import.apply', { table: 'topics', cells: [HEAD, ['Анатомия', '02-1', 1, 1, 1, 'Кости', 'лекция']] }, dean);
-  const sb2Pair = store.list('pairs').find(p => p.subjectId === sb2 && p.date === '2026-09-04');
-  assert.equal(sb2Pair.topicId, store.list('topics').find(t => t.subjectId === sb2).id);
-
-  store.update('pairs', mine()[0].id, { status: 'closed' });
-  const cells = [HEAD,
-    ['Информатика', '01-1', 1, 1, 2, 'Другое название', 'лекция'],
-    ['Информатика', '01-1', 1, 1, 4, 'Новая тема', 'практика']];
-  const imported = call('import.apply', { table: 'topics', cells }, dean).data;
-  assert.deepEqual([imported.inserted, imported.updated, imported.skipped, imported.errors], [1, 0, 1, [{ row: 2, field: 'name', code: 'held' }]]);
-  assert.deepEqual(call('topics.plan', { subjectId: sb1 }, dean).data.topics.map(t => [t.order, t.name === 'Другое название', t.pair && t.pair.date]),
-    [[2, false, '2026-09-01'], [3, false, '2026-09-08'], [4, false, null]]);
-
-  // a topic added by dir.save lands on the free pair
-  const added = call('dir.save', { table: 'topics', row: { subjectId: sb1, unit: 1, order: 1, name: 'Раньше всех', lessonType: 'lecture' } }, dean).data.row;
-  assert.equal(mine()[1].topicId, added.id);
-});
-
-test('topic writes read each sheet once and batch their writes', () => {
-  const { store, call, calls, reads, reset, dean, sb1, topics: [topic1] } = setup();
-  call('schedule.generate', {}, dean);
-  const check = () => {
-    assert.equal(Math.max(...Object.values(reads)), 1);
-    assert.equal((calls.update || 0) + (calls.remove || 0), 0);
-    assert.equal((calls.updateMany || 0) <= 2, true);
-  };
-  reset();
-  call('dir.remove', { table: 'topics', id: topic1 }, dean);
-  assert.equal(calls.remove, 1);
-  assert.equal(Math.max(...Object.values(reads)), 1);
-  reset();
-  call('dir.save', { table: 'topics', row: { subjectId: sb1, unit: 1, order: 9, name: 'Ещё', lessonType: 'lecture' } }, dean);
-  assert.equal(Math.max(...Object.values(reads)), 1);
-  reset();
-  call('import.apply', { table: 'topics', cells: [HEAD,
-    ['Информатика', '01-1', 1, 1, 2, 'Переименована', 'лекция'], ['Информатика', '01-1', 1, 1, 10, 'Десятая', 'лекция']] }, dean);
-  check();
-  assert.equal(store.list('topics').find(t => t.order === 2).name, 'Переименована');
-});
-
 test('relayout: nothing to change writes nothing and uses the rows it is given', () => {
   const { store, call, calls, reset, dean } = setup();
   call('schedule.generate', {}, dean);
   reset();
-  const result = relayout(store, null, { topics: store.list('topics'), pairs: store.list('pairs'), settings: readSettings(store.list('settings')) });
+  const result = relayout(store, null, { subjects: store.list('subjects'), syllabi: store.list('syllabi'), topics: store.list('topics'), pairs: store.list('pairs'), settings: readSettings(store.list('settings')) });
   assert.equal(result.changed, 0);
   assert.equal(result.pairs.length, 4);
+  assert.equal(result.subjects.length, 2);
   assert.deepEqual(calls, {});
 });
 
@@ -204,23 +159,6 @@ test('generate: pairs between today and a later semester start are removed, held
   assert.equal(call('settings.save', { settings: { ...S, semesterStart: '2026-09-04' } }, dean).ok, true);
   const sb1Pairs = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
   assert.deepEqual(sb1Pairs().map(p => [p.date, p.topicId]), [['2026-09-01', ''], ['2026-09-08', topics[0]]]);
-  const shown = () => call('topics.plan', { subjectId: sb1 }, dean).data.topics.map(t => [t.order, t.pair && t.pair.date]);
-  assert.deepEqual(shown(), [[1, '2026-09-08'], [2, null], [3, null]]);
-  const onPairs = store.list('pairs').map(p => p.topicId).filter(Boolean);
-  assert.equal(new Set(onPairs).size, onPairs.length);
-  store.update('pairs', sb1Pairs()[0].id, { topicId: topics[0] });
-  assert.deepEqual(shown(), [[1, '2026-09-08'], [2, null], [3, null]]);
-  store.update('pairs', sb1Pairs()[0].id, { topicId: '' });
-  // the in-semester pair comes first in the store, a later out-of-semester pair holds the same topic: the one inside the semester is shown
-  const [first, second] = sb1Pairs();
-  store.update('pairs', first.id, { date: '2026-09-09', topicId: topics[0] });
-  store.update('pairs', second.id, { date: '2026-09-20', topicId: topics[0] });
-  assert.deepEqual(shown(), [[1, '2026-09-09'], [2, null], [3, null]]);
-  // a held pair is shown before a planned one, though the planned one is later in the store
-  store.update('pairs', first.id, { date: '2026-09-01', status: 'closed' });
-  store.update('pairs', second.id, { date: '2026-09-08' });
-  assert.deepEqual(shown(), [[1, '2026-09-01'], [2, null], [3, null]]);
-  store.update('pairs', first.id, { status: 'planned', topicId: '' });
   const preview = call('schedule.generate', { dryRun: true }, dean).data;
   assert.deepEqual([preview.from, preview.removed, preview.kept], ['2026-09-04', 1, 3]);
   const early = store.list('pairs').find((p) => p.subjectId === sb1 && p.date === '2026-09-01');
@@ -233,22 +171,20 @@ test('generate: pairs between today and a later semester start are removed, held
 });
 
 test('semester: only topics of the current semester are laid, switching moves them', () => {
-  const { store, state, call, dean, sb1, topics: [topic1, topic2] } = setup();
-  const b1 = store.insert('topics', { subjectId: sb1, semester: 2, unit: 1, order: 1, name: 'Второй семестр 1', lessonType: 'lecture' }).id;
-  const b2 = store.insert('topics', { subjectId: sb1, semester: 2, unit: 1, order: 2, name: 'Второй семестр 2', lessonType: 'lecture' }).id;
+  const { store, state, call, dean, staff, ds1, sb1, topics: [topic1, topic2] } = setup();
+  const spring = store.insert('syllabi', { disciplineId: ds1, teacherId: staff.teacher1, semester: 2, planSemester: 2 }).id;
+  const b1 = topicRow(store, spring, 1, 'Второй семестр 1');
+  const b2 = topicRow(store, spring, 2, 'Второй семестр 2');
   call('schedule.generate', {}, dean);
   const mine = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
   const planOf = () => call('topics.plan', { subjectId: sb1 }, dean).data;
-  const rows = (plan) => plan.topics.map(t => [t.semester, t.order, t.pair && t.pair.date]);
   assert.deepEqual(mine().map(p => p.topicId), [topic1, topic2]);
   assert.equal(planOf().semester, 1);
-  assert.deepEqual(rows(planOf()), [[1, 1, '2026-09-01'], [1, 2, '2026-09-08'], [1, 3, null], [2, 1, null], [2, 2, null]]);
 
   store.update('pairs', mine()[0].id, { status: 'closed' });
   assert.equal(call('settings.save', { settings: { ...S, semester: 2 } }, dean).data.settings.semester, 2);
   assert.deepEqual(mine().map(p => p.topicId), [topic1, b1]);
   assert.deepEqual([planOf().semester, planOf().withoutTopic], [2, 0]);
-  assert.deepEqual(rows(planOf()), [[1, 1, '2026-09-01'], [1, 2, null], [1, 3, null], [2, 1, '2026-09-08'], [2, 2, null]]);
   assert.equal(call('settings.save', { settings: S }, dean).data.settings.semester, 2);
   assert.deepEqual(mine().map(p => p.topicId), [topic1, b1]);
   call('settings.save', { settings: { ...S, semester: 1 } }, dean);
@@ -263,8 +199,8 @@ test('semester: only topics of the current semester are laid, switching moves th
   assert.equal(call('topics.plan', { subjectId: sb1 }, dean12).data.withoutTopic, 2);
 });
 
-test('semester switch and topic writes read each sheet at most once', () => {
-  const { store, call, calls, reads, writes, reset, dean, sb1, topics: [, topic2] } = setup();
+test('semester switch and pair changes read each sheet at most once', () => {
+  const { store, call, calls, reads, writes, reset, dean, sb1 } = setup();
   call('schedule.generate', {}, dean);
   const check = (label, response) => {
     assert.equal(response.ok, true, label);
@@ -283,7 +219,4 @@ test('semester switch and topic writes read each sheet at most once', () => {
   check('move', call('schedule.changePair', { id: moved, date: '2026-09-10', slot: 2 }, dean));
   check('cancel', call('schedule.cancelPair', { id: moved }, dean));
   check('restore', call('schedule.restorePair', { id: moved }, dean));
-  check('topic save', call('dir.save', { table: 'topics', row: { subjectId: sb1, semester: 2, unit: 1, order: 9, name: 'Ещё', lessonType: 'lecture' } }, dean));
-  check('topic remove', call('dir.remove', { table: 'topics', id: topic2 }, dean));
-  check('import', call('import.apply', { table: 'topics', cells: [HEAD, ['Информатика', '01-1', 2, 1, 2, 'Переименована', 'лекция']] }, dean));
 });

@@ -6,11 +6,12 @@ import { SCHEMA } from '../core/schema.js';
 import { createFileStore } from '../backend/store/fileStore.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { handleRequest } from '../backend/api.js';
-import { seed } from './seed.js';
+import { seed, seedAdmin } from './seed.js';
 
 // Local stand: serves the static site and answers the production API from a JSON file. Node only.
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 export const MAX_BODY_BYTES = 20 * 1024 * 1024;
+export const DATA_FILES = { demo: 'dev/data/db.json', real: 'dev/data/real.json' };
 const TOO_LARGE = Symbol('too large');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
@@ -76,13 +77,25 @@ function serveFile(req, res, siteDir, pathname) {
   res.end(req.method === 'HEAD' ? undefined : body);
 }
 
-export async function startDevServer({ port = 5273, dataFile = 'dev/data/db.json', siteDir = 'site', maxBodyBytes = MAX_BODY_BYTES } = {}) {
+// Arguments of a direct run -> { mode, dataFile } (files relative to `root`) or { error: 'reset_refused' }.
+// --reset deletes only the fictional data file; the real one is never deleted by any arguments.
+export function standArgs(argv, root = ROOT) {
+  const real = argv.includes('--real');
+  const reset = argv.includes('--reset');
+  if (real && reset) return { error: 'reset_refused' };
+  if (reset) fs.rmSync(path.resolve(root, DATA_FILES.demo), { force: true });
+  return real ? { mode: 'real', dataFile: DATA_FILES.real } : { mode: 'demo', dataFile: DATA_FILES.demo };
+}
+
+// mode 'demo': a missing data file is filled with the fictional stand. mode 'real': a missing file gets an empty base and one admin;
+// the fictional seed is never called, so no invented people, subjects or pairs get in.
+export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, siteDir = 'site', maxBodyBytes = MAX_BODY_BYTES, mode = 'demo' } = {}) {
   const dataPath = path.resolve(ROOT, dataFile);
   const sitePath = path.resolve(ROOT, siteDir);
   const platform = createNodePlatform();
   const fresh = !fs.existsSync(dataPath);
   const store = createFileStore(SCHEMA, platform, dataPath);
-  if (fresh) seed(store, platform);
+  if (fresh) (mode === 'real' ? seedAdmin : seed)(store, platform);
   const ctx = { store, platform, log: (error) => console.error(error) };
 
   const server = http.createServer(async (req, res) => {
@@ -121,8 +134,11 @@ export async function startDevServer({ port = 5273, dataFile = 'dev/data/db.json
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const dataFile = 'dev/data/db.json';
-  if (process.argv.includes('--reset')) fs.rmSync(path.resolve(ROOT, dataFile), { force: true });
-  const server = await startDevServer({ port: 5273, dataFile });
-  console.log(`${server.url}  data: ${path.resolve(ROOT, dataFile)}`);
+  const args = standArgs(process.argv.slice(2));
+  if (args.error) {
+    console.error('--reset не работает с --real: настоящие данные стенда не стираются. Если файл правда нужно удалить, удалите dev/data/real.json руками.');
+    process.exit(1);
+  }
+  const server = await startDevServer({ port: 5273, dataFile: args.dataFile, mode: args.mode });
+  console.log(`${server.url}  data: ${path.resolve(ROOT, args.dataFile)}`);
 }
