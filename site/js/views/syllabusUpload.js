@@ -5,7 +5,7 @@ import { el, errorKey, hasText, modal, showModal, note, markBusy, focusById, ref
 import { icon } from '../icons.js';
 import { loadXlsx } from '../xlsxLoader.js';
 import { bookSheets, syllabusBook, READ_OPTIONS } from '../excel.js';
-import { fileLabels, fileData } from '../syllabus.js';
+import { fileLabels, fileData, renamedHint } from '../syllabus.js';
 import { dayMonth } from './pairParts.js';
 
 // The Excel file of a syllabus, for the screens that show one (the syllabus page; «Предметы» of the deanery):
@@ -256,7 +256,7 @@ function actions(check, ready, closeDialog) {
 // Each semester of the file: what it holds, and whether it is new or replaces the uploaded one. When a file both adds
 // and removes rows, a renamed topic is among them: one line says what happens to it.
 function summaries(list) {
-  const renamed = list.some((s) => s.replaces && s.added > 0 && s.removed > 0);
+  const renamed = renamedHint(list);
   return [el('ul', { class: 'check-semesters' }, list.map((s) => el('li', { class: 'check-semester' },
     el('p', { class: 'check-semester__figures' }, t('syllabus.check.summary', {
       semester: s.planSemester, topics: s.topics, units: s.units, lecture: s.lectureHours,

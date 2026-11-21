@@ -17,6 +17,34 @@ export function templateHref(groupId, date) {
   return groupId && day <= 5 ? '#/template/' + groupId + '/' + day : null;
 }
 
+// ---- The week as a grid: the pair numbers of the week are its rows, its days the columns ----
+
+const byDateThenId = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+
+// [{ slot, startTime, endTime }] by pair number, only the numbers the week has. A row takes the time of the earliest
+// pair of its number (by date, then id): the bells may have changed in the middle of the week.
+export function weekRows(pairs) {
+  const first = new Map();
+  for (const pair of [...pairs].sort(byDateThenId)) if (!first.has(pair.slot)) first.set(pair.slot, pair);
+  return [...first.values()].sort((a, b) => a.slot - b.slot).map(({ slot, startTime, endTime }) => ({ slot, startTime, endTime }));
+}
+
+// The dates of the columns: Monday to Friday always, Saturday and Sunday only when there is a pair on that day.
+export function gridDays(pairs, from) {
+  return Array.from({ length: 7 }, (_, i) => addDays(from, i)).filter((date, i) => i < 5 || pairs.some((pair) => pair.date === date));
+}
+
+// The pairs of one cell in the order given, the cancelled ones after the others.
+export function cellPairs(pairs, date, slot) {
+  const here = pairs.filter((pair) => pair.date === date && pair.slot === slot);
+  return [...here.filter((pair) => pair.status !== 'cancelled'), ...here.filter((pair) => pair.status === 'cancelled')];
+}
+
+// The pair does not keep the time of its row (the bells changed in the middle of the week): its card says when.
+export function ownTime(pair, row) {
+  return pair.startTime !== row.startTime || pair.endTime !== row.endTime;
+}
+
 // What is special about a pair, always in this order: cancelled, substitution, moved.
 export function pairFlags(pair) {
   const flags = [];

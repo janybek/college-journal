@@ -45,6 +45,19 @@ export function scheduleNotes(view) {
   return notes.length > 0 ? notes : [{ tone: 'success', key: 'syllabus.fits', params: { pairs: schedule.pairs } }];
 }
 
+// ---- The check window of an upload (syllabus.preview) ----
+
+// A semester that replaces the uploaded one and both adds and removes rows may hold a renamed topic: a new name
+// reads as one row gone and one added.
+export function mayHaveRenamed(semester) {
+  return semester.replaces && semester.added > 0 && semester.removed > 0;
+}
+
+// The window says what happens to a renamed topic when any semester of the file may hold one.
+export function renamedHint(semesters) {
+  return semesters.some(mayHaveRenamed);
+}
+
 // ---- The Excel file of a syllabus (syllabusBook in excel.js) ----
 
 // The names core/syllabusFile.js reads: tests/i18n.test.js checks that the dictionaries repeat them in every language.

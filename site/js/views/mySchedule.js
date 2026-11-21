@@ -1,15 +1,17 @@
 import { call } from '../api.js';
 import { getUser } from '../session.js';
 import { t } from '../i18n.js';
-import { el, errorKey, emptyState, note, pageHeader, refresh } from '../ui.js';
+import { el, errorKey, emptyState, note, pageHeader, refresh, showModal, focusById } from '../ui.js';
 import { icon } from '../icons.js';
 import { groupByDay } from '../pairs.js';
-import { weekNav, dayList } from './pairParts.js';
+import { weekNav, weekView, pairDetails, pairCardId } from './pairParts.js';
 
 // «Моё расписание» (#/my): the week of the signed-in teacher (the pairs they teach, substitutions included) or
 // of the student's group. The first request has no `from`: the server answers with the week of «today» and says
-// which day that is; the device clock is not used. Today's day is marked and scrolled into view once, when the
-// screen opens. A teacher sees the group of each pair, a student its teacher.
+// which day that is; the device clock is not used. A teacher sees the group of each pair, a student its teacher.
+// On a wide window the teacher's week is a grid (pair numbers down the left, days across); on a narrower one, and
+// always for the student, the days are a list, and today's day is scrolled into view once, when the screen opens.
+// A pair opens its window: the lesson in full, the note, the syllabus of the subject.
 
 const blank = () => ({
   from: null,          // the Monday of the week shown; null: the week of «today»
@@ -19,6 +21,7 @@ const blank = () => ({
   errorKey: null,
   ticket: 0,
   scrolled: false,     // today has been brought into view
+  details: null,       // the pair whose window is open
 });
 let state = blank();
 
@@ -40,6 +43,20 @@ export function render(root) {
       state.result ? el('div', { class: 'toolbar schedule-toolbar' }, weekNav({ from: state.from ?? state.result.from, onChange: choose })) : null,
       body(student)));
   if (!state.scrolled && state.result && state.result.from === state.from) bringTodayIntoView(root);
+  if (state.details) showModal(root, pairDetails(state.details, { onClose: closeDetails }));
+}
+
+function openDetails(pair) {
+  if (state.details) return;
+  state.details = pair;
+  refresh();
+}
+
+function closeDetails() {
+  const pair = state.details;
+  state.details = null;
+  refresh();
+  if (pair) focusById(pairCardId(pair), 'week-this');
 }
 
 async function load(owner) {
@@ -81,17 +98,19 @@ function body(student) {
   if (!result) return el('div', { class: 'schedule-empty' }, el('p', { class: 'loading' }, t('common.loading')));
   // The week being replaced by the next one stays, dimmed, until the answer comes.
   const stale = result.from !== state.from;
-  // Monday to Saturday; Sunday only when it has a pair.
+  // The list: Monday to Saturday, Sunday only when it has a pair. The grid picks its own days.
   const days = groupByDay(result.pairs, result.from, 7).filter((day, i) => i < 6 || day.pairs.length > 0);
   return el('div', { class: 'schedule-body' + (stale ? ' is-stale' : ''), 'aria-busy': stale ? 'true' : null },
     el('div', { class: 'schedule-week' },
       result.pairs.length === 0 ? note('info', t('my.emptyWeek')) : null,
-      dayList(days, state.today, { show: student ? ['teacher'] : ['group'] })));
+      weekView(days, state.today, {
+        pairs: result.pairs, from: result.from, list: student, show: student ? ['teacher'] : ['group'], onOpen: openDetails,
+      })));
 }
 
 // Once per opening, after the frame is on the page: a later redraw (language, theme, another week) keeps the
-// person's own scroll. Only when the head of today is out of sight (a phone, a day low in the list): on a wide
-// window the days stand side by side and today is already in view.
+// person's own scroll. Only for the list, and only when the head of today is out of sight (a phone, a day low in
+// the list); the grid shows the whole week at once.
 function bringTodayIntoView(root) {
   state.scrolled = true;
   requestAnimationFrame(() => {

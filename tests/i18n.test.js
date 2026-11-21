@@ -134,6 +134,15 @@ test('a weekday of the schedule names the week template it opens', () => {
   assert.ok(ru['schedule.toTemplate']);
 });
 
+test('the week grid and the pair window have their texts', () => {
+  for (const key of ['pairs.grid.caption', 'pairs.grid.slot', 'pairs.hasNote', 'pairs.details.when', 'pairs.details.teacher', 'pairs.details.room',
+    'pairs.details.topic', 'pairs.details.noTopic', 'pairs.details.note', 'pairs.details.syllabus', 'pairs.details.control']) assert.ok(ru[key], key);
+});
+
+test('a group with a syllabus but no pairs yet has a calm line on «Предметы», not «по плану 18 пар, в расписании 0»', () => {
+  assert.equal(ru['subjects.notScheduled'], 'ещё нет в расписании');
+});
+
 test('dictionaries have identical key sets', () => {
   assert.deepEqual(Object.keys(ky).sort(), Object.keys(ru).sort());
   assert.deepEqual(Object.keys(en).sort(), Object.keys(ru).sort());

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freeGroups, nextRow, addRequest, syllabusBadge, pairsNote, addedTeachers } from '../site/js/subjects.js';
+import { freeGroups, nextRow, addRequest, syllabusBadge, pairsNote, addedTeachers, withoutRow } from '../site/js/subjects.js';
 
 const groups = [{ id: 'g1', name: '01-1' }, { id: 'g2', name: '02-1' }, { id: 'g3', name: '03-1' }];
 const rows = [
@@ -34,6 +34,20 @@ test('syllabusBadge: uploaded for the current semester, only for the other one, 
 test('pairsNote: only where the schedule of a group holds another number of pairs than the plan', () => {
   assert.deepEqual([pairsNote(rows[0], rows[0].groups[0]), pairsNote(rows[0], rows[0].groups[1]), pairsNote(rows[1], rows[1].groups[0])],
     [null, { key: 'subjects.pairsDiffer', params: { planned: 18, scheduled: 17 } }, null]);
+});
+
+test('pairsNote: a group with a syllabus but no pairs in the schedule yet gets a calm line, not a mismatch', () => {
+  assert.deepEqual(pairsNote(rows[0], { ...rows[0].groups[0], scheduledPairs: 0 }), { key: 'subjects.notScheduled', calm: true });
+  assert.equal(pairsNote(rows[1], { ...rows[1].groups[0], scheduledPairs: 0 }), null);                // нет силлабуса — нечего сравнивать
+});
+
+test('withoutRow: the errors of the rows after a removed one move up with their rows', () => {
+  const errors = { 0: { groupId: 'a' }, 1: { teacherId: 'b' }, 3: { groupId: 'c', teacherId: 'd' } };
+  assert.deepEqual(withoutRow(errors, 1), { 0: { groupId: 'a' }, 2: { groupId: 'c', teacherId: 'd' } });
+  assert.deepEqual(withoutRow(errors, 0), { 0: { teacherId: 'b' }, 2: { groupId: 'c', teacherId: 'd' } });
+  assert.deepEqual(withoutRow(errors, 3), { 0: { groupId: 'a' }, 1: { teacherId: 'b' } });
+  assert.deepEqual(withoutRow({}, 0), {});
+  assert.deepEqual(errors, { 0: { groupId: 'a' }, 1: { teacherId: 'b' }, 3: { groupId: 'c', teacherId: 'd' } });   // не меняет то, что дали
 });
 
 test('addedTeachers: the rows of the discipline that hold a subject just created', () => {

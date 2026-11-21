@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes } from '../site/js/syllabus.js';
+import { shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint } from '../site/js/syllabus.js';
 
 // A row of the syllabus page as syllabus.get gives it.
 const R = (over) => ({ id: 'tp_1', kind: 'topic', unit: 1, label: '', name: 'Т', lectureHours: 2, practiceHours: 0, practiceKind: '', selfHours: null, description: '', planned: 1, pairs: [], ...over });
@@ -33,4 +33,18 @@ test('scheduleNotes: how the plan fits the schedule of the semester', () => {
   assert.deepEqual(scheduleNotes(view({ pairs: 18, unplaced: 0, withoutTopic: 0 })), [{ tone: 'success', key: 'syllabus.fits', params: { pairs: 18 } }]);
   assert.deepEqual(scheduleNotes(view({ pairs: 17, unplaced: 1, withoutTopic: 0 })), [{ tone: 'warning', key: 'syllabus.unplaced', params: { count: 1, planned: 18, scheduled: 17 } }]);
   assert.deepEqual(scheduleNotes(view({ pairs: 20, unplaced: 0, withoutTopic: 2 })), [{ tone: 'info', key: 'syllabus.spare', params: { count: 2 } }]);
+});
+
+// A semester of the check window as syllabus.preview gives it: whether it replaces the uploaded one and what it changes.
+const S = (over) => ({ planSemester: 1, replaces: true, added: 0, changed: 0, removed: 0, ...over });
+
+test('mayHaveRenamed: a replacing semester that both adds and removes rows may hold a renamed topic', () => {
+  assert.deepEqual([S({ added: 1, removed: 1 }), S({ added: 1 }), S({ removed: 1 }), S({ replaces: false, added: 10, removed: 0 }), S({ replaces: false, added: 1, removed: 1 })].map(mayHaveRenamed),
+    [true, false, false, false, false]);
+});
+
+test('renamedHint: the check window says what happens to a renamed topic when any semester may hold one', () => {
+  assert.equal(renamedHint([S({ added: 2 }), S({ planSemester: 2, added: 1, removed: 1 })]), true);
+  assert.equal(renamedHint([S({ added: 2 }), S({ planSemester: 2, changed: 3 })]), false);
+  assert.equal(renamedHint([]), false);
 });

@@ -6,7 +6,7 @@ import {
 } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
-import { freeGroups, nextRow, addRequest, syllabusBadge, pairsNote, addedTeachers } from '../subjects.js';
+import { freeGroups, nextRow, addRequest, syllabusBadge, pairsNote, addedTeachers, withoutRow } from '../subjects.js';
 import { startUpload, renderUpload, leaveUpload } from './syllabusUpload.js';
 
 // «Предметы» of the deanery (#/subjects): who teaches which discipline in which group, and whose syllabus is in.
@@ -165,7 +165,8 @@ function line(row, block, rights) {
 }
 
 // The groups of a row as chips; under them, for each group whose schedule differs from the plan, a line named
-// after the group (a line under its own chip would push the next chips apart).
+// after the group (a line under its own chip would push the next chips apart). A group without pairs yet gets a
+// calm line instead of the warning.
 function groupList(row, editable) {
   const notes = row.groups.map((group) => ({ group, differs: pairsNote(row, group) })).filter(({ differs }) => differs !== null);
   return el('div', { class: 'groups' },
@@ -179,9 +180,11 @@ function groupList(row, editable) {
         }, el('span', {}, name), icon('pencil', 'group-chip__icon'))
         : el('span', { class: 'group-chip' }, name));
     })),
-    notes.map(({ group, differs }) => el('p', { class: 'groups__note' },
+    notes.map(({ group, differs }) => el('p', { class: 'groups__note' + (differs.calm ? ' is-calm' : '') },
       el('span', { class: 'groups__note-group' }, group.groupName || '—'), ' ',
-      t(differs.key, { planned: tCount('syllabus.pairsCount', differs.params.planned), scheduled: differs.params.scheduled }))));
+      differs.params
+        ? t(differs.key, { planned: tCount('syllabus.pairsCount', differs.params.planned), scheduled: differs.params.scheduled })
+        : t(differs.key))));
 }
 
 function badgeText(shown) {
@@ -347,7 +350,7 @@ function addRow(d) {
 
 function removeRow(d, i) {
   d.items.splice(i, 1);
-  d.rowErrors = {};
+  d.rowErrors = withoutRow(d.rowErrors, i);
   refresh();
   focusById(`subjects-row-${Math.min(i, d.items.length - 1)}-group`);
 }

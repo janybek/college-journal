@@ -9,12 +9,14 @@ import { permissions } from '../shell.js';
 import { getToken } from '../session.js';
 import { addDays, addMinutes, isDate, isTime, mondayOf } from '../dates.js';
 import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref } from '../pairs.js';
-import { weekNav, dayList, pairCardId, pairTime, weekdayDate, lessonPieces, flagBadge } from './pairParts.js';
+import { weekNav, weekView, pairDetails, pairCardId, pairTime, weekdayDate, lessonPieces, flagBadge } from './pairParts.js';
 
-// The deanery's schedule (#/schedule): the week of a group or of a teacher, or one day across all groups. A pair
+// The deanery's schedule (#/schedule): the week of a group or of a teacher, or one day across all groups. A week
+// is a grid on a wide window (pair numbers down the left, days across) and a list of days on a narrower one. A pair
 // that may still change opens a dialog to substitute the teacher, move the pair, change the room or cancel it;
-// a cancelled pair of today or later can be put back. Without schedule.changePair (the vice-rector) the
-// schedule is read-only. In the week of a group a weekday opens that day of the group's week template.
+// a cancelled pair of today or later can be put back; any other pair (every pair for the vice-rector, who has no
+// schedule.changePair) opens its read-only window. In the week of a group a weekday opens that day of the
+// group's week template.
 // «Today» always comes from the server's answer, never from the device clock.
 // Drawn from `state`, so a redraw (language switch) keeps the mode, the week and an open dialog.
 
@@ -46,7 +48,7 @@ const blank = () => ({
   ticket: 0,
   status: null,        // { key, params }: what the last change did
   freshId: null,       // the pair changed last, marked in the week
-  dialog: null,        // { kind: 'change' | 'cancel' | 'restore', ... }
+  dialog: null,        // { kind: 'change' | 'cancel' | 'restore' | 'details', ... }
 });
 let state = blank();
 // What the dean was looking at when they left the screen (for the week template, say): the mode, the group or the
@@ -274,19 +276,20 @@ function body() {
 }
 
 function weekBody(shown) {
-  // Monday to Saturday; Sunday only when it has a pair.
+  // The list: Monday to Saturday, Sunday only when it has a pair. The grid picks its own days.
   const days = groupByDay(shown.pairs, shown.from, 7).filter((day, i) => i < 6 || day.pairs.length > 0);
-  const list = dayList(days, state.today, {
+  const week = weekView(days, state.today, {
+    pairs: shown.pairs,
+    from: shown.from,
     show: state.mode === 'group' ? ['teacher'] : ['group'],
-    onOpen: canChange() ? openPair : null,
-    canOpen,
+    onOpen: openCard,
     // The week of a group: a weekday opens that day of the group's week template.
     dayHref: state.mode === 'group' && can('dir.list:weekTemplate') ? (date) => templateHref(state.groupId, date) : null,
   });
-  if (state.freshId) list.querySelector('#' + CSS.escape(pairCardId({ id: state.freshId })))?.classList.add('is-fresh');
+  if (state.freshId) week.querySelector('#' + CSS.escape(pairCardId({ id: state.freshId })))?.classList.add('is-fresh');
   return el('div', { class: 'schedule-week' },
     shown.pairs.length === 0 ? note('info', t('schedule.emptyWeek')) : null,
-    list);
+    week);
 }
 
 const actionId = (pair) => 'pair-action-' + pair.id;
@@ -349,6 +352,20 @@ function rowAction(pair) {
 
 // The dialogs of one pair
 
+// A card of the week: the dialog to change the pair when it may still change and the dean may change it, else
+// the pair's read-only window.
+function openCard(pair) {
+  if (state.dialog) return;
+  if (canChange() && canOpen(pair)) {
+    openPair(pair);
+    return;
+  }
+  state.status = null;
+  state.freshId = null;
+  state.dialog = { kind: 'details', pair, stale: false, returnId: pairCardId(pair) };
+  refresh();
+}
+
 function openPair(pair) {
   if (!canChange() || state.dialog) return;
   const returnId = state.mode === 'day' ? actionId(pair) : pairCardId(pair);
@@ -370,6 +387,7 @@ function openPair(pair) {
 }
 
 function dialogFor(d) {
+  if (d.kind === 'details') return pairDetails(d.pair, { onClose: closeDialog });
   if (d.kind === 'change') return changeDialog(d);
   if (d.kind === 'cancel') return cancelDialog(d);
   return restoreDialog(d);
@@ -384,7 +402,8 @@ function closeDialog() {
   focusById(d.returnId, 'schedule-mode-' + state.mode);
 }
 
-// Where and what the pair is now: the kicker, and a line with the day, the pair number and the time.
+// Where and what the pair is now: the kicker, a line with the day, the pair number and the time, and a line with
+// the lesson in full and its type (a cancelled pair has lost its lesson).
 function pairHeader(d, titleKey) {
   const { pair } = d;
   const time = pairTime(pair);
@@ -395,6 +414,8 @@ function pairHeader(d, titleKey) {
     el('h2', { class: 'dialog__title', id: 'schedule-dialog-title' }, t(titleKey)),
     el('div', { class: 'pair-now' },
       el('p', { class: 'pair-now__place' }, icon('calendar'), el('span', {}, time ? t('schedule.placeTime', { place, time }) : place)),
+      pair.status === 'cancelled' ? null : el('p', { class: 'pair-now__topic' + (pair.topic ? '' : ' is-none') }, icon('book'),
+        pair.topic ? el('span', { class: 'pair-now__lesson' }, lessonPieces(pair.topic)) : el('span', {}, t('pairs.details.noTopic'))),
       flags.length > 0 ? el('p', { class: 'badges' }, flags.map((flag) => flagBadge(flag, pair))) : null),
   ];
 }

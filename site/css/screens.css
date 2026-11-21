@@ -1043,13 +1043,14 @@
 
 .week-toolbar > .field { flex: 0 1 10rem; }
 
-/* The colour of a subject (and of a discipline on «Предметы»): the tones of the initials avatars. */
-.legend__item[data-tone="0"], .lesson[data-tone="0"], .pair[data-tone="0"], .discipline[data-tone="0"] { --lesson: var(--tone-0); --lesson-bg: var(--tone-0-bg); }
-.legend__item[data-tone="1"], .lesson[data-tone="1"], .pair[data-tone="1"], .discipline[data-tone="1"] { --lesson: var(--tone-1); --lesson-bg: var(--tone-1-bg); }
-.legend__item[data-tone="2"], .lesson[data-tone="2"], .pair[data-tone="2"], .discipline[data-tone="2"] { --lesson: var(--tone-2); --lesson-bg: var(--tone-2-bg); }
-.legend__item[data-tone="3"], .lesson[data-tone="3"], .pair[data-tone="3"], .discipline[data-tone="3"] { --lesson: var(--tone-3); --lesson-bg: var(--tone-3-bg); }
-.legend__item[data-tone="4"], .lesson[data-tone="4"], .pair[data-tone="4"], .discipline[data-tone="4"] { --lesson: var(--tone-4); --lesson-bg: var(--tone-4-bg); }
-.legend__item[data-tone="5"], .lesson[data-tone="5"], .pair[data-tone="5"], .discipline[data-tone="5"] { --lesson: var(--tone-5); --lesson-bg: var(--tone-5-bg); }
+/* The colour of a subject (and of a discipline on «Предметы»): the tones of the initials avatars. The window of a
+   pair carries the colour of its card. */
+.legend__item[data-tone="0"], .lesson[data-tone="0"], .pair[data-tone="0"], .discipline[data-tone="0"], .pair-details__head[data-tone="0"] { --lesson: var(--tone-0); --lesson-bg: var(--tone-0-bg); }
+.legend__item[data-tone="1"], .lesson[data-tone="1"], .pair[data-tone="1"], .discipline[data-tone="1"], .pair-details__head[data-tone="1"] { --lesson: var(--tone-1); --lesson-bg: var(--tone-1-bg); }
+.legend__item[data-tone="2"], .lesson[data-tone="2"], .pair[data-tone="2"], .discipline[data-tone="2"], .pair-details__head[data-tone="2"] { --lesson: var(--tone-2); --lesson-bg: var(--tone-2-bg); }
+.legend__item[data-tone="3"], .lesson[data-tone="3"], .pair[data-tone="3"], .discipline[data-tone="3"], .pair-details__head[data-tone="3"] { --lesson: var(--tone-3); --lesson-bg: var(--tone-3-bg); }
+.legend__item[data-tone="4"], .lesson[data-tone="4"], .pair[data-tone="4"], .discipline[data-tone="4"], .pair-details__head[data-tone="4"] { --lesson: var(--tone-4); --lesson-bg: var(--tone-4-bg); }
+.legend__item[data-tone="5"], .lesson[data-tone="5"], .pair[data-tone="5"], .discipline[data-tone="5"], .pair-details__head[data-tone="5"] { --lesson: var(--tone-5); --lesson-bg: var(--tone-5-bg); }
 
 /* Each subject of the group and how many pairs it has a week; a subject not in the week yet is dashed. */
 .legend {
@@ -1760,6 +1761,191 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   .pair.is-fresh { animation: fresh-lesson 2.4s ease-out both; }
 }
 
+/* The week as a grid (a staff window from 1100 px): the pair numbers down the left with their time, written once,
+   the days across under a head like the template board's; today's column is washed in the accent. A cell holds
+   short cards; the whole pair is in its window. Keep the width in step with GRID_FROM in views/pairParts.js. */
+.week-grid {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+}
+
+.grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+}
+
+/* Narrow enough to leave the days room for «Понедельник» even with a Saturday column at 1100 px. */
+.grid__slot-col { width: 6rem; }
+
+.grid th,
+.grid td {
+  border-bottom: 1px solid var(--border);
+  border-left: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.grid tr > :first-child { border-left: 0; }
+
+.grid tbody tr:last-child > * { border-bottom: 0; }
+
+.grid thead th {
+  padding: var(--space-2);
+  background: var(--muted);
+  vertical-align: bottom;
+}
+
+.grid thead th:first-child { border-top-left-radius: calc(var(--radius-card) - 1px); }
+
+.grid thead th:last-child { border-top-right-radius: calc(var(--radius-card) - 1px); }
+
+.grid__corner {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.grid__dayhead {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+}
+
+.grid__daytitle,
+.grid__daytitle > .day__link {
+  display: grid;
+  min-width: 0;
+  line-height: 1.3;
+}
+
+.grid__day .day__name {
+  font-size: 0.8125rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.grid__date {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* Today: the head under an accent bar, its column washed. */
+.grid thead th.is-today {
+  background: var(--primary-wash);
+  box-shadow: inset 0 3px 0 var(--primary);
+}
+
+.grid__day.is-today .day__name { color: var(--primary-ink); }
+
+.grid td.is-today { background: var(--primary-wash); }
+
+.grid__slot {
+  padding: var(--space-3) var(--space-2);
+  background: var(--surface);
+  font-weight: 400;
+}
+
+.grid__pair {
+  display: block;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.grid__time {
+  display: block;
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.grid__cell { padding: var(--space-1); }
+
+.grid__pairs {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.grid__pairs > li { display: grid; }
+
+/* The short card: the subject on up to two lines, then one line each for who and where and for the lesson, then the
+   marks. Lines that do not fit end in an ellipsis; the window has them in full. */
+.pair--brief {
+  gap: 0.1875rem;
+  min-width: 0;
+  padding: 0.4375rem 0.375rem var(--space-2) var(--space-2);
+  font-size: var(--hint-fs);
+}
+
+.pair--brief .pair__time {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pair--brief .pair__subject {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.875rem;
+  line-height: 1.25;
+  hyphens: auto;
+}
+
+.pair__line {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pair__line .pair__who {
+  display: inline;
+  margin-right: var(--space-2);
+}
+
+.pair__line .pair__who:last-child { margin-right: 0; }
+
+.pair__line .pair__who .icon {
+  margin-right: 0.1875rem;
+  vertical-align: -0.125rem;
+}
+
+.pair__line--topic { color: var(--text); }
+
+.pair__line--topic.is-none { color: var(--text-muted); }
+
+.pair__marks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.125rem;
+}
+
+.pair__has-note {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-muted);
+}
+
+.pair__has-note .icon {
+  width: 1rem;
+  height: 1rem;
+}
+
 /* The day of all groups as a table. */
 .schedule-table .table { min-width: 64rem; }
 
@@ -1824,6 +2010,84 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
   gap: var(--space-4);
   align-items: start;
+}
+
+/* The change dialog names the lesson in full under the place. */
+.pair-now__topic {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.pair-now__topic > .icon {
+  flex: none;
+  margin-top: 0.125rem;
+  color: var(--primary-ink);
+}
+
+.pair-now__topic.is-none { color: var(--text-muted); }
+
+.pair-now__lesson {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem var(--space-2);
+}
+
+/* The window of a pair: the subject under a bar in its colour, as on its card; then the facts, a label on the left
+   of each (above it on a phone). */
+.pair-details__head {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--lesson);
+}
+
+.pair-details__head .dialog__kicker { margin-bottom: 0; }
+
+.pair-details__head .dialog__title { overflow-wrap: anywhere; }
+
+.pair-facts { border-top: 1px solid var(--border); }
+
+.pair-facts__row {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.pair-facts dt {
+  padding-top: 0.0625rem;
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-weight: 500;
+}
+
+.pair-facts dd {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pair-facts .badge { white-space: normal; }
+
+.pair-facts__when { font-variant-numeric: tabular-nums; }
+
+.pair-facts__when::first-letter { text-transform: uppercase; }
+
+.pair-facts__topic {
+  flex: 1 1 100%;
+  font-weight: 500;
+}
+
+.pair-facts__note { white-space: pre-line; }
+
+@media (max-width: 30rem) {
+  .pair-facts__row { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* «Моё расписание»: today's day is scrolled to under the sticky bar, not behind it. */
@@ -2647,6 +2911,8 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
   font-size: 0.75rem;
   line-height: 1.35;
 }
+
+.groups__note.is-calm { color: var(--text-muted); }
 
 .groups__note-group {
   font-weight: 600;

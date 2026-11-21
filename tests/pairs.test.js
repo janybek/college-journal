@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref, topicText, lessonTypeKey, lessonParts, controlLine } from '../site/js/pairs.js';
+import {
+  groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref, topicText, lessonTypeKey, lessonParts, controlLine,
+  weekRows, gridDays, cellPairs, ownTime,
+} from '../site/js/pairs.js';
 import { pairLock } from '../core/schedule.js';
 import { SCHEMA } from '../core/schema.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
@@ -108,4 +111,34 @@ test('controlLine: the modules marked on a lesson; the «Модуль» badge on
   // no marks: an empty array, or anything that is not an array
   for (const none of [[], undefined, null, 'модуль', { name: 'x', unit: 1 }]) assert.deepEqual(controlLine(none), { badge: false, names: [] }, String(none));
   assert.deepEqual(controlLine([null, 'x', { name: 'Зачёт', unit: 1 }]), { badge: false, names: [{ key: 'pairs.topicPlain', params: { name: 'Зачёт' } }] });
+});
+
+// The week as a grid: rows are the pair numbers of the week, columns its days. 16 ноября 2026 — понедельник.
+const P = (id, date, slot, startTime, endTime, extra = {}) => ({ id, date, slot, startTime, endTime, status: 'planned', ...extra });
+const week = [P('a', '2026-11-16', 2, '09:40', '11:10'), P('b', '2026-11-18', 1, '08:00', '09:30'), P('c', '2026-11-17', 2, '09:45', '11:15'),
+  P('d', '2026-11-16', 2, '09:40', '11:10', { status: 'cancelled' }), P('e', '2026-11-16', 2, '09:40', '11:10')];
+
+test('weekRows: only the pair numbers of the week, with the time of the earliest pair of each number', () => {
+  assert.deepEqual(weekRows(week), [{ slot: 1, startTime: '08:00', endTime: '09:30' }, { slot: 2, startTime: '09:40', endTime: '11:10' }]);
+  assert.deepEqual(weekRows([]), []);
+  // the bells changed in the middle of the week: the earliest pair by date, then by id, gives the time
+  assert.deepEqual(weekRows([P('z', '2026-11-17', 1, '08:05', '09:35'), P('y', '2026-11-17', 1, '08:10', '09:40'), P('x', '2026-11-18', 1, '08:00', '09:30')]),
+    [{ slot: 1, startTime: '08:10', endTime: '09:40' }]);
+});
+
+test('cellPairs: the pairs of one cell, the cancelled ones last', () => {
+  assert.deepEqual(cellPairs(week, '2026-11-16', 2).map((p) => p.id), ['a', 'e', 'd']);            // отменённая — последней
+  assert.deepEqual(cellPairs(week, '2026-11-19', 2), []);
+});
+
+test('gridDays: Monday to Friday always, Saturday and Sunday only with a pair', () => {
+  assert.deepEqual(gridDays(week, '2026-11-16'), ['2026-11-16', '2026-11-17', '2026-11-18', '2026-11-19', '2026-11-20']);
+  assert.deepEqual(gridDays([...week, P('s', '2026-11-22', 1, '08:00', '09:30')], '2026-11-16').slice(5), ['2026-11-22']);       // воскресенье с парой; пустой субботы нет
+  assert.deepEqual(gridDays([...week, P('s', '2026-11-21', 1, '08:00', '09:30')], '2026-11-16').slice(5), ['2026-11-21']);
+  assert.deepEqual(gridDays([], '2026-11-16').length, 5);
+});
+
+test('ownTime: the time of a pair differs from the time of its row', () => {
+  assert.deepEqual([ownTime(week[2], weekRows(week)[1]), ownTime(week[0], weekRows(week)[1])], [true, false]);
+  assert.equal(ownTime(P('f', '2026-11-19', 2, '09:40', '11:15'), weekRows(week)[1]), true);
 });
