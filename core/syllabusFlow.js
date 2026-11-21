@@ -113,6 +113,10 @@ export function checkSubmit(doc, held = []) {
   const lessonsOf = (u) => LESSON_LISTS.flatMap((k) => u[k] || []);
   if (!units.some((u) => lessonsOf(u).length > 0)) errors.push({ section: 'plan', code: 'empty' });
   else for (const u of units) if (lessonsOf(u).length === 0) errors.push({ section: 'plan', unit: u.unit, code: 'unit_empty' });
+  // занятие с юнитом не 1, 2, 3… в плане не показывается: сохранить такой план нельзя, отправить тоже
+  for (const l of doc?.lessons || []) {
+    if (!Number.isInteger(l.unit) || l.unit < 1) errors.push({ section: 'plan', code: 'bad_unit', id: l.id, name: l.name });
+  }
   for (const u of units) {
     for (const kind of [...LESSON_LISTS, 'control']) {
       const allowed = kind === 'control' ? [0, 2] : [2, 4];

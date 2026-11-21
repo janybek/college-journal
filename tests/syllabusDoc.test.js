@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { DOC_TABLES, rowsOfVersion, buildDoc, sectionWrites, copyRows, draftVersion } from '../core/syllabusDoc.js';
+import { checkSubmit } from '../core/syllabusFlow.js';
 import { checkSection } from '../core/syllabusSections.js';
 
 const version = { id: 'sy_1', disciplineId: 'ds_1', teacherId: 'sf_t', semester: 1, status: 'draft', version: 1, manualOrder: false,
@@ -168,4 +169,16 @@ test('draftVersion: a copy of the approved title and goal, or an empty version w
   assert.deepEqual([fromApproved.disciplineId, fromApproved.teacherId, fromApproved.semester], ['ds_1', 'sf_t', 1]);
   const empty = draftVersion({ ...args, approved: null, number: 1, planSemester: 3, course: 2 });
   assert.deepEqual([empty.status, empty.version, empty.planSemester, empty.course, empty.manualOrder, empty.department, empty.goal, empty.credits], ['draft', 1, 3, 2, false, '', '', null]);
+});
+
+test('sectionWrites: a topic whose unit is not a whole number from 1 stops the saving of the plan; nothing is dropped silently', () => {
+  for (const unit of [null, '', 0, 'abc', 1.5, '2']) {
+    const bad = rowsOfVersion({ ...tables, topics: [...tables.topics, topic('tp_x', 6, unit, 'lecture', 'Потерянная')] }, 'sy_1');
+    const d = buildDoc(version, bad);
+    const w = sectionWrites('plan', checkSection('plan', d.plan).value, version, bad);
+    assert.deepEqual(w.errors, [{ code: 'bad_unit', id: 'tp_x', name: 'Потерянная' }], String(unit));
+    assert.deepEqual([w.syllabus, changed(w)], [null, []], String(unit));
+    assert.equal(w.tables.topics.remove.includes('tp_x'), false);
+    assert.deepEqual(checkSubmit(d).errors.filter((e) => e.code === 'bad_unit'), [{ section: 'plan', code: 'bad_unit', id: 'tp_x', name: 'Потерянная' }], String(unit));
+  }
 });

@@ -135,6 +135,8 @@ export function sectionWrites(section, value, version, rows) {
       join(tables.outcomes, listWrites(stored, (value[kind] || []).map((t, i) => ({ kind, order: i + 1, text: t })), id));
     }
   } else if (section === 'plan') {
+    const lost = rows.topics.filter((t) => !isUnit(t.unit));
+    if (lost.length) return fail(lost.map((t) => ({ code: 'bad_unit', id: t.id, name: text(t.name) })));
     const w = planWrites(value, rows.topics, version.manualOrder === true);
     if (w.errors.length) return fail(w.errors);
     tables.topics.insert = w.insert.map((r) => ({ syllabusId: id, ...r }));
