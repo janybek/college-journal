@@ -157,19 +157,22 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   assert.deepEqual(store.list('groups').map((g) => [g.name, g.course, store.list('students').find((s) => s.groupId === g.id).cardNo]),
     [['01-1', 1, 'S1001'], ['02-1', 1, 'S2001'], ['03-1', 2, 'S3001']]);
   assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('disciplines').length, store.list('syllabi').length,
-    store.list('topics').length, store.list('pairs').length], [6, 9, 2, 2, 17, 159]);
+    store.list('topics').length, store.list('pairs').length], [6, 9, 2, 2, 27, 159]);
   const groupByName = new Map(store.list('groups').map((g) => [g.name, g.id]));
   const subjectOf = (name, group) => store.list('subjects').find((s) => s.name === name && s.groupId === groupByName.get(group));
   const pairsOf = (subject) => store.list('pairs').filter((p) => p.subjectId === subject.id).sort((a, b) => a.date.localeCompare(b.date) || a.slot - b.slot);
-  const labelOf = new Map(store.list('topics').map((t) => [t.id, t.label]));
-  // lessonsOfGroup(group): the pairs of the group's «Информатика» that carry a lesson, by date -> [row label, type, part]
-  const lessonsOfGroup = (group) => pairsOf(subjectOf('Информатика', group)).filter((p) => p.topicId !== '').map((p) => [labelOf.get(p.topicId), p.lessonType, p.part]);
-  assert.deepEqual(lessonsOfGroup('01-1').slice(0, 3), [['1.1', 'lecture', 1], ['1.2', 'lecture', 1], ['1.2', 'practice', 1]]);
-  assert.deepEqual([lessonsOfGroup('01-1').length, new Set(lessonsOfGroup('01-1').map(String)).size, lessonsOfGroup('01-1')[17]], [18, 18, ['2.5', 'practice', 1]]);
-  // the last pair of 01-1 (2.5, practice) carries the mark of the module
+  const INTRO = 'Цифровой пост медсестры: введение в IT';
+  const PROGRAMS = 'Рабочие программы: Windows, МИС и утилиты';
+  const TABLES = 'Электронные таблицы: учёт лекарств и расчёт доз';
+  const nameOf = new Map(store.list('topics').map((t) => [t.id, t.name]));
+  // lessonsOfGroup(group): the pairs of the group's «Информатика» that carry a lesson, by date -> [topic name, type, part]
+  const lessonsOfGroup = (group) => pairsOf(subjectOf('Информатика', group)).filter((p) => p.topicId !== '').map((p) => [nameOf.get(p.topicId), p.lessonType, p.part]);
+  assert.deepEqual(lessonsOfGroup('01-1').slice(0, 3), [[INTRO, 'lecture', 1], [PROGRAMS, 'lecture', 1], [PROGRAMS, 'practice', 1]]);
+  assert.deepEqual([lessonsOfGroup('01-1').length, new Set(lessonsOfGroup('01-1').map(String)).size, lessonsOfGroup('01-1')[17]], [18, 18, [TABLES, 'practice', 1]]);
+  // the last pair of 01-1 (the tables topic, practice) carries the mark of the module
   const last = pairsOf(subjectOf('Информатика', '01-1')).at(-1);
   assert.deepEqual(pairViews(store, (p) => p.id === last.id)[0].topic.controls, [{ name: 'Модуль 2 (рубежный контроль)', unit: 2 }]);
-  // 02-1 (same teacher, same syllabus): one pair is cancelled — 17 lessons stand on their dates, the last one (2.5, practice) did not fit
+  // 02-1 (same teacher, same syllabus): one pair is cancelled — 17 lessons stand on their dates, the last one (the tables topic, practice) did not fit
   const of02 = pairsOf(subjectOf('Информатика', '02-1'));
   assert.deepEqual([of02.length, of02.filter((p) => p.status === 'cancelled').length, lessonsOfGroup('02-1')], [18, 1, lessonsOfGroup('01-1').slice(0, 17)]);
   // 03-1 (teacher3, no syllabus) and «Анатомия»: no pair has a lesson

@@ -4,7 +4,10 @@ import { AppError } from '../core/errors.js';
 import { localDate } from '../core/dates.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { planSyllabusUpload, scheduleFit, subjectScope, syllabusFor, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
-import { controlMarks, lessonKey, lessonsOf } from '../core/topics.js';
+import { controlMarks, lessonKey, lessonTypeOf, lessonsOf } from '../core/topics.js';
+import { versionsOf } from '../core/syllabusFlow.js';
+import { lessonNumbers } from '../core/syllabusPlan.js';
+import { FIXED_STATUSES } from '../core/schema.js';
 import { can } from '../core/permissions.js';
 import { loadSettings, relayout, todayOf } from './scheduleData.js';
 
@@ -33,15 +36,27 @@ function ownerOf(staff, subject) {
   return { discipline: { id: subject.disciplineId, name: subject.name }, teacher: { id: subject.teacherId, fullName: teacher ? teacher.fullName : '' } };
 }
 
+// Where the file goes in each half of the year: the approved version of the key «discipline + teacher», its rows and the held pairs of them.
 function planFor(doc, sheets, owner, platform) {
   const { discipline, teacher } = owner;
-  const syllabi = sheets.syllabi.filter((s) => s.disciplineId === discipline.id && s.teacherId === teacher.id);
-  const own = new Set(syllabi.map((s) => s.id));
-  const topics = sheets.topics.filter((t) => own.has(t.syllabusId));
+  const versions = {};
+  for (const half of [1, 2]) {
+    const { approved } = versionsOf(sheets.syllabi, { disciplineId: discipline.id, teacherId: teacher.id, semester: half });
+    if (!approved) continue;
+    const rows = sheets.topics.filter((t) => t.syllabusId === approved.id);
+    const own = new Set(rows.map((t) => t.id));
+    const held = new Map();
+    for (const p of sheets.pairs) {
+      if (!own.has(p.topicId) || !FIXED_STATUSES.includes(p.status)) continue;
+      if (!held.has(p.topicId)) held.set(p.topicId, []);
+      held.get(p.topicId).push(p);
+    }
+    versions[half] = { syllabus: approved, rows, held };
+  }
   const groupName = new Map(sheets.groups.map((g) => [g.id, g.name]));
   const groups = sheets.subjects.filter((s) => s.disciplineId === discipline.id && s.teacherId === teacher.id)
     .map((s) => groupName.get(s.groupId) ?? '').filter((name) => name !== '').sort();
-  return planSyllabusUpload(doc, { discipline, teacher, syllabi, topics, pairs: sheets.pairs, today: localDate(platform.now()), groups });
+  return planSyllabusUpload(doc, { discipline, teacher, versions, today: localDate(platform.now()), groups });
 }
 
 // Writes a plan that has no errors: syllabus rows, then topic rows (removed, changed, new), then the lessons of every group of the teacher.
@@ -51,7 +66,7 @@ function writePlan(store, platform, plan, sheets, subject) {
   const fresh = plan.parts.filter((p) => p.syllabus.id === null);
   const known = plan.parts.filter((p) => p.syllabus.id !== null);
 
-  const created = fresh.length > 0 ? store.insertMany('syllabi', fresh.map((p) => p.syllabus.row)) : [];
+  const created = fresh.length > 0 ? store.insertMany('syllabi', fresh.map((p) => ({ ...p.syllabus.row, status: 'approved', version: 1 }))) : [];
   const changed = known.length > 0 ? store.updateMany('syllabi', known.map((p) => ({ id: p.syllabus.id, patch: p.syllabus.row }))) : [];
   const idOfHalf = new Map([...fresh.map((p, i) => [p.semester, created[i].id]), ...known.map((p) => [p.semester, p.syllabus.id])]);
   const syllabi = [...sheets.syllabi.map((s) => changed.find((c) => c.id === s.id) ?? s), ...created];
@@ -118,8 +133,9 @@ function shownSemester(asked, current, loaded) {
   return loaded.length === 1 ? loaded[0].semester : current;
 }
 
-// One row of the page: fields by name, hours as numbers, the pairs of THIS subject that stand on it.
-function pageRow(row, own, marks) {
+// One row of the page: fields by name, hours as numbers, the pairs of THIS subject that stand on it. Besides the fields of a lesson
+// the row keeps the earlier fields (kind, label, lectureHours, practiceHours, practiceKind) for the screens that still read them.
+function pageRow(row, own, marks, numbers) {
   const mine = [];
   for (const p of own) {
     if (p.status === 'cancelled' || p.status === 'missed' || !p.topicId) continue;
@@ -127,10 +143,13 @@ function pageRow(row, own, marks) {
     if (onRow) mine.push(p);
   }
   mine.sort((a, b) => cmp(a.date, b.date) || a.slot - b.slot);
+  const type = lessonTypeOf(row);
   return {
-    id: row.id, kind: row.kind, unit: row.unit, unitTitle: row.unitTitle ?? '', label: row.label, name: row.name,
-    lectureHours: hours(row.lectureHours), practiceHours: hours(row.practiceHours), practiceKind: row.practiceKind,
-    selfHours: nullable(row.selfHours), description: row.description,
+    id: row.id, lessonKind: row.lessonKind, number: numbers.get(row.id), unit: row.unit, unitTitle: row.unitTitle ?? '', name: row.name,
+    hours: hours(row.hours), controlForms: row.controlForms ?? '', selfHours: nullable(row.selfHours), description: row.description,
+    kind: type === 'control' ? 'control' : 'topic', label: '', lectureHours: type === 'lecture' ? hours(row.hours) : 0,
+    practiceHours: type === 'practice' || type === 'control' ? hours(row.hours) : 0,
+    practiceKind: row.lessonKind === 'seminar' || row.lessonKind === 'lab' ? row.lessonKind : '',
     planned: lessonsOf([row]).length,
     pairs: mine.map((p) => ({ date: p.date, lessonType: p.lessonType, part: p.part, status: p.status })),
   };
@@ -170,7 +189,7 @@ export function syllabusPage(store, platform, data, user) {
     .sort((a, b) => cmp(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId));
 
   const loaded = hasDiscipline
-    ? syllabi.filter((s) => s.disciplineId === subject.disciplineId && s.teacherId === subject.teacherId)
+    ? syllabi.filter((s) => s.disciplineId === subject.disciplineId && s.teacherId === subject.teacherId && s.status === 'approved')
       .map((s) => ({ semester: s.semester, planSemester: s.planSemester })).sort((a, b) => a.semester - b.semester)
     : [];
   const semester = shownSemester(asked, settings.semester, loaded);
@@ -182,11 +201,12 @@ export function syllabusPage(store, platform, data, user) {
   let syllabus = null;
   if (row) {
     const marks = controlMarks(rows);
+    const numbers = lessonNumbers(rows);
     const current = semester === settings.semester;
     syllabus = {
       planSemester: row.planSemester, audience: row.audience, credits: row.credits, totalHours: row.totalHours,
       classHours: row.classHours, selfHours: row.selfHours, updated: row.updated,
-      rows: rows.map((r) => pageRow(r, own, marks)),
+      rows: rows.map((r) => pageRow(r, own, marks, numbers)),
       totals: syllabusTotals(rows),
       schedule: current ? scheduleFit(rows, own, settings, subjectScope(subject, own, index, settings).skip) : null,
     };
@@ -209,7 +229,7 @@ export function studentSubjects(store, user) {
   const groupId = user.row.groupId;
   const mine = typeof groupId === 'string' && groupId !== '' ? subjects.filter((s) => s.groupId === groupId) : [];
   const teacherName = (id) => (staff.find((s) => s.id === id) || { fullName: '' }).fullName;
-  const has = (s) => typeof s.disciplineId === 'string' && s.disciplineId !== '' && syllabi.some((y) => y.disciplineId === s.disciplineId && y.teacherId === s.teacherId);
+  const has = (s) => typeof s.disciplineId === 'string' && s.disciplineId !== '' && syllabi.some((y) => y.disciplineId === s.disciplineId && y.teacherId === s.teacherId && y.status === 'approved');
   return {
     subjects: mine.sort((a, b) => cmp(String(a.name).toLowerCase(), String(b.name).toLowerCase()) || cmp(a.id, b.id))
       .map((s) => ({ id: s.id, name: s.name, teacherName: teacherName(s.teacherId), hasSyllabus: has(s) })),

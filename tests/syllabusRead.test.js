@@ -6,33 +6,36 @@ import { setup, A, file, T, M } from './syllabusSetup.js';
 // A stand with the syllabus A loaded for «Информатика» of teacher1 (both groups).
 function ready() {
   const x = setup();
-  assert.equal(x.send('syllabus.apply', x.sb1, A, x.dean).data.applied, true);
+  assert.equal(x.publish(x.sb1, A).data.applied, true);
   const get = (token, data = { subjectId: x.sb1 }) => x.call('syllabus.get', data, token);
   return { ...x, get };
 }
 
 test('syllabus.get: the page of a subject', () => {
-  const { call, send, get, pairOf, dean, staff, ds1, g1, sb1, sb2, sb3 } = ready();
+  const { publish, call, send, get, pairOf, dean, staff, ds1, g1, sb1, sb2, sb3 } = ready();
   const d = get(dean).data;
   assert.deepEqual([d.today, d.currentSemester, d.semesters, d.semester, d.canUpload], ['2026-08-31', 1, [{ semester: 1, planSemester: 1 }], 1, true]);
   assert.deepEqual(d.subject, { id: sb1, name: 'Информатика', disciplineId: ds1, groupId: g1, groupName: '01-1', course: 1, teacherId: staff.teacher1, teacherName: 'teacher1' });
   assert.deepEqual(d.groups, [{ subjectId: sb1, groupName: '01-1' }, { subjectId: sb3, groupName: '02-1' }]);
   const { rows, totals, schedule, ...info } = d.syllabus;
   assert.deepEqual(info, { planSemester: 1, audience: 'Сестринское дело', credits: 1, totalHours: 10, classHours: 6, selfHours: 4, updated: '2026-08-31' });
-  assert.deepEqual(rows.map((r) => [r.kind, r.unit, r.label, r.name, r.lectureHours, r.practiceHours, r.practiceKind, r.selfHours, r.description]),
-    [['topic', 1, '', 'Введение', 2, 2, '', null, 'О теме Введение'], ['topic', 1, '', 'Практикум', 0, 2, '', null, 'О теме Практикум'], ['control', 1, '', '', 0, 0, '', null, '']]);
-  assert.deepEqual(rows.map((r) => r.planned), [2, 1, 0]);
-  assert.deepEqual(rows.map((r) => r.pairs), [[{ date: '2026-09-01', lessonType: 'lecture', part: 1, status: 'planned' },
-    { date: '2026-09-08', lessonType: 'practice', part: 1, status: 'planned' }], [], []]);
-  assert.deepEqual(totals, { topics: 2, units: 1, lectureHours: 2, practiceHours: 4, controlHours: 0, hours: 6, selfHours: 0, pairs: 3 });
+  // a row is one lesson: its kind, the number of the kind (Л1, П1, П2), the hours; the earlier fields stay for the screens
+  assert.deepEqual(rows.map((r) => [r.lessonKind, r.number, r.name, r.hours, r.kind, r.lectureHours, r.practiceHours, r.label]),
+    [['lecture', 1, 'Введение', 2, 'topic', 2, 0, ''], ['practice', 1, 'Введение', 2, 'topic', 0, 2, ''], ['practice', 2, 'Практикум', 2, 'topic', 0, 2, ''], ['control', 1, '', 0, 'control', 0, 0, '']]);
+  assert.deepEqual(rows.map((r) => [r.unit, r.practiceKind, r.controlForms, r.selfHours, r.description]),
+    [[1, '', '', null, 'О теме Введение'], [1, '', '', null, ''], [1, '', '', null, 'О теме Практикум'], [1, '', '', null, '']]);
+  assert.deepEqual(rows.map((r) => r.planned), [1, 1, 1, 0]);
+  assert.deepEqual(rows.map((r) => r.pairs), [[{ date: '2026-09-01', lessonType: 'lecture', part: 1, status: 'planned' }],
+    [{ date: '2026-09-08', lessonType: 'practice', part: 1, status: 'planned' }], [], []]);
+  assert.deepEqual(totals, { topics: 3, units: 1, lectureHours: 2, practiceHours: 4, controlHours: 0, hours: 6, selfHours: 0, pairs: 3 });
   assert.deepEqual(schedule, { pairs: 2, unplaced: 1, withoutTopic: 0 });
   // the same syllabus of another group: its own dates
   const second = get(dean, { subjectId: sb3 }).data;
-  assert.deepEqual([second.subject.groupName, second.syllabus.rows[0].pairs.map((p) => p.date)], ['02-1', ['2026-09-02', '2026-09-09']]);
+  assert.deepEqual([second.subject.groupName, second.syllabus.rows.flatMap((r) => r.pairs.map((p) => p.date))], ['02-1', ['2026-09-02', '2026-09-09']]);
   // a subject without a syllabus; another semester
   assert.deepEqual([get(dean, { subjectId: sb2 }).data.syllabus, get(dean, { subjectId: sb2 }).data.semesters], [null, []]);
   assert.deepEqual([get(dean, { subjectId: sb1, semester: 2 }).data.semester, get(dean, { subjectId: sb1, semester: 2 }).data.syllabus], [2, null]);
-  send('syllabus.apply', sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]]), dean);
+  publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]]));
   const other = get(dean, { subjectId: sb1, semester: 2 }).data;
   assert.deepEqual([other.semesters, other.syllabus.planSemester, other.syllabus.schedule, other.syllabus.rows[0].pairs],
     [[{ semester: 1, planSemester: 1 }, { semester: 2, planSemester: 4 }], 4, null, []]);
@@ -40,10 +43,10 @@ test('syllabus.get: the page of a subject', () => {
   call('schedule.cancelPair', { id: pairOf(sb1, '2026-09-01').id }, dean);
   assert.deepEqual(get(dean).data.syllabus.rows[0].pairs.map((p) => [p.date, p.lessonType]), [['2026-09-08', 'lecture']]);
   // a module without hours shows the pair its mark stands on
-  send('syllabus.apply', sb2, file([T('Кости', 2, ''), T('Мышцы', '', 2), M]), dean);
+  publish(sb2, file([T('Кости', 2, ''), T('Мышцы', '', 2), M]));
   assert.deepEqual(get(dean, { subjectId: sb2 }).data.syllabus.rows[2].pairs.map((p) => [p.date, p.lessonType]), [['2026-09-11', 'practice']]);
   // a line break in the description reaches the page as it is
-  send('syllabus.apply', sb1, file([[1, '', 'Введение', 2, 2, '', 'Первая строка\nвторая строка'], T('Практикум', '', 2), M]), dean);
+  publish(sb1, file([[1, '', 'Введение', 2, 2, '', 'Первая строка\nвторая строка'], T('Практикум', '', 2), M]));
   assert.equal(get(dean).data.syllabus.rows[0].description, 'Первая строка\nвторая строка');
 });
 
@@ -93,8 +96,8 @@ test('subjects.overview and student.subjects', () => {
 });
 
 test('a syllabus of another semester only counts as otherSemester in the overview', () => {
-  const { call, send, dean, sb1 } = ready();
-  send('syllabus.apply', sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]]), dean);
+  const { publish, call, send, dean, sb1 } = ready();
+  publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]]));
   call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: [], bells: ['08:00'], semester: 2 } }, dean);
   const row = call('subjects.overview', {}, dean).data.rows.find((r) => r.disciplineName === 'Информатика');
   assert.deepEqual([row.uploaded, row.otherSemester, row.plannedPairs], [true, true, 1]);
@@ -113,15 +116,15 @@ test('reading: every sheet once, nothing written', () => {
 });
 
 test('two modules without hours on one pair: the pair view and the page carry both marks as a list', () => {
-  const { call, send, get, dean, g1, sb1 } = ready();
+  const { publish, call, send, get, dean, g1, sb1 } = ready();
   const two = [T('Введение', 2, ''), [1, '', 'Модуль А', '', '', 'модуль', ''], [1, '', 'Модуль Б', '', '', 'модуль', '']];
-  assert.equal(send('syllabus.apply', sb1, file(two), dean).data.applied, true);
+  assert.equal(publish(sb1, file(two)).data.applied, true);
   const views = () => call('schedule.list', { from: '2026-09-01', to: '2026-09-11', groupId: g1 }, dean).data.pairs;
   assert.deepEqual(views().filter((p) => p.topic).map((p) => p.topic.controls), [[{ name: 'Модуль А', unit: 1 }, { name: 'Модуль Б', unit: 1 }]]);
   assert.equal('control' in views().find((p) => p.topic).topic, false);
   const rows = get(dean).data.syllabus.rows;
   assert.deepEqual(rows.map((r) => r.pairs.map((p) => p.date)), [['2026-09-01'], ['2026-09-01'], ['2026-09-01']]);
   // a pair with no mark has an empty list
-  send('syllabus.apply', sb1, file([T('Введение', 2, 2)]), dean);
+  publish(sb1, file([T('Введение', 2, 2)]));
   assert.deepEqual(views().filter((p) => p.topic).map((p) => p.topic.controls), [[], []]);
 });

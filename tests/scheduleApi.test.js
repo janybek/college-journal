@@ -34,7 +34,7 @@ function spyOn(store) {
 
 // One plan row, one lecture pair: the row gives one lesson.
 const topicRow = (store, syllabusId, order, name) => store.insert('topics', {
-  syllabusId, order, unit: 1, label: '', name, lectureHours: 2, practiceHours: 0, practiceKind: '', description: '', kind: 'topic',
+  syllabusId, order, unit: 1, lessonKind: 'lecture', name, hours: 2, description: '',
 }).id;
 
 function setup({ withSettings = true, withTemplate = true } = {}) {
@@ -59,7 +59,7 @@ function setup({ withSettings = true, withTemplate = true } = {}) {
   const sb2 = store.insert('subjects', { name: 'Анатомия', disciplineId: ds2, groupId: g2, teacherId: staff.teacher2, scheme: 'A' }).id;
   const r1 = store.insert('rooms', { name: '101' }).id;
   const r2 = store.insert('rooms', { name: '102' }).id;
-  const syllabus1 = store.insert('syllabi', { disciplineId: ds1, teacherId: staff.teacher1, semester: 1, planSemester: 1 }).id;
+  const syllabus1 = store.insert('syllabi', { disciplineId: ds1, teacherId: staff.teacher1, semester: 1, planSemester: 1, status: 'approved', version: 1 }).id;
   const topics = [1, 2, 3].map((order) => topicRow(store, syllabus1, order, 'Тема ' + order));
   if (withSettings) call('settings.save', { settings: S }, tokens.dean);
   const wt = withTemplate
@@ -162,7 +162,7 @@ test('generate: pairs between today and a later semester start are removed, held
 
 test('semester: only topics of the current semester are laid, switching moves them', () => {
   const { store, state, call, dean, staff, ds1, sb1, topics: [topic1, topic2] } = setup();
-  const spring = store.insert('syllabi', { disciplineId: ds1, teacherId: staff.teacher1, semester: 2, planSemester: 2 }).id;
+  const spring = store.insert('syllabi', { disciplineId: ds1, teacherId: staff.teacher1, semester: 2, planSemester: 2, status: 'approved', version: 1 }).id;
   const b1 = topicRow(store, spring, 1, 'Второй семестр 1');
   const b2 = topicRow(store, spring, 2, 'Второй семестр 2');
   call('schedule.generate', {}, dean);

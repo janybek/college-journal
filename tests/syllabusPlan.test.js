@@ -66,3 +66,36 @@ test('docLessons', () => {
   assert.deepEqual(docLessons(year).map((p) => [p.semester, p.planSemester, p.units.map((u) => u.unit), p.rows.map((r) => [r.unit, r.lessonKind, r.name])]),
     [[1, 1, [1], [[1, 'lecture', 'Осень']]], [2, 2, [1, 2], [[1, 'practice', 'Весна'], [2, 'lecture', 'Весна 2']]]]);
 });
+
+test('autoOrder: more lectures than practices; a row of an unknown kind stays at the end of its unit', () => {      // M1, M4
+  const lectures = [row('l1', 1, 'lecture', 1), row('l2', 1, 'lecture', 2), row('l3', 1, 'lecture', 3), row('p1', 1, 'practice', 4), row('m', 1, 'control', 5)];
+  assert.deepEqual(autoOrder(lectures), ['l1', 'p1', 'l2', 'l3', 'm']);
+  const odd = [row('q', 1, 'экзамен', 1), ...lectures.map((r) => ({ ...r, order: r.order + 1 })), row('x2', 2, 'lecture', 7)];
+  assert.deepEqual(autoOrder(odd), ['l1', 'p1', 'l2', 'l3', 'm', 'q', 'x2']);
+  assert.equal(lessonNumbers(odd).get('q'), 1);
+});
+
+test('planWrites: a stored row of an unknown kind is kept at the end of its unit, and is an error when its unit is gone', () => {      // M1
+  const odd = [row('a', 1, 'lecture', 1), row('q', 1, 'экзамен', 2), row('m', 1, 'control', 3), row('x', 2, 'lecture', 4)];
+  const kept = planWrites({ units: [unit({ lecture: [item('a'), item('', 'Новая')], control: [item('m')] }), unit({ lecture: [item('x')] })] }, odd, false);
+  assert.deepEqual([kept.errors, kept.remove, kept.update, kept.insert.map((r) => [r.name, r.order])],
+    [[], [], [{ id: 'q', patch: { order: 4 } }, { id: 'x', patch: { order: 5 } }], [['Новая', 2]]]);
+  const orphan = [row('a', 1, 'lecture', 1), row('q', 2, 'экзамен', 2)];
+  const lost = planWrites({ units: [unit({ lecture: [item('a')] })] }, orphan, false);
+  assert.deepEqual([lost.errors, lost.insert, lost.update, lost.remove], [[{ unit: 2, list: 'экзамен', field: 'id', code: 'unknown_kind', id: 'q' }], [], [], []]);
+});
+
+test('planWrites: a row inserted into a unit with a title takes the title; a manual order follows a changed kind', () => {      // M2, M4
+  const titled = planWrites({ units: [unit({ title: 'Основы', lecture: [item('a'), item('', 'Новая')], practice: [item('b')], control: [item('m')] })] }, stored, false);
+  assert.deepEqual(titled.insert.map((r) => [r.name, r.unitTitle]), [['Новая', 'Основы']]);
+  // ручной порядок a, b(практика), c; практика b стала лекцией: у неё больше нет своего места, она встаёт в конец своего юнита
+  const hand = [row('a', 1, 'lecture', 1), row('b', 1, 'practice', 2), row('c', 1, 'lecture', 3)];
+  const changed = planWrites({ units: [unit({ lecture: [item('a'), item('c'), item('b')] })] }, hand, true);
+  assert.deepEqual(changed.update, [{ id: 'c', patch: { order: 2 } }, { id: 'b', patch: { order: 3, lessonKind: 'lecture' } }]);
+});
+
+test('docLessons: a control in the middle of the plan stays where the file has it', () => {      // M4
+  const { doc } = parseSyllabus([{ name: 'Сведения', cells: [['Семестр', 1]] }, { name: 'Тематический план', cells: [['Юнит', 'Тема', 'Лекция, ч', 'Практика, ч', 'Вид занятия'],
+    [1, 'Первая', 2, '', ''], [1, '', '', 2, 'модуль'], [2, 'Вторая', 2, '', '']] }]);
+  assert.deepEqual(docLessons(doc)[0].rows.map((r) => [r.unit, r.lessonKind, r.name, r.hours]), [[1, 'lecture', 'Первая', 2], [1, 'control', '', 2], [2, 'lecture', 'Вторая', 2]]);
+});

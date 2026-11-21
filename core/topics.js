@@ -15,26 +15,27 @@ export function lessonKey(x) {
   return x && x.topicId ? `${x.topicId}|${x.lessonType}|${x.part}` : '';
 }
 
-// How many pairs of this kind a plan row takes (whole pairs; no hours — 0).
+// The kind of the pair a plan row gives: 'lecture', 'practice' (practice, seminar, lab), 'control'; '' for an unknown kind of lesson.
+export function lessonTypeOf(row) {
+  const kind = row && row.lessonKind;
+  if (kind === 'lecture' || kind === 'control') return kind;
+  return kind === 'practice' || kind === 'seminar' || kind === 'lab' ? 'practice' : '';
+}
+
+// How many pairs of this kind a plan row takes: its hours in whole pairs when the kind is the kind of the row, otherwise 0.
 export function partsOf(row, lessonType) {
-  const pairs = (hours) => Math.floor((Number(hours) || 0) / HOURS_PER_PAIR);
-  if (row.kind === 'control') return lessonType === 'control' ? pairs(row.practiceHours) : 0;
-  if (lessonType === 'lecture') return pairs(row.lectureHours);
-  if (lessonType === 'practice') return pairs(row.practiceHours);
-  return 0;
+  const own = lessonTypeOf(row);
+  return own !== '' && own === lessonType ? Math.floor((Number(row.hours) || 0) / HOURS_PER_PAIR) : 0;
 }
 
 const byOrder = (a, b) => a.order - b.order;
 
-// Rows of ONE syllabus -> lessons in teaching order: by `order`; a topic gives its lectures, then its practices;
-// a module with hours gives its own pairs; a module without hours gives none.
+// Rows of ONE syllabus -> lessons in teaching order: by `order`; a row gives the pairs of its own kind, a control without hours gives none.
 export function lessonsOf(rows) {
   const lessons = [];
   for (const row of [...(rows || [])].sort(byOrder)) {
-    const types = row.kind === 'control' ? ['control'] : ['lecture', 'practice'];
-    for (const lessonType of types) {
-      for (let part = 1; part <= partsOf(row, lessonType); part++) lessons.push({ topicId: row.id, lessonType, part });
-    }
+    const lessonType = lessonTypeOf(row);
+    for (let part = 1; part <= partsOf(row, lessonType); part++) lessons.push({ topicId: row.id, lessonType, part });
   }
   return lessons;
 }
@@ -46,7 +47,7 @@ export function controlMarks(rows) {
   for (const row of [...(rows || [])].sort(byOrder)) {
     const own = lessonsOf([row]);
     if (own.length) last = own[own.length - 1];
-    else if (row.kind === 'control' && last) {
+    else if (row.lessonKind === 'control' && last) {
       const key = lessonKey(last);
       marks.set(key, [...(marks.get(key) || []), row]);
     }

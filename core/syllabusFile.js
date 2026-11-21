@@ -144,7 +144,7 @@ function findSheet(sheets, kind) {
 }
 
 function readInfo(sheet, errors, ignored) {
-  const info = { discipline: '', teacher: '', semester: null, audience: '', credits: null, totalHours: null, classHours: null, selfHours: null };
+  const info = { discipline: '', teacher: '', semester: null, course: null, audience: '', credits: null, totalHours: null, classHours: null, selfHours: null };
   let semesterBad = false;
   let semesterRow = 0;
   let semesterEmpty = true;
@@ -163,7 +163,6 @@ function readInfo(sheet, errors, ignored) {
     seen.add(key);
     const value = line[1];
     const bad = (field) => errors.push({ sheet: 'info', row, field, code: 'bad_value' });
-    if (key === 'course') return;
     if (key === 'semester') {
       semesterRow = row;
       semesterEmpty = isEmpty(value);
@@ -174,7 +173,7 @@ function readInfo(sheet, errors, ignored) {
       if (text.length > TEXT_MAX) errors.push({ sheet: 'info', row, field: key, code: 'too_long' }); else info[key] = text;
     } else if (!isEmpty(value)) {
       const n = toInt(value);
-      const [min, max] = key === 'credits' ? [1, 60] : key === 'totalHours' ? [1, 2000] : [0, 2000];
+      const [min, max] = key === 'course' ? [1, 6] : key === 'credits' ? [1, 60] : key === 'totalHours' ? [1, 2000] : [0, 2000];
       if (inRange(n, min, max)) info[key] = n; else bad(key);
     }
   });

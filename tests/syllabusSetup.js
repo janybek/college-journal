@@ -70,6 +70,8 @@ export function setup() {
   call('schedule.generate', {}, tokens.dean);
 
   const send = (action, subjectId, sheets, token) => call(action, { subjectId, sheets }, token);
+  // «the syllabus of the file is in force»: the file is applied and its version is the approved one (task 34: syllabus.apply does both)
+  const publish = (subjectId, sheets, token = tokens.dean) => send('syllabus.apply', subjectId, sheets, token);
   const pairOf = (subjectId, date) => store.list('pairs').find((p) => p.subjectId === subjectId && p.date === date);
   // the pairs of a subject by date: [date, topic name, lesson type, part]
   const lessons = (subjectId) => {
@@ -79,7 +81,7 @@ export function setup() {
   };
   const snapshot = () => JSON.stringify([store.list('topics'), store.list('syllabi'), store.list('pairs')]);
   return {
-    store, spy: spied.spy, call, send, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, reset: spied.reset,
+    store, spy: spied.spy, call, send, publish, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, reset: spied.reset,
     ...tokens, staff, ds1, ds2, g1, g2, sb1, sb2, sb3, S,
   };
 }

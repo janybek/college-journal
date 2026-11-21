@@ -2,9 +2,12 @@
 import { semesterHalf } from './syllabus.js';
 
 const ALTERNATING = ['lecture', 'practice', 'seminar', 'lab'];
+const KNOWN = new Set([...ALTERNATING, 'control']);
+const UNKNOWN = 'unknown';
+const kindKey = (kind) => (KNOWN.has(kind) ? kind : UNKNOWN);
 
 // Занятия одного юнита по спискам видов (каждый список уже в нужном порядке): i-я лекция, i-я практика, i-й семинар,
-// i-я лабораторная, затем весь контроль.
+// i-я лабораторная, затем весь контроль, затем занятия неизвестного вида (они не пропадают: каждое остаётся в конце своего юнита).
 function interleave(lists) {
   const out = [];
   const longest = Math.max(0, ...ALTERNATING.map((k) => (lists[k] || []).length));
@@ -12,6 +15,7 @@ function interleave(lists) {
     for (const kind of ALTERNATING) if (i < (lists[kind] || []).length) out.push(lists[kind][i]);
   }
   out.push(...(lists.control || []));
+  out.push(...(lists[UNKNOWN] || []));
   return out;
 }
 
@@ -22,7 +26,7 @@ export function autoOrder(rows) {
   for (const r of [...rows].sort(byOrder)) {
     if (!units.has(r.unit)) units.set(r.unit, {});
     const lists = units.get(r.unit);
-    (lists[r.lessonKind] ||= []).push(r.id);
+    (lists[kindKey(r.lessonKind)] ||= []).push(r.id);
   }
   return [...units.keys()].sort((a, b) => a - b).flatMap((u) => interleave(units.get(u)));
 }
@@ -62,25 +66,32 @@ export function planWrites(value, stored, manualOrder) {
       });
     }
   });
+  // Строка неизвестного вида, которой нет в запросе, не пропадает: она остаётся в конце своего юнита (если юнита больше нет — ошибка).
+  const kept = stored.filter((r) => !seen.has(r.id) && !KNOWN.has(r.lessonKind));
+  for (const r of kept) {
+    if (!units.some((u) => u.unit === r.unit)) errors.push({ unit: r.unit, list: r.lessonKind, field: 'id', code: 'unknown_kind', id: r.id });
+    else seen.add(r.id);
+  }
   if (errors.length) return { errors, insert: [], update: [], remove: [], units: [] };
 
   const ordered = [];
-  for (const { unit } of units) {
+  for (const { unit, title } of units) {
     const mine = wanted.filter((w) => w.unit === unit);
     const lists = {};
     if (!manualOrder) {
-      for (const w of mine) (lists[w.lessonKind] ||= []).push(w);
+      for (const w of mine) (lists[kindKey(w.lessonKind)] ||= []).push(w);
       ordered.push(...interleave(lists));
-      continue;
+    } else {
+      // «места»: прежний порядок строк, оставшихся в этом юните с тем же видом
+      const placed = mine.filter((w) => w.old && w.old.unit === unit && w.old.lessonKind === w.lessonKind);
+      const slots = placed.map((w) => w.old).sort(byOrder).map((r) => r.lessonKind);
+      const queues = {};
+      for (const w of placed) (queues[w.lessonKind] ||= []).push(w);
+      ordered.push(...slots.map((kind) => queues[kind].shift()));
+      for (const w of mine) if (!placed.includes(w)) (lists[kindKey(w.lessonKind)] ||= []).push(w);
+      ordered.push(...interleave(lists));
     }
-    // «места»: прежний порядок строк, оставшихся в этом юните с тем же видом
-    const placed = mine.filter((w) => w.old && w.old.unit === unit && w.old.lessonKind === w.lessonKind);
-    const slots = placed.map((w) => w.old).sort(byOrder).map((r) => r.lessonKind);
-    const queues = {};
-    for (const w of placed) (queues[w.lessonKind] ||= []).push(w);
-    ordered.push(...slots.map((kind) => queues[kind].shift()));
-    for (const w of mine) if (!placed.includes(w)) (lists[w.lessonKind] ||= []).push(w);
-    ordered.push(...interleave(lists));
+    for (const r of kept.filter((k) => k.unit === unit)) ordered.push({ unit, lessonKind: r.lessonKind, item: r, title, old: r });
   }
 
   const insert = [];

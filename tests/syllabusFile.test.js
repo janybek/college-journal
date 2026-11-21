@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import {
   parseSyllabus, MAX_SHEET_ROWS, HOURS_ALLOWED, DESCRIPTION_MAX, SYLLABUS_SHEETS, INFO_ROWS, PLAN_COLUMNS, KIND_WORDS,
 } from '../core/syllabusFile.js';
-import { HOURS_PER_PAIR, lessonsOf } from '../core/topics.js';
+import { HOURS_PER_PAIR } from '../core/topics.js';
+import { docLessons } from '../core/syllabusPlan.js';
 
 const INFO = [['Дисциплина', 'Информатика'], ['Преподаватель', 'Teacher One'], ['Курс', 1], ['Семестр', 1], ['Специальность', 'Сестринское дело'],
   ['Кредиты', 2], ['Всего часов', 60], ['Аудиторных часов', 36], ['СРС, часов', 24]];
@@ -26,7 +27,7 @@ test('the sample file is read whole and without warnings', () => {
   const ok = parseSyllabus(book());
   assert.deepEqual([ok.errors, ok.warnings], [[], []]);
   assert.deepEqual(ok.found, { info: 'Сведения', plan: 'Тематический план' });
-  assert.deepEqual(ok.doc.info, { discipline: 'Информатика', teacher: 'Teacher One', semester: 1, audience: 'Сестринское дело', credits: 2, totalHours: 60, classHours: 36, selfHours: 24 });
+  assert.deepEqual(ok.doc.info, { discipline: 'Информатика', teacher: 'Teacher One', semester: 1, course: 1, audience: 'Сестринское дело', credits: 2, totalHours: 60, classHours: 36, selfHours: 24 });
   assert.deepEqual(ok.doc.rows.map((r) => (r.kind === 'control' ? 'M' + r.unit : r.label)), ['1.1', '1.2', '1.3', '1.4', '1.5', 'M1', '2.1', '2.2', '2.3', '2.4', '2.5', 'M2']);
   assert.deepEqual(ok.doc.rows[2], { kind: 'topic', semester: 1, unit: 1, unitTitle: '', label: '1.3', name: NAMES[2], lectureHours: 2, practiceHours: 2, practiceKind: 'seminar', selfHours: 2, description: 'Описание 3', row: 4 });
   assert.deepEqual(ok.doc.rows[5], { kind: 'control', semester: 1, unit: 1, unitTitle: '', label: '', name: 'Модуль 1 (рубежный контроль)', lectureHours: 0, practiceHours: 0, practiceKind: '', selfHours: null, description: '', row: 7 });
@@ -98,6 +99,13 @@ test('sheets and columns', () => {
 
 test('info sheet errors', () => {
   assert.deepEqual(codes(parseSyllabus(book([['Семестр', 1], ['Кредиты', 'два'], ['Всего часов', 0]]))), [['info', 2, 'credits', 'bad_value'], ['info', 3, 'totalHours', 'bad_value']]);
+});
+
+test('the course of the info sheet: 1-6 or none; another value is a bad value', () => {
+  const course = (value) => { const r = parseSyllabus(book([['Семестр', 1], ['Курс', value]])); return [r.errors.map((e) => [e.row, e.field, e.code]), r.doc && r.doc.info.course]; };
+  assert.deepEqual([course(1), course(6), course('3'), course(''), course(7), course(0), course('первый')],
+    [[[], 1], [[], 6], [[], 3], [[], null], [[[2, 'course', 'bad_value']], null], [[[2, 'course', 'bad_value']], null], [[[2, 'course', 'bad_value']], null]]);
+  assert.equal(parseSyllabus(book([['Семестр', 1]])).doc.info.course, null);
 });
 
 test('warnings: extra columns, numbers that do not add up, unit without a module', () => {
@@ -224,8 +232,7 @@ test('«Итого» rows are skipped and named in the remark, not read as a top
   }
   // a kept «Жалпы маалымат» takes its pairs in its place: nothing after it shifts
   const general = one([[1, '1.1', 'Введение', 2, '', ''], [1, '1.2', 'Жалпы маалымат', 2, 2, ''], [1, '1.3', 'Сети', 2, '', '']]);
-  const ids = general.doc.rows.map((row, i) => ({ ...row, id: row.label, order: i + 1 }));
-  assert.deepEqual(lessonsOf(ids).map((l) => l.topicId + ' ' + l.lessonType), ['1.1 lecture', '1.2 lecture', '1.2 practice', '1.3 lecture']);
+  assert.deepEqual(docLessons(general.doc)[0].rows.map((l) => l.name + ' ' + l.lessonKind), ['Введение lecture', 'Жалпы маалымат lecture', 'Жалпы маалымат practice', 'Сети lecture']);
 });
 
 test('class type: more spellings; an unknown word and a kind without practice hours have their own codes', () => {   // M2

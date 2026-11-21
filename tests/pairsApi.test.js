@@ -57,9 +57,9 @@ function setup() {
   const sb2 = store.insert('subjects', { name: 'Анатомия', disciplineId: ds2, groupId: g2, teacherId: ids.teacher2, scheme: 'A' }).id;
   const r1 = store.insert('rooms', { name: '101' });
   const r2 = store.insert('rooms', { name: '102' });
-  const syllabusId = store.insert('syllabi', { disciplineId: ds1, teacherId: ids.teacher1, semester: 1, planSemester: 1 }).id;
+  const syllabusId = store.insert('syllabi', { disciplineId: ds1, teacherId: ids.teacher1, semester: 1, planSemester: 1, status: 'approved', version: 1 }).id;
   const topicIds = [1, 2, 3, 4].map((order) => store.insert('topics', {
-    syllabusId, order, unit: 1, label: '', name: 'Тема ' + order, lectureHours: 2, practiceHours: 0, practiceKind: '', description: '', kind: 'topic',
+    syllabusId, order, unit: 1, lessonKind: 'lecture', name: 'Тема ' + order, hours: 2, description: '',
   }).id);
   call('settings.save', { settings: S }, t.dean);
   store.insert('weekTemplate', { weekday: 2, slot: 1, subjectId: sb1, roomId: r1.id });
@@ -82,7 +82,7 @@ test('schedule views: mine, list, filters, limits and permissions', () => {
     [['2026-09-08', 'Информатика', 'teacher1', x.r1Name, 'Тема 2', '08:00', '09:30']]);
   assert.equal(JSON.stringify(week).includes('passwordHash'), false);
   assert.deepEqual(call('schedule.list', { from: '2026-09-01', to: '2026-09-01', groupId: x.g1 }, x.dean).data.pairs[0].topic,
-    { id: x.topicIds[0], unit: 1, label: '', name: 'Тема 1', kind: 'topic', lessonType: 'lecture', part: 1, parts: 1, practiceKind: '', controls: [] });
+    { id: x.topicIds[0], unit: 1, name: 'Тема 1', lessonKind: 'lecture', number: 1, lessonType: 'lecture', part: 1, parts: 1, controls: [], kind: 'topic', label: '', practiceKind: '' });
   assert.deepEqual([call('schedule.mine', {}, x.S1).data.from, call('schedule.mine', {}, x.S1).data.to], ['2026-08-31', '2026-09-06']);
   assert.deepEqual(call('schedule.mine', { from: 'мусор' }, x.S1).error, { code: 'bad_request' });
 

@@ -3,7 +3,8 @@ import { AppError } from '../core/errors.js';
 import { localDate, addMinutes } from '../core/dates.js';
 import { readSettings, PAIR_MINUTES } from '../core/settings.js';
 import { planGeneration } from '../core/schedule.js';
-import { NO_LESSON, controlMarks, layoutLessons, lessonKey, partsOf } from '../core/topics.js';
+import { NO_LESSON, controlMarks, layoutLessons, lessonKey, lessonTypeOf, partsOf } from '../core/topics.js';
+import { lessonNumbers } from '../core/syllabusPlan.js';
 import { subjectScope, syllabusIndex } from '../core/syllabus.js';
 
 export function todayOf(platform) {
@@ -101,6 +102,11 @@ export function pairViews(store, keep, rows = {}) {
     rowsOfSyllabus.get(t.syllabusId).push(t);
   }
   const marksOf = new Map();
+  const numbersOf = new Map();
+  const numberOf = (topic) => {
+    if (!numbersOf.has(topic.syllabusId)) numbersOf.set(topic.syllabusId, lessonNumbers(rowsOfSyllabus.get(topic.syllabusId)));
+    return numbersOf.get(topic.syllabusId).get(topic.id);
+  };
   // All the marks of the pair (several modules without hours can stand after one lesson), in row order; [] when there are none.
   const marksOn = (topic, pair) => {
     if (!marksOf.has(topic.syllabusId)) marksOf.set(topic.syllabusId, controlMarks(rowsOfSyllabus.get(topic.syllabusId)));
@@ -117,8 +123,9 @@ export function pairViews(store, keep, rows = {}) {
       teacherId: p.teacherId, teacherName: nameOf(staff, p.teacherId, 'fullName'),
       roomId: p.roomId, roomName: nameOf(rooms, p.roomId, 'name'),
       topic: topic ? {
-        id: topic.id, unit: topic.unit, label: topic.label, name: topic.name, kind: topic.kind, lessonType: p.lessonType, part: p.part,
-        parts: partsOf(topic, p.lessonType), practiceKind: topic.practiceKind, controls: marksOn(topic, p),
+        id: topic.id, unit: topic.unit, name: topic.name, lessonKind: topic.lessonKind, number: numberOf(topic), lessonType: p.lessonType, part: p.part,
+        parts: partsOf(topic, p.lessonType), controls: marksOn(topic, p), kind: lessonTypeOf(topic) === 'control' ? 'control' : 'topic', label: '',
+        practiceKind: topic.lessonKind === 'seminar' || topic.lessonKind === 'lab' ? topic.lessonKind : '',
       } : null,
       substitution: subject ? subject.teacherId !== p.teacherId : false,
       moved: p.date !== p.planDate || p.slot !== p.planSlot,

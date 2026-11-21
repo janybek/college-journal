@@ -83,7 +83,7 @@ test('syllabusBook: the file «Скачать (Excel)» gives is read back by th
   // «№» 1.10 stays text, the line break of the description is in place
   assert.deepEqual(parsed.doc.rows.map(({ row, semester, ...rest }) => rest),
     SAMPLE.rows.map((r) => ({ kind: r.kind, unit: r.unit, unitTitle: '', label: r.label, name: r.name, lectureHours: r.lectureHours ?? 0, practiceHours: r.practiceHours ?? 0, practiceKind: r.practiceKind, selfHours: r.selfHours, description: r.description })));
-  assert.deepEqual(parsed.doc.info, { discipline: 'Информатика', teacher: 'Teacher One', semester: 1, audience: 'Сестринское дело', credits: 2, totalHours: 6, classHours: 6, selfHours: 0 });
+  assert.deepEqual(parsed.doc.info, { discipline: 'Информатика', teacher: 'Teacher One', semester: 1, course: 1, audience: 'Сестринское дело', credits: 2, totalHours: 6, classHours: 6, selfHours: 0 });
   // СРС of zero is a number on the page («zero is a number too»), so it stays a zero, not an empty cell
   const zero = parseSyllabus(reread(syllabusBook(XLSX, labels, { ...SAMPLE, rows: [{ ...SAMPLE.rows[0], selfHours: 0 }] })).sheets);
   assert.deepEqual(zero.doc.rows.map((r) => r.selfHours), [0]);
@@ -208,7 +208,10 @@ test('round trip through the site: download → upload unchanged changes nothing
   assert.deepEqual([year.applied, year.warnings, year.summaries.map((s) => [s.semester, s.replaces])], [true, [], [[1, true], [2, false]]]);
   const back = send('syllabus.preview', sb1, downloaded(), dean).data;
   assert.deepEqual([back.ok, back.warnings, unchanged(back)], [true, [], [[1, true, 0, 0, 0], [2, true, 0, 0, 0]]]);
-  assert.equal(call('syllabus.get', { subjectId: sb1, semester: 1 }, dean).data.syllabus.rows[2].unitTitle, 'Сети');
+  // a row «lecture + practice» is two lessons now, so it is downloaded as two rows: «Сети» is the fourth row of the first semester
+  const autumn = call('syllabus.get', { subjectId: sb1, semester: 1 }, dean).data.syllabus.rows;
+  assert.deepEqual(autumn.map((r) => [r.lessonKind, r.name, r.unitTitle]), [['lecture', 'Введение', 'Основы'], ['practice', 'Введение', 'Основы'],
+    ['control', 'Модуль 1 (рубежный контроль)', 'Основы'], ['lecture', 'Сети', 'Сети'], ['control', '', 'Сети']]);
 });
 
 test('two halves uploaded from two files: the download changes nothing stored and says nothing new (N1)', () => {

@@ -3,20 +3,22 @@ import assert from 'node:assert/strict';
 import { setup, INFO, HEAD, T, M, file, A, FIRST, READS } from './syllabusSetup.js';
 
 test('syllabus upload: one syllabus of a teacher, laid over every group of that teacher', () => {
-  const { store, send, call, pairOf, lessons, lists, calls, writes, reset, dean, staff, ds1, sb1, sb2, sb3 } = setup();
+  const { publish, store, send, call, pairOf, lessons, lists, calls, writes, reset, dean, staff, ds1, sb1, sb2, sb3 } = setup();
   const pre = send('syllabus.preview', sb1, A, dean).data;
   assert.deepEqual([pre.ok, pre.applied, pre.errors, pre.warnings], [true, false, [], []]);
-  assert.deepEqual(pre.summaries, [{ semester: 1, planSemester: 1, replaces: false, topics: 2, units: 1, lectureHours: 2, practiceHours: 4, controlHours: 0, pairs: 3, added: 2, changed: 0, removed: 0 }]);
+  assert.deepEqual(pre.summaries, [{ semester: 1, planSemester: 1, replaces: false, topics: 3, units: 1, lectureHours: 2, practiceHours: 4, controlHours: 0, pairs: 3, added: 3, changed: 0, removed: 0 }]);
   assert.deepEqual([store.list('topics').length, store.list('syllabi').length], [0, 0]);
 
   reset();
-  const done = send('syllabus.apply', sb1, A, dean).data;
+  const done = publish(sb1, A).data;
   assert.deepEqual([done.ok, done.applied], [true, true]);
   const { id: syllabusId, ...sheetRow } = store.list('syllabi')[0];
   const OLD = ['disciplineId', 'teacherId', 'semester', 'planSemester', 'audience', 'credits', 'totalHours', 'classHours', 'selfHours', 'updated'];
   assert.deepEqual(Object.fromEntries(OLD.map((k) => [k, sheetRow[k]])), { disciplineId: ds1, teacherId: staff.teacher1, semester: 1, planSemester: 1, audience: 'Сестринское дело', credits: 1, totalHours: 10, classHours: 6, selfHours: 4, updated: '2026-08-31' });
-  assert.deepEqual(store.list('topics').map((t) => [t.syllabusId, t.kind, t.order, t.unit, t.name, t.lectureHours, t.practiceHours, t.description]),
-    [[syllabusId, 'topic', 1, 1, 'Введение', 2, 2, 'О теме Введение'], [syllabusId, 'topic', 2, 1, 'Практикум', 0, 2, 'О теме Практикум'], [syllabusId, 'control', 3, 1, '', 0, 0, '']]);
+  // a row of the file is one lesson of one kind; the first lesson of a row keeps its description, the rest has none
+  assert.deepEqual(store.list('topics').map((t) => [t.syllabusId === syllabusId, t.order, t.lessonKind, t.name, t.hours, t.description]),
+    [[true, 1, 'lecture', 'Введение', 2, 'О теме Введение'], [true, 2, 'practice', 'Введение', 2, ''], [true, 3, 'practice', 'Практикум', 2, 'О теме Практикум'], [true, 4, 'control', '', 0, '']]);
+  assert.deepEqual([sheetRow.status, sheetRow.version, sheetRow.manualOrder], ['approved', 1, true]);
   // у каждой группы свои даты, темы одни и те же; все группы записаны одной пачкой
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);
   assert.deepEqual(lessons(sb3), [['2026-09-02', ...FIRST[0]], ['2026-09-09', ...FIRST[1]]]);
@@ -28,14 +30,14 @@ test('syllabus upload: one syllabus of a teacher, laid over every group of that 
 
   // тот же силлабус загружают со страницы другой группы: строка «Силлабусов» по-прежнему одна, пишется только она
   reset();
-  const again = send('syllabus.apply', sb3, A, dean).data;
+  const again = publish(sb3, A).data;
   const [sum] = again.summaries;
   assert.deepEqual([again.applied, sum.replaces, sum.added + sum.changed + sum.removed, store.list('syllabi').length], [true, true, 0, 1]);
   assert.deepEqual([lists, writes, calls.update || 0, calls.insert || 0], [READS, { 'updateMany:syllabi': 1 }, 0, 0]);
 
   // строка добавлена, строка ушла, порядок сдвинулся — по одной пачке каждого вида на все группы
   reset();
-  assert.equal(send('syllabus.apply', sb1, file([T('Новая тема', 2, ''), T('Введение', 2, 2), M]), dean).data.applied, true);
+  assert.equal(publish(sb1, file([T('Новая тема', 2, ''), T('Введение', 2, 2), M])).data.applied, true);
   assert.deepEqual(writes, { 'updateMany:syllabi': 1, 'removeMany:topics': 1, 'updateMany:topics': 1, 'insertMany:topics': 1, 'updateMany:pairs': 1 });
   assert.deepEqual([calls.get, calls.update || 0, calls.insert || 0, calls.remove || 0], [1, 0, 0, 0]);
   assert.deepEqual([lessons(sb1), lessons(sb3)], [[['2026-09-01', 'Новая тема', 'lecture', 1], ['2026-09-08', 'Введение', 'lecture', 1]],
@@ -52,57 +54,57 @@ test('syllabus upload: one syllabus of a teacher, laid over every group of that 
 
   // перенос строки в описании доходит до листа «Темы» как есть: строки тем пишутся без normalizeRow — и изменённые (updateMany), и новая (insertMany)
   const described = [['Новая тема', 'Первая строка\nвторая строка'], ['Введение', 'Цель:\nзнать IT'], ['Сети', 'Схема:\nзвезда']];
-  assert.equal(send('syllabus.apply', sb1, file([...described.map(([name, text], i) => [1, '', name, 2, i === 1 ? 2 : '', '', text]), M]), dean).data.applied, true);
+  assert.equal(publish(sb1, file([...described.map(([name, text], i) => [1, '', name, 2, i === 1 ? 2 : '', '', text]), M])).data.applied, true);
   assert.deepEqual(described.map(([name]) => store.list('topics').find((t) => t.name === name).description), described.map(([, text]) => text));
 });
 
 test('a module without hours marks the last pair of its unit; a module with hours is a pair of its own', () => {
-  const { send, call, dean, g1, sb1 } = setup();
-  send('syllabus.apply', sb1, file([T('Введение', 2, ''), T('Практикум', '', 2), M]), dean);
+  const { publish, send, call, dean, g1, sb1 } = setup();
+  publish(sb1, file([T('Введение', 2, ''), T('Практикум', '', 2), M]));
   const view = () => call('schedule.list', { from: '2026-09-01', to: '2026-09-11', groupId: g1 }, dean).data.pairs.map((p) => [p.topic.name, p.topic.kind, p.topic.lessonType, p.topic.controls]);
   assert.deepEqual(view(), [['Введение', 'topic', 'lecture', []], ['Практикум', 'topic', 'practice', [{ name: '', unit: 1 }]]]);
-  send('syllabus.apply', sb1, file([T('Введение', 2, ''), [1, '', 'Сдача модуля', '', 2, 'модуль', '']]), dean);
+  publish(sb1, file([T('Введение', 2, ''), [1, '', 'Сдача модуля', '', 2, 'модуль', '']]));
   assert.deepEqual(view(), [['Введение', 'topic', 'lecture', []], ['Сдача модуля', 'control', 'control', []]]);
 });
 
 test('syllabus upload: a file with an error writes nothing', () => {               // Review Focus 14
-  const { send, snapshot, writes, dean, sb1 } = setup();
-  send('syllabus.apply', sb1, A, dean);
+  const { publish, send, snapshot, writes, dean, sb1 } = setup();
+  publish(sb1, A);
   const before = snapshot();
-  const bad = send('syllabus.apply', sb1, file([T('Введение', 3, '')]), dean).data;
+  const bad = publish(sb1, file([T('Введение', 3, '')])).data;
   assert.deepEqual([bad.ok, bad.applied, bad.summaries], [false, false, []]);
   assert.deepEqual(bad.errors, [{ sheet: 'plan', row: 2, field: 'lectureHours', code: 'bad_hours' }]);
   assert.equal(snapshot(), before);
 });
 
 test('syllabus upload: held pairs keep their topic, whichever group held them', () => {      // Review Focus 13
-  const { store, send, pairOf, lessons, snapshot, dean, sb1, sb3 } = setup();
-  send('syllabus.apply', sb1, A, dean);
+  const { publish, store, send, pairOf, lessons, snapshot, dean, sb1, sb3 } = setup();
+  publish(sb1, A);
   const first = pairOf(sb3, '2026-09-02');                                          // проведена в группе 02-1
   store.update('pairs', first.id, { status: 'closed' });
   // порядок сдвинулся: проведённая пара держит «Введение», остальные получают первое свободное занятие
-  assert.equal(send('syllabus.apply', sb1, file([T('Новая тема', 2, ''), T('Введение', 2, 2), T('Практикум', '', 2), M]), dean).data.applied, true);
+  assert.equal(publish(sb1, file([T('Новая тема', 2, ''), T('Введение', 2, 2), T('Практикум', '', 2), M])).data.applied, true);
   assert.deepEqual(lessons(sb3), [['2026-09-02', 'Введение', 'lecture', 1], ['2026-09-09', 'Новая тема', 'lecture', 1]]);
   assert.deepEqual(lessons(sb1), [['2026-09-01', 'Новая тема', 'lecture', 1], ['2026-09-08', 'Введение', 'lecture', 1]]);
   assert.equal(store.get('pairs', first.id).topicId, first.topicId);
   // темы проведённой пары нет в файле; у неё не осталось лекционных часов — ничего не записано
   const before = snapshot();
   for (const [rows, code] of [[[T('Практикум', '', 2), M], 'held_missing'], [[T('Введение', '', 2), M], 'held_hours']]) {
-    const refused = send('syllabus.apply', sb1, file(rows), dean).data;
+    const refused = publish(sb1, file(rows)).data;
     assert.deepEqual([refused.ok, refused.applied, refused.errors.map((e) => e.code)], [false, false, [code]]);
     assert.equal(snapshot(), before);
   }
   // переименование на том же месте — замечание, тема проведённой пары получает новое название
   // the file has 8 classroom hours: the declared numbers say so, so the only remark is the rename
   const info8 = INFO.map(([title, value]) => [title, title === 'Всего часов' ? 12 : title === 'Аудиторных часов' ? 8 : value]);
-  const renamed = send('syllabus.apply', sb1, file([T('Новая тема', 2, ''), T('Введение в предмет', 2, 2), T('Практикум', '', 2), M], info8), dean).data;
+  const renamed = publish(sb1, file([T('Новая тема', 2, ''), T('Введение в предмет', 2, 2), T('Практикум', '', 2), M], info8)).data;
   assert.deepEqual([renamed.applied, renamed.warnings], [true, [{ code: 'held_renamed', order: 2, from: 'Введение', to: 'Введение в предмет', date: '2026-09-02' }]]);
   assert.deepEqual(lessons(sb3)[0], ['2026-09-02', 'Введение в предмет', 'lecture', 1]);
 });
 
 test('a group follows the syllabus of its own teacher', () => {                   // Review Focus 17
-  const { store, send, call, pairOf, lessons, lists, writes, reset, dean, staff, sb1, sb3 } = setup();
-  send('syllabus.apply', sb1, A, dean);
+  const { publish, store, send, call, pairOf, lessons, lists, writes, reset, dean, staff, sb1, sb3 } = setup();
+  publish(sb1, A);
   // разовая замена на паре тему не меняет
   call('schedule.changePair', { id: pairOf(sb1, '2026-09-08').id, teacherId: staff.teacher2 }, dean);
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);
@@ -115,21 +117,21 @@ test('a group follows the syllabus of its own teacher', () => {                 
   assert.ok((writes['updateMany:pairs'] || 0) <= 1);
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);            // группа 01-1 не тронута
   // teacher2 получает свой силлабус: он продолжается со второго занятия (одна пара уже проведена)
-  assert.equal(send('syllabus.apply', sb3, file([T('Основы', 2, ''), T('Сети', 2, ''), M]), dean).data.applied, true);
+  assert.equal(publish(sb3, file([T('Основы', 2, ''), T('Сети', 2, ''), M])).data.applied, true);
   assert.equal(store.list('syllabi').length, 2);
   assert.deepEqual(lessons(sb3), [['2026-09-02', ...FIRST[0]], ['2026-09-09', 'Сети', 'lecture', 1]]);
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);
   // тему, проведённую в группе 02-1, нельзя убрать из силлабуса teacher1, хотя группа уже у другого преподавателя
-  assert.deepEqual(send('syllabus.apply', sb1, file([T('Практикум', '', 2), M]), dean).data.errors.map((e) => e.code), ['held_missing']);
+  assert.deepEqual(publish(sb1, file([T('Практикум', '', 2), M])).data.errors.map((e) => e.code), ['held_missing']);
 });
 
 test('syllabus upload: semesters as in the curriculum; the spring file leaves the autumn one alone; the switch lays it', () => {   // Review Focus 18
-  const { store, send, call, lessons, writes, reset, dean, sb1, sb3, S } = setup();
-  send('syllabus.apply', sb1, A, dean);
+  const { publish, store, send, call, lessons, writes, reset, dean, sb1, sb3, S } = setup();
+  publish(sb1, A);
   reset();
-  assert.equal(send('syllabus.apply', sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]]), dean).data.applied, true);      // 4-й семестр по плану — весенний
+  assert.equal(publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]])).data.applied, true);      // 4-й семестр по плану — весенний
   assert.equal(writes['updateMany:pairs'] || 0, 0);
-  assert.deepEqual([store.list('syllabi').map((s) => [s.semester, s.planSemester]), store.list('topics').length], [[[1, 1], [2, 4]], 5]);
+  assert.deepEqual([store.list('syllabi').map((s) => [s.semester, s.planSemester]), store.list('topics').length], [[[1, 1], [2, 4]], 6]);
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);
   call('settings.save', { settings: { ...S, semester: 2 } }, dean);
   assert.deepEqual(lessons(sb1), [['2026-09-01', 'Таблицы', 'lecture', 1], ['2026-09-08', '', '', null]]);
@@ -137,26 +139,26 @@ test('syllabus upload: semesters as in the curriculum; the spring file leaves th
 });
 
 test('syllabus upload: one file for the whole year writes both semesters in one batch', () => {
-  const { store, send, lessons, writes, reset, dean, sb1 } = setup();
+  const { publish, store, send, lessons, writes, reset, dean, sb1 } = setup();
   const yearFile = [{ name: 'Сведения', cells: [['Семестр', '1-2']] },
     { name: 'Тематический план', cells: [['Семестр', ...HEAD], [1, ...T('Осень', 2, '')], [2, ...T('Весна', 2, '')]] }];
   reset();
-  const done = send('syllabus.apply', sb1, yearFile, dean).data;
+  const done = publish(sb1, yearFile).data;
   assert.deepEqual([done.applied, done.summaries.map((s) => [s.semester, s.planSemester, s.pairs])], [true, [[1, 1, 1], [2, 2, 1]]]);
   assert.deepEqual([writes['insertMany:syllabi'], writes['insertMany:topics'], store.list('syllabi').length], [1, 1, 2]);
   assert.deepEqual(lessons(sb1), [['2026-09-01', 'Осень', 'lecture', 1], ['2026-09-08', '', '', null]]);
 });
 
 test('syllabus upload: only the deanery and the administrator; bad requests; the old ways are closed', () => {   // Review Focus 15
-  const { store, send, call, snapshot, dean, prorector, teacher1, staff, g1, sb1 } = setup();
+  const { publish, store, send, call, snapshot, dean, prorector, teacher1, staff, g1, sb1 } = setup();
   for (const token of [teacher1, prorector]) {
     for (const action of ['syllabus.preview', 'syllabus.apply']) assert.deepEqual(send(action, sb1, A, token).error, { code: 'forbidden' });
   }
-  assert.deepEqual(send('syllabus.apply', 'sb_nope', A, dean).error, { code: 'not_found' });
-  assert.deepEqual(send('syllabus.apply', ` ${sb1} `, A, dean).error, { code: 'not_found' });
-  for (const subjectId of [[sb1], 5, '', null]) assert.deepEqual(send('syllabus.apply', subjectId, A, dean).error, { code: 'bad_request' });
+  assert.deepEqual(publish('sb_nope', A).error, { code: 'not_found' });
+  assert.deepEqual(publish(` ${sb1} `, A).error, { code: 'not_found' });
+  for (const subjectId of [[sb1], 5, '', null]) assert.deepEqual(publish(subjectId, A).error, { code: 'bad_request' });
   for (const sheets of ['x', [], Array(11).fill(A[0]), [{ name: 5, cells: [] }], [{ name: 'Сведения', cells: 'x' }], [{ name: 'Сведения', cells: [5] }]]) {
-    assert.deepEqual(send('syllabus.apply', sb1, sheets, dean).error, { code: 'bad_request' });
+    assert.deepEqual(publish(sb1, sheets).error, { code: 'bad_request' });
   }
   // a cell is text, a number, a boolean or empty: an object or an array would be stored as «[object Object]» or «a,b»
   const before = snapshot();
@@ -167,9 +169,9 @@ test('syllabus upload: only the deanery and the administrator; bad requests; the
   assert.equal(snapshot(), before);
   assert.equal(send('syllabus.preview', sb1, [{ name: 'Сведения', cells: [['Семестр', 1, true, null]] }, A[1]], dean).ok, true);   // boolean and empty cells are cells
   const orphan = store.insert('subjects', { name: 'Старый предмет', groupId: g1, teacherId: staff.teacher1, scheme: 'A' }).id;      // без дисциплины
-  assert.deepEqual(send('syllabus.apply', orphan, A, dean).error, { code: 'invalid', fields: [{ field: 'disciplineId', code: 'bad_ref' }] });
+  assert.deepEqual(publish(orphan, A).error, { code: 'invalid', fields: [{ field: 'disciplineId', code: 'bad_ref' }] });
   assert.equal(store.list('topics').length, 0);
-  const topicRow = { syllabusId: 'sy_x', order: 1, unit: 1, name: 'Мимо файла', lectureHours: 2, practiceHours: 0, kind: 'topic' };
+  const topicRow = { syllabusId: 'sy_x', order: 1, unit: 1, name: 'Мимо файла', lessonKind: 'lecture', hours: 2 };
   for (const token of [dean, teacher1]) assert.deepEqual(call('dir.save', { table: 'topics', row: topicRow }, token).error, { code: 'forbidden' });
   assert.deepEqual(call('dir.list', { table: 'topics' }, dean).error, { code: 'forbidden' });
   assert.deepEqual(call('import.apply', { table: 'topics', cells: [['Предмет']] }, dean).error, { code: 'forbidden' });
@@ -217,8 +219,8 @@ test('a new teacher of a group takes its future pairs of the old teacher, moved 
 });
 
 test('the check window says when a file of another curriculum semester replaces the stored one, and in which groups', () => {   // I3
-  const { send, lists, reset, dean, sb1, sb3 } = setup();
-  send('syllabus.apply', sb1, A, dean);
+  const { publish, send, lists, reset, dean, sb1, sb3 } = setup();
+  publish(sb1, A);
   reset();
   const third = send('syllabus.preview', sb3, file([T('Второй курс', 2, ''), M], [['Семестр', '3 семестр']]), dean).data;
   assert.deepEqual([third.ok, third.warnings.filter((w) => w.code === 'semester_replaces')], [true, [{ code: 'semester_replaces', stored: 1, file: 3, groups: ['01-1', '02-1'] }]]);
@@ -227,8 +229,8 @@ test('the check window says when a file of another curriculum semester replaces 
 });
 
 test('a discipline or a person with a stored syllabus cannot be deleted: no orphan rows in «Силлабусы» and «Темы»', () => {   // M7
-  const { store, send, call, dean, staff, ds2, sb2 } = setup();
-  assert.equal(send('syllabus.apply', sb2, file([T('Анатомия 1', 2, '')]), dean).data.applied, true);
+  const { publish, store, send, call, dean, staff, ds2, sb2 } = setup();
+  assert.equal(publish(sb2, file([T('Анатомия 1', 2, '')])).data.applied, true);
   for (const p of store.list('pairs').filter((p) => p.subjectId === sb2)) store.remove('pairs', p.id);
   for (const w of store.list('weekTemplate').filter((w) => w.subjectId === sb2)) store.remove('weekTemplate', w.id);
   assert.equal(call('dir.remove', { table: 'subjects', id: sb2 }, dean).ok, true);
@@ -237,4 +239,17 @@ test('a discipline or a person with a stored syllabus cannot be deleted: no orph
   assert.deepEqual(call('dir.remove', { table: 'disciplines', id: ds2 }, dean).error, { code: 'in_use' });
   assert.deepEqual(call('dir.remove', { table: 'staff', id: staff.teacher2 }, token).error, { code: 'in_use' });
   assert.deepEqual([store.list('syllabi').length, store.list('topics').length], [1, 1]);
+});
+
+test('only the approved version is laid over the pairs; the file writes the approved version 1 and keeps the number of an existing one', () => {
+  const { publish, store, call, lessons, dean, sb1 } = setup();
+  publish(sb1, A);
+  assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);      // the pairs got the same lessons as before the change
+  store.update('syllabi', store.list('syllabi')[0].id, { version: 4 });
+  publish(sb1, file([T('Введение', 2, 2), M]));
+  assert.deepEqual([store.list('syllabi')[0].status, store.list('syllabi')[0].version], ['approved', 4]);
+  // a version that is not approved does not lie on the pairs
+  store.update('syllabi', store.list('syllabi')[0].id, { status: 'draft' });
+  call('schedule.generate', {}, dean);
+  assert.deepEqual(lessons(sb1).map((x) => x[1]), ['', '']);
 });

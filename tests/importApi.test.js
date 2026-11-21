@@ -135,8 +135,8 @@ test('a subjects import that changes the teacher re-lays the group and hands it 
   const t2 = teacher('tea2');                                                     // tea2 has no syllabus
   const ds = store.insert('disciplines', { name: 'Информатика' }).id;
   const sb = store.insert('subjects', { name: 'Информатика', disciplineId: ds, groupId: g1, teacherId: t1, scheme: 'A' }).id;
-  const sy = store.insert('syllabi', { disciplineId: ds, teacherId: t1, semester: 1, planSemester: 1 }).id;
-  store.insert('topics', { syllabusId: sy, order: 1, unit: 1, label: '', name: 'Введение', lectureHours: 2, practiceHours: 2, practiceKind: '', description: '', kind: 'topic' });
+  const sy = store.insert('syllabi', { disciplineId: ds, teacherId: t1, semester: 1, planSemester: 1, status: 'approved', version: 1 }).id;
+  for (const [order, lessonKind] of [[1, 'lecture'], [2, 'practice']]) store.insert('topics', { syllabusId: sy, order, unit: 1, lessonKind, name: 'Введение', hours: 2, description: '' });
   assert.equal(call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-09-25', holidays: [], bells: ['08:00', '09:40'], semester: 1 } }, dean).ok, true);
   store.insert('weekTemplate', { weekday: 2, slot: 1, subjectId: sb, roomId: '' });
   assert.equal(call('schedule.generate', {}, dean).ok, true);                     // four Tuesdays: 1, 8, 15, 22 September

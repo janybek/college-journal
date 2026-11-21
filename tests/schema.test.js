@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SCHEMA, SEMESTERS, TOPIC_KINDS, PRACTICE_KINDS, tableNames, PAIR_STATUSES, FIXED_STATUSES, LESSON_TYPES, WEEKDAYS, SYLLABUS_STATUSES, OPEN_STATUSES, LESSON_KINDS } from '../core/schema.js';
+import { SCHEMA, SEMESTERS, tableNames, PAIR_STATUSES, FIXED_STATUSES, LESSON_TYPES, WEEKDAYS, SYLLABUS_STATUSES, OPEN_STATUSES, LESSON_KINDS } from '../core/schema.js';
 
 test('tableNames lists tables in schema order', () => {
   assert.deepEqual(tableNames(), ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'translations', 'settings', 'weekTemplate',
@@ -18,8 +18,10 @@ test('schedule tables', () => {
   assert.deepEqual(SCHEMA.pairs.columns.map(c => c.title), ['id', 'дата', '№ пары', 'время начала', 'группа', 'предмет', 'преподаватель',
     'аудитория', 'тема', 'тип занятия', 'часть', 'статус', 'дата по плану', '№ пары по плану', 'изменена вручную', 'примечание']);
   assert.deepEqual(SCHEMA.topics.columns.map(c => c.title),
-    ['id', 'силлабус', '№ по порядку', 'юнит', '№ в силлабусе', 'название', 'лекция, ч', 'практика, ч', 'вид практики', 'СРС, ч', 'описание', 'вид строки', 'название юнита']);
-  assert.deepEqual(SCHEMA.topics.columns.map(c => c.key), ['id', 'syllabusId', 'order', 'unit', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description', 'kind', 'unitTitle']);
+    ['id', 'силлабус', '№ по порядку', 'юнит', 'вид занятия', 'название', 'часы', 'формы текущего контроля', 'СРС, ч', 'описание', 'название юнита', 'скопирована из']);
+  assert.deepEqual(SCHEMA.topics.columns.map(c => c.key),
+    ['id', 'syllabusId', 'order', 'unit', 'lessonKind', 'name', 'hours', 'controlForms', 'selfHours', 'description', 'unitTitle', 'sourceId']);
+  assert.deepEqual(SCHEMA.topics.columns.filter(c => c.type !== 'string').map(c => c.key), ['order', 'unit', 'hours', 'selfHours']);
   assert.deepEqual(SEMESTERS, [1, 2]);
   assert.deepEqual(SCHEMA.weekTemplate.columns.map(c => c.title), ['id', 'день недели', '№ пары', 'предмет', 'аудитория']);
   assert.deepEqual(SCHEMA.pairs.columns.filter(c => c.type !== 'string').map(c => [c.key, c.type]),
@@ -42,7 +44,6 @@ test('syllabi sheet, pair lesson columns and kinds', () => {
     ['id', 'дисциплина', 'преподаватель', 'семестр', 'семестр по плану', 'специальность', 'кредиты', 'всего часов', 'аудиторных часов', 'часов СРС', 'обновлён']);
   const pairKeys = SCHEMA.pairs.columns.map(c => c.key);
   assert.deepEqual(pairKeys.slice(pairKeys.indexOf('topicId'), pairKeys.indexOf('topicId') + 3), ['topicId', 'lessonType', 'part']);
-  assert.deepEqual([TOPIC_KINDS, PRACTICE_KINDS], [['topic', 'control'], ['', 'seminar', 'lab']]);
 });
 
 test('syllabus version fields and section sheets', () => {

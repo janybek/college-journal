@@ -6,8 +6,6 @@ export const FIXED_STATUSES = ['running', 'closed'];
 export const LESSON_TYPES = ['lecture', 'practice', 'control'];
 export const WEEKDAYS = [1, 2, 3, 4, 5];
 export const SEMESTERS = [1, 2];
-export const TOPIC_KINDS = ['topic', 'control'];
-export const PRACTICE_KINDS = ['', 'seminar', 'lab'];
 export const SYLLABUS_STATUSES = ['draft', 'review', 'returned', 'approved', 'archived'];
 export const OPEN_STATUSES = ['draft', 'review', 'returned'];
 export const LESSON_KINDS = ['lecture', 'practice', 'seminar', 'lab', 'control'];
@@ -89,9 +87,9 @@ export const SCHEMA = {
     sheet: 'Темы', prefix: 'tp',
     columns: [
       col('id', 'id'), col('syllabusId', 'силлабус'), col('order', '№ по порядку', 'int'), col('unit', 'юнит', 'int'),
-      col('label', '№ в силлабусе'), col('name', 'название'), col('lectureHours', 'лекция, ч', 'int'),
-      col('practiceHours', 'практика, ч', 'int'), col('practiceKind', 'вид практики'), col('selfHours', 'СРС, ч', 'int'),
-      col('description', 'описание'), col('kind', 'вид строки'), col('unitTitle', 'название юнита'),
+      col('lessonKind', 'вид занятия'), col('name', 'название'), col('hours', 'часы', 'int'),
+      col('controlForms', 'формы текущего контроля'), col('selfHours', 'СРС, ч', 'int'), col('description', 'описание'),
+      col('unitTitle', 'название юнита'), col('sourceId', 'скопирована из'),
     ],
   },
   units: {
