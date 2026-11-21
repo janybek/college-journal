@@ -32,6 +32,13 @@ const ROLE_ACTIONS = {
   'schedule.cancelPair': { admin: true, dean: true },
   'schedule.restorePair': { admin: true, dean: true },
   'syllabus.get': { admin: true, dean: true, prorector: true, teacher: true, student: true },
+  'syllabus.form': { admin: true, dean: true, prorector: true, teacher: true },
+  'syllabus.startDraft': { admin: true, dean: true, teacher: true },
+  'syllabus.saveSection': { admin: true, dean: true, teacher: true },
+  'syllabus.submit': { admin: true, dean: true, teacher: true },
+  'syllabus.approve': { admin: true, dean: true },
+  'syllabus.return': { admin: true, dean: true },
+  'syllabus.queue': { admin: true, dean: true, prorector: true },
   'student.subjects': { student: true },
   'schedule.mine': { teacher: true, student: true },
 };

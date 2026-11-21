@@ -74,7 +74,8 @@ test('the syllabus is uploaded by the deanery and the administrator; topics have
   for (const role of ['teacher', 'prorector', 'student']) assert.equal(can([role], 'syllabus.preview'), false);
   for (const role of ['admin', 'dean', 'teacher']) for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.apply']) assert.equal(can([role], action, 'topics'), false);
   assert.equal(can(['teacher'], 'dir.save', 'weekTemplate'), false);
-  assert.deepEqual(listPermissions(['teacher']), ['schedule.mine', 'syllabus.get', 'teacher.mySubjects']);
+  assert.deepEqual(listPermissions(['teacher']),
+    ['schedule.mine', 'syllabus.form', 'syllabus.get', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects']);
   assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.subjects', 'syllabus.get']);
   assert.equal(can(['dean'], 'topics.plan'), false);
   assert.equal(can(['student'], 'student.subjects'), true);
@@ -86,4 +87,12 @@ test('disciplines and subjects actions', () => {
   assert.deepEqual([can(['dean'], 'dir.save', 'disciplines'), can(['prorector'], 'dir.list', 'disciplines'), can(['prorector'], 'dir.save', 'disciplines'),
     can(['teacher'], 'dir.list', 'disciplines'), can(['dean'], 'import.apply', 'disciplines')], [true, true, false, false, true]);
   assert.deepEqual([can(['dean'], 'subjects.add'), can(['prorector'], 'subjects.add'), can(['prorector'], 'subjects.overview'), can(['teacher'], 'subjects.overview')], [true, false, true, false]);
+});
+
+test('syllabus form actions by role', () => {
+  const roles = ['admin', 'dean', 'prorector', 'teacher', 'student'];
+  const who = (action) => roles.map((r) => can([r], action));
+  for (const action of ['syllabus.startDraft', 'syllabus.saveSection', 'syllabus.submit']) assert.deepEqual(who(action), [true, true, false, true, false], action);
+  assert.deepEqual([who('syllabus.form'), who('syllabus.approve'), who('syllabus.return'), who('syllabus.queue')],
+    [[true, true, true, true, false], [true, true, false, false, false], [true, true, false, false, false], [true, true, true, false, false]]);
 });

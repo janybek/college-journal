@@ -8,6 +8,12 @@ export const WEEKDAYS = [1, 2, 3, 4, 5];
 export const SEMESTERS = [1, 2];
 export const TOPIC_KINDS = ['topic', 'control'];
 export const PRACTICE_KINDS = ['', 'seminar', 'lab'];
+export const SYLLABUS_STATUSES = ['draft', 'review', 'returned', 'approved', 'archived'];
+export const OPEN_STATUSES = ['draft', 'review', 'returned'];
+export const LESSON_KINDS = ['lecture', 'practice', 'seminar', 'lab', 'control'];
+export const OUTCOME_KINDS = ['knowledge', 'skill', 'attitude', 'prerequisite', 'postrequisite'];
+export const LITERATURE_KINDS = ['main', 'extra'];
+export const RULE_KINDS = ['behavior', 'ethics', 'sanction_behavior', 'sanction_ethics'];
 
 const col = (key, title, type = 'string') => ({ key, title, type });
 
@@ -72,6 +78,11 @@ export const SCHEMA = {
       col('planSemester', 'семестр по плану', 'int'), col('audience', 'специальность'), col('credits', 'кредиты', 'int'),
       col('totalHours', 'всего часов', 'int'), col('classHours', 'аудиторных часов', 'int'), col('selfHours', 'часов СРС', 'int'),
       col('updated', 'обновлён'),
+      col('department', 'кафедра'), col('faculty', 'факультет'), col('academicYear', 'учебный год'), col('course', 'курс', 'int'),
+      col('contacts', 'контакты преподавателя'), col('place', 'место проведения'), col('goal', 'цель курса'), col('status', 'статус'),
+      col('version', 'версия', 'int'), col('remark', 'замечание деканата'), col('submittedBy', 'отправил'), col('submittedAt', 'отправлен'),
+      col('decidedBy', 'решение принял'), col('decidedAt', 'дата решения'), col('editedBy', 'правил'),
+      col('manualOrder', 'порядок задан вручную', 'bool'),
     ],
   },
   topics: {
@@ -82,6 +93,48 @@ export const SCHEMA = {
       col('practiceHours', 'практика, ч', 'int'), col('practiceKind', 'вид практики'), col('selfHours', 'СРС, ч', 'int'),
       col('description', 'описание'), col('kind', 'вид строки'), col('unitTitle', 'название юнита'),
     ],
+  },
+  units: {
+    sheet: 'Юниты', prefix: 'un',
+    columns: [
+      col('id', 'id'), col('syllabusId', 'силлабус'), col('unit', 'юнит', 'int'), col('title', 'название'), col('description', 'описание'),
+      col('questions', 'ключевые вопросы'), col('guidance', 'методические указания'), col('results', 'ожидаемые результаты'),
+    ],
+  },
+  outcomes: {
+    sheet: 'Результаты обучения', prefix: 'oc',
+    columns: [col('id', 'id'), col('syllabusId', 'силлабус'), col('kind', 'вид'), col('order', '№ по порядку', 'int'), col('text', 'текст')],
+  },
+  selfWork: {
+    sheet: 'СРС', prefix: 'sw',
+    columns: [
+      col('id', 'id'), col('syllabusId', 'силлабус'), col('order', '№ по порядку', 'int'), col('unit', 'юнит', 'int'),
+      col('name', 'название'), col('tasks', 'задания'), col('hours', 'часы', 'int'),
+    ],
+  },
+  literature: {
+    sheet: 'Литература', prefix: 'lt',
+    columns: [
+      col('id', 'id'), col('syllabusId', 'силлабус'), col('kind', 'вид'), col('unit', 'юнит', 'int'), col('order', '№ по порядку', 'int'),
+      col('authors', 'авторы'), col('title', 'заглавие'), col('year', 'год'), col('publisher', 'издательство'), col('availability', 'наличие'),
+    ],
+  },
+  software: {
+    sheet: 'Программное обеспечение', prefix: 'so',
+    columns: [col('id', 'id'), col('syllabusId', 'силлабус'), col('order', '№ по порядку', 'int'), col('name', 'название'), col('link', 'ссылка')],
+  },
+  grading: {
+    sheet: 'Оценивание', prefix: 'gr',
+    columns: [
+      col('id', 'id'), col('syllabusId', 'силлабус'), col('order', '№ по порядку', 'int'), col('name', 'вид контроля'),
+      col('maxPoints', 'максимум баллов', 'int'), col('rangeFail', 'неуд., баллы'), col('rangeFair', 'удовл., баллы'),
+      col('rangeGood', 'хорошо, баллы'), col('rangeExcellent', 'отлично, баллы'), col('criteriaFail', 'неуд., критерии'),
+      col('criteriaFair', 'удовл., критерии'), col('criteriaGood', 'хорошо, критерии'), col('criteriaExcellent', 'отлично, критерии'),
+    ],
+  },
+  rules: {
+    sheet: 'Правила', prefix: 'rl',
+    columns: [col('id', 'id'), col('syllabusId', 'силлабус'), col('kind', 'вид'), col('order', '№ по порядку', 'int'), col('text', 'текст')],
   },
   pairs: {
     sheet: 'Пары', prefix: 'p',
