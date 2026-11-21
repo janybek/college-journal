@@ -161,12 +161,14 @@ function readHours(value) {
   return n !== null && HOURS_ALLOWED.includes(n) ? { ok: true, value: n } : { ok: false, value: 0 };
 }
 
-function readPlan(sheet, infoSemester, infoSemesterBad, errors, ignored, flags, infoSemesterEmpty) {
+// semesterInfo: { value, bad, empty } of the «Семестр» line of the info sheet. -> { rows, noSemester }
+function readPlan(sheet, semesterInfo, errors, ignored) {
+  const infoSemester = semesterInfo.value;
   const rows = [];
   const used = usedRows(sheet.cells);
   if (used > MAX_SHEET_ROWS) {
     errors.push({ sheet: 'plan', row: 0, field: '', code: 'too_many_rows' });
-    return rows;
+    return { rows, noSemester: false };
   }
   const head = Array.isArray(sheet.cells[0]) ? sheet.cells[0] : [];
   const at = {};
@@ -178,10 +180,12 @@ function readPlan(sheet, infoSemester, infoSemesterBad, errors, ignored, flags, 
   const missing = PLAN_COLUMNS.filter((c) => c.required && !(c.key in at));
   if (missing.length) {
     for (const c of missing) errors.push({ sheet: 'plan', row: 1, field: c.key, code: 'missing_column' });
-    return rows;
+    return { rows, noSemester: false };
   }
   // No semester anywhere: one error on the info sheet instead of one per plan row.
-  if (infoSemester === null && infoSemesterEmpty && !infoSemesterBad && !('semester' in at)) { flags.noSemester = true; infoSemesterBad = true; }
+  const noSemester = infoSemester === null && semesterInfo.empty && !semesterInfo.bad && !('semester' in at);
+  const needSemester = !semesterInfo.bad && !noSemester;
+  const lacking = [];
   const colIndex = (key) => PLAN_COLUMNS.findIndex((c) => c.key === key);
   const lastUnit = {};
   let lastSemester = 0;
@@ -207,7 +211,8 @@ function readPlan(sheet, infoSemester, infoSemesterBad, errors, ignored, flags, 
       if (inRange(n, 1, 8)) semester = n; else fail('semester', 'bad_value');
     } else if (infoSemester !== null) {
       semester = infoSemester;
-    } else if (!infoSemesterBad) {
+    } else if (needSemester) {
+      lacking.push(row);
       fail('semester', 'required');
     }
     if (semester !== null) {
@@ -256,14 +261,17 @@ function readPlan(sheet, infoSemester, infoSemesterBad, errors, ignored, flags, 
       selfHours, description, row,
     });
   }
-  errors.push(...rowErrors);
+  // Every row lacks a semester: one error (on the first row) instead of one per row.
+  const everyLacks = rows.length > 0 && lacking.length === rows.length;
+  errors.push(...(everyLacks ? rowErrors.filter((e) => !(e.field === 'semester' && e.code === 'required')) : rowErrors));
+  if (everyLacks) errors.push({ sheet: 'plan', row: lacking[0], field: 'semester', code: 'required', count: lacking.length });
 
   if (!rows.some((r) => r.kind === 'topic')) errors.push({ sheet: 'plan', row: 0, field: '', code: 'empty' });
   const semesters = [...new Set(rows.map((r) => r.semester).filter((s) => s !== null))];
   if (semesters.length > 2 || (semesters.length === 2 && (semesters[0] % 2 === semesters[1] % 2 || Math.ceil(semesters[0] / 2) !== Math.ceil(semesters[1] / 2)))) {
     errors.push({ sheet: 'plan', row: 0, field: 'semester', code: 'semester_clash' });
   }
-  return rows;
+  return { rows, noSemester };
 }
 
 function planWarnings(info, rows, selfFilled) {
@@ -304,19 +312,19 @@ export function parseSyllabus(sheets) {
   let semesterBad = false;
   let semesterRow = 0;
   let semesterEmpty = true;
-  const flags = { noSemester: false };
+  let noSemester = false;
   if (infoSheet) ({ info, semesterBad, semesterRow, semesterEmpty } = readInfo(infoSheet, infoErrors, infoIgnored));
   else infoErrors.push({ sheet: 'info', row: 0, field: '', code: 'missing_sheet' });
 
   let rows = [];
   let selfFilled = false;
   if (planSheet) {
-    rows = readPlan(planSheet, info ? info.semester : null, semesterBad, planErrors, planIgnored, flags, semesterEmpty);
+    ({ rows, noSemester } = readPlan(planSheet, { value: info ? info.semester : null, bad: semesterBad, empty: semesterEmpty }, planErrors, planIgnored));
     selfFilled = rows.some((r) => r.selfHours !== null);
   } else {
     planErrors.push({ sheet: 'plan', row: 0, field: '', code: 'missing_sheet' });
   }
-  if (flags.noSemester) { infoErrors.push({ sheet: 'info', row: semesterRow, field: 'semester', code: 'required' }); infoErrors.sort((a, b) => a.row - b.row); }
+  if (noSemester) { infoErrors.push({ sheet: 'info', row: semesterRow, field: 'semester', code: 'required' }); infoErrors.sort((a, b) => a.row - b.row); }
   planErrors.sort((a, b) => a.row - b.row);
   result.errors = [...infoErrors, ...planErrors];
 

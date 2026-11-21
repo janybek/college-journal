@@ -120,6 +120,17 @@ test('titles in three languages and kind words', () => {
   assert.deepEqual([HOURS_PER_PAIR, HOURS_ALLOWED], [2, [0, 2, 4]]);
 });
 
+test('a missing semester is reported once when every row lacks it', () => {
+  const rows50 = Array.from({ length: 50 }, (_, i) => [1, '', 'Т' + i, 2, '', '']);
+  const range = parseSyllabus(book([['Семестр', '1-2']], [SHORT, ...rows50]));
+  assert.deepEqual(range.errors, [{ sheet: 'plan', row: 2, field: 'semester', code: 'required', count: 50 }]);
+  const TWO = ['Семестр', ...SHORT];
+  const emptyCol = parseSyllabus(book([['Курс', 1]], [TWO, ...rows50.map((r) => ['', ...r])]));
+  assert.deepEqual(codes(emptyCol), [['plan', 2, 'semester', 'required']]);
+  const some = parseSyllabus(book([['Семестр', '1-2']], [TWO, ...rows50.map((r, i) => [i === 9 || i === 19 ? '' : 1, ...r])]));
+  assert.deepEqual(codes(some), [['plan', 11, 'semester', 'required'], ['plan', 21, 'semester', 'required']]);
+});
+
 test('hardening for real files', () => {
   // 1. trailing blank rows do not count toward MAX_SHEET_ROWS
   const blanks = Array.from({ length: 400 }, () => ['', '', '', '', '', '']);
