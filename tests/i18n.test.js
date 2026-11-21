@@ -71,7 +71,11 @@ test('final fix wave: field texts of the file check, the replaced semester, unit
   }
   for (const word of ['лекция', 'практика', 'семинар', 'лабораторная', 'модуль']) assert.ok(ru['syllabus.error.practiceKind.bad_value'].includes(word), word);
   // I1: the success text says that the future pairs now belong to the new teacher
-  assert.match(ru['subjects.edit.saved'], /предстоящие пары теперь у нового преподавателя/);
+  // N2: moved pairs pass to the new teacher too; pairs handed to another teacher stay
+  assert.match(ru['subjects.edit.saved'], /предстоящие пары, в том числе перенесённые, теперь у нового преподавателя/);
+  assert.match(ru['subjects.edit.saved'], /отданные на замену другому преподавателю, остались/);
+  // N3: the import result says how many pairs stayed with the previous teachers
+  for (const dict of [ru, ky, en]) assert.match(dict['import.done.busy'], /\{count\}/);
 });
 
 test('«Все занятия стоят на парах»: the number of pairs is written with its word in every language (M12)', () => {

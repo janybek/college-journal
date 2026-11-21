@@ -102,15 +102,17 @@ export function planGeneration({ template, subjects, settings, pairs, from, rest
   return { toInsert, toUpdate: toUpdate.map(({ id, patch }) => ({ id, patch })), toRemove, kept, conflicts };
 }
 
-// A subject got another teacher: the pairs the schedule made for it from today on and nobody changed by hand (those
-// planGeneration would rewrite) go to the new teacher. A pair whose time the new teacher already teaches stays as it is.
+// A subject got another teacher (subject.teacherId; oldTeacherId — the one before): its planned pairs from today on
+// that the old teacher teaches go to the new one, those moved by hand too. A pair given to someone else (a one-off
+// substitution) keeps its teacher; so do held, past and cancelled pairs. A pair whose time the new teacher already
+// teaches stays as it is and is counted.
 // -> { patches: [{ id, patch: { teacherId } }], skippedBusy }
-export function teacherHandover(pairs, subject, today) {
+export function teacherHandover(pairs, subject, today, oldTeacherId) {
   const slots = pairSlots(pairs);
   const patches = [];
   let skippedBusy = 0;
   for (const pair of pairs || []) {
-    if (pair.subjectId !== subject.id || pair.status !== 'planned' || pair.changed !== false || pair.date < today || pair.teacherId === subject.teacherId) continue;
+    if (pair.subjectId !== subject.id || pair.status !== 'planned' || pair.date < today || pair.teacherId !== oldTeacherId || oldTeacherId === subject.teacherId) continue;
     if (busyCodes(slots, { id: pair.id, day: pair.date, slot: pair.slot, teacherId: subject.teacherId }).length > 0) skippedBusy++;
     else patches.push({ id: pair.id, patch: { teacherId: subject.teacherId } });
   }

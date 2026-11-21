@@ -152,3 +152,29 @@ test('a subjects import that changes the teacher re-lays the group and hands it 
   assert.deepEqual(lessons(), [[false, '', null], [false, '', null], [false, '', null], [false, '', null]]);   // NO_LESSON on every pair that is not held
   assert.deepEqual(store.list('pairs').map((p) => p.teacherId === t2), [true, true, true, true]);              // the future pairs follow the new teacher (I1)
 });
+
+test('a subjects import says how many pairs stayed with the old teacher because the new one teaches at that time (N3)', () => {
+  const { store, call, dean } = setup();
+  const g1 = store.list('groups')[0].id;
+  const g2 = store.insert('groups', { name: '02-1', course: 1 }).id;
+  const teacher = (login) => store.insert('staff', { fullName: login, login, passwordHash: 'x', roles: 'teacher', lang: 'ky', mustChangePassword: false, active: true }).id;
+  const t1 = teacher('tea1');
+  const t2 = teacher('tea2');
+  const ds = store.insert('disciplines', { name: 'Информатика' }).id;
+  const ds2 = store.insert('disciplines', { name: 'Анатомия' }).id;
+  const sb = store.insert('subjects', { name: 'Информатика', disciplineId: ds, groupId: g1, teacherId: t1, scheme: 'A' }).id;
+  const other = store.insert('subjects', { name: 'Анатомия', disciplineId: ds2, groupId: g2, teacherId: t2, scheme: 'A' }).id;
+  assert.equal(call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-09-25', holidays: [], bells: ['08:00', '09:40'], semester: 1 } }, dean).ok, true);
+  store.insert('weekTemplate', { weekday: 2, slot: 1, subjectId: sb, roomId: '' });         // Tuesdays 1, 8, 15, 22 September
+  store.insert('weekTemplate', { weekday: 3, slot: 1, subjectId: other, roomId: '' });
+  assert.equal(call('schedule.generate', {}, dean).ok, true);
+  // tea2 is moved by hand onto Tuesday 15 September, pair 1 (another group): that pair of «Информатика» cannot go to tea2
+  const busy = store.list('pairs').find((x) => x.subjectId === other && x.date === '2026-09-16');
+  assert.equal(call('schedule.changePair', { id: busy.id, date: '2026-09-15' }, dean).ok, true);
+  const done = call('import.apply', { table: 'subjects', cells: [['Дисциплина', 'Преподаватель', 'Группа'], ['Информатика', 'tea2', '01-1']] }, dean).data;
+  assert.deepEqual([done.updated, done.skippedBusy], [1, 1]);
+  const teachers = store.list('pairs').filter((x) => x.subjectId === sb).sort((a, b) => a.date.localeCompare(b.date)).map((x) => [x.date, x.teacherId === t2]);
+  assert.deepEqual(teachers, [['2026-09-01', true], ['2026-09-08', true], ['2026-09-15', false], ['2026-09-22', true]]);
+  // other tables say nothing about pairs
+  assert.equal('skippedBusy' in call('import.apply', { table: 'rooms', cells: [['Название'], ['101']] }, dean).data, false);
+});

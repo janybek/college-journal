@@ -234,6 +234,8 @@ function resultBody(result) {
       [result.updated, 'import.done.updated'],
       [result.skipped, 'import.done.skipped', true],
     ]),
+    // A subjects import gave groups other teachers; pairs at a time the new teacher already teaches stayed with the old one.
+    result.skippedBusy > 0 ? note('warning', t('import.done.busy', { count: result.skippedBusy })) : null,
     errorsBlock(result.errors),
     el('button', { type: 'button', id: 'import-again', class: 'button button--secondary', onclick: startOver }, icon('upload'), t('import.again')),
   ];

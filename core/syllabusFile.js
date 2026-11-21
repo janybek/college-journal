@@ -68,9 +68,14 @@ for (const [kind, words] of [['', ORDINARY], ['seminar', SEMINAR], ['lab', LAB],
 
 const normTitle = (value) => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/\s*:$/, '');
 
-// The topic cell of a row that sums the plan up («Итого», «Всего часов»): the row is skipped and named in the remark.
-const TOTAL_WORDS = new Set(['итого', 'итого часов', 'всего', 'всего часов', 'жалпы', 'жалпы саат', 'жыйынтыгы', 'жыйынтык', 'total', 'total hours']);
-const isTotal = (value) => typeof value === 'string' && TOTAL_WORDS.has(normTitle(value));
+// A row that sums the plan up: the first whole word of its topic cell is one of these («Итого», «Итого по курсу»,
+// «Всего за семестр», «Итого 36», «Итого:»). «Итоговое занятие» and «Всеобщая история» stay topics. The row is skipped
+// and named in the remark.
+const TOTAL_WORDS = new Set(['итого', 'всего', 'жалпы', 'жыйынтыгы', 'итог', 'total']);
+const isTotal = (value) => {
+  const first = typeof value === 'string' ? /^\s*([a-zа-яёөүң]+)/i.exec(value) : null;
+  return first !== null && TOTAL_WORDS.has(first[1].toLowerCase());
+};
 
 function titleIndex(items) {
   const index = new Map();
@@ -217,7 +222,8 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
     const line = Array.isArray(sheet.cells[i]) ? sheet.cells[i] : [];
     const cell = (key) => (key in at ? line[at[key]] : undefined);
     if (PLAN_COLUMNS.every((c) => isEmpty(cell(c.key)))) continue;
-    if (isTotal(cell('name'))) { ignored.push(toText(cell('name'))); continue; }
+    // A totals row has no class type; a module called «Итог» (with «модуль» in «Вид занятия») is a module.
+    if (isTotal(cell('name')) && isEmpty(cell('practiceKind'))) { ignored.push(toText(cell('name'))); continue; }
     const row = i + 1;
     const found = [];
     const fail = (field, code) => found.push({ sheet: 'plan', row, field, code });

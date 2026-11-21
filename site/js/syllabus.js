@@ -83,34 +83,44 @@ export function fileLabels(text) {
 // The answer of syllabus.get -> what the file holds. No syllabus: the template with the discipline, the teacher and
 // the course written in. A syllabus: the one shown, with the semester of the curriculum (planSemester, 1–8) — not the
 // semester of the year — so that the downloaded file, uploaded again, stays the same semester.
-// other: the answer of syllabus.get for the other semester of the year. When it has a syllabus of the same academic
-// year (1 and 2, 3 and 4…), the file holds the whole year: «1-2» in «Сведения», the semester of every row in the plan,
-// the autumn rows first — the file a teacher of a two-semester course would upload.
+// other: the answer of syllabus.get for the other semester of the year. The file holds the whole year («1-2» in
+// «Сведения», the semester of every row in the plan, the autumn rows first — the file a teacher of a two-semester
+// course would upload) only when the same file, uploaded back, changes nothing: see yearInfo. Otherwise it is the
+// semester shown, as one semester's file.
 export function fileData(view, other = null) {
   const { subject, syllabus } = view;
   const who = { discipline: subject.name, teacher: subject.teacherName, course: subject.course };
   if (syllabus === null) return { info: who, rows: [] };
-  const year = other && other.syllabus ? [view, other].sort((a, b) => a.semester - b.semester).map((v) => v.syllabus) : null;
-  if (!year || Math.ceil(year[0].planSemester / 2) !== Math.ceil(year[1].planSemester / 2)) {
+  const [autumn, spring] = other && other.syllabus ? [view, other].sort((a, b) => a.semester - b.semester).map((v) => v.syllabus) : [];
+  const year = autumn ? yearInfo(autumn, spring) : null;
+  if (year === null) {
     const { planSemester, audience, credits, totalHours, classHours, selfHours, rows } = syllabus;
     return { info: { ...who, semester: planSemester, audience, credits, totalHours, classHours, selfHours }, rows };
   }
-  const [autumn, spring] = year;
   return {
-    info: {
-      ...who, semester: autumn.planSemester + '-' + spring.planSemester, audience: present(autumn.audience) ? autumn.audience : spring.audience,
-      ...Object.fromEntries(YEAR_NUMBERS.map((key) => [key, yearNumber(autumn[key], spring[key])])),
-    },
+    info: { ...who, semester: autumn.planSemester + '-' + spring.planSemester, ...year },
     rows: [...autumn.rows.map((row) => ({ ...row, semester: autumn.planSemester })), ...spring.rows.map((row) => ({ ...row, semester: spring.planSemester }))],
   };
 }
 
 const present = (value) => value !== null && value !== undefined && value !== '';
-const YEAR_NUMBERS = ['credits', 'totalHours', 'classHours', 'selfHours'];
-// A number of the year: a file of the whole year gave both halves the same numbers; two files of a semester each — their sum.
-function yearNumber(a, b) {
-  if (a === b || !present(b)) return a;
-  return present(a) ? Number(a) + Number(b) : b;
+const YEAR_INFO = ['audience', 'credits', 'totalHours', 'classHours', 'selfHours'];
+const asText = (value) => (present(value) ? String(value) : '');
+
+// The one «Сведения» of a year file, or null when there can be none. An upload writes the «Сведения» of its file to
+// every semester in it and checks its hours against the plan of the whole file. So both semesters must be one academic
+// year and store the same specialty, credits and hours (two files of a semester each store their own: no sheet holds
+// both), and the classroom hours and the СРС (when the plan gives it) must be those of the plan of the year — else the
+// file, uploaded unchanged, would bring a remark its semesters never had.
+function yearInfo(autumn, spring) {
+  if (Math.ceil(autumn.planSemester / 2) !== Math.ceil(spring.planSemester / 2)) return null;
+  if (!YEAR_INFO.every((key) => asText(autumn[key]) === asText(spring[key]))) return null;
+  const rows = [...autumn.rows, ...spring.rows];
+  const classHours = rows.reduce((n, row) => n + (Number(row.lectureHours) || 0) + (Number(row.practiceHours) || 0), 0);
+  const selfRows = rows.filter((row) => typeof row.selfHours === 'number');
+  if (present(autumn.classHours) && Number(autumn.classHours) !== classHours) return null;
+  if (present(autumn.selfHours) && selfRows.length > 0 && Number(autumn.selfHours) !== selfRows.reduce((n, row) => n + row.selfHours, 0)) return null;
+  return Object.fromEntries(YEAR_INFO.map((key) => [key, autumn[key]]));
 }
 
 // «Силлабус — Информатика — Teacher One.xlsx»: the parts joined; characters a file name cannot hold are dropped,

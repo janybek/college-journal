@@ -43,21 +43,26 @@ function previewOf({ spec, db, parsed, badRows }) {
 
 // A subjects import that gave a group another teacher: the new teacher takes the group's future pairs (as on «Предметы»)
 // and the group follows that teacher's syllabus; the teachers and the lessons go in one batch of pairs.
+// -> how many pairs stayed with the old teacher because the new one teaches at that time.
 function relayoutTeachers(store, db, updated, today) {
   const before = new Map(db.subjects.map((s) => [s.id, s]));
   const moved = updated.filter((row) => before.get(row.id) !== undefined && before.get(row.id).teacherId !== row.teacherId);
-  if (moved.length === 0) return;
+  if (moved.length === 0) return 0;
   const fresh = new Map(updated.map((row) => [row.id, row]));
   const pairs = store.list('pairs');
   // One subject after another, each seeing the pairs the ones before it handed over: two groups never land on one teacher at once.
   const patches = [];
+  let skippedBusy = 0;
   let now = pairs;
   for (const subject of moved) {
-    const handed = new Map(teacherHandover(now, subject, today).patches.map(({ id, patch }) => [id, patch]));
+    const handover = teacherHandover(now, subject, today, before.get(subject.id).teacherId);
+    skippedBusy += handover.skippedBusy;
+    const handed = new Map(handover.patches.map(({ id, patch }) => [id, patch]));
     for (const [id, patch] of handed) patches.push({ id, patch });
     now = now.map((p) => (handed.has(p.id) ? { ...p, ...handed.get(p.id) } : p));
   }
   relayout(store, moved.map((row) => row.id), { subjects: db.subjects.map((s) => fresh.get(s.id) ?? s), pairs }, patches);
+  return skippedBusy;
 }
 
 function applyOf({ spec, table, db, parsed, badRows }, { store, platform }) {
@@ -83,8 +88,9 @@ function applyOf({ spec, table, db, parsed, badRows }, { store, platform }) {
   const changed = plan.toUpdate.filter(({ id, patch }) => !sameValues(stored.get(id), patch));
   const updated = changed.length > 0 ? store.updateMany(table, changed) : [];
   const created = toInsert.length > 0 ? store.insertMany(table, toInsert) : [];
-  if (table === 'subjects') relayoutTeachers(store, db, updated, todayOf(platform));
-  return { inserted: toInsert.length, updated: plan.toUpdate.length, skipped: badRows, passwords, ...report };
+  const answer = { inserted: toInsert.length, updated: plan.toUpdate.length, skipped: badRows, passwords, ...report };
+  if (table === 'subjects') answer.skippedBusy = relayoutTeachers(store, db, updated, todayOf(platform));
+  return answer;
 }
 
 export const importHandlers = {

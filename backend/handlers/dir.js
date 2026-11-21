@@ -97,7 +97,7 @@ function save(data, ctx) {
     if (table === 'disciplines' && saved.name !== old.name) renameSubjects(store, saved);
     // A new teacher of a group takes its future pairs and the group follows that teacher's syllabus: one batch of pairs.
     if (table === 'subjects' && saved.teacherId !== old.teacherId) {
-      const { patches, skippedBusy } = teacherHandover(db.pairs, saved, todayOf(platform));
+      const { patches, skippedBusy } = teacherHandover(db.pairs, saved, todayOf(platform), old.teacherId);
       relayout(store, [saved.id], { subjects: db.subjects.map((s) => (s.id === saved.id ? saved : s)), pairs: db.pairs }, patches);
       return { row: withoutHash(saved), skippedBusy };
     }

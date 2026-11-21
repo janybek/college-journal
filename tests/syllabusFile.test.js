@@ -200,12 +200,17 @@ test('«Итого» rows are skipped and named in the remark, not read as a top
   assert.deepEqual(totals.doc.rows.map((r) => r.name), ['А', 'Б']);
   assert.equal(totals.doc.rows.reduce((n, r) => n + (r.lectureHours + r.practiceHours) / HOURS_PER_PAIR, 0), 4);
   assert.deepEqual(totals.warnings[0], { code: 'ignored', sheet: 'plan', titles: ['Итого'] });
-  for (const word of ['ИТОГО:', ' Всего ', 'Итого  часов', 'Жалпы', 'жыйынтыгы:', 'Total']) {
+  // the first whole word decides (N4): a colon, numbers or more words may follow
+  for (const word of ['ИТОГО:', ' Всего ', 'Итого  часов', 'Жалпы', 'жыйынтыгы:', 'Total', 'Итого по курсу', 'Всего за семестр', 'Итого 36', 'Итого:',
+    'Итог', 'ИТОГО ЧАСОВ:', 'Всего по юниту 1', 'Total:', 'жалпы саат:', 'Итого: 36 ч']) {
     const r = one([[1, '', 'А', 2, '', ''], ['', '', word, 2, '', '']]);
-    assert.deepEqual([r.errors, r.doc.rows.length], [[], 1], word);
+    assert.deepEqual([r.errors, r.doc && r.doc.rows.length], [[], 1], word);
   }
-  // a topic that only starts with the word stays a topic
-  assert.equal(one([[1, '', 'Итоговое тестирование', 2, '', '']]).doc.rows.length, 1);
+  // a topic that only starts with the letters of the word stays a topic
+  for (const name of ['Итоговое тестирование', 'Итоговое занятие', 'Итоги года', 'Всеобщая история', 'Totally new', 'Жалпылоо']) {
+    const r = one([[1, '', name, 2, '', '']]);
+    assert.deepEqual([r.errors, r.doc && r.doc.rows.map((row) => row.name)], [[], [name]], name);
+  }
 });
 
 test('class type: more spellings; an unknown word and a kind without practice hours have their own codes', () => {   // M2

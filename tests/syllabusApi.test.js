@@ -175,38 +175,44 @@ test('syllabus upload: only the deanery and the administrator; bad requests; the
   assert.deepEqual(call('syllabus.apply', { subjectId: sb1, cells: [['Семестр']] }, dean).error, { code: 'bad_request' });   // прежний формат
 });
 
-test('a new teacher of a group takes its future pairs in the same batch as the lessons; substituted, held, past and busy pairs keep theirs', () => {   // I1
+test('a new teacher of a group takes its future pairs of the old teacher, moved ones too, in the same batch as the lessons; substituted, held, past, cancelled and busy pairs keep theirs', () => {   // I1, N2
   const { store, call, pairOf, lists, writes, calls, reset, dean, teacher1, teacher2, staff, g2, sb1, sb3, S } = setup();
-  call('settings.save', { settings: { ...S, semesterEnd: '2026-09-25' } }, dean);
-  call('schedule.generate', {}, dean);
+  call('settings.save', { settings: { ...S, semesterEnd: '2026-10-09' } }, dean);
+  call('schedule.generate', {}, dean);                                                     // sb3 (02-1, teacher1): Wednesdays 09-02 … 10-07
   const past = store.insert('pairs', { date: '2026-08-26', slot: 1, startTime: '08:00', groupId: g2, subjectId: sb3, teacherId: staff.teacher1, roomId: '',
     topicId: '', lessonType: '', part: null, status: 'planned', planDate: '2026-08-26', planSlot: 1, changed: false, note: '' }).id;
-  store.update('pairs', pairOf(sb3, '2026-09-02').id, { status: 'closed' });                                             // held
-  assert.equal(call('schedule.changePair', { id: pairOf(sb3, '2026-09-09').id, teacherId: staff.dean }, dean).ok, true);  // substituted by hand
-  // teacher2 is already busy at the time of the 09-23 pair of 02-1: a pair of 01-1 is moved there and given to teacher2
-  assert.equal(call('schedule.changePair', { id: pairOf(sb1, '2026-09-22').id, date: '2026-09-23', teacherId: staff.teacher2 }, dean).ok, true);
+  const ok = (action, data) => assert.equal(call(action, data, dean).ok, true, action);
+  store.update('pairs', pairOf(sb3, '2026-09-02').id, { status: 'closed' });                               // held
+  ok('schedule.changePair', { id: pairOf(sb3, '2026-09-09').id, teacherId: staff.dean });                    // a one-off substitution
+  ok('schedule.changePair', { id: pairOf(sb3, '2026-09-16').id, date: '2026-09-17' });                       // moved by hand, still teacher1
+  // teacher2 is busy on 09-24 at pair 1 (a pair of 01-1 moved there and given to teacher2); the 09-23 pair of 02-1 is moved into that slot
+  ok('schedule.changePair', { id: pairOf(sb1, '2026-09-22').id, date: '2026-09-24', teacherId: staff.teacher2 });
+  ok('schedule.changePair', { id: pairOf(sb3, '2026-09-23').id, date: '2026-09-24' });
+  ok('schedule.cancelPair', { id: pairOf(sb3, '2026-10-07').id });                                          // cancelled
 
   reset();
   const saved = call('dir.save', { table: 'subjects', row: { id: sb3, teacherId: staff.teacher2 } }, dean);
   assert.deepEqual([saved.ok, saved.data.row.teacherId, saved.data.skippedBusy], [true, staff.teacher2, 1]);
+  const DATES = ['2026-08-26', '2026-09-02', '2026-09-09', '2026-09-17', '2026-09-24', '2026-09-30', '2026-10-07'];
   const teacherOf = (date) => store.list('pairs').find((p) => p.subjectId === sb3 && p.date === date).teacherId;
-  assert.deepEqual(['2026-08-26', '2026-09-02', '2026-09-09', '2026-09-16', '2026-09-23'].map(teacherOf),
-    [staff.teacher1, staff.teacher1, staff.dean, staff.teacher2, staff.teacher1]);
+  assert.deepEqual(DATES.map(teacherOf), [staff.teacher1, staff.teacher1, staff.dean, staff.teacher2, staff.teacher1, staff.teacher2, staff.teacher1]);
   assert.equal(store.get('pairs', past).teacherId, staff.teacher1);
   // one read of every sheet, one batch for the pairs: the teacher and the lessons together
   for (const [table, n] of Object.entries(lists)) assert.equal(n, 1, table);
   assert.deepEqual([writes['updateMany:pairs'], calls.update], [1, 1]);
 
-  // «Моё расписание»: the new teacher has the pair, without the «Замена» mark; the old one no longer has it
-  const week = (token) => call('schedule.mine', { from: '2026-09-14' }, token).data.pairs.filter((p) => p.subjectId === sb3);
-  assert.deepEqual(week(teacher2).map((p) => [p.date, p.groupName, p.substitution]), [['2026-09-16', '02-1', false]]);
-  assert.deepEqual(week(teacher1), []);
-  assert.deepEqual(call('schedule.list', { from: '2026-09-14', groupId: g2 }, dean).data.pairs.filter((p) => p.subjectId === sb3).map((p) => [p.teacherName, p.substitution]),
-    [['teacher2', false]]);
+  // «Моё расписание»: the new teacher has the moved pair, without the «Замена» mark; the old one no longer has the future ones
+  const week = (token, from) => call('schedule.mine', { from }, token).data.pairs.filter((p) => p.subjectId === sb3);
+  assert.deepEqual(week(teacher2, '2026-09-14').map((p) => [p.date, p.groupName, p.substitution, p.moved]), [['2026-09-17', '02-1', false, true]]);
+  assert.deepEqual(week(teacher2, '2026-09-28').map((p) => [p.date, p.substitution]), [['2026-09-30', false]]);
+  assert.deepEqual(week(teacher1, '2026-09-28'), []);
+  assert.deepEqual(week(teacher1, '2026-10-05').map((p) => [p.date, p.status]), [['2026-10-07', 'cancelled']]);   // the cancelled pair stays as it was
+  assert.deepEqual(call('schedule.list', { from: '2026-09-28', groupId: g2 }, dean).data.pairs.filter((p) => p.subjectId === sb3 && p.status === 'planned')
+    .map((p) => [p.teacherName, p.substitution]), [['teacher2', false]]);
 
-  // back to the first teacher: the future pairs follow again, the hand-substituted one stays with its substitute
+  // back to the first teacher: the pairs of teacher2 follow again, moved one included; the substitute keeps his pair
   assert.equal(call('dir.save', { table: 'subjects', row: { id: sb3, teacherId: staff.teacher1 } }, dean).ok, true);
-  assert.deepEqual(['2026-09-09', '2026-09-16', '2026-09-23'].map(teacherOf), [staff.dean, staff.teacher1, staff.teacher1]);
+  assert.deepEqual(DATES.slice(2, 6).map(teacherOf), [staff.dean, staff.teacher1, staff.teacher1, staff.teacher1]);
 });
 
 test('the check window says when a file of another curriculum semester replaces the stored one, and in which groups', () => {   // I3

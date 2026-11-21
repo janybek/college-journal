@@ -151,20 +151,30 @@ test('syllabusBook: a unit title is written once, on the first row of its unit, 
 test('fileData: both semesters of the year in one file — «1-2» in «Сведения», the semester of every row in the plan', () => {   // R2
   const half = (semester, planSemester, rows, over = {}) => ({ semester, subject: { name: 'Информатика', teacherName: 'Teacher One', course: 1 },
     semesters: [{ semester: 1, planSemester: 1 }, { semester: 2, planSemester: 2 }],
-    syllabus: { planSemester, audience: 'Сестринское дело', credits: 4, totalHours: 20, classHours: 12, selfHours: 8, rows, ...over } });
+    syllabus: { planSemester, audience: 'Сестринское дело', credits: 4, totalHours: 10, classHours: 8, selfHours: 2, rows, ...over } });
   const autumn = half(1, 1, SAMPLE.rows.slice(0, 2));
   const spring = half(2, 2, [{ ...blankRow, kind: 'topic', name: 'Таблицы', lectureHours: 2, practiceHours: 2 }]);
   // shown from either semester, the file is the same: the autumn rows first
   for (const [view, other] of [[autumn, spring], [spring, autumn]]) {
     const data = fileData(view, other);
     assert.deepEqual([data.info.semester, data.rows.map((r) => [r.semester, r.name])], ['1-2', [[1, 'Введение'], [1, 'Введение'], [2, 'Таблицы']]]);
-    assert.deepEqual([data.info.audience, data.info.credits, data.info.classHours], ['Сестринское дело', 4, 12]);
+    assert.deepEqual([data.info.audience, data.info.credits, data.info.classHours], ['Сестринское дело', 4, 8]);
     const back = parseSyllabus(reread(syllabusBook(XLSX, labels, data)).sheets);
     assert.deepEqual([back.errors, back.doc.info.semester, back.doc.rows.map((r) => r.semester)], [[], null, [1, 1, 2]]);
   }
-  // halves uploaded from two files: the numbers of the year are their sums
-  const apart = fileData(autumn, half(2, 2, spring.syllabus.rows, { credits: 2, totalHours: 10, classHours: 4, selfHours: 6 }));
-  assert.deepEqual([apart.info.credits, apart.info.totalHours, apart.info.classHours, apart.info.selfHours], [6, 30, 16, 14]);
+  // one «Сведения» sheet must hold what both semesters store (N1): other numbers, another specialty, or numbers the plan
+  // of the year does not add up to — only the semester shown, as one semester's file
+  for (const over of [{ credits: 2, totalHours: 10, classHours: 4, selfHours: 6 }, { audience: 'Лечебное дело' }, { credits: 3 }]) {
+    const apart = fileData(autumn, half(2, 2, spring.syllabus.rows, over));
+    assert.deepEqual([apart.info.semester, apart.info.credits, apart.info.classHours, apart.rows.length], [1, 4, 8, 2], JSON.stringify(over));
+  }
+  const notYear = { classHours: 4 };                                                       // each half alone, not the year (8)
+  assert.deepEqual(fileData(half(1, 1, autumn.syllabus.rows, notYear), half(2, 2, spring.syllabus.rows, notYear)).info.semester, 1);
+  const noSelfYear = { selfHours: 1 };                                                     // the plan of the year has 2 of СРС
+  assert.deepEqual(fileData(half(1, 1, autumn.syllabus.rows, noSelfYear), half(2, 2, spring.syllabus.rows, noSelfYear)).info.semester, 1);
+  // numbers left empty in both halves say nothing to check
+  const blankNumbers = { credits: null, totalHours: null, classHours: null, selfHours: null };
+  assert.deepEqual(fileData(half(1, 1, autumn.syllabus.rows, blankNumbers), half(2, 2, spring.syllabus.rows, blankNumbers)).info.semester, '1-2');
   // semesters of two academic years (1 and 4) cannot stand in one file: only the semester shown
   const far = fileData(autumn, half(2, 4, spring.syllabus.rows));
   assert.deepEqual([far.info.semester, far.rows.length], [1, 2]);
@@ -199,6 +209,36 @@ test('round trip through the site: download → upload unchanged changes nothing
   const back = send('syllabus.preview', sb1, downloaded(), dean).data;
   assert.deepEqual([back.ok, back.warnings, unchanged(back)], [true, [], [[1, true, 0, 0, 0], [2, true, 0, 0, 0]]]);
   assert.equal(call('syllabus.get', { subjectId: sb1, semester: 1 }, dean).data.syllabus.rows[2].unitTitle, 'Сети');
+});
+
+test('two halves uploaded from two files: the download changes nothing stored and says nothing new (N1)', () => {
+  const info = (semester, credits, total, classHours, self) => [['Дисциплина', 'Информатика'], ['Курс', 1], ['Семестр', semester], ['Специальность', 'Сестринское дело'],
+    ['Кредиты', credits], ['Всего часов', total], ['Аудиторных часов', classHours], ['СРС, часов', self]];
+  const HEAD = ['Юнит', 'Название юнита', '№', 'Тема', 'Лекция, ч', 'Практика, ч', 'Вид занятия', 'СРС, ч', 'Описание'];
+  const plan = (topic) => [HEAD, [1, 'Основы', '1.1', topic, 2, 2, '', 2, ''], [1, '', '', 'Модуль 1', '', '', 'модуль', '', '']];   // 4 classroom hours, 2 of СРС
+  for (const [label, autumn, spring, yearFile] of [
+    ['different numbers', info(1, 2, 10, 6, 4), info(2, 3, 12, 6, 6), false],
+    ['identical numbers the year does not add up to', info(1, 2, 10, 4, 6), info(2, 2, 10, 4, 6), false],
+    ['identical numbers of the whole year', info(1, 2, 12, 8, 4), info(2, 2, 12, 8, 4), true],
+  ]) {
+    const { send, call, dean, sb1 } = setup();
+    const first = send('syllabus.apply', sb1, [{ name: 'Сведения', cells: autumn }, { name: 'Тематический план', cells: plan('Введение') }], dean).data;
+    assert.equal(send('syllabus.apply', sb1, [{ name: 'Сведения', cells: spring }, { name: 'Тематический план', cells: plan('Формулы') }], dean).data.applied, true, label);
+    const get = (semester) => call('syllabus.get', { subjectId: sb1, semester }, dean).data;
+    const stored = () => [1, 2].map((semester) => {
+      const { planSemester, audience, credits, totalHours, classHours, selfHours, rows } = get(semester).syllabus;
+      return { planSemester, audience, credits, totalHours, classHours, selfHours, rows: rows.map((r) => r.name) };
+    });
+    const before = stored();
+    const data = fileData(get(1), get(2));
+    assert.equal(data.info.semester, yearFile ? '1-2' : 1, label);
+    const again = send('syllabus.apply', sb1, reread(syllabusBook(XLSX, labels, data)).sheets.map(({ name, cells }) => ({ name, cells })), dean).data;
+    assert.equal(again.applied, true, label);
+    // no remark the first upload of that semester did not have; nothing added, changed or removed; both semesters stored as before
+    assert.deepEqual(again.warnings.filter((w) => !first.warnings.some((f) => JSON.stringify(f) === JSON.stringify(w))), [], label);
+    assert.deepEqual(again.summaries.map((s) => [s.added, s.changed, s.removed]), again.summaries.map(() => [0, 0, 0]), label);
+    assert.deepEqual(stored(), before, label);
+  }
 });
 
 test('bookSheets: empty rows above the data, an empty sheet, a date on the second sheet, too many sheets', () => {
