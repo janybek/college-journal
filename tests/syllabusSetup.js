@@ -14,7 +14,7 @@ export const M = [1, '', '', '', '', 'модуль', ''];                       
 export const file = (rows, info = INFO) => [{ name: 'Сведения', cells: info }, { name: 'Тематический план', cells: [HEAD, ...rows] }];
 export const A = file([T('Введение', 2, 2), T('Практикум', '', 2), M]);             // lessons: Введение — lecture, practice; Практикум — practice
 export const FIRST = [['Введение', 'lecture', 1], ['Введение', 'practice', 1]];
-export const READS = { subjects: 1, staff: 1, syllabi: 1, topics: 1, pairs: 1, settings: 1 };      // sheets of one upload: each once
+export const READS = { subjects: 1, staff: 1, groups: 1, syllabi: 1, topics: 1, pairs: 1, settings: 1 };      // sheets of one upload: each once
 
 export const S = { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: ['2026-09-07'], bells: DEFAULT_BELLS, semester: 1 };
 

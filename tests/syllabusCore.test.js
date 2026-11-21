@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { NO_LESSON, layoutLessons } from '../core/topics.js';
 import { semesterHalf, syllabusFor, syllabusIndex, subjectScope, syllabusTotals, scheduleFit, planSyllabusUpload } from '../core/syllabus.js';
 
-const blank = { unit: 1, label: '', practiceKind: '', selfHours: null, description: '' };
+const blank = { unit: 1, unitTitle: '', label: '', practiceKind: '', selfHours: null, description: '' };
 const topic = (id, order, lectureHours, practiceHours, syllabusId = 'sy_1') => ({ ...blank, id, syllabusId, order, name: id, lectureHours, practiceHours, kind: 'topic' });
 const control = (id, order, hours = 0) => ({ ...blank, id, syllabusId: 'sy_1', order, name: '', lectureHours: 0, practiceHours: hours, kind: 'control' });
 const L = (topicId, lessonType, part = 1) => ({ topicId, lessonType, part });
@@ -142,4 +142,25 @@ test('planSyllabusUpload: other discipline or teacher in the file, semesters', (
   assert.deepEqual(year.parts.map((p) => [p.semester, p.planSemester, p.toInsert.map((r) => [r.order, r.name]), p.summary.pairs]), [[1, 1, [[1, 'Осень']], 1], [2, 2, [[1, 'Весна']], 1]]);
   const third = planSyllabusUpload(doc([row('Тема', 2, 0, 2, { semester: 3 })], { semester: 3 }), have).parts[0];                     // «3 семестр» — это осенний
   assert.deepEqual([third.semester, third.planSemester, third.syllabus.id, third.syllabus.row.planSemester, third.toRemove], [1, 3, 'sy_1', 3, ['tp_1', 'tp_2', 'tp_3']]);
+});
+
+test('planSyllabusUpload: a file of another curriculum semester over the stored one warns which groups it replaces', () => {   // I3
+  const groups = ['01-1', '02-1'];
+  const third = planSyllabusUpload(doc([row('Тема', 2, 0, 2, { semester: 3 })], { semester: 3 }), { ...have, groups });
+  assert.deepEqual(third.warnings, [{ code: 'semester_replaces', stored: 1, file: 3, groups }]);
+  assert.deepEqual(planSyllabusUpload(doc(base), { ...have, groups }).warnings, []);                              // the same semester again
+  assert.deepEqual(planSyllabusUpload(doc([row('Тема', 2, 0, 2, { semester: 3 })], { semester: 3 }), ctx({ groups })).warnings, []);   // nothing stored yet
+  // a year file: only the half that differs says so
+  const year = planSyllabusUpload(doc([row('Осень', 2, 0, 2, { semester: 3 }), row('Весна', 2, 0, 3, { semester: 4 })], { semester: null }), { ...have, groups });
+  assert.deepEqual(year.warnings, [{ code: 'semester_replaces', stored: 1, file: 3, groups }, { code: 'semester_replaces', stored: 2, file: 4, groups }]);
+  // a stored row without its semester of the curriculum says nothing it cannot know
+  const unknown = { ...have, groups, syllabi: [{ ...syllabi[0], planSemester: null }] };
+  assert.deepEqual(planSyllabusUpload(doc([row('Тема', 2, 0, 2, { semester: 3 })], { semester: 3 }), unknown).warnings, []);
+});
+
+test('planSyllabusUpload: the unit title is a field of the row; a new title is a change', () => {                 // R3
+  const titled = planSyllabusUpload(doc([row('Введение', 2, 2, 2, { unitTitle: 'Основы' }), row('Практикум', 0, 2, 3, { unitTitle: 'Основы' }), mod(4, { unitTitle: 'Основы' })]), have).parts[0];
+  assert.deepEqual(titled.toUpdate, [{ id: 'tp_1', patch: { unitTitle: 'Основы' } }, { id: 'tp_2', patch: { unitTitle: 'Основы' } }, { id: 'tp_3', patch: { unitTitle: 'Основы' } }]);
+  assert.deepEqual([titled.summary.added, titled.summary.changed, titled.summary.removed], [0, 2, 0]);
+  assert.equal(first.parts[0].toInsert[0].unitTitle, '');
 });

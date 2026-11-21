@@ -16,7 +16,9 @@ const SURNAMES = [
   'Asanov', 'Bekov', 'Chynybekov', 'Duishenov', 'Ermekov', 'Isaev', 'Jumabaev', 'Kasymov', 'Mamytov', 'Orozov',
   'Sadykov', 'Toktogulov', 'Usenov',
 ];
-const GROUPS = [{ name: '01-1', course: 1 }, { name: '02-1', course: 2 }, { name: '03-1', course: 3 }];
+// teacher1 teaches «Информатика» in 01-1 and 02-1 by one syllabus of the 1st semester, so both groups are on the 1st course.
+// The student numbers keep their own prefix: S1001…, S2001…, S3001….
+const GROUPS = [{ name: '01-1', course: 1, card: 1 }, { name: '02-1', course: 1, card: 2 }, { name: '03-1', course: 2, card: 3 }];
 const STUDENTS_PER_GROUP = 22;
 const STAFF = [
   { login: 'admin', fullName: 'Admin Demo', roles: 'admin' },
@@ -81,7 +83,7 @@ export function seed(store, platform) {
     const group = store.insert('groups', { name: def.name, course: def.course });
     const students = [];
     for (let i = 0; i < STUDENTS_PER_GROUP; i++) {
-      const cardNo = `S${def.course}${String(i + 1).padStart(3, '0')}`;
+      const cardNo = `S${def.card}${String(i + 1).padStart(3, '0')}`;
       const number = g * STUDENTS_PER_GROUP + i;
       students.push({
         fullName: `${SURNAMES[(number * 5 + g) % SURNAMES.length]} ${GIVEN[number % GIVEN.length]}`,

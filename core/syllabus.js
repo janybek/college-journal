@@ -77,7 +77,7 @@ export function scheduleFit(rows, pairs, settings, skip = 0) {
 const norm = (text) => String(text ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
 const text = (v) => (v === null || v === undefined ? '' : String(v));
 const num = (v) => (v === null || v === undefined || v === '' ? null : Number(v));
-const ROW_FIELDS = ['unit', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description'];
+const ROW_FIELDS = ['unit', 'unitTitle', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description'];
 const NUMERIC = new Set(['unit', 'lectureHours', 'practiceHours', 'selfHours']);
 const same = (field, a, b) => (NUMERIC.has(field) ? num(a) === num(b) : text(a) === text(b));
 const HELD_FIELD = { lecture: 'lectureHours', practice: 'practiceHours', control: 'practiceHours' };
@@ -86,6 +86,12 @@ function planPart(half, fileRows, ctx, errors, warnings) {
   const { today } = ctx;
   const syllabus = (ctx.syllabi || []).find((s) => s.semester === half && s.disciplineId === ctx.discipline.id && s.teacherId === ctx.teacher.id) || null;
   const stored = syllabus ? (ctx.topics || []).filter((t) => t.syllabusId === syllabus.id).sort((a, b) => a.order - b.order) : [];
+  const planSemester = fileRows[0].semester;
+  // Another semester of the curriculum in the same half of the year replaces the stored one in every group: the window says so.
+  const storedPlan = syllabus ? Number(syllabus.planSemester) || 0 : 0;
+  if (storedPlan > 0 && storedPlan !== planSemester) {
+    warnings.push({ code: 'semester_replaces', stored: storedPlan, file: planSemester, groups: ctx.groups || [] });
+  }
   const storedIds = new Set(stored.map((t) => t.id));
   const held = new Map();                                              // topic id -> held pairs by date
   for (const p of ctx.pairs || []) {
@@ -143,7 +149,7 @@ function planPart(half, fileRows, ctx, errors, warnings) {
   let toRemove = [];
   for (const r of file) {
     const t = match.get(r.place);
-    const wanted = { order: r.place, unit: r.unit, label: r.label, name: r.name, lectureHours: r.lectureHours, practiceHours: r.practiceHours, practiceKind: r.practiceKind, selfHours: r.selfHours, description: r.description };
+    const wanted = { order: r.place, unit: r.unit, unitTitle: r.unitTitle ?? '', label: r.label, name: r.name, lectureHours: r.lectureHours, practiceHours: r.practiceHours, practiceKind: r.practiceKind, selfHours: r.selfHours, description: r.description };
     if (!t) {
       toInsert.push({ syllabusId: syllabus ? syllabus.id : null, ...wanted, kind: r.kind });
       continue;
@@ -156,7 +162,6 @@ function planPart(half, fileRows, ctx, errors, warnings) {
 
   const kindOf = new Map(stored.map((t) => [t.id, t.kind]));
   const totals = syllabusTotals(file.map((r) => ({ id: 'r' + r.place, order: r.place, ...r })));
-  const planSemester = fileRows[0].semester;
   const info = ctx.doc.info;
   return {
     semester: half, planSemester,
@@ -176,8 +181,9 @@ function planPart(half, fileRows, ctx, errors, warnings) {
   };
 }
 
-// doc comes from parseSyllabus. syllabi and topics are those of this discipline and teacher; pairs — of any group.
-export function planSyllabusUpload(doc, { discipline, teacher, syllabi, topics, pairs, today }) {
+// doc comes from parseSyllabus. syllabi and topics are those of this discipline and teacher; pairs — of any group;
+// groups — the names of the groups the teacher teaches the discipline in (for the remark that a file replaces another semester).
+export function planSyllabusUpload(doc, { discipline, teacher, syllabi, topics, pairs, today, groups = [] }) {
   const errors = [];
   const warnings = [];
   const { info } = doc;
@@ -195,7 +201,7 @@ export function planSyllabusUpload(doc, { discipline, teacher, syllabi, topics, 
     if (!byHalf.has(half)) byHalf.set(half, []);
     byHalf.get(half).push(r);
   }
-  const ctx = { doc, discipline, teacher, syllabi, topics, pairs, today };
+  const ctx = { doc, discipline, teacher, syllabi, topics, pairs, today, groups };
   const parts = [...byHalf.keys()].sort((a, b) => a - b).map((half) => planPart(half, byHalf.get(half), ctx, errors, warnings));
   // All or nothing: one error anywhere empties every part.
   if (errors.length) {

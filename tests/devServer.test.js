@@ -153,6 +153,9 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   assert.deepEqual(store.list('subjects').map((s) => `${s.name}:${groupName.get(s.groupId)}:${staffLogin.get(s.teacherId)}`).sort(),
     ['Анатомия:01-1:teacher2', 'Анатомия:02-1:teacher2', 'Анатомия:03-1:teacher2',
       'Информатика:01-1:teacher1', 'Информатика:02-1:teacher1', 'Информатика:03-1:teacher3']);
+  // one syllabus of the 1st semester serves both groups of teacher1, so both are on the 1st course (M6); the student numbers keep their prefixes
+  assert.deepEqual(store.list('groups').map((g) => [g.name, g.course, store.list('students').find((s) => s.groupId === g.id).cardNo]),
+    [['01-1', 1, 'S1001'], ['02-1', 1, 'S2001'], ['03-1', 2, 'S3001']]);
   assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('disciplines').length, store.list('syllabi').length,
     store.list('topics').length, store.list('pairs').length], [6, 9, 2, 2, 17, 159]);
   const groupByName = new Map(store.list('groups').map((g) => [g.name, g.id]));

@@ -28,8 +28,8 @@ test('the sample file is read whole and without warnings', () => {
   assert.deepEqual(ok.found, { info: 'Сведения', plan: 'Тематический план' });
   assert.deepEqual(ok.doc.info, { discipline: 'Информатика', teacher: 'Teacher One', semester: 1, audience: 'Сестринское дело', credits: 2, totalHours: 60, classHours: 36, selfHours: 24 });
   assert.deepEqual(ok.doc.rows.map((r) => (r.kind === 'control' ? 'M' + r.unit : r.label)), ['1.1', '1.2', '1.3', '1.4', '1.5', 'M1', '2.1', '2.2', '2.3', '2.4', '2.5', 'M2']);
-  assert.deepEqual(ok.doc.rows[2], { kind: 'topic', semester: 1, unit: 1, label: '1.3', name: NAMES[2], lectureHours: 2, practiceHours: 2, practiceKind: 'seminar', selfHours: 2, description: 'Описание 3', row: 4 });
-  assert.deepEqual(ok.doc.rows[5], { kind: 'control', semester: 1, unit: 1, label: '', name: 'Модуль 1 (рубежный контроль)', lectureHours: 0, practiceHours: 0, practiceKind: '', selfHours: null, description: '', row: 7 });
+  assert.deepEqual(ok.doc.rows[2], { kind: 'topic', semester: 1, unit: 1, unitTitle: '', label: '1.3', name: NAMES[2], lectureHours: 2, practiceHours: 2, practiceKind: 'seminar', selfHours: 2, description: 'Описание 3', row: 4 });
+  assert.deepEqual(ok.doc.rows[5], { kind: 'control', semester: 1, unit: 1, unitTitle: '', label: '', name: 'Модуль 1 (рубежный контроль)', lectureHours: 0, practiceHours: 0, practiceKind: '', selfHours: null, description: '', row: 7 });
   assert.deepEqual([ok.doc.rows[7].practiceKind, ok.doc.rows[9].description], ['lab', '']);
   const sum = (key) => ok.doc.rows.reduce((n, r) => n + (r[key] ?? 0), 0);
   assert.deepEqual([sum('lectureHours'), sum('practiceHours'), sum('selfHours')], [20, 16, 24]);
@@ -74,7 +74,7 @@ test('errors of plan rows', () => {
   assert.deepEqual(codes(one([[1, '', 'А', 0, '0', '']])), [['plan', 2, 'lectureHours', 'no_hours']]);
   assert.deepEqual(codes(one([[1, '', '', 2, '', '']])), [['plan', 2, 'name', 'required']]);
   assert.deepEqual(codes(one([[1, '', 'А', 2, '', 'коллоквиум']])), [['plan', 2, 'practiceKind', 'bad_value']]);
-  assert.deepEqual(codes(one([[1, '', 'А', 2, '', 'семинар']])), [['plan', 2, 'practiceKind', 'bad_value']]);
+  assert.deepEqual(codes(one([[1, '', 'А', 2, '', 'семинар']])), [['plan', 2, 'practiceKind', 'kind_needs_practice']]);
   assert.deepEqual(codes(one([[1, '', 'А', 2, '', ''], [1, '', 'Модуль', 2, '', 'модуль']])), [['plan', 3, 'lectureHours', 'bad_value']]);
   assert.deepEqual(codes(one([[2, '', 'А', 2, '', ''], [1, '', 'Б', 2, '', '']])), [['plan', 3, 'unit', 'unit_order']]);
   assert.deepEqual(codes(one([[0, '', 'А', 2, '', ''], [1, 'x'.repeat(21), 'Б', 2, '', ''], [1, '', 'x'.repeat(201), 2, '', ''], [1, '', 'Г', 2.5, 'два', '']])),
@@ -112,7 +112,7 @@ test('warnings: extra columns, numbers that do not add up, unit without a module
 test('titles in three languages and kind words', () => {
   assert.deepEqual(Object.keys(SYLLABUS_SHEETS), ['info', 'plan']);
   assert.deepEqual(INFO_ROWS.map((r) => r.key), ['discipline', 'teacher', 'course', 'semester', 'audience', 'credits', 'totalHours', 'classHours', 'selfHours']);
-  assert.deepEqual(PLAN_COLUMNS.map((c) => c.key), ['semester', 'unit', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description']);
+  assert.deepEqual(PLAN_COLUMNS.map((c) => c.key), ['semester', 'unit', 'unitTitle', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description']);
   assert.deepEqual(PLAN_COLUMNS.filter((c) => c.required).map((c) => c.key), ['name', 'lectureHours', 'practiceHours']);
   for (const item of [...Object.values(SYLLABUS_SHEETS), ...INFO_ROWS, ...PLAN_COLUMNS]) for (const lang of ['ru', 'ky', 'en']) assert.ok((item.titles ?? item)[lang], lang);
   assert.deepEqual([KIND_WORDS['семинар'], KIND_WORDS['лабораторная'], KIND_WORDS['модуль'], KIND_WORDS['рубежный контроль'], KIND_WORDS['практика']], ['seminar', 'lab', 'control', 'control', '']);
@@ -126,7 +126,8 @@ test('a missing semester is reported once when every row lacks it', () => {
   assert.deepEqual(range.errors, [{ sheet: 'plan', row: 2, field: 'semester', code: 'required', count: 50 }]);
   const TWO = ['Семестр', ...SHORT];
   const emptyCol = parseSyllabus(book([['Курс', 1]], [TWO, ...rows50.map((r) => ['', ...r])]));
-  assert.deepEqual(codes(emptyCol), [['plan', 2, 'semester', 'required']]);
+  // the template's «Семестр» column left empty in every row is no semester: the one error points to «Сведения»
+  assert.deepEqual(codes(emptyCol), [['info', 0, 'semester', 'required']]);
   const some = parseSyllabus(book([['Семестр', '1-2']], [TWO, ...rows50.map((r, i) => [i === 9 || i === 19 ? '' : 1, ...r])]));
   assert.deepEqual(codes(some), [['plan', 11, 'semester', 'required'], ['plan', 21, 'semester', 'required']]);
 });
@@ -151,7 +152,7 @@ test('hardening for real files', () => {
   // 4. hour spellings
   for (const spelled of ['2 ч', '2ч', '2 ч.', '2,0', '2.0', ' 2 Ч ']) assert.equal(one([[1, '', 'А', spelled, '', '']]).doc.rows[0].lectureHours, 2, spelled);
   for (const spelled of ['4 ч', '4,0', '4.0']) assert.equal(one([[1, '', 'А', '', spelled, '']]).doc.rows[0].practiceHours, 4, spelled);
-  for (const spelled of ['3', '2,5', 'два', '2 часа', '-2']) assert.deepEqual(codes(one([[1, '', 'А', spelled, '', '']])), [['plan', 2, 'lectureHours', 'bad_hours']], spelled);
+  for (const spelled of ['3', '2,5', 'два', '2 дня', '-2']) assert.deepEqual(codes(one([[1, '', 'А', spelled, '', '']])), [['plan', 2, 'lectureHours', 'bad_hours']], spelled);
   // 5. one error for a missing semester, not one per row
   const lots = Array.from({ length: 50 }, (_, i) => [1, '', 'Т' + i, 2, '', '']);
   assert.deepEqual(codes(parseSyllabus(book([['Курс', 1]], [SHORT, ...lots]))), [['info', 0, 'semester', 'required']]);
@@ -162,4 +163,79 @@ test('hardening for real files', () => {
     assert.deepEqual(codes(r), [['plan', 0, 'semester', 'semester_clash']], pair.join());
   }
   assert.deepEqual(parseSyllabus(book([], [['Семестр', ...SHORT], [3, 1, '', 'А', 2, '', ''], [4, 1, '', 'Б', 2, '', '']])).errors, []);
+});
+
+// ---- Final fix wave: the wording of real syllabi ----
+
+const semesterOf = (value) => parseSyllabus(book([['Семестр', value]], [SHORT, ['', '', 'А', 2, '', '']]));
+const yearOf = (value) => parseSyllabus(book([['Семестр', value]], [['Семестр', ...SHORT], [1, '', '', 'А', 2, '', ''], [2, '', '', 'Б', 2, '', '']]));
+
+test('the semester as real title pages write it: a number followed by words, a range', () => {     // I2
+  for (const [value, n] of [[3, 3], ['3', 3], [' 3 ', 3], ['3 семестр', 3], ['3-семестр', 3], ['3 - семестр', 3], ['3-й', 3], ['3-й семестр', 3], ['3 й семестр', 3],
+    ['4 (Весенний)', 4], ['4 (весенний семестр)', 4], ['1 курс 1 семестр', 1], ['2 курс, 3 семестр', 3], ['1-курс 2-семестр', 2], ['1-семестр', 1], ['Семестр 5', 5], ['5 СЕМЕСТР', 5], ['2nd semester', 2]]) {
+    const r = semesterOf(value);
+    assert.deepEqual([r.errors, r.doc && r.doc.rows[0].semester], [[], n], JSON.stringify(value));
+  }
+  for (const value of ['1-2', '1–2', '1 и 2', '1, 2', '1,2', '3-4 семестр', '1 и 2 семестры']) {
+    const r = yearOf(value);
+    assert.deepEqual([r.errors, r.doc && r.doc.info.semester, r.doc && r.doc.rows.map((row) => row.semester)], [[], null, [1, 2]], JSON.stringify(value));
+  }
+  for (const value of [0, 9, '0', '9 семестр', 'III', 'осенний', '1 курс', '3.5', 2.5, 1.2, 'семестр', '3 семестр 4', '1-9', '3 (весенний', 'два']) {
+    assert.deepEqual(codes(semesterOf(value)), [['info', 1, 'semester', 'bad_value']], JSON.stringify(value));
+  }
+});
+
+test('the semester column of the plan takes the same single forms, not a range', () => {         // I2
+  const column = (value) => parseSyllabus(book([['Кредиты', 2]], [['Семестр', ...SHORT], [value, '', '', 'А', 2, '', '']]));
+  for (const [value, n] of [[1, 1], ['2', 2], ['1 семестр', 1], ['3-й', 3], ['1-семестр', 1], ['4 (весенний)', 4]]) {
+    const r = column(value);
+    assert.deepEqual([r.errors, r.doc && r.doc.rows[0].semester], [[], n], JSON.stringify(value));
+  }
+  for (const value of ['1-2', 'I', 9, 'осень']) assert.deepEqual(codes(column(value)), [['plan', 2, 'semester', 'bad_value']], JSON.stringify(value));
+});
+
+test('«Итого» rows are skipped and named in the remark, not read as a topic', () => {                  // M1
+  const totals = one([[1, '', 'А', 2, 2, ''], [1, '', 'Б', 2, 2, ''], ['', '', 'Итого', 4, 4, '']]);
+  assert.deepEqual(totals.errors, []);
+  assert.deepEqual(totals.doc.rows.map((r) => r.name), ['А', 'Б']);
+  assert.equal(totals.doc.rows.reduce((n, r) => n + (r.lectureHours + r.practiceHours) / HOURS_PER_PAIR, 0), 4);
+  assert.deepEqual(totals.warnings[0], { code: 'ignored', sheet: 'plan', titles: ['Итого'] });
+  for (const word of ['ИТОГО:', ' Всего ', 'Итого  часов', 'Жалпы', 'жыйынтыгы:', 'Total']) {
+    const r = one([[1, '', 'А', 2, '', ''], ['', '', word, 2, '', '']]);
+    assert.deepEqual([r.errors, r.doc.rows.length], [[], 1], word);
+  }
+  // a topic that only starts with the word stays a topic
+  assert.equal(one([[1, '', 'Итоговое тестирование', 2, '', '']]).doc.rows.length, 1);
+});
+
+test('class type: more spellings; an unknown word and a kind without practice hours have their own codes', () => {   // M2
+  for (const [word, kind] of [['Лабораторная работа', 'lab'], ['лабораторное занятие', 'lab'], ['Практическое занятие №2', ''], ['Семинарское занятие', 'seminar'],
+    ['практикалык сабак', ''], ['Лабораториялык иш', 'lab']]) {
+    assert.deepEqual(one([[1, '', 'А', '', 2, word]]).doc.rows[0].practiceKind, kind, word);
+  }
+  for (const word of ['Контрольная работа', 'Итоговое занятие']) assert.equal(one([[1, '', 'А', 2, '', ''], [1, '', 'Тест', '', '', word]]).doc.rows[1].kind, 'control', word);
+  assert.deepEqual(codes(one([[1, '', 'А', '', 2, 'коллоквиум']])), [['plan', 2, 'practiceKind', 'bad_value']]);
+  assert.deepEqual(codes(one([[1, '', 'А', 2, '', 'семинар']])), [['plan', 2, 'practiceKind', 'kind_needs_practice']]);
+});
+
+test('hours written with a word', () => {                                                              // M3
+  for (const spelled of ['2 часа', '2 час.', '2 час', '2 саат', '2 h', '2h', '2 hours', '2 ч.']) assert.equal(one([[1, '', 'А', spelled, '', '']]).doc.rows[0].lectureHours, 2, spelled);
+  for (const spelled of ['4 часа', '4 саат', '4 hours']) assert.equal(one([[1, '', 'А', '', spelled, '']]).doc.rows[0].practiceHours, 4, spelled);
+  for (const spelled of ['3 часа', '2,5 часа', 'два часа', '2 дня']) assert.deepEqual(codes(one([[1, '', 'А', spelled, '', '']])), [['plan', 2, 'lectureHours', 'bad_hours']], spelled);
+});
+
+test('unit titles: the first title of a unit names every row of it; a second one is a remark', () => {   // R3
+  const HEAD_T = ['Юнит', 'Название юнита', 'Тема', 'Лекция, ч', 'Практика, ч'];
+  const r = parseSyllabus(book([['Семестр', 1]], [HEAD_T, [1, 'Техническое и программное обеспечение', 'А', 2, ''], [1, '', 'Б', 2, ''],
+    [2, '', 'В', 2, ''], [2, 'Сети', 'Г', 2, ''], [2, 'Другое', 'Д', 2, ''], [3, '', 'Е', 2, '']]));
+  assert.deepEqual(r.errors, []);
+  assert.deepEqual(r.doc.rows.map((row) => [row.unit, row.unitTitle]),
+    [[1, 'Техническое и программное обеспечение'], [1, 'Техническое и программное обеспечение'], [2, 'Сети'], [2, 'Сети'], [2, 'Сети'], [3, '']]);
+  assert.deepEqual(r.warnings.find((w) => w.code === 'unit_title_differs'), { code: 'unit_title_differs', row: 6, unit: 2, title: 'Сети', other: 'Другое' });
+  // other names of the column, three languages; no column — no titles
+  for (const title of ['Название юнита', 'Юниттин аталышы', 'Unit title', 'Название раздела']) {
+    assert.equal(parseSyllabus(book([['Семестр', 1]], [['Юнит', title, 'Тема', 'Лекция, ч', 'Практика, ч'], [1, 'X', 'А', 2, '']])).doc.rows[0].unitTitle, 'X', title);
+  }
+  assert.equal(one([[1, '', 'А', 2, '', '']]).doc.rows[0].unitTitle, '');
+  assert.deepEqual(codes(parseSyllabus(book([['Семестр', 1]], [HEAD_T, [1, 'x'.repeat(201), 'А', 2, '']]))), [['plan', 2, 'unitTitle', 'too_long']]);
 });

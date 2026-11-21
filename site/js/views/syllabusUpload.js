@@ -5,7 +5,7 @@ import { el, errorKey, hasText, modal, showModal, note, markBusy, focusById, ref
 import { icon } from '../icons.js';
 import { loadXlsx } from '../xlsxLoader.js';
 import { bookSheets, syllabusBook, READ_OPTIONS } from '../excel.js';
-import { fileLabels, fileData, renamedHint } from '../syllabus.js';
+import { fileLabels, fileData, fileName, renamedHint } from '../syllabus.js';
 import { dayMonth } from './pairParts.js';
 
 // The Excel file of a syllabus, for the screens that show one (the syllabus page; «Предметы» of the deanery):
@@ -19,7 +19,7 @@ import { dayMonth } from './pairParts.js';
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_ERRORS_SHOWN = 200;
 const RETRYABLE = ['network', 'internal'];
-const HELP = [['order', 'layers'], ['hours', 'clock'], ['control', 'checkCircle'], ['columns', 'grid'], ['self', 'book']];
+const HELP = [['order', 'layers'], ['hours', 'clock'], ['semester', 'calendar'], ['control', 'checkCircle'], ['columns', 'grid'], ['self', 'book']];
 
 const blank = () => ({
   check: null,             // the open check window, see readFile
@@ -64,7 +64,7 @@ export function uploadControls(view, onDone) {
     helpPanel());
 }
 
-// «Как заполнить шаблон»: five rules, each beside the sign of what it is about.
+// «Как заполнить шаблон»: six rules, each beside the sign of what it is about.
 function helpPanel() {
   return el('section', { class: 'syllabus-help', id: 'syllabus-help', hidden: !state.helpOpen, 'aria-labelledby': 'syllabus-help-toggle' },
     el('ul', { class: 'syllabus-help__list' }, HELP.map(([key, iconName]) => el('li', { class: 'syllabus-help__item' },
@@ -86,7 +86,19 @@ async function download(view) {
     refresh();
     return;
   }
-  XLSX.writeFile(syllabusBook(XLSX, fileLabels(t), fileData(view)), view.syllabus === null ? 'syllabus-template.xlsx' : 'syllabus.xlsx');
+  // Both semesters of the year are stored: the file holds the whole syllabus, so the other semester is read too.
+  let other = null;
+  if (view.syllabus !== null && view.semesters.length === 2) {
+    try {
+      other = await call('syllabus.get', { subjectId: view.subject.id, semester: view.semester === 1 ? 2 : 1 });
+    } catch (error) {
+      state.downloadErrorKey = errorKey(error.code);
+      refresh();
+      return;
+    }
+  }
+  const name = view.syllabus === null ? 'syllabus-template.xlsx' : fileName([t('syllabus.title'), view.subject.name, view.subject.teacherName]);
+  XLSX.writeFile(syllabusBook(XLSX, fileLabels(t), fileData(view, other)), name);
   if (state.downloadErrorKey) {
     state.downloadErrorKey = null;
     refresh();
@@ -229,7 +241,7 @@ function checkDialog(check) {
     check.phase === 'checking' ? el('p', { class: 'loading', role: 'status' }, t('import.check.busy')) : null,
     check.fileError ? note('error', t(check.fileError.key, check.fileError.params), { role: 'alert' }) : null,
     answer && ready ? summaries(answer.summaries) : null,
-    answer ? warnings(answer) : null,
+    answer ? warnings(answer, check.sheets) : null,
     answer ? errors(answer, check.sheets) : null,
     check.messageKey ? note('error', t(check.messageKey), { role: 'alert' }) : null,
     failed ? el('p', { class: 'check-failed' }, icon('alert', 'check-failed__icon'), el('span', {}, t('syllabus.check.failed'))) : null,
@@ -268,7 +280,7 @@ function summaries(list) {
   renamed ? el('p', { class: 'check-renamed' }, icon('info', 'check-renamed__icon'), el('span', {}, t('syllabus.check.renamed'))) : null];
 }
 
-function warnings(answer) {
+function warnings(answer, sheets) {
   if (answer.warnings.length === 0) return null;
   return el('section', { class: 'check-group check-group--warning', 'aria-labelledby': 'syllabus-check-warnings' },
     el('h3', { class: 'check-group__title', id: 'syllabus-check-warnings' },
@@ -279,7 +291,7 @@ function warnings(answer) {
       el('p', {},
         warning.sheet ? el('span', { class: 'check-list__where' }, t('syllabus.whereSheet', { sheet: sheetName(answer, warning.sheet) })) : null,
         warning.sheet ? ' ' : null,
-        warningText(warning))))));
+        warningText(warning, (row) => excelRow(answer, sheets, 'plan', row)))))));
 }
 
 function errors(answer, sheets) {
@@ -306,29 +318,41 @@ function fieldName(sheet, field) {
   return hasText(key) ? t(key) : field;
 }
 
-// «Лист «…», строка N, «…»:» with the row Excel shows: the empty rows above the sheet's data are added back.
+// The row Excel shows for a row of the server: the empty rows above the sheet's data are added back.
+function excelRow(answer, sheets, sheet, row) {
+  const read = (sheets || []).find((s) => s.name === sheetName(answer, sheet));
+  return row + (read ? read.firstRow : 0);
+}
+
+// «Лист «…», строка N, «…»:» with the row Excel shows.
 function where(answer, sheets, error) {
   const sheet = sheetName(answer, error.sheet);
   if (error.row > 0) {
-    const read = (sheets || []).find((s) => s.name === sheet);
-    const row = error.row + (read ? read.firstRow : 0);
+    const row = excelRow(answer, sheets, error.sheet, error.row);
     return error.field ? t('syllabus.where', { sheet, row, column: fieldName(error.sheet, error.field) }) : t('syllabus.whereSheet', { sheet });
   }
   return error.field ? t('syllabus.whereColumn', { sheet, column: fieldName(error.sheet, error.field) }) : t('syllabus.whereSheet', { sheet });
 }
 
+// The text of an error: the most particular one there is — of this sheet and column, of this column, of the code.
 function errorText(error) {
-  const key = 'syllabus.error.' + error.code;
-  if (!hasText(key)) return t(errorKey(error.code));
+  const key = [`syllabus.error.${error.sheet}.${error.field}.${error.code}`, `syllabus.error.${error.field}.${error.code}`, 'syllabus.error.' + error.code]
+    .find((candidate) => !candidate.includes('..') && hasText(candidate));
+  if (!key) return t(errorKey(error.code));
   return t(key, { name: error.name, date: error.date ? dayMonth(error.date) : '', held: error.held });
 }
 
 const joined = (list) => (Array.isArray(list) ? list.join(', ') : '');
 
-function warningText(warning) {
+// rowOf(n): the row Excel shows for row n of the plan.
+function warningText(warning, rowOf) {
   const key = 'syllabus.warning.' + warning.code;
   if (!hasText(key)) return warning.code;
   switch (warning.code) {
+    case 'semester_replaces':
+      return t(key, { stored: warning.stored, file: warning.file, groups: joined(warning.groups) });
+    case 'unit_title_differs':
+      return t(key, { row: rowOf(warning.row), unit: warning.unit, title: warning.title, other: warning.other });
     case 'ignored_sheets':
     case 'ignored':
       return t(key, { titles: joined(warning.titles) });

@@ -237,11 +237,25 @@ test('sheetsStore: updateMany and removeMany run under the lock', () => {
   assert.equal(locked, 2);
 });
 
+test('a Topics sheet of the first syllabus version gets the unit title at its end; setup loses nothing and runs again safely', () => {   // R3
+  const platform = createNodePlatform({ now: () => 1_000_000, secret: 'test-secret' });
+  const before = SCHEMA.topics.columns.filter((c) => c.key !== 'unitTitle').map((c) => c.title);
+  const row = ['tp_1', 'sy_1', 1, 2, '1.1', 'Введение', 2, 2, 'seminar', 4, 'Описание', 'topic'];
+  const live = createFakeSpreadsheet({ 'Темы': [before, row] });
+  assert.deepEqual(ensureSheets(SCHEMA, live).addedColumns, ['Темы.название юнита']);
+  assert.deepEqual(live.dump('Темы')[1].slice(0, row.length), row);
+  const stored = createSheetsStore(SCHEMA, platform, live).list('topics')[0];
+  assert.deepEqual([stored.id, stored.unit, stored.name, stored.practiceKind, stored.unitTitle], ['tp_1', 2, 'Введение', 'seminar', '']);
+  assert.deepEqual(ensureSheets(SCHEMA, live).addedColumns, []);
+  createSheetsStore(SCHEMA, platform, live).updateMany('topics', [{ id: 'tp_1', patch: { unitTitle: 'Основы' } }]);
+  assert.deepEqual(createSheetsStore(SCHEMA, platform, live).list('topics')[0].unitTitle, 'Основы');
+});
+
 test('a Topics sheet made before the syllabus columns gets them; the old columns are not read', () => {
   const platform = createNodePlatform({ now: () => 1_000_000, secret: 'test-secret' });
   const old = createFakeSpreadsheet({ 'Темы': [['id', 'предмет', 'юнит', '№ по порядку', 'название', 'тип пары', 'семестр'], ['tp_1', 'sb_1', 1, 1, 'Введение', 'lecture', 1]] });
   assert.deepEqual(ensureSheets(SCHEMA, old).addedColumns,
-    ['Темы.силлабус', 'Темы.№ в силлабусе', 'Темы.лекция, ч', 'Темы.практика, ч', 'Темы.вид практики', 'Темы.СРС, ч', 'Темы.описание', 'Темы.вид строки']);
+    ['Темы.силлабус', 'Темы.№ в силлабусе', 'Темы.лекция, ч', 'Темы.практика, ч', 'Темы.вид практики', 'Темы.СРС, ч', 'Темы.описание', 'Темы.вид строки', 'Темы.название юнита']);
   const row = createSheetsStore(SCHEMA, platform, old).list('topics')[0];
   assert.deepEqual([row.id, row.name, row.order, row.syllabusId, row.lectureHours, 'subjectId' in row, 'semester' in row], ['tp_1', 'Введение', 1, '', null, false, false]);
 });

@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref, topicText, lessonTypeKey, lessonParts, controlLine,
-  weekRows, gridDays, cellPairs, ownTime,
+  weekRows, gridDays, cellPairs, ownTime, hyphenate,
 } from '../site/js/pairs.js';
 import { pairLock } from '../core/schedule.js';
 import { SCHEMA } from '../core/schema.js';
@@ -141,4 +141,17 @@ test('gridDays: Monday to Friday always, Saturday and Sunday only with a pair', 
 test('ownTime: the time of a pair differs from the time of its row', () => {
   assert.deepEqual([ownTime(week[2], weekRows(week)[1]), ownTime(week[0], weekRows(week)[1])], [true, false]);
   assert.equal(ownTime(P('f', '2026-11-19', 2, '09:40', '11:15'), weekRows(week)[1]), true);
+});
+
+test('hyphenate: long words of a subject get soft hyphens between syllables, so a narrow grid card breaks them properly (T30)', () => {
+  const shown = (text) => hyphenate(text).split('\u00AD').join('-');
+  assert.equal(shown('Предпринимательство и менеджмент в здравоохранении'), 'Пред-при-ни-ма-тель-ство и ме-нед-жмент в здра-во-ох-ра-не-нии');
+  assert.equal(shown('Информационное обеспечение профессиональной деятельности'), 'Ин-фор-ма-ци-он-ное обес-пе-че-ние про-фес-си-ональ-ной де-ятель-нос-ти');
+  // short words, digits and signs stay as they are; the text without the soft hyphens is the name itself
+  for (const name of ['Анатомия', 'Сүйлөө маданияты', 'ИКТ-2', '«Умные» гаджеты', '']) assert.equal(hyphenate(name).split('\u00AD').join(''), name);
+  assert.equal(hyphenate('Химия 1.2'), 'Химия 1.2');
+  // no piece shorter than two letters
+  for (const word of hyphenate('Электрокардиография Фармакология Communication').split(' ')) {
+    for (const piece of word.split('\u00AD')) assert.ok(piece.length >= 2, word);
+  }
 });

@@ -1761,7 +1761,7 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   .pair.is-fresh { animation: fresh-lesson 2.4s ease-out both; }
 }
 
-/* The week as a grid (a staff window from 1100 px): the pair numbers down the left with their time, written once,
+/* The week as a grid (a staff window from 1200 px): the pair numbers down the left with their time, written once,
    the days across under a head like the template board's; today's column is washed in the accent. A cell holds
    short cards; the whole pair is in its window. Keep the width in step with GRID_FROM in views/pairParts.js. */
 .week-grid {
@@ -1776,7 +1776,7 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   table-layout: fixed;
 }
 
-/* Narrow enough to leave the days room for «Понедельник» even with a Saturday column at 1100 px. */
+/* Narrow enough to leave the days room for «Понедельник» even with a Saturday column at 1200 px. */
 .grid__slot-col { width: 6rem; }
 
 .grid th,
@@ -1877,8 +1877,9 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
 
 .grid__pairs > li { display: grid; }
 
-/* The short card: the subject on up to two lines, then one line each for who and where and for the lesson, then the
-   marks. Lines that do not fit end in an ellipsis; the window has them in full. */
+/* The short card: the subject on up to three lines, then one line each for who and where and for the lesson, then the
+   marks. Lines that do not fit end in an ellipsis; the window has them in full. The subject breaks between words; a word
+   longer than the card («Предпринимательство» in a narrow column) breaks at a soft hyphen (hyphenate in pairs.js). */
 .pair--brief {
   gap: 0.1875rem;
   min-width: 0;
@@ -1896,9 +1897,10 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   display: -webkit-box;
   overflow: hidden;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 3;
   font-size: 0.875rem;
   line-height: 1.25;
+  overflow-wrap: break-word;
   hyphens: auto;
 }
 
@@ -2537,6 +2539,15 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   font-weight: 700;
   letter-spacing: 0.06em;
   text-transform: uppercase;
+}
+
+/* A unit with a title reads as a line of text, not as a label: «Юнит 1. Техническое и программное обеспечение». */
+.plan-unit__head th.has-title {
+  color: var(--text);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
 }
 
 .plan-unit + .plan-unit .plan-unit__head th { border-top: 1px solid var(--border-strong); }

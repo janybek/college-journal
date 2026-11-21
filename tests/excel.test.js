@@ -4,6 +4,7 @@ import XLSX from 'xlsx';
 import { TEMPLATE_ROWS, MAX_BOOK_SHEETS, templateSheet, findDateCell, bookSheets, syllabusBook, READ_OPTIONS } from '../site/js/excel.js';
 import { fileLabels, fileData } from '../site/js/syllabus.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
+import { setup } from './syllabusSetup.js';
 import ru from '../site/js/i18n/ru.js';
 import ky from '../site/js/i18n/ky.js';
 import en from '../site/js/i18n/en.js';
@@ -81,7 +82,7 @@ test('syllabusBook: the file «Скачать (Excel)» gives is read back by th
   assert.deepEqual(parsed.errors, []);
   // «№» 1.10 stays text, the line break of the description is in place
   assert.deepEqual(parsed.doc.rows.map(({ row, semester, ...rest }) => rest),
-    SAMPLE.rows.map((r) => ({ kind: r.kind, unit: r.unit, label: r.label, name: r.name, lectureHours: r.lectureHours ?? 0, practiceHours: r.practiceHours ?? 0, practiceKind: r.practiceKind, selfHours: r.selfHours, description: r.description })));
+    SAMPLE.rows.map((r) => ({ kind: r.kind, unit: r.unit, unitTitle: '', label: r.label, name: r.name, lectureHours: r.lectureHours ?? 0, practiceHours: r.practiceHours ?? 0, practiceKind: r.practiceKind, selfHours: r.selfHours, description: r.description })));
   assert.deepEqual(parsed.doc.info, { discipline: 'Информатика', teacher: 'Teacher One', semester: 1, audience: 'Сестринское дело', credits: 2, totalHours: 6, classHours: 6, selfHours: 0 });
   // СРС of zero is a number on the page («zero is a number too»), so it stays a zero, not an empty cell
   const zero = parseSyllabus(reread(syllabusBook(XLSX, labels, { ...SAMPLE, rows: [{ ...SAMPLE.rows[0], selfHours: 0 }] })).sheets);
@@ -91,7 +92,7 @@ test('syllabusBook: the file «Скачать (Excel)» gives is read back by th
 test('syllabusBook: the blank template has two sheets, the discipline and the teacher filled in, no topics and no semester yet', () => {
   const blank = reread(syllabusBook(XLSX, labels, { info: { discipline: 'Информатика', teacher: 'Teacher One', course: 1 }, rows: [] }));
   assert.deepEqual(blank.sheets.map((s) => s.name), ['Сведения', 'Тематический план']);
-  assert.deepEqual(blank.sheets[0].cells.slice(0, 4), [['Дисциплина', 'Информатика'], ['Преподаватель', 'Teacher One'], ['Курс', 1], ['Семестр', '']]);
+  assert.deepEqual(blank.sheets[0].cells.slice(0, 4), [['Дисциплина', 'Информатика'], ['Преподаватель', 'Teacher One'], ['Курс', '1'], ['Семестр', '']]);
   assert.deepEqual(blank.sheets[1].cells.length, 1);                                  // only the titles: the empty text rows of the template are dropped
   // the parser asks for the semester (one error on «Сведения») and for the topics
   assert.deepEqual(parseSyllabus(blank.sheets).errors.map((e) => [e.sheet, e.code]), [['info', 'required'], ['plan', 'empty']]);
@@ -122,19 +123,82 @@ test('fileData: «Скачать (Excel)» writes the semester of the curriculum
 test('syllabusBook: the text columns are Text-formatted for TEMPLATE_ROWS rows, the hours are not', () => {
   const planSheet = syllabusBook(XLSX, labels, null).Sheets['Тематический план'];
   const titles = XLSX.utils.sheet_to_json(planSheet, { header: 1 })[0];
-  assert.deepEqual(titles, ['Юнит', '№', 'Тема', 'Лекция, ч (1 пара = 2 ч)', 'Практика, ч (1 пара = 2 ч)', 'Вид занятия', 'СРС, ч', 'Описание']);
+  // «Название юнита» beside «Юнит»; «Семестр» (only for a course of two semesters) just before «Описание» (R2, R3)
+  assert.deepEqual(titles, ['Юнит', 'Название юнита', '№', 'Тема', 'Лекция, ч (1 пара = 2 ч)', 'Практика, ч (1 пара = 2 ч)', 'Вид занятия', 'СРС, ч', 'Семестр', 'Описание']);
   const formatOf = (title) => planSheet[XLSX.utils.encode_cell({ r: TEMPLATE_ROWS, c: titles.indexOf(title) })]?.z;
-  assert.deepEqual(['№', 'Тема', 'Вид занятия', 'Описание', 'Юнит', 'СРС, ч'].map(formatOf), ['@', '@', '@', '@', undefined, undefined]);
-  // «Сведения»: the values of the discipline, the teacher and the specialty are text, the numbers are not
+  assert.deepEqual(['Название юнита', '№', 'Тема', 'Вид занятия', 'Описание', 'Юнит', 'СРС, ч', 'Семестр'].map(formatOf), ['@', '@', '@', '@', '@', undefined, undefined, undefined]);
+  // «Сведения»: the discipline, the teacher, the course, the semester and the specialty are text: «1-2» typed into the
+  // semester does not become a date, «1,2» not a fraction (R1); the numbers of hours are not text
   const infoSheet = syllabusBook(XLSX, labels, null).Sheets['Сведения'];
-  assert.deepEqual(['B1', 'B2', 'B3', 'B4', 'B5', 'B6'].map((ref) => infoSheet[ref]?.z), ['@', '@', undefined, undefined, '@', undefined]);
+  assert.deepEqual(['B1', 'B2', 'B3', 'B4', 'B5', 'B6'].map((ref) => infoSheet[ref]?.z), ['@', '@', '@', '@', '@', undefined]);
   // the written rows: hours of zero are an empty cell, the kind is the word of the dictionary
   const filled = syllabusBook(XLSX, labels, SAMPLE).Sheets['Тематический план'];
   assert.deepEqual(XLSX.utils.sheet_to_json(filled, { header: 1, defval: '' }).slice(1, 5), [
-    [1, '1.10', 'Введение', 2, '', '', 2, 'Первая строка\nвторая строка'],
-    [1, '', 'Введение', '', 2, 'семинар', '', ''],
-    [1, '', '', '', '', 'модуль', '', ''],
-    [2, '', 'Экзамен', '', 2, 'модуль', '', '']]);
+    [1, '', '1.10', 'Введение', 2, '', '', 2, '', 'Первая строка\nвторая строка'],
+    [1, '', '', 'Введение', '', 2, 'семинар', '', '', ''],
+    [1, '', '', '', '', '', 'модуль', '', '', ''],
+    [2, '', '', 'Экзамен', '', 2, 'модуль', '', '', '']]);
+});
+
+test('syllabusBook: a unit title is written once, on the first row of its unit, and read back on every row of it', () => {   // R3
+  const titled = { ...SAMPLE, rows: SAMPLE.rows.map((r) => ({ ...r, unitTitle: r.unit === 1 ? 'Техническое и программное обеспечение' : '' })) };
+  const plan = XLSX.utils.sheet_to_json(syllabusBook(XLSX, labels, titled).Sheets['Тематический план'], { header: 1, defval: '' });
+  assert.deepEqual(plan.slice(1, 5).map((row) => row[1]), ['Техническое и программное обеспечение', '', '', '']);
+  const back = parseSyllabus(reread(syllabusBook(XLSX, labels, titled)).sheets);
+  assert.deepEqual([back.errors, back.doc.rows.map((r) => r.unitTitle)], [[], ['Техническое и программное обеспечение', 'Техническое и программное обеспечение', 'Техническое и программное обеспечение', '']]);
+});
+
+test('fileData: both semesters of the year in one file — «1-2» in «Сведения», the semester of every row in the plan', () => {   // R2
+  const half = (semester, planSemester, rows, over = {}) => ({ semester, subject: { name: 'Информатика', teacherName: 'Teacher One', course: 1 },
+    semesters: [{ semester: 1, planSemester: 1 }, { semester: 2, planSemester: 2 }],
+    syllabus: { planSemester, audience: 'Сестринское дело', credits: 4, totalHours: 20, classHours: 12, selfHours: 8, rows, ...over } });
+  const autumn = half(1, 1, SAMPLE.rows.slice(0, 2));
+  const spring = half(2, 2, [{ ...blankRow, kind: 'topic', name: 'Таблицы', lectureHours: 2, practiceHours: 2 }]);
+  // shown from either semester, the file is the same: the autumn rows first
+  for (const [view, other] of [[autumn, spring], [spring, autumn]]) {
+    const data = fileData(view, other);
+    assert.deepEqual([data.info.semester, data.rows.map((r) => [r.semester, r.name])], ['1-2', [[1, 'Введение'], [1, 'Введение'], [2, 'Таблицы']]]);
+    assert.deepEqual([data.info.audience, data.info.credits, data.info.classHours], ['Сестринское дело', 4, 12]);
+    const back = parseSyllabus(reread(syllabusBook(XLSX, labels, data)).sheets);
+    assert.deepEqual([back.errors, back.doc.info.semester, back.doc.rows.map((r) => r.semester)], [[], null, [1, 1, 2]]);
+  }
+  // halves uploaded from two files: the numbers of the year are their sums
+  const apart = fileData(autumn, half(2, 2, spring.syllabus.rows, { credits: 2, totalHours: 10, classHours: 4, selfHours: 6 }));
+  assert.deepEqual([apart.info.credits, apart.info.totalHours, apart.info.classHours, apart.info.selfHours], [6, 30, 16, 14]);
+  // semesters of two academic years (1 and 4) cannot stand in one file: only the semester shown
+  const far = fileData(autumn, half(2, 4, spring.syllabus.rows));
+  assert.deepEqual([far.info.semester, far.rows.length], [1, 2]);
+  assert.deepEqual(fileData(autumn, { ...spring, syllabus: null }).info.semester, 1);
+});
+
+test('round trip through the site: download → upload unchanged changes nothing, for one semester and for a whole year', () => {   // R2
+  const { send, call, dean, sb1 } = setup();
+  const upload = (sheets) => send('syllabus.apply', sb1, sheets, dean).data;
+  const downloaded = () => {
+    const view = call('syllabus.get', { subjectId: sb1, semester: 1 }, dean).data;
+    const other = view.semesters.length === 2 ? call('syllabus.get', { subjectId: sb1, semester: 2 }, dean).data : null;
+    return reread(syllabusBook(XLSX, labels, fileData(view, other))).sheets.map(({ name, cells }) => ({ name, cells }));
+  };
+  const unchanged = (preview) => preview.summaries.map((s) => [s.semester, s.replaces, s.added, s.changed, s.removed]);
+
+  const INFO1 = [['Семестр', 1], ['Специальность', 'Сестринское дело'], ['Кредиты', 1], ['Всего часов', 10], ['Аудиторных часов', 6], ['СРС, часов', 4]];
+  const HEAD1 = ['Юнит', 'Название юнита', '№', 'Тема', 'Лекция, ч', 'Практика, ч', 'Вид занятия', 'Описание'];
+  const one = upload([{ name: 'Сведения', cells: INFO1 }, { name: 'Тематический план', cells: [HEAD1, [1, 'Основы', '1.1', 'Введение', 2, 2, '', 'О курсе'],
+    [1, '', '', 'Практикум', '', 2, 'семинар', ''], [1, '', '', '', '', '', 'модуль', '']] }]);
+  assert.deepEqual([one.applied, one.warnings], [true, []]);
+  const again = send('syllabus.preview', sb1, downloaded(), dean).data;
+  assert.deepEqual([again.ok, again.warnings, unchanged(again)], [true, [], [[1, true, 0, 0, 0]]]);
+
+  const INFO2 = [['Дисциплина', 'Информатика'], ['Курс', 1], ['Семестр', '1-2'], ['Специальность', 'Сестринское дело'], ['Кредиты', 3], ['Всего часов', 20], ['Аудиторных часов', 12], ['СРС, часов', 8]];
+  const HEAD2 = ['Семестр', 'Юнит', 'Название юнита', '№', 'Тема', 'Лекция, ч', 'Практика, ч', 'Вид занятия', 'СРС, ч', 'Описание'];
+  const year = upload([{ name: 'Сведения', cells: INFO2 }, { name: 'Тематический план', cells: [HEAD2,
+    [1, 1, 'Основы', '1.1', 'Введение', 2, 2, '', 2, 'О курсе'], [1, 1, '', '', 'Модуль 1 (рубежный контроль)', '', '', 'модуль', '', ''],
+    [1, 2, 'Сети', '2.1', 'Сети', 2, '', '', 2, ''], [1, 2, '', '', '', '', '', 'модуль', '', ''],
+    [2, 1, 'Таблицы', '1.1', 'Формулы', '', 4, 'лабораторная', 4, 'Расчёт доз'], [2, 1, '', '', 'Экзамен', '', 2, 'модуль', '', '']] }]);
+  assert.deepEqual([year.applied, year.warnings, year.summaries.map((s) => [s.semester, s.replaces])], [true, [], [[1, true], [2, false]]]);
+  const back = send('syllabus.preview', sb1, downloaded(), dean).data;
+  assert.deepEqual([back.ok, back.warnings, unchanged(back)], [true, [], [[1, true, 0, 0, 0], [2, true, 0, 0, 0]]]);
+  assert.equal(call('syllabus.get', { subjectId: sb1, semester: 1 }, dean).data.syllabus.rows[2].unitTitle, 'Сети');
 });
 
 test('bookSheets: empty rows above the data, an empty sheet, a date on the second sheet, too many sheets', () => {
@@ -158,7 +222,7 @@ test('bookSheets: empty rows above the data, an empty sheet, a date on the secon
 test('bookSheets: a parser error row plus firstRow is the row Excel shows when empty rows stand above the plan', () => {
   const book = syllabusBook(XLSX, labels, SAMPLE);
   const plan = XLSX.utils.sheet_to_json(book.Sheets['Тематический план'], { header: 1, defval: '' }).slice(0, 5);
-  plan[2][3] = 3;                                                                      // the seminar «Введение» gets 3 hours of lecture
+  plan[2][4] = 3;                                                                      // the seminar «Введение» gets 3 hours of lecture
   book.Sheets['Тематический план'] = XLSX.utils.aoa_to_sheet(plan, { origin: 'A4' });  // the plan starts at row 4 in Excel
   const read = reread(book);
   const planSheet = read.sheets.find((s) => s.name === 'Тематический план');

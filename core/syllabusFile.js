@@ -30,6 +30,7 @@ export const INFO_ROWS = [
 export const PLAN_COLUMNS = [
   { key: 'semester', titles: { ru: 'Семестр', ky: 'Семестр', en: 'Semester' }, required: false },
   { key: 'unit', titles: { ru: 'Юнит', ky: 'Юнит', en: 'Unit' }, aliases: ['Раздел', 'Модуль', 'Module'], required: false },
+  { key: 'unitTitle', titles: { ru: 'Название юнита', ky: 'Юниттин аталышы', en: 'Unit title' }, aliases: ['Название раздела', 'Название модуля'], required: false },
   { key: 'label', titles: { ru: '№', ky: '№', en: 'No.' }, aliases: ['№ темы', 'No', 'N'], required: false },
   { key: 'name', titles: { ru: 'Тема', ky: 'Тема', en: 'Topic' }, aliases: ['Название', 'Название темы', 'Наименование темы'], required: true },
   {
@@ -52,10 +53,13 @@ export const PLAN_COLUMNS = [
 // Cell text and the keys below are compared in this form: lower case, digits, dots and «№» removed, spaces squeezed.
 const kindWord = (text) => String(text ?? '').toLowerCase().replace(/[0-9.№]/g, '').replace(/\s+/g, ' ').trim();
 
-const ORDINARY = ['', 'практика', 'практическое', 'практическое занятие', 'пз', 'лекция', 'теория', 'practice', 'lecture'];
-const SEMINAR = ['семинар', 'семинарское занятие', 'seminar'];
-const LAB = ['лабораторная', 'лабораторное', 'лабораторное занятие', 'lab', 'laboratory'];
-const CONTROL = ['модуль', 'рубежный контроль', 'рубежный', 'контроль', 'module', 'control', 'аралык көзөмөл', 'аралык текшерүү'];
+const ORDINARY = ['', 'практика', 'практическое', 'практическое занятие', 'пз', 'лекция', 'теория', 'practice', 'lecture',
+  'практикалык', 'практикалык сабак'];
+const SEMINAR = ['семинар', 'семинарское занятие', 'seminar', 'семинардык сабак'];
+const LAB = ['лабораторная', 'лабораторное', 'лабораторное занятие', 'лабораторная работа', 'лаб работа', 'lab', 'laboratory',
+  'лабораториялык', 'лабораториялык иш', 'лабораториялык сабак'];
+const CONTROL = ['модуль', 'рубежный контроль', 'рубежный', 'контроль', 'module', 'control', 'аралык көзөмөл', 'аралык текшерүү',
+  'контрольная работа', 'итоговое занятие'];
 
 export const KIND_WORDS = {};
 for (const [kind, words] of [['', ORDINARY], ['seminar', SEMINAR], ['lab', LAB], [KIND_CONTROL, CONTROL]]) {
@@ -63,6 +67,10 @@ for (const [kind, words] of [['', ORDINARY], ['seminar', SEMINAR], ['lab', LAB],
 }
 
 const normTitle = (value) => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/\s*:$/, '');
+
+// The topic cell of a row that sums the plan up («Итого», «Всего часов»): the row is skipped and named in the remark.
+const TOTAL_WORDS = new Set(['итого', 'итого часов', 'всего', 'всего часов', 'жалпы', 'жалпы саат', 'жыйынтыгы', 'жыйынтык', 'total', 'total hours']);
+const isTotal = (value) => typeof value === 'string' && TOTAL_WORDS.has(normTitle(value));
 
 function titleIndex(items) {
   const index = new Map();
@@ -98,13 +106,26 @@ const usedRows = (cells) => {
 };
 const inRange = (n, min, max) => n !== null && n >= min && n <= max;
 
-function parseSemesterCell(value) {
+const BAD = { ok: false, value: null };
+// A number with an ordinal ending of three languages: «3», «3-й», «3 й», «3rd», «3-чү».
+const ONE_SEMESTER = /^(\d+)(?:\s*-?\s*(?:й|ий|ый|ой|th|st|nd|rd|чи|нчи|инчи|ынчы|үнчү|унчу|чү))?$/;
+const TWO_SEMESTERS = /^(\d+)\s*(?:-|–|—|,|;|\/|и)\s*(\d+)$/;
+
+// The semester as title pages write it: «3», «3 семестр», «3-семестр», «3-й», «4 (Весенний)», «1 курс 1 семестр», «Семестр 5».
+// A range («1-2», «1 и 2», «1, 2») only where `range` allows it: then value is null and the rows give the semester.
+function readSemester(value, range) {
   if (isEmpty(value)) return { ok: true, value: null };
-  const n = toInt(value);
-  if (inRange(n, 1, 8)) return { ok: true, value: n };
-  const pair = typeof value === 'string' ? /^\s*(\d+)\s*(?:-|–|—|,|;|\/|и)\s*(\d+)\s*$/.exec(value) : null;
-  if (pair && inRange(+pair[1], 1, 8) && inRange(+pair[2], 1, 8)) return { ok: true, value: null };
-  return { ok: false, value: null };
+  if (typeof value === 'number') return inRange(toInt(value), 1, 8) ? { ok: true, value } : BAD;
+  if (typeof value !== 'string') return BAD;
+  const text = value.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim()
+    .replace(/\s*\([^()]*\)$/, '')                                  // «4 (Весенний)»
+    .replace(/^\d+\s*-?\s*(?:й\s*)?курс\S*[\s,;]*/, '')                // «1 курс 1 семестр», «2 курс, 3 семестр»
+    .replace(/^(?:семестр\S*|semester)[\s:]*/, '')                   // «Семестр 5»
+    .replace(/[\s-]*(?:семестр\S*|semester)$/, '');                  // «3 семестр», «3-семестр», «1 и 2 семестры»
+  const one = ONE_SEMESTER.exec(text);
+  if (one) return inRange(+one[1], 1, 8) ? { ok: true, value: +one[1] } : BAD;
+  const two = range ? TWO_SEMESTERS.exec(text) : null;
+  return two && inRange(+two[1], 1, 8) && inRange(+two[2], 1, 8) ? { ok: true, value: null } : BAD;
 }
 
 function findSheet(sheets, kind) {
@@ -135,7 +156,7 @@ function readInfo(sheet, errors, ignored) {
     if (key === 'semester') {
       semesterRow = row;
       semesterEmpty = isEmpty(value);
-      const parsed = parseSemesterCell(value);
+      const parsed = readSemester(value, true);
       if (parsed.ok) info.semester = parsed.value; else { semesterBad = true; bad(key); }
     } else if (key === 'discipline' || key === 'teacher' || key === 'audience') {
       const text = toText(value);
@@ -149,9 +170,9 @@ function readInfo(sheet, errors, ignored) {
   return { info, semesterBad, semesterRow, semesterEmpty };
 }
 
-// «2», «2 ч», «2ч», «2 ч.», «2,0», «2.0»
+// «2», «2 ч», «2ч», «2 ч.», «2,0», «2.0», «2 часа», «2 час.», «2 саат», «2 h», «2 hours»
 function hoursText(text) {
-  const m = /^\s*(\d+)(?:[.,]0+)?\s*(?:ч\.?)?\s*$/i.exec(text);
+  const m = /^\s*(\d+)(?:[.,]0+)?\s*(?:(?:ч|час|часа|часов|саат|h|hrs?|hours?)\.?)?\s*$/i.exec(text);
   return m ? parseInt(m[1], 10) : null;
 }
 
@@ -161,14 +182,14 @@ function readHours(value) {
   return n !== null && HOURS_ALLOWED.includes(n) ? { ok: true, value: n } : { ok: false, value: 0 };
 }
 
-// semesterInfo: { value, bad, empty } of the «Семестр» line of the info sheet. -> { rows, noSemester }
+// semesterInfo: { value, bad, empty } of the «Семестр» line of the info sheet. -> { rows, noSemester, titleWarnings }
 function readPlan(sheet, semesterInfo, errors, ignored) {
   const infoSemester = semesterInfo.value;
   const rows = [];
   const used = usedRows(sheet.cells);
   if (used > MAX_SHEET_ROWS) {
     errors.push({ sheet: 'plan', row: 0, field: '', code: 'too_many_rows' });
-    return { rows, noSemester: false };
+    return { rows, noSemester: false, titleWarnings: [] };
   }
   const head = Array.isArray(sheet.cells[0]) ? sheet.cells[0] : [];
   const at = {};
@@ -180,10 +201,12 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
   const missing = PLAN_COLUMNS.filter((c) => c.required && !(c.key in at));
   if (missing.length) {
     for (const c of missing) errors.push({ sheet: 'plan', row: 1, field: c.key, code: 'missing_column' });
-    return { rows, noSemester: false };
+    return { rows, noSemester: false, titleWarnings: [] };
   }
-  // No semester anywhere: one error on the info sheet instead of one per plan row.
-  const noSemester = infoSemester === null && semesterInfo.empty && !semesterInfo.bad && !('semester' in at);
+  // No semester anywhere: one error on the info sheet instead of one per plan row. The template has a «Семестр» column for
+  // a course of two semesters; left empty in every row, it is no semester either.
+  const columnUsed = 'semester' in at && sheet.cells.slice(1, used).some((line) => Array.isArray(line) && !isEmpty(line[at.semester]));
+  const noSemester = infoSemester === null && semesterInfo.empty && !semesterInfo.bad && !columnUsed;
   const needSemester = !semesterInfo.bad && !noSemester;
   const lacking = [];
   const colIndex = (key) => PLAN_COLUMNS.findIndex((c) => c.key === key);
@@ -194,6 +217,7 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
     const line = Array.isArray(sheet.cells[i]) ? sheet.cells[i] : [];
     const cell = (key) => (key in at ? line[at[key]] : undefined);
     if (PLAN_COLUMNS.every((c) => isEmpty(cell(c.key)))) continue;
+    if (isTotal(cell('name'))) { ignored.push(toText(cell('name'))); continue; }
     const row = i + 1;
     const found = [];
     const fail = (field, code) => found.push({ sheet: 'plan', row, field, code });
@@ -207,8 +231,8 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
     let semester = null;
     const semesterValue = cell('semester');
     if (!isEmpty(semesterValue)) {
-      const n = toInt(semesterValue);
-      if (inRange(n, 1, 8)) semester = n; else fail('semester', 'bad_value');
+      const parsed = readSemester(semesterValue, false);
+      if (parsed.ok) semester = parsed.value; else fail('semester', 'bad_value');
     } else if (infoSemester !== null) {
       semester = infoSemester;
     } else if (needSemester) {
@@ -231,6 +255,8 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
       if (unit < (lastUnit[semester] ?? 0)) fail('unit', 'unit_order'); else lastUnit[semester] = unit;
     }
 
+    const unitTitle = toText(cell('unitTitle'));
+    if (unitTitle.length > TEXT_MAX) fail('unitTitle', 'too_long');
     const label = toText(cell('label'));
     if (label.length > LABEL_MAX) fail('label', 'too_long');
     const name = toText(cell('name'));
@@ -243,7 +269,7 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
     else if (isControl && lecture.value > 0) fail('lectureHours', 'bad_value');
     if (!practice.ok || (isControl && practice.value > HOURS_PER_PAIR)) fail('practiceHours', 'bad_hours');
     if (!isControl && lecture.ok && practice.ok && lecture.value + practice.value === 0) fail('lectureHours', 'no_hours');
-    if (!isControl && known && wordKind !== '' && practice.ok && practice.value === 0) fail('practiceKind', 'bad_value');
+    if (!isControl && known && wordKind !== '' && practice.ok && practice.value === 0) fail('practiceKind', 'kind_needs_practice');
 
     let selfHours = null;
     if (!isEmpty(cell('selfHours'))) {
@@ -256,7 +282,7 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
     found.sort((a, b) => colIndex(a.field) - colIndex(b.field));
     rowErrors.push(...found);
     rows.push({
-      kind: isControl ? KIND_CONTROL : 'topic', semester, unit, label, name,
+      kind: isControl ? KIND_CONTROL : 'topic', semester, unit, unitTitle, label, name,
       lectureHours: lecture.value, practiceHours: practice.value, practiceKind: isControl ? '' : wordKind,
       selfHours, description, row,
     });
@@ -271,7 +297,21 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
   if (semesters.length > 2 || (semesters.length === 2 && (semesters[0] % 2 === semesters[1] % 2 || Math.ceil(semesters[0] / 2) !== Math.ceil(semesters[1] / 2)))) {
     errors.push({ sheet: 'plan', row: 0, field: 'semester', code: 'semester_clash' });
   }
-  return { rows, noSemester };
+  return { rows, noSemester, titleWarnings: unitTitles(rows) };
+}
+
+// A unit is named by the first title among its rows; every row of the unit gets it. Another title further down is a remark.
+function unitTitles(rows) {
+  const titles = new Map();
+  const warnings = [];
+  for (const r of rows) {
+    const key = `${r.semester}:${r.unit}`;
+    if (r.unitTitle === '') continue;
+    if (!titles.has(key)) titles.set(key, r.unitTitle);
+    else if (titles.get(key) !== r.unitTitle) warnings.push({ code: 'unit_title_differs', row: r.row, unit: r.unit, title: titles.get(key), other: r.unitTitle });
+  }
+  for (const r of rows) r.unitTitle = titles.get(`${r.semester}:${r.unit}`) ?? '';
+  return warnings;
 }
 
 function planWarnings(info, rows, selfFilled) {
@@ -313,13 +353,14 @@ export function parseSyllabus(sheets) {
   let semesterRow = 0;
   let semesterEmpty = true;
   let noSemester = false;
+  let titleWarnings = [];
   if (infoSheet) ({ info, semesterBad, semesterRow, semesterEmpty } = readInfo(infoSheet, infoErrors, infoIgnored));
   else infoErrors.push({ sheet: 'info', row: 0, field: '', code: 'missing_sheet' });
 
   let rows = [];
   let selfFilled = false;
   if (planSheet) {
-    ({ rows, noSemester } = readPlan(planSheet, { value: info ? info.semester : null, bad: semesterBad, empty: semesterEmpty }, planErrors, planIgnored));
+    ({ rows, noSemester, titleWarnings } = readPlan(planSheet, { value: info ? info.semester : null, bad: semesterBad, empty: semesterEmpty }, planErrors, planIgnored));
     selfFilled = rows.some((r) => r.selfHours !== null);
   } else {
     planErrors.push({ sheet: 'plan', row: 0, field: '', code: 'missing_sheet' });
@@ -335,7 +376,7 @@ export function parseSyllabus(sheets) {
 
   if (result.errors.length === 0) {
     result.doc = { info, rows };
-    result.warnings.push(...planWarnings(info, rows, selfFilled));
+    result.warnings.push(...titleWarnings, ...planWarnings(info, rows, selfFilled));
   }
   return result;
 }

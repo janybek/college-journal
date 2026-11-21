@@ -44,10 +44,10 @@ test('syllabus upload: one syllabus of a teacher, laid over every group of that 
   call('schedule.cancelPair', { id: pairOf(sb3, '2026-09-02').id }, dean);
   assert.deepEqual([lessons(sb3), lessons(sb1)[0]], [[['2026-09-02', '', '', null], ['2026-09-09', 'Новая тема', 'lecture', 1]], ['2026-09-01', 'Новая тема', 'lecture', 1]]);
 
-  // проверка файла читает пять листов и ничего не пишет
+  // проверка файла читает шесть листов и ничего не пишет
   reset();
   send('syllabus.preview', sb1, A, dean);
-  assert.deepEqual([lists, writes, calls.update || 0, calls.insert || 0], [{ subjects: 1, staff: 1, syllabi: 1, topics: 1, pairs: 1 }, {}, 0, 0]);
+  assert.deepEqual([lists, writes, calls.update || 0, calls.insert || 0], [{ subjects: 1, staff: 1, groups: 1, syllabi: 1, topics: 1, pairs: 1 }, {}, 0, 0]);
 
   // перенос строки в описании доходит до листа «Темы» как есть: строки тем пишутся без normalizeRow — и изменённые (updateMany), и новая (insertMany)
   const described = [['Новая тема', 'Первая строка\nвторая строка'], ['Введение', 'Цель:\nзнать IT'], ['Сети', 'Схема:\nзвезда']];
@@ -173,4 +173,61 @@ test('syllabus upload: only the deanery and the administrator; bad requests; the
   assert.deepEqual(call('dir.list', { table: 'topics' }, dean).error, { code: 'forbidden' });
   assert.deepEqual(call('import.apply', { table: 'topics', cells: [['Предмет']] }, dean).error, { code: 'forbidden' });
   assert.deepEqual(call('syllabus.apply', { subjectId: sb1, cells: [['Семестр']] }, dean).error, { code: 'bad_request' });   // прежний формат
+});
+
+test('a new teacher of a group takes its future pairs in the same batch as the lessons; substituted, held, past and busy pairs keep theirs', () => {   // I1
+  const { store, call, pairOf, lists, writes, calls, reset, dean, teacher1, teacher2, staff, g2, sb1, sb3, S } = setup();
+  call('settings.save', { settings: { ...S, semesterEnd: '2026-09-25' } }, dean);
+  call('schedule.generate', {}, dean);
+  const past = store.insert('pairs', { date: '2026-08-26', slot: 1, startTime: '08:00', groupId: g2, subjectId: sb3, teacherId: staff.teacher1, roomId: '',
+    topicId: '', lessonType: '', part: null, status: 'planned', planDate: '2026-08-26', planSlot: 1, changed: false, note: '' }).id;
+  store.update('pairs', pairOf(sb3, '2026-09-02').id, { status: 'closed' });                                             // held
+  assert.equal(call('schedule.changePair', { id: pairOf(sb3, '2026-09-09').id, teacherId: staff.dean }, dean).ok, true);  // substituted by hand
+  // teacher2 is already busy at the time of the 09-23 pair of 02-1: a pair of 01-1 is moved there and given to teacher2
+  assert.equal(call('schedule.changePair', { id: pairOf(sb1, '2026-09-22').id, date: '2026-09-23', teacherId: staff.teacher2 }, dean).ok, true);
+
+  reset();
+  const saved = call('dir.save', { table: 'subjects', row: { id: sb3, teacherId: staff.teacher2 } }, dean);
+  assert.deepEqual([saved.ok, saved.data.row.teacherId, saved.data.skippedBusy], [true, staff.teacher2, 1]);
+  const teacherOf = (date) => store.list('pairs').find((p) => p.subjectId === sb3 && p.date === date).teacherId;
+  assert.deepEqual(['2026-08-26', '2026-09-02', '2026-09-09', '2026-09-16', '2026-09-23'].map(teacherOf),
+    [staff.teacher1, staff.teacher1, staff.dean, staff.teacher2, staff.teacher1]);
+  assert.equal(store.get('pairs', past).teacherId, staff.teacher1);
+  // one read of every sheet, one batch for the pairs: the teacher and the lessons together
+  for (const [table, n] of Object.entries(lists)) assert.equal(n, 1, table);
+  assert.deepEqual([writes['updateMany:pairs'], calls.update], [1, 1]);
+
+  // «Моё расписание»: the new teacher has the pair, without the «Замена» mark; the old one no longer has it
+  const week = (token) => call('schedule.mine', { from: '2026-09-14' }, token).data.pairs.filter((p) => p.subjectId === sb3);
+  assert.deepEqual(week(teacher2).map((p) => [p.date, p.groupName, p.substitution]), [['2026-09-16', '02-1', false]]);
+  assert.deepEqual(week(teacher1), []);
+  assert.deepEqual(call('schedule.list', { from: '2026-09-14', groupId: g2 }, dean).data.pairs.filter((p) => p.subjectId === sb3).map((p) => [p.teacherName, p.substitution]),
+    [['teacher2', false]]);
+
+  // back to the first teacher: the future pairs follow again, the hand-substituted one stays with its substitute
+  assert.equal(call('dir.save', { table: 'subjects', row: { id: sb3, teacherId: staff.teacher1 } }, dean).ok, true);
+  assert.deepEqual(['2026-09-09', '2026-09-16', '2026-09-23'].map(teacherOf), [staff.dean, staff.teacher1, staff.teacher1]);
+});
+
+test('the check window says when a file of another curriculum semester replaces the stored one, and in which groups', () => {   // I3
+  const { send, lists, reset, dean, sb1, sb3 } = setup();
+  send('syllabus.apply', sb1, A, dean);
+  reset();
+  const third = send('syllabus.preview', sb3, file([T('Второй курс', 2, ''), M], [['Семестр', '3 семестр']]), dean).data;
+  assert.deepEqual([third.ok, third.warnings.filter((w) => w.code === 'semester_replaces')], [true, [{ code: 'semester_replaces', stored: 1, file: 3, groups: ['01-1', '02-1'] }]]);
+  const { settings, ...previewReads } = READS;                                     // the check reads every sheet once; the settings only when it writes
+  assert.deepEqual(lists, previewReads);
+});
+
+test('a discipline or a person with a stored syllabus cannot be deleted: no orphan rows in «Силлабусы» and «Темы»', () => {   // M7
+  const { store, send, call, dean, staff, ds2, sb2 } = setup();
+  assert.equal(send('syllabus.apply', sb2, file([T('Анатомия 1', 2, '')]), dean).data.applied, true);
+  for (const p of store.list('pairs').filter((p) => p.subjectId === sb2)) store.remove('pairs', p.id);
+  for (const w of store.list('weekTemplate').filter((w) => w.subjectId === sb2)) store.remove('weekTemplate', w.id);
+  assert.equal(call('dir.remove', { table: 'subjects', id: sb2 }, dean).ok, true);
+  const admin = store.insert('staff', { fullName: 'adm', login: 'adm', passwordHash: store.list('staff')[0].passwordHash, roles: 'admin', lang: 'ru', mustChangePassword: false, active: true });
+  const token = call('auth.login', { login: admin.login, password: 'secret12' }).data.token;
+  assert.deepEqual(call('dir.remove', { table: 'disciplines', id: ds2 }, dean).error, { code: 'in_use' });
+  assert.deepEqual(call('dir.remove', { table: 'staff', id: staff.teacher2 }, token).error, { code: 'in_use' });
+  assert.deepEqual([store.list('syllabi').length, store.list('topics').length], [1, 1]);
 });

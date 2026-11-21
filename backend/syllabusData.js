@@ -38,7 +38,10 @@ function planFor(doc, sheets, owner, platform) {
   const syllabi = sheets.syllabi.filter((s) => s.disciplineId === discipline.id && s.teacherId === teacher.id);
   const own = new Set(syllabi.map((s) => s.id));
   const topics = sheets.topics.filter((t) => own.has(t.syllabusId));
-  return planSyllabusUpload(doc, { discipline, teacher, syllabi, topics, pairs: sheets.pairs, today: localDate(platform.now()) });
+  const groupName = new Map(sheets.groups.map((g) => [g.id, g.name]));
+  const groups = sheets.subjects.filter((s) => s.disciplineId === discipline.id && s.teacherId === teacher.id)
+    .map((s) => groupName.get(s.groupId) ?? '').filter((name) => name !== '').sort();
+  return planSyllabusUpload(doc, { discipline, teacher, syllabi, topics, pairs: sheets.pairs, today: localDate(platform.now()), groups });
 }
 
 // Writes a plan that has no errors: syllabus rows, then topic rows (removed, changed, new), then the lessons of every group of the teacher.
@@ -79,7 +82,7 @@ export function uploadSyllabus(store, platform, data, write) {
   const parsed = parseSyllabus(cells);
   if (parsed.doc === null) return { ok: false, applied: false, found: parsed.found, summaries: [], errors: parsed.errors, warnings: parsed.warnings };
 
-  const sheets = { subjects, staff: store.list('staff'), syllabi: store.list('syllabi'), topics: store.list('topics'), pairs: store.list('pairs') };
+  const sheets = { subjects, staff: store.list('staff'), groups: store.list('groups'), syllabi: store.list('syllabi'), topics: store.list('topics'), pairs: store.list('pairs') };
   const plan = planFor(parsed.doc, sheets, ownerOf(sheets.staff, subject), platform);
   const errors = [...parsed.errors, ...plan.errors];
   const ok = errors.length === 0;
@@ -95,7 +98,7 @@ export function saveSyllabusDoc(store, platform, subjectId, doc) {
   const subjects = store.list('subjects');
   const subject = subjects.find((s) => s.id === subjectId);
   if (!subject || !subject.disciplineId) throw new Error(`saveSyllabusDoc: no subject with a discipline: ${subjectId}`);
-  const sheets = { subjects, staff: store.list('staff'), syllabi: store.list('syllabi'), topics: store.list('topics'), pairs: store.list('pairs') };
+  const sheets = { subjects, staff: store.list('staff'), groups: store.list('groups'), syllabi: store.list('syllabi'), topics: store.list('topics'), pairs: store.list('pairs') };
   const plan = planFor(doc, sheets, ownerOf(sheets.staff, subject), platform);
   if (plan.errors.length > 0) throw new Error('saveSyllabusDoc: ' + JSON.stringify(plan.errors));
   writePlan(store, platform, plan, sheets, subject);
@@ -125,7 +128,7 @@ function pageRow(row, own, marks) {
   }
   mine.sort((a, b) => cmp(a.date, b.date) || a.slot - b.slot);
   return {
-    id: row.id, kind: row.kind, unit: row.unit, label: row.label, name: row.name,
+    id: row.id, kind: row.kind, unit: row.unit, unitTitle: row.unitTitle ?? '', label: row.label, name: row.name,
     lectureHours: hours(row.lectureHours), practiceHours: hours(row.practiceHours), practiceKind: row.practiceKind,
     selfHours: nullable(row.selfHours), description: row.description,
     planned: lessonsOf([row]).length,

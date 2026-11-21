@@ -127,12 +127,12 @@ test('disciplines import: the deanery loads the list, a known name is not added 
   assert.deepEqual([call('import.apply', { table: 'disciplines', cells: file.slice(0, 3) }, dean).data.inserted, store.list('disciplines').length], [0, 2]);
 });
 
-test('a subjects import that changes the teacher re-lays the group; every sheet is read once', () => {
+test('a subjects import that changes the teacher re-lays the group and hands it its pairs; every sheet is read once', () => {
   const { store, call, dean } = setup();
   const g1 = store.list('groups')[0].id;
   const teacher = (login) => store.insert('staff', { fullName: login, login, passwordHash: 'x', roles: 'teacher', lang: 'ky', mustChangePassword: false, active: true }).id;
   const t1 = teacher('tea1');
-  teacher('tea2');                                                                // tea2 has no syllabus
+  const t2 = teacher('tea2');                                                     // tea2 has no syllabus
   const ds = store.insert('disciplines', { name: 'Информатика' }).id;
   const sb = store.insert('subjects', { name: 'Информатика', disciplineId: ds, groupId: g1, teacherId: t1, scheme: 'A' }).id;
   const sy = store.insert('syllabi', { disciplineId: ds, teacherId: t1, semester: 1, planSemester: 1 }).id;
@@ -150,4 +150,5 @@ test('a subjects import that changes the teacher re-lays the group; every sheet 
   assert.deepEqual([done.updated, done.errors], [1, []]);
   for (const [table, n] of Object.entries(lists)) assert.equal(n, 1, table);
   assert.deepEqual(lessons(), [[false, '', null], [false, '', null], [false, '', null], [false, '', null]]);   // NO_LESSON on every pair that is not held
+  assert.deepEqual(store.list('pairs').map((p) => p.teacherId === t2), [true, true, true, true]);              // the future pairs follow the new teacher (I1)
 });

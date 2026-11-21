@@ -83,11 +83,12 @@ export function bookSheets(XLSX, book) {
 // ---- The syllabus file: «Сведения» and «Тематический план» ----
 
 const INFO_KEYS = ['discipline', 'teacher', 'course', 'semester', 'audience', 'credits', 'totalHours', 'classHours', 'selfHours'];
-const INFO_TEXT = ['discipline', 'teacher', 'audience'];
-// Without «Семестр»: the file holds one semester, and it is written in «Сведения».
-const PLAN_KEYS = ['unit', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description'];
-const PLAN_TEXT = ['label', 'name', 'practiceKind', 'description'];
-const PLAN_WIDTHS = { unit: 7, label: 8, name: 46, lectureHours: 12, practiceHours: 12, practiceKind: 14, selfHours: 8, description: 60 };
+// The course and the semester are text too: «1-2» typed into a number cell of Russian Excel becomes a date, «1,2» a fraction.
+const INFO_TEXT = ['discipline', 'teacher', 'course', 'semester', 'audience'];
+// «Семестр» is filled only for a course of two semesters; for one it stays empty and «Сведения» says which.
+const PLAN_KEYS = ['unit', 'unitTitle', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'semester', 'description'];
+const PLAN_TEXT = ['unitTitle', 'label', 'name', 'practiceKind', 'description'];
+const PLAN_WIDTHS = { unit: 7, unitTitle: 28, label: 8, name: 46, lectureHours: 12, practiceHours: 12, practiceKind: 14, selfHours: 8, semester: 9, description: 60 };
 
 const absent = (value) => value === null || value === undefined || value === '';
 // A cell formatted as Text: Excel keeps «1.10» and «01-1» as typed in it.
@@ -95,8 +96,10 @@ const textCell = (value) => ({ t: 's', v: absent(value) ? '' : String(value), z:
 const valueCell = (value) => (typeof value === 'number' ? { t: 'n', v: value } : { t: 's', v: String(value) });
 
 // The value of one cell of a plan row; null leaves the cell empty. Hours of zero are an empty cell (the parser reads
-// both alike); a zero of СРС stays a zero, because the page tells «0» from «not given».
-function planValue(row, key, kinds) {
+// both alike); a zero of СРС stays a zero, because the page tells «0» from «not given». The title of a unit stands
+// only on its first row (firstOfUnit): the parser gives it to every row of the unit.
+function planValue(row, key, kinds, firstOfUnit) {
+  if (key === 'unitTitle') return firstOfUnit && !absent(row.unitTitle) ? String(row.unitTitle) : '';
   if (key === 'practiceKind') return row.kind === 'control' ? kinds.control : kinds[row.practiceKind] ?? '';
   if (key === 'lectureHours' || key === 'practiceHours') return Number(row[key]) > 0 ? Number(row[key]) : null;
   if (PLAN_TEXT.includes(key)) return absent(row[key]) ? '' : String(row[key]);
@@ -124,9 +127,11 @@ export function syllabusBook(XLSX, labels, data = null) {
   const titles = PLAN_KEYS.map((key) => labels.plan[key]);
   const plan = templateSheet(XLSX, titles, PLAN_KEYS.map((key) => PLAN_TEXT.includes(key)));
   rows.forEach((row, i) => {
+    const before = rows[i - 1];
+    const firstOfUnit = !before || before.unit !== row.unit || before.semester !== row.semester;
     PLAN_KEYS.forEach((key, c) => {
       const ref = XLSX.utils.encode_cell({ r: i + 1, c });
-      const value = planValue(row, key, labels.kinds);
+      const value = planValue(row, key, labels.kinds, firstOfUnit);
       if (PLAN_TEXT.includes(key)) plan[ref] = textCell(value);
       else if (value === null) delete plan[ref];
       else plan[ref] = valueCell(value);

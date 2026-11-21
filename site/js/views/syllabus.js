@@ -193,8 +193,10 @@ function infoCard(view) {
       el('dd', { class: 'fact__value' + (value === '—' ? ' is-empty' : '') }, String(value))))));
 }
 
+// A param named in counts is a number of something and is written with its word («18 пар»).
 function notes(view) {
-  return el('div', { class: 'notes syllabus-notes' }, scheduleNotes(view).map(({ tone, key, params }) => note(tone, t(key, params))));
+  return el('div', { class: 'notes syllabus-notes' }, scheduleNotes(view).map(({ tone, key, params, counts = {} }) => note(tone, t(key, params && Object.fromEntries(
+    Object.entries(params).map(([name, value]) => [name, counts[name] ? tCount(counts[name], value) : value]))))));
 }
 
 // «Тематический план»
@@ -212,9 +214,11 @@ function planCard(view) {
     self ? ['syllabus.col.self', 'num'] : null,
     ['syllabus.col.pairs', 'plan-table__pairs'],
   ].filter(Boolean);
+  // A unit has a head when the plan has several, or when it has a title: «Юнит 1. Техническое и программное обеспечение».
   const bodies = groups.map((group) => el('tbody', { class: 'plan-unit' },
-    groups.length > 1 ? el('tr', { class: 'plan-unit__head' },
-      el('th', { scope: 'rowgroup', colspan: String(columns.length) }, t('syllabus.unitN', { n: group.unit }))) : null,
+    groups.length > 1 || group.title ? el('tr', { class: 'plan-unit__head' },
+      el('th', { scope: 'rowgroup', colspan: String(columns.length), class: group.title ? 'has-title' : null },
+        group.title ? t('syllabus.unitTitled', { n: group.unit, title: group.title }) : t('syllabus.unitN', { n: group.unit }))) : null,
     group.rows.map((row) => planRow(row, view, self))));
   return el('section', { class: 'card syllabus-plan', 'aria-labelledby': 'syllabus-plan-title' },
     el('h2', { class: 'syllabus-card__title', id: 'syllabus-plan-title' }, t('syllabus.plan')),

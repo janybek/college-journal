@@ -17,8 +17,8 @@ test('schedule tables', () => {
   assert.deepEqual(SCHEMA.pairs.columns.map(c => c.title), ['id', 'дата', '№ пары', 'время начала', 'группа', 'предмет', 'преподаватель',
     'аудитория', 'тема', 'тип занятия', 'часть', 'статус', 'дата по плану', '№ пары по плану', 'изменена вручную', 'примечание']);
   assert.deepEqual(SCHEMA.topics.columns.map(c => c.title),
-    ['id', 'силлабус', '№ по порядку', 'юнит', '№ в силлабусе', 'название', 'лекция, ч', 'практика, ч', 'вид практики', 'СРС, ч', 'описание', 'вид строки']);
-  assert.deepEqual(SCHEMA.topics.columns.map(c => c.key), ['id', 'syllabusId', 'order', 'unit', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description', 'kind']);
+    ['id', 'силлабус', '№ по порядку', 'юнит', '№ в силлабусе', 'название', 'лекция, ч', 'практика, ч', 'вид практики', 'СРС, ч', 'описание', 'вид строки', 'название юнита']);
+  assert.deepEqual(SCHEMA.topics.columns.map(c => c.key), ['id', 'syllabusId', 'order', 'unit', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description', 'kind', 'unitTitle']);
   assert.deepEqual(SEMESTERS, [1, 2]);
   assert.deepEqual(SCHEMA.weekTemplate.columns.map(c => c.title), ['id', 'день недели', '№ пары', 'предмет', 'аудитория']);
   assert.deepEqual(SCHEMA.pairs.columns.filter(c => c.type !== 'string').map(c => [c.key, c.type]),

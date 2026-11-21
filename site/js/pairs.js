@@ -110,3 +110,43 @@ export function controlLine(controls) {
     names: named.map((mark) => ({ key: 'pairs.topicPlain', params: { name: mark.name } })),
   };
 }
+
+// ---- Long names in a narrow card ----
+
+// Syllable rules of Russian (Kyrgyz and English follow them well enough): a break after й/ь/ъ, between two vowels,
+// and between consonants that stand between vowels. Each rule: [what stays before the break, what must follow it].
+const VOWELS = 'аеёиоуыэюяөүaeiouy';
+const CONSONANTS = 'бвгджзклмнпрстфхцчшщңbcdfghjklmnpqrstvwxz';
+const SIGNS = 'йьъ';
+const ANY = '[' + VOWELS + CONSONANTS + SIGNS + ']';
+const VOWEL = '[' + VOWELS + ']';
+const CONSONANT = '[' + CONSONANTS + ']';
+const SYLLABLE_RULES = [
+  ['[' + SIGNS + ']', ANY + ANY],
+  [VOWEL, VOWEL + ANY],
+  [VOWEL + CONSONANT, CONSONANT + VOWEL],
+  [CONSONANT + VOWEL, CONSONANT + VOWEL],
+  [VOWEL + CONSONANT, CONSONANT + CONSONANT + VOWEL],
+  [VOWEL + CONSONANT + CONSONANT, CONSONANT + CONSONANT + VOWEL],
+].map(([before, after]) => new RegExp('(' + before + ')(?=' + after + ')', 'gi'));
+const SOFT_HYPHEN = '\u00AD';
+const LONG_WORD = 8;
+
+function hyphenateWord(word) {
+  if (word.length < LONG_WORD) return word;
+  const allowed = new Set();
+  for (const rule of SYLLABLE_RULES) for (const match of word.matchAll(rule)) allowed.add(match.index + match[1].length);
+  const cuts = [];
+  for (const at of [...allowed].sort((a, b) => a - b)) {
+    if (at < 2 || word.length - at < 2 || (cuts.length > 0 && at - cuts[cuts.length - 1] < 2)) continue;
+    cuts.push(at);
+  }
+  return cuts.reduceRight((text, at) => text.slice(0, at) + SOFT_HYPHEN + text.slice(at), word);
+}
+
+// The name with soft hyphens between the syllables of its long words: a card narrower than a word («Предпринимательство»
+// in a column of 120 px) breaks it as «Предпринима-тельство» instead of at the edge. Shown as text only; the soft
+// hyphens are invisible where the word fits.
+export function hyphenate(text) {
+  return String(text ?? '').replace(/[a-zа-яёөүң]+/gi, hyphenateWord);
+}

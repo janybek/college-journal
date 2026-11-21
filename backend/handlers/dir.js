@@ -3,7 +3,8 @@ import { normalizeRow, validateRow } from '../../core/validate.js';
 import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { readSettings } from '../../core/settings.js';
 import { USER_TABLES } from '../users.js';
-import { relayout } from '../scheduleData.js';
+import { teacherHandover } from '../../core/schedule.js';
+import { relayout, todayOf } from '../scheduleData.js';
 
 const DIR_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'weekTemplate'];
 const LOGIN_TABLES = ['students', 'staff'];
@@ -94,9 +95,11 @@ function save(data, ctx) {
   if (old) {
     const saved = store.update(table, old.id, row);
     if (table === 'disciplines' && saved.name !== old.name) renameSubjects(store, saved);
-    // A new teacher of a group follows the syllabus of that teacher: the lessons are laid again.
+    // A new teacher of a group takes its future pairs and the group follows that teacher's syllabus: one batch of pairs.
     if (table === 'subjects' && saved.teacherId !== old.teacherId) {
-      relayout(store, [saved.id], { subjects: db.subjects.map((s) => (s.id === saved.id ? saved : s)), pairs: db.pairs });
+      const { patches, skippedBusy } = teacherHandover(db.pairs, saved, todayOf(platform));
+      relayout(store, [saved.id], { subjects: db.subjects.map((s) => (s.id === saved.id ? saved : s)), pairs: db.pairs }, patches);
+      return { row: withoutHash(saved), skippedBusy };
     }
     return { row: withoutHash(saved) };
   }
@@ -107,11 +110,11 @@ function save(data, ctx) {
   return { row: withoutHash(created), tempPassword };
 }
 
-// What blocks deleting a row: [sheet, test(row)] pairs, each sheet read once.
+// What blocks deleting a row: [sheet, test(row)] pairs, each sheet read once. A stored syllabus keeps its discipline and its teacher.
 const BLOCKERS = {
-  disciplines: (id) => [['subjects', (r) => r.disciplineId === id]],
+  disciplines: (id) => [['subjects', (r) => r.disciplineId === id], ['syllabi', (r) => r.disciplineId === id]],
   groups: (id) => [['students', (r) => r.groupId === id], ['subjects', (r) => r.groupId === id], ['pairs', (r) => r.groupId === id]],
-  staff: (id) => [['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id]],
+  staff: (id) => [['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id], ['syllabi', (r) => r.teacherId === id]],
   subjects: (id) => [['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id]],
   rooms: (id) => [['weekTemplate', (r) => r.roomId === id], ['pairs', (r) => r.roomId === id]],
 };

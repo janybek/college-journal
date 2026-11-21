@@ -26,8 +26,9 @@ const groupBy = (rows) => {
 // Lays the lessons of the syllabus each given subject follows (null: all subjects) over that subject's pairs; saves the pairs whose lesson changed.
 // Only the syllabus of the current semester is laid, over the pairs inside the semester dates (and the held ones).
 // `rows` holds sheets the request has already read, as they stand after its own write; those are not read again.
+// `also`: other patches of pairs ([{ id, patch }], e.g. a new teacher) written in the same batch as the lessons.
 // -> { changed, subjects, syllabi, topics, pairs }: the sheets as they are now, so the caller need not read them a second time.
-export function relayout(store, subjectIds = null, rows = {}) {
+export function relayout(store, subjectIds = null, rows = {}, also = []) {
   const subjects = rows.subjects ?? store.list('subjects');
   const syllabi = rows.syllabi ?? store.list('syllabi');
   const topics = rows.topics ?? store.list('topics');
@@ -37,12 +38,13 @@ export function relayout(store, subjectIds = null, rows = {}) {
   const pairsBySubject = groupBy(pairs);
   const wanted = subjectIds === null ? null : new Set(subjectIds);
 
-  const assigned = new Map();                                          // pair id -> { topicId, lessonType, part }
+  const assigned = new Map(also.map(({ id, patch }) => [id, { ...patch }]));   // pair id -> { topicId, lessonType, part } and the patch of `also`
+  const lesson = (id, patch) => assigned.set(id, { ...assigned.get(id), ...patch });
   for (const subject of subjects) {
     if (wanted !== null && !wanted.has(subject.id)) continue;
     const scope = subjectScope(subject, pairsBySubject.get(subject.id) || [], index, settings);
-    for (const id of scope.clear) assigned.set(id, { ...NO_LESSON });
-    for (const { id, patch } of layoutLessons(scope.topics, scope.pairs, scope.skip).assign) assigned.set(id, patch);
+    for (const id of scope.clear) lesson(id, NO_LESSON);
+    for (const { id, patch } of layoutLessons(scope.topics, scope.pairs, scope.skip).assign) lesson(id, patch);
   }
   if (assigned.size === 0) return { changed: 0, subjects, syllabi, topics, pairs };
   store.updateMany('pairs', [...assigned].map(([id, patch]) => ({ id, patch })));

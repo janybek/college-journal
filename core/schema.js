@@ -80,7 +80,7 @@ export const SCHEMA = {
       col('id', 'id'), col('syllabusId', 'силлабус'), col('order', '№ по порядку', 'int'), col('unit', 'юнит', 'int'),
       col('label', '№ в силлабусе'), col('name', 'название'), col('lectureHours', 'лекция, ч', 'int'),
       col('practiceHours', 'практика, ч', 'int'), col('practiceKind', 'вид практики'), col('selfHours', 'СРС, ч', 'int'),
-      col('description', 'описание'), col('kind', 'вид строки'),
+      col('description', 'описание'), col('kind', 'вид строки'), col('unitTitle', 'название юнита'),
     ],
   },
   pairs: {

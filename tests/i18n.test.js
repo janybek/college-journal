@@ -40,21 +40,50 @@ test('the sheets, lines, columns and kinds of the syllabus template are the name
 });
 
 test('every code of the syllabus check has a text; the old texts of the syllabus import are gone', () => {
-  for (const code of ['missing_sheet', 'missing_column', 'too_many_rows', 'empty', 'required', 'bad_value', 'too_long', 'bad_hours', 'no_hours', 'unit_order', 'semester_order', 'semester_clash', 'held_missing', 'held_hours']) {
+  for (const code of ['missing_sheet', 'missing_column', 'too_many_rows', 'empty', 'required', 'bad_value', 'too_long', 'bad_hours', 'no_hours', 'unit_order', 'semester_order', 'semester_clash', 'held_missing', 'held_hours', 'kind_needs_practice']) {
     assert.ok(ru['syllabus.error.' + code], code);
   }
-  for (const code of ['ignored_sheets', 'ignored', 'info_empty', 'total_mismatch', 'class_mismatch', 'self_mismatch', 'no_control', 'discipline_differs', 'teacher_differs', 'held_renamed']) {
+  for (const code of ['ignored_sheets', 'ignored', 'info_empty', 'total_mismatch', 'class_mismatch', 'self_mismatch', 'no_control', 'discipline_differs', 'teacher_differs', 'held_renamed', 'semester_replaces', 'unit_title_differs']) {
     assert.ok(ru['syllabus.warning.' + code], code);
   }
   assert.ok(ru['syllabus.error.bad_hours'].includes('1 пара = 2 часа'));
   for (const key of ['syllabus.upload', 'syllabus.template', 'syllabus.download', 'syllabus.check.title', 'syllabus.check.whose', 'syllabus.check.summary',
     'syllabus.check.first', 'syllabus.check.replace', 'syllabus.check.failed', 'syllabus.check.apply', 'syllabus.done', 'syllabus.where', 'syllabus.whereSheet',
     'syllabus.fileError.dateCell', 'syllabus.fileError.tooMany', 'syllabus.help.title']) assert.ok(ru[key], key);
-  for (const key of ['order', 'hours', 'control', 'columns', 'self']) assert.ok(ru['syllabus.help.' + key], key);
+  for (const key of ['order', 'hours', 'semester', 'control', 'columns', 'self']) assert.ok(ru['syllabus.help.' + key], key);
   assert.equal(ru['syllabus.upload'], 'Загрузить (Excel)');
   for (const dict of [ru, ky, en]) {
     for (const gone of ['syllabus.lead', 'syllabus.step.subject', 'syllabus.subjectHint', 'syllabus.sheet', 'syllabus.back', 'topics.import']) assert.equal(gone in dict, false, gone);
   }
+});
+
+test('final fix wave: field texts of the file check, the replaced semester, unit titles, a new teacher of a group', () => {
+  // I2: the semester cell has its own text; the plan column (one number per row) another
+  assert.equal(ru['syllabus.error.semester.bad_value'], 'Семестр — число от 1 до 8, как в учебном плане (например 3). Для курса на два семестра — «1-2».');
+  // I3, M2, M13, R3, M4
+  assert.equal(ru['syllabus.warning.semester_replaces'],
+    'В журнале загружен силлабус {stored} семестра. Этот файл ({file} семестр) заменит его во всех группах: {groups}. Если это другой курс, заведите для него отдельную дисциплину.');
+  for (const dict of [ru, ky, en]) {
+    for (const key of ['syllabus.error.plan.semester.bad_value', 'syllabus.error.practiceKind.bad_value', 'syllabus.unitTitled', 'subjects.edit.busy.one', 'subjects.edit.busy.other']) assert.ok(dict[key], key);
+    assert.match(dict['syllabus.error.semester_clash'], /3/);                                       // different academic years, e.g. 2 and 3
+    assert.match(dict['syllabus.help.semester'], /1-2/);
+    assert.match(dict['syllabus.help.columns'], new RegExp(dict['syllabus.file.plan.unitTitle']));
+  }
+  for (const word of ['лекция', 'практика', 'семинар', 'лабораторная', 'модуль']) assert.ok(ru['syllabus.error.practiceKind.bad_value'].includes(word), word);
+  // I1: the success text says that the future pairs now belong to the new teacher
+  assert.match(ru['subjects.edit.saved'], /предстоящие пары теперь у нового преподавателя/);
+});
+
+test('«Все занятия стоят на парах»: the number of pairs is written with its word in every language (M12)', () => {
+  const said = {};
+  for (const lang of ['ru', 'ky', 'en']) {
+    setLang(lang);
+    said[lang] = [18, 21].map((n) => t('syllabus.fits', { pairs: tCount('syllabus.pairsCount', n) }));
+  }
+  setLang('ky');
+  assert.deepEqual(said.ru, ['Все занятия стоят на парах: в расписании семестра 18 пар.', 'Все занятия стоят на парах: в расписании семестра 21 пара.']);
+  assert.equal(said.ky[0], 'Бардык темалар сабактарга коюлду: семестрдин жадыбалында 18 сабак.');
+  assert.equal(said.en[0], 'Every lesson has a class: the semester schedule has 18 classes.');
 });
 
 test('every directory that can be in use elsewhere explains why it cannot be removed', () => {

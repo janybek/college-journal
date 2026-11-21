@@ -3,7 +3,7 @@ import { el, badge, iconButton, avatarTone, modal, refresh } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { addDays, dayParts, isTime } from '../dates.js';
-import { pairFlags, topicText, lessonTypeKey, lessonParts, controlLine, weekRows, gridDays, cellPairs, ownTime } from '../pairs.js';
+import { pairFlags, topicText, lessonTypeKey, lessonParts, controlLine, weekRows, gridDays, cellPairs, ownTime, hyphenate } from '../pairs.js';
 
 // Parts shared by the schedule screens: the deanery's «Расписание» and the teacher's and student's own week.
 // Everything from the server goes in as text.
@@ -168,8 +168,11 @@ export function dayList(days, today, { show = [], onOpen = null, canOpen = null,
 
 // ---- The week as a grid: the pair numbers down the left with their time, the days across ----
 
-// From this width on a staff week is a grid; below it (and always for the student) the days are a list.
-export const GRID_FROM = '(min-width: 1100px)';
+// From this width on a staff week is a grid; below it (and always for the student) the days are a list. At 1200 px a day
+// column holds a card of about 120 px of text (about 100 px with a Saturday column): a real discipline name
+// («Информационное обеспечение профессиональной деятельности») still reads on three lines, long words broken at
+// their syllables (hyphenate).
+export const GRID_FROM = '(min-width: 1200px)';
 let gridQuery = null;
 
 // One listener for the whole app: when the window crosses GRID_FROM while a week is on the screen, the screen is
@@ -229,9 +232,9 @@ function gridHead(date, today, dayHref) {
       isToday ? badge(t('pairs.today'), 'primary', true) : null));
 }
 
-// The short card of the grid: the subject, who and where on one line, the lesson on one line, then the marks: its
-// type, a module marked on it, cancelled / substitution / moved, a note. The time only when the pair keeps another
-// time than its row. The rest is in the pair's window.
+// The short card of the grid: the subject on up to three lines (its full name in the tooltip and the pair's window),
+// who and where on one line, the lesson on one line, then the marks: its type, a module marked on it, cancelled /
+// substitution / moved, a note. The time only when the pair keeps another time than its row. The rest is in the window.
 function briefCard(pair, row, { show, onOpen }) {
   const flags = pairFlags(pair);
   const cancelled = flags.includes('cancelled');
@@ -250,7 +253,7 @@ function briefCard(pair, row, { show, onOpen }) {
     // Where the card stands, for a screen reader that reads the button on its own.
     el('span', { class: 'visually-hidden' }, pairPlace(pair) + ': '),
     ownTime(pair, row) ? el('span', { class: 'pair__time' }, pairTime(pair)) : null,
-    el('span', { class: 'pair__subject' }, pair.subjectName),
+    el('span', { class: 'pair__subject', title: pair.subjectName }, hyphenate(pair.subjectName)),
     who.length > 0 ? el('span', { class: 'pair__line' }, who) : null,
     cancelled ? null : el('span', { class: 'pair__line pair__line--topic' + (lesson ? '' : ' is-none') },
       lesson ? t(lesson.key, lesson.params) : t('pairs.noTopic')),

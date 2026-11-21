@@ -25,7 +25,7 @@ const blank = () => ({
   loading: false,
   loadErrorKey: null,
   ticket: 0,
-  status: null,        // { key, params }: what the last change did
+  status: null,        // { key, params, busy }: what the last change did; busy — pairs left with the old teacher
   freshIds: [],        // subjects just added or given another teacher: their rows are marked
   dialog: null,        // { kind: 'add' | 'group', ... }
 });
@@ -98,7 +98,8 @@ function reloadFailure(id) {
 function body() {
   const { rows } = state.data;
   const notes = el('div', { class: 'notes', role: 'status' },
-    state.status ? note('success', t(state.status.key, state.status.params)) : null);
+    state.status ? note('success', t(state.status.key, state.status.params)) : null,
+    state.status && state.status.busy > 0 ? note('warning', tCount('subjects.edit.busy', state.status.busy)) : null);
   if (rows.length === 0) {
     return el('div', { class: 'stack' }, notes, reloadFailure('subjects-retry'),
       emptyState('book',
@@ -516,10 +517,12 @@ async function saveTeacher(d) {
   Object.assign(d, { busy: 'save', teacherError: null, messageKey: null });
   refresh();
   try {
-    await call('dir.save', { table: 'subjects', row: { id: d.subjectId, teacherId: d.teacherId } });
+    const answer = await call('dir.save', { table: 'subjects', row: { id: d.subjectId, teacherId: d.teacherId } });
     if (state !== owner) return;
-    // The group moves to the row of its new teacher; its chip keeps its id there.
-    Object.assign(owner, { dialog: null, freshIds: [d.subjectId], status: { key: 'subjects.edit.saved', params: { group: d.groupName } } });
+    // The group moves to the row of its new teacher; its chip keeps its id there. Its pairs went to the new teacher,
+    // except those at a time the new teacher already teaches: the screen says how many stayed.
+    const busy = Number(answer && answer.skippedBusy) || 0;
+    Object.assign(owner, { dialog: null, freshIds: [d.subjectId], status: { key: 'subjects.edit.saved', params: { group: d.groupName }, busy } });
     refresh();
     focusById(d.returnId, 'subjects-add');
     load();
