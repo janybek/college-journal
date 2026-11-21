@@ -1,7 +1,8 @@
 // Subjects and their disciplines for the handlers and for setup. No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
 import { normalizeRow, validateRow } from '../core/validate.js';
-import { scheduleFit, syllabusFor, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
+import { scheduleFit, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
+import { rightsOn, versionsOf } from '../core/syllabusFlow.js';
 import { rolesOf } from './users.js';
 import { loadSettings } from './scheduleData.js';
 
@@ -86,7 +87,7 @@ const byName = (a, b) => cmp(String(a).toLowerCase(), String(b).toLowerCase());
 
 // 'subjects.overview': one row per «discipline + teacher» with the groups they teach it in, and the state of the syllabus for the current semester.
 // Every sheet is read once; nothing is written.
-export function subjectsOverview(store) {
+export function subjectsOverview(store, user) {
   const subjects = store.list('subjects');
   const groups = store.list('groups');
   const staff = store.list('staff');
@@ -115,7 +116,9 @@ export function subjectsOverview(store) {
   }
   const rows = [...byKey.values()].map((list) => {
     const { disciplineId, teacherId } = list[0];
-    const current = syllabusFor(list[0], syllabi, settings.semester);
+    const { approved: current, open } = versionsOf(syllabi, { disciplineId, teacherId, semester: settings.semester });
+    // the prorector does not see drafts
+    const openStatus = open && rightsOn(open, { id: user.id, roles: user.roles, teaches: false }).see ? open.status : null;
     const totals = syllabusTotals(current ? index.topicsOf.get(current.id) || [] : []);
     const discipline = disciplineOf.get(disciplineId);
     return {
@@ -125,7 +128,7 @@ export function subjectsOverview(store) {
         subjectId: s.id, groupId: s.groupId, groupName: groupOf.has(s.groupId) ? groupOf.get(s.groupId).name : '',
         scheduledPairs: scheduleFit([], pairsOf.get(s.id) || [], settings).pairs,
       })).sort((a, b) => byName(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId)),
-      uploaded: current !== null,
+      uploaded: current !== null, syllabusStatus: current !== null ? 'approved' : 'none', open: openStatus,
       otherSemester: syllabi.some((y) => y.disciplineId === disciplineId && y.teacherId === teacherId && y.status === 'approved' && y.semester !== settings.semester),
       plannedHours: totals.hours, plannedPairs: totals.pairs,
     };
@@ -133,7 +136,7 @@ export function subjectsOverview(store) {
 
   return {
     currentSemester: settings.semester,
-    rows,
+    rows, reviewCount: syllabi.filter((y) => y.status === 'review').length,
     disciplines: disciplines.map((d) => ({ id: d.id, name: d.name })).sort((a, b) => byName(a.name, b.name) || cmp(a.id, b.id)),
     groups: groups.map((g) => ({ id: g.id, name: g.name })).sort((a, b) => byName(a.name, b.name) || cmp(a.id, b.id)),
     teachers: staff.filter((s) => s.active === true && rolesOf(s, 'staff').includes('teacher'))

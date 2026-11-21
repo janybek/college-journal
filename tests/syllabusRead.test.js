@@ -17,7 +17,7 @@ test('syllabus.get: the page of a subject', () => {
   assert.deepEqual([d.today, d.currentSemester, d.semesters, d.semester, d.canUpload], ['2026-08-31', 1, [{ semester: 1, planSemester: 1 }], 1, true]);
   assert.deepEqual(d.subject, { id: sb1, name: 'Информатика', disciplineId: ds1, groupId: g1, groupName: '01-1', course: 1, teacherId: staff.teacher1, teacherName: 'teacher1' });
   assert.deepEqual(d.groups, [{ subjectId: sb1, groupName: '01-1' }, { subjectId: sb3, groupName: '02-1' }]);
-  const { rows, totals, schedule, ...info } = d.syllabus;
+  const { rows, totals, schedule, title, goals, selfWork, literature, software, policies, units, ...info } = d.syllabus;
   assert.deepEqual(info, { planSemester: 1, audience: 'Сестринское дело', credits: 1, totalHours: 10, classHours: 6, selfHours: 4, updated: '2026-08-31' });
   // a row is one lesson: its kind, the number of the kind (Л1, П1, П2), the hours; the earlier fields stay for the screens
   assert.deepEqual(rows.map((r) => [r.lessonKind, r.number, r.name, r.hours, r.kind, r.lectureHours, r.practiceHours, r.label]),
@@ -73,13 +73,13 @@ test('syllabus.get: who sees which subject', () => {
 test('subjects.overview and student.subjects', () => {
   const { call, prorector, dean, teacher1, s1, s2, staff, ds1, ds2, g1, g2, sb1, sb2, sb3 } = ready();
   const view = call('subjects.overview', {}, prorector).data;
-  assert.equal(view.currentSemester, 1);
+  assert.deepEqual([view.currentSemester, view.reviewCount], [1, 0]);
   assert.deepEqual(view.rows, [
     { disciplineId: ds2, disciplineName: 'Анатомия', teacherId: staff.teacher2, teacherName: 'teacher2',
-      groups: [{ subjectId: sb2, groupId: g2, groupName: '02-1', scheduledPairs: 2 }], uploaded: false, otherSemester: false, plannedHours: 0, plannedPairs: 0 },
+      groups: [{ subjectId: sb2, groupId: g2, groupName: '02-1', scheduledPairs: 2 }], uploaded: false, syllabusStatus: 'none', open: null, otherSemester: false, plannedHours: 0, plannedPairs: 0 },
     { disciplineId: ds1, disciplineName: 'Информатика', teacherId: staff.teacher1, teacherName: 'teacher1',
       groups: [{ subjectId: sb1, groupId: g1, groupName: '01-1', scheduledPairs: 2 }, { subjectId: sb3, groupId: g2, groupName: '02-1', scheduledPairs: 2 }],
-      uploaded: true, otherSemester: false, plannedHours: 6, plannedPairs: 3 }]);
+      uploaded: true, syllabusStatus: 'approved', open: null, otherSemester: false, plannedHours: 6, plannedPairs: 3 }]);
   assert.deepEqual(view.disciplines, [{ id: ds2, name: 'Анатомия' }, { id: ds1, name: 'Информатика' }]);
   assert.deepEqual(view.groups, [{ id: g1, name: '01-1' }, { id: g2, name: '02-1' }]);
   assert.deepEqual(view.teachers, [{ id: staff.dean, fullName: 'dean' }, { id: staff.teacher1, fullName: 'teacher1' }, { id: staff.teacher2, fullName: 'teacher2' }]);
@@ -105,9 +105,11 @@ test('a syllabus of another semester only counts as otherSemester in the overvie
 
 test('reading: every sheet once, nothing written', () => {
   const { call, lists, calls, writes, reset, sb1, dean, teacher1, s1 } = ready();
-  const page = { subjects: 1, groups: 1, staff: 1, syllabi: 1, topics: 1, pairs: 1, settings: 1 };
+  const overview = { subjects: 1, groups: 1, staff: 1, syllabi: 1, topics: 1, pairs: 1, settings: 1, disciplines: 1 };
+  const page = { subjects: 1, groups: 1, staff: 1, syllabi: 1, pairs: 1, settings: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1 };
   for (const [action, data, token, expected] of [['syllabus.get', { subjectId: sb1 }, s1, page], ['syllabus.get', { subjectId: sb1 }, teacher1, page],
-    ['subjects.overview', {}, dean, { ...page, disciplines: 1 }], ['student.subjects', {}, s1, { subjects: 1, staff: 1, syllabi: 1 }]]) {
+    ['syllabus.get', { subjectId: sb1, version: 'open' }, dean, page], ['subjects.overview', {}, dean, overview],
+    ['student.subjects', {}, s1, { subjects: 1, staff: 1, syllabi: 1 }]]) {
     reset();
     assert.equal(call(action, data, token).ok, true);
     assert.deepEqual(lists, expected, action);
@@ -138,4 +140,104 @@ test('only an approved version of another half of the year counts as otherSemest
   assert.deepEqual([draft !== undefined, overview().otherSemester], [true, false]);
   publish(sb1, file([T('Весна', 2, ''), M], [['Семестр', 2]]));
   assert.equal(overview().otherSemester, true);
+});
+
+// ---- the page with every section and version (task 40) ----
+
+test('syllabus.get: every section of the approved version', () => {
+  const { get, dean } = ready();
+  const d = get(dean).data;
+  assert.deepEqual([d.shown, d.hidden, d.state.approved, d.state.open], ['approved', false, { version: 1, decidedAt: '2026-08-31' }, null]);
+  for (const key of ['title', 'goals', 'selfWork', 'literature', 'software', 'policies', 'units']) assert.equal(key in d.syllabus, true, key);
+  assert.deepEqual([d.syllabus.title.department, d.syllabus.goals.goal, d.syllabus.units.units.map((u) => u.unit)], ['Кафедра информатики', 'Цель курса', [1]]);
+  assert.equal(JSON.stringify(d).includes('passwordHash'), false);
+});
+
+test('who sees which version: a student never sees an open version or a remark; under review the syllabus is hidden from students', () => {   // Review Focus 23
+  const { call, get, draft, lessons, pairOf, dean, prorector, teacher1, teacher2, s1, staff, sb1 } = ready();
+  const page = (token, data = {}) => get(token, { subjectId: sb1, ...data });
+  // no open version yet: the student and the prorector get the same refusal as for a draft; the deanery and the teacher of the subject get syllabus null
+  assert.deepEqual([page(s1, { version: 'open' }).error, page(prorector, { version: 'open' }).error, page(dean, { version: 'open' }).data.syllabus,
+    page(teacher1, { version: 'open' }).data.syllabus], [{ code: 'forbidden' }, { code: 'forbidden' }, null, null]);
+  const open = draft(sb1, 1, teacher1);                                                      // a copy of the approved one
+  // a draft: the student sees the approved version and knows nothing of the open one
+  assert.deepEqual([page(s1).data.shown, page(s1).data.state.open, page(s1).data.hidden, page(s1, { version: 'open' }).error], ['approved', null, false, { code: 'forbidden' }]);
+  assert.deepEqual([page(teacher1).data.state.open.status, page(teacher1, { version: 'open' }).data.shown, page(dean, { version: 'open' }).data.syllabus.rows.length > 0], ['draft', 'open', true]);
+  assert.deepEqual([page(prorector).data.state.open, page(prorector, { version: 'open' }).error], [null, { code: 'forbidden' }]);
+  assert.deepEqual(page(teacher1, { version: 'open' }).data.syllabus.schedule, null);
+  assert.deepEqual(page(teacher1, { version: 'open' }).data.syllabus.rows.map((r) => r.pairs), [[], [], [], []]);
+  // under review: the student sees no syllabus at all, nor in the list of subjects; the lessons on the pairs stay
+  call('syllabus.submit', { syllabusId: open }, teacher1);
+  assert.deepEqual([page(s1).data.syllabus, page(s1).data.hidden, call('student.subjects', {}, s1).data.subjects.find((x) => x.id === sb1).hasSyllabus], [null, true, false]);
+  assert.deepEqual(lessons(sb1).map((x) => x[1]), ['Введение', 'Введение']);
+  assert.deepEqual([page(teacher1).data.hidden, page(prorector, { version: 'open' }).data.shown], [false, 'open']);
+  // returned: the student sees the approved version again; the remark is in no field of his answer nor of the replacing teacher's
+  call('syllabus.return', { syllabusId: open, remark: 'ТАЙНОЕ-ЗАМЕЧАНИЕ' }, dean);
+  call('schedule.changePair', { id: pairOf(sb1, '2026-09-08').id, teacherId: staff.teacher2 }, dean);
+  for (const token of [s1, teacher2]) assert.equal(JSON.stringify(page(token)).includes('ТАЙНОЕ-ЗАМЕЧАНИЕ'), false);
+  assert.deepEqual([page(s1).data.hidden, page(s1).data.shown, page(teacher2, { version: 'open' }).error], [false, 'approved', { code: 'forbidden' }]);
+  for (const token of [teacher1, dean, prorector]) assert.equal(page(token).data.state.open.remark, 'ТАЙНОЕ-ЗАМЕЧАНИЕ');
+  assert.equal(page(teacher1).data.state.open.status, 'returned');
+  for (const version of [['open'], 'draft', 'archived', ' open', 5, null]) assert.deepEqual(page(dean, { version }).error, { code: 'bad_request' });
+});
+
+test('a draft and its remark never reach a student, whatever the status', () => {
+  const { call, get, draft, save, dean, teacher1, s1, sb1 } = ready();
+  const open = draft(sb1, 1, teacher1);
+  const title = get(dean, { subjectId: sb1, version: 'open' }).data.syllabus.title;
+  save(open, 'title', { ...title, department: 'ЧЕРНОВИК-КАФЕДРА' }, teacher1);
+  const seen = () => JSON.stringify([get(s1), call('student.subjects', {}, s1)]);
+  for (const status of ['draft', 'review', 'returned']) {
+    if (status === 'review') call('syllabus.submit', { syllabusId: open }, teacher1);
+    if (status === 'returned') call('syllabus.return', { syllabusId: open, remark: 'СЕКРЕТ' }, dean);
+    assert.equal(seen().includes('ЧЕРНОВИК-КАФЕДРА') || seen().includes('СЕКРЕТ'), false, status);
+  }
+});
+
+test('the halves of the year are hidden separately', () => {                                          // Review Focus 32
+  const { call, draft, fill, dean, teacher1, s1, sb1 } = ready();
+  const spring = draft(sb1, 2, teacher1);
+  fill(spring, teacher1);
+  call('syllabus.submit', { syllabusId: spring }, teacher1);
+  const page = (data = {}) => call('syllabus.get', { subjectId: sb1, ...data }, s1).data;
+  assert.deepEqual([page().hidden, page().syllabus !== null, page({ semester: 2 }).syllabus, page({ semester: 2 }).hidden,
+    call('student.subjects', {}, s1).data.subjects.find((x) => x.id === sb1).hasSyllabus], [false, true, null, false, true]);
+  // both halves approved, the current one (1st) under review again: without the parameter semester the student reads «updating», not the other half;
+  // the hidden half stays in `semesters`
+  call('syllabus.approve', { syllabusId: spring }, dean);
+  const autumn = draft(sb1, 1, teacher1);
+  call('syllabus.submit', { syllabusId: autumn }, teacher1);
+  assert.deepEqual([page().hidden, page().syllabus, page().semesters.map((x) => x.semester)], [true, null, [1, 2]]);
+  assert.deepEqual([page({ semester: 2 }).hidden, page({ semester: 2 }).syllabus !== null], [false, true]);
+});
+
+test('can: what each person may do from the page', () => {
+  const { call, draft, dean, prorector, teacher1, teacher2, s1, s2, sb1, sb2 } = ready();
+  const can = (token, subjectId = sb1) => Object.entries(call('syllabus.get', { subjectId }, token).data.can).filter(([, yes]) => yes).map(([k]) => k).join();
+  assert.deepEqual([can(teacher2, sb2), can(dean, sb2), can(prorector, sb2), can(s2, sb2)], ['fill,edit', 'fill,edit', '', '']);      // no versions
+  assert.deepEqual([can(teacher1), can(dean), can(s1)], ['edit', 'edit', '']);                                             // an approved one
+  const open = draft(sb1, 1, teacher1);
+  assert.deepEqual([can(teacher1), can(dean)], ['edit,submit', 'edit,submit,approve']);
+  call('syllabus.submit', { syllabusId: open }, dean);
+  assert.deepEqual([can(teacher1), can(dean)], ['', 'approve,giveBack']);
+  assert.equal(call('syllabus.get', { subjectId: sb1 }, teacher1).data.canUpload, false);
+});
+
+test('statuses in the lists: the overview of the deanery and the subjects of a teacher', () => {
+  const { call, draft, reset, lists, writes, calls, dean, prorector, teacher1, teacher2, sb1, sb2 } = ready();
+  const row = (token = dean, name = 'Информатика') => call('subjects.overview', {}, token).data.rows.find((r) => r.disciplineName === name);
+  assert.deepEqual([row().syllabusStatus, row().open, call('subjects.overview', {}, dean).data.reviewCount], ['approved', null, 0]);
+  // a draft of the other half does not give the mark «a syllabus of another semester exists»
+  draft(sb2, 2, teacher2);
+  assert.deepEqual([row(dean, 'Анатомия').syllabusStatus, row(dean, 'Анатомия').otherSemester, row(dean, 'Анатомия').open], ['none', false, null]);
+  const open = draft(sb1, 1, teacher1);
+  assert.deepEqual([row().open, row(prorector).open], ['draft', null]);                         // the prorector does not see drafts
+  call('syllabus.submit', { syllabusId: open }, teacher1);
+  assert.deepEqual([row().syllabusStatus, row().open, row(prorector).open, call('subjects.overview', {}, dean).data.reviewCount], ['approved', 'review', 'review', 1]);
+  assert.deepEqual(call('teacher.mySubjects', {}, teacher1).data.subjects.map((x) => x.syllabus), [{ approved: true, open: 'review' }, { approved: true, open: 'review' }]);
+  assert.deepEqual(call('teacher.mySubjects', {}, teacher2).data.subjects.map((x) => x.syllabus), [{ approved: false, open: null }]);
+  // speed: «My subjects» reads every sheet once and writes nothing
+  reset();
+  call('teacher.mySubjects', {}, teacher1);
+  assert.deepEqual([lists, writes, calls.get], [{ groups: 1, students: 1, subjects: 1, syllabi: 1, settings: 1 }, {}, 1]);
 });

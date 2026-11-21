@@ -399,6 +399,23 @@ test('who uploads: the teacher of the subject, the deanery, the administrator; n
   assert.equal(store.list('syllabi').find((s) => s.id === mine).status, 'returned');
 });
 
+test('a file fills a returned version as it fills a draft; the remark of the deanery stays', () => {
+  const { store, send, call, fill, dean, teacher1, sb1 } = setup();
+  const mine = send('syllabus.apply', sb1, A, teacher1).data.drafts[0].syllabusId;
+  fill(mine, dean);
+  assert.equal(call('syllabus.submit', { syllabusId: mine }, teacher1).data.submitted, true);
+  assert.equal(call('syllabus.return', { syllabusId: mine, remark: 'Доработать тему' }, dean).data.returned, true);
+  const before = store.list('syllabi').find((s) => s.id === mine);
+  const done = send('syllabus.apply', sb1, file([T('Новая тема', 2, ''), M]), teacher1).data;
+  assert.deepEqual([done.applied, done.drafts.map((d) => d.syllabusId)], [true, [mine]]);
+  const after = store.list('syllabi').find((s) => s.id === mine);
+  assert.deepEqual([after.status, after.remark, after.version, store.list('syllabi').length], ['returned', 'Доработать тему', before.version, 1]);
+  assert.deepEqual(topicsOf(store, mine).map((t) => t.name).filter((n) => n !== ''), ['Новая тема']);
+  // the remark is still in the page of the teacher and the deanery; the version is still returned and can be submitted again
+  for (const token of [teacher1, dean]) assert.equal(call('syllabus.get', { subjectId: sb1 }, token).data.state.open.remark, 'Доработать тему');
+  assert.equal(call('syllabus.submit', { syllabusId: mine }, teacher1).data.submitted, true);
+});
+
 test('Kyrgyz names: every row of the file becomes a lesson or is named in a remark', () => {
   const { send, store, teacher2, sb2 } = setup();
   const done = send('syllabus.apply', sb2, file([T('Жалпы анатомия', 2, 2), T('Жыйынтыктоочу сабак', 2, ''), [1, '', 'Жалпы: 6 саат', '', '', '', ''], [1, '', '', '', '', 'аралык көзөмөл', '']]), teacher2).data;

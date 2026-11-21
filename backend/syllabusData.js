@@ -1,11 +1,13 @@
 // Reading: the page of a syllabus and the subjects of a student. Every sheet is read once; nothing is written.
 // No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
-import { scheduleFit, subjectScope, syllabusFor, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
+import { scheduleFit, subjectScope, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
 import { controlMarks, lessonKey, lessonTypeOf, lessonsOf } from '../core/topics.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
-import { can } from '../core/permissions.js';
+import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
+import { rightsOn, versionsOf } from '../core/syllabusFlow.js';
 import { loadSettings, todayOf } from './scheduleData.js';
+import { readTables, viewerOf } from './syllabusDraft.js';
 
 const MANAGER_ROLES = ['admin', 'dean', 'prorector'];
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -41,11 +43,28 @@ function pageRow(row, own, marks, numbers) {
   };
 }
 
-// 'syllabus.get': the syllabus of the subject's discipline and teacher, with the dates of THIS subject's group.
+// The page of one version: the earlier summary fields stay for the screens that still read them; the sections come from the document.
+function shownVersion(version, rows, own, settings, subject, index, current) {
+  const marks = controlMarks(rows.topics);
+  const numbers = lessonNumbers(rows.topics);
+  const doc = buildDoc(version, rows);
+  return {
+    planSemester: version.planSemester, audience: version.audience, credits: version.credits, totalHours: version.totalHours,
+    classHours: version.classHours, selfHours: version.selfHours, updated: version.updated,
+    rows: rows.topics.map((r) => pageRow(r, own, marks, numbers)),
+    totals: syllabusTotals(rows.topics),
+    schedule: current ? scheduleFit(rows.topics, own, settings, subjectScope(subject, own, index, settings).skip) : null,
+    title: doc.title, goals: doc.goals, selfWork: doc.selfWork, literature: doc.literature, software: doc.software, policies: doc.policies, units: doc.units,
+  };
+}
+
+// 'syllabus.get' { subjectId, semester?, version? }: the syllabus of the subject's discipline and teacher, with the dates of THIS subject's group.
+// version: 'approved' (default) or 'open'.
 export function syllabusPage(store, platform, data, user) {
-  const { subjectId, semester: asked } = data;
+  const { subjectId, semester: asked, version: want = 'approved' } = data;
   if (typeof subjectId !== 'string') throw new AppError('bad_request');
   if (asked !== undefined && asked !== 1 && asked !== 2) throw new AppError('bad_request');
+  if (want !== 'approved' && want !== 'open') throw new AppError('bad_request');
 
   const subjects = store.list('subjects');
   const subject = subjects.find((s) => s.id === subjectId);
@@ -53,15 +72,16 @@ export function syllabusPage(store, platform, data, user) {
   const groups = store.list('groups');
   const staff = store.list('staff');
   const syllabi = store.list('syllabi');
-  const topics = store.list('topics');
   const pairs = store.list('pairs');
   const settings = loadSettings(store);
+  const tables = readTables(store, DOC_TABLES);
 
   const isManager = user.roles.some((r) => MANAGER_ROLES.includes(r));
   const isTeacher = user.kind === 'staff' && user.roles.includes('teacher');
   const isOwnTeacher = isTeacher && subject.teacherId === user.id;
   const covers = isTeacher && pairs.some((p) => p.subjectId === subject.id && p.teacherId === user.id);
-  const ownGroup = user.kind === 'student' && typeof subject.groupId === 'string' && subject.groupId !== '' && subject.groupId === user.row.groupId;
+  const isStudent = user.kind === 'student';
+  const ownGroup = isStudent && typeof subject.groupId === 'string' && subject.groupId !== '' && subject.groupId === user.row.groupId;
   if (!(isManager || isOwnTeacher || covers || ownGroup)) throw new AppError('forbidden');
 
   const groupName = (id) => (groups.find((g) => g.id === id) || { name: '' }).name;
@@ -74,36 +94,59 @@ export function syllabusPage(store, platform, data, user) {
     .map((s) => ({ subjectId: s.id, groupName: groupName(s.groupId) }))
     .sort((a, b) => cmp(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId));
 
-  const loaded = hasDiscipline
-    ? syllabi.filter((s) => s.disciplineId === subject.disciplineId && s.teacherId === subject.teacherId && s.status === 'approved')
-      .map((s) => ({ semester: s.semester, planSemester: s.planSemester })).sort((a, b) => a.semester - b.semester)
-    : [];
-  const semester = shownSemester(asked, settings.semester, loaded);
-
-  const index = syllabusIndex(syllabi, topics);
-  const row = syllabusFor(subject, syllabi, semester);
-  const rows = row ? index.topicsOf.get(row.id) || [] : [];
-  const own = pairs.filter((p) => p.subjectId === subject.id);
-  let syllabus = null;
-  if (row) {
-    const marks = controlMarks(rows);
-    const numbers = lessonNumbers(rows);
-    const current = semester === settings.semester;
-    syllabus = {
-      planSemester: row.planSemester, audience: row.audience, credits: row.credits, totalHours: row.totalHours,
-      classHours: row.classHours, selfHours: row.selfHours, updated: row.updated,
-      rows: rows.map((r) => pageRow(r, own, marks, numbers)),
-      totals: syllabusTotals(rows),
-      schedule: current ? scheduleFit(rows, own, settings, subjectScope(subject, own, index, settings).skip) : null,
-    };
+  // both halves of the year: the approved version, the open one and what this person may do with the open one
+  const halves = {};
+  for (const half of [1, 2]) {
+    const { approved, open } = hasDiscipline ? versionsOf(syllabi, { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: half }) : { approved: null, open: null };
+    halves[half] = { approved, open, rights: open ? rightsOn(open, viewerOf(user, open, subjects)) : null };
   }
+  const seenOpen = (half) => halves[half].rights !== null && halves[half].rights.see;
+  // the half hidden from a student stays in the list: else he would be shown the other half instead of «updating»
+  const loaded = [1, 2].filter((h) => halves[h].approved || seenOpen(h))
+    .map((h) => ({ semester: h, planSemester: (halves[h].approved || halves[h].open).planSemester }));
+  const semester = shownSemester(asked, settings.semester, loaded);
+  const { approved, open } = halves[semester];
+
+  const mayCreate = hasDiscipline && (user.roles.includes('admin') || user.roles.includes('dean') || isOwnTeacher);
+  let shown = 'approved';
+  let version = approved;
+  let hidden = false;
+  if (want === 'open') {
+    // nobody but the deanery, the administrator and the teacher of the subject may learn that an open version does not exist
+    if (seenOpen(semester)) version = open;
+    else if (user.roles.includes('admin') || user.roles.includes('dean') || isOwnTeacher) version = null;
+    else throw new AppError('forbidden');
+    shown = 'open';
+  } else if (isStudent && approved && open && open.status === 'review') {
+    hidden = true;
+    version = null;
+  }
+
+  const index = syllabusIndex(syllabi, tables.topics);
+  let syllabus = null;
+  if (version) {
+    const own = shown === 'open' ? [] : pairs.filter((p) => p.subjectId === subject.id);
+    syllabus = shownVersion(version, rowsOfVersion(tables, version.id), own, settings, subject, index, shown === 'approved' && semester === settings.semester);
+  }
+  const rights = halves[semester].rights || { edit: false, submit: false, approve: false, giveBack: false };
+  const can = {
+    fill: mayCreate && !approved && !open, edit: open ? rights.edit : mayCreate,
+    submit: rights.submit, approve: rights.approve, giveBack: rights.giveBack,
+  };
   return {
     today: todayOf(platform), currentSemester: settings.semester,
     subject: {
       id: subject.id, name: subject.name, disciplineId: subject.disciplineId, groupId: subject.groupId, groupName: group ? group.name : '',
       course: group ? group.course : null, teacherId: subject.teacherId, teacherName: teacher ? teacher.fullName : '',
     },
-    groups: shownGroups, semesters: loaded, semester, canUpload: can(user.roles, 'syllabus.apply'), syllabus,
+    groups: shownGroups, semesters: loaded, semester, shown, hidden,
+    state: {
+      approved: approved ? { version: approved.version, decidedAt: approved.decidedAt ?? '' } : null,
+      open: seenOpen(semester)
+        ? { syllabusId: open.id, status: open.status, version: open.version, remark: open.remark ?? '', submittedAt: open.submittedAt ?? '', updated: open.updated ?? '' }
+        : null,
+    },
+    can, canUpload: can.edit, syllabus,
   };
 }
 
@@ -115,7 +158,11 @@ export function studentSubjects(store, user) {
   const groupId = user.row.groupId;
   const mine = typeof groupId === 'string' && groupId !== '' ? subjects.filter((s) => s.groupId === groupId) : [];
   const teacherName = (id) => (staff.find((s) => s.id === id) || { fullName: '' }).fullName;
-  const has = (s) => typeof s.disciplineId === 'string' && s.disciplineId !== '' && syllabi.some((y) => y.disciplineId === s.disciplineId && y.teacherId === s.teacherId && y.status === 'approved');
+  // an approved version of any half of the year that is not hidden (the open version of that half is not under review)
+  const has = (s) => typeof s.disciplineId === 'string' && s.disciplineId !== '' && [1, 2].some((semester) => {
+    const { approved, open } = versionsOf(syllabi, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester });
+    return approved !== null && !(open !== null && open.status === 'review');
+  });
   return {
     subjects: mine.sort((a, b) => cmp(String(a.name).toLowerCase(), String(b.name).toLowerCase()) || cmp(a.id, b.id))
       .map((s) => ({ id: s.id, name: s.name, teacherName: teacherName(s.teacherId), hasSyllabus: has(s) })),

@@ -3,7 +3,9 @@ import { addDays, mondayOf } from '../core/dates.js';
 import { DEFAULT_BELLS, settingsToRows } from '../core/settings.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { generateSchedule, relayout, todayOf } from '../backend/scheduleData.js';
-import { publishSyllabusDoc } from '../backend/syllabusUpload.js';
+import { publishSyllabusDoc, uploadSyllabus } from '../backend/syllabusUpload.js';
+import { draftForm, saveSection, startDraft } from '../backend/syllabusDraft.js';
+import { approveSyllabus, returnSyllabus, submitSyllabus } from '../backend/syllabusFlow.js';
 
 // One password for every fictional person of the dev stand.
 export const DEV_PASSWORD = 'journal2026';
@@ -63,6 +65,109 @@ const SYLLABUS_2 = sheetsOf([
   [2, '', 'Экзамен', '', 2, 'модуль', '', ''],
 ]);
 
+// The sections of the approved syllabus of «Информатика», semester 1 (fictional): everything the form has besides the file.
+const BOOK = (authors, title, year, publisher) => ({ authors, title, year, publisher, availability: 'библиотека колледжа' });
+const SECTIONS_1 = {
+  title: {
+    department: 'Кафедра информатики и медицинской техники', faculty: 'Факультет сестринского дела', academicYear: '2026–2027', course: 1,
+    contacts: 'teacher1@example.test, приём по вторникам с 14:00', place: 'Кабинет 204, главный корпус',
+  },
+  goals: {
+    goal: 'Научить будущего медика уверенно работать с компьютером и медицинской информационной системой.',
+    knowledge: ['устройство рабочего места и правила работы в кабинете', 'основные функции медицинской информационной системы (МИС)', 'правила защиты персональных данных пациента'],
+    skill: ['вести электронную карту пациента', 'искать и проверять медицинскую информацию', 'составлять документы и таблицы учёта'],
+    attitude: ['бережное отношение к данным пациента', 'аккуратность при работе с техникой', 'готовность учиться новым программам'],
+    prerequisite: ['школьный курс информатики'], postrequisite: ['клиническая практика', 'медицинская статистика'],
+  },
+  selfWork: { items: [
+    { unit: 1, name: 'Памятка по кибергигиене', tasks: 'Составить памятку из десяти правил для поста медсестры.', hours: 2 },
+    { unit: 1, name: 'Обзор медицинского справочника', tasks: 'Найти и сравнить два источника по одному препарату.', hours: 4 },
+    { unit: 2, name: 'График дежурств в таблице', tasks: 'Собрать график дежурств на месяц с проверкой выходных.', hours: 4 },
+    { unit: 2, name: 'Таблица учёта препаратов', tasks: 'Заполнить таблицу учёта и посчитать остатки формулами.', hours: 4 },
+  ] },
+  literature: {
+    main: [BOOK('Асанов А.', 'Информатика для медицинских колледжей', '2022', 'Учебное издательство'), BOOK('Бекова Э.', 'Медицинские информационные системы', '2021', 'Научный центр'),
+      BOOK('Исаев Р.', 'Основы работы с электронными таблицами', '2020', 'Городская типография')],
+    extra: [BOOK('Орозов Т.', 'Защита данных в здравоохранении', '2023', 'Учебное издательство'), BOOK('Садыкова Н.', 'Цифровая гигиена', '2022', 'Научный центр')],
+  },
+  software: { items: [{ name: 'LibreOffice Calc', link: 'https://www.libreoffice.org/' }, { name: 'Учебная версия МИС колледжа', link: '' }] },
+  policies: {
+    grading: [
+      { name: 'Текущий контроль', maxPoints: 40, rangeFail: '0–19', rangeFair: '20–27', rangeGood: '28–35', rangeExcellent: '36–40',
+        criteriaFail: 'Задания не выполнены.', criteriaFair: 'Выполнено больше половины заданий.', criteriaGood: 'Выполнено почти всё, есть мелкие ошибки.', criteriaExcellent: 'Выполнено всё без ошибок.' },
+      { name: 'Рубежный контроль', maxPoints: 30, rangeFail: '0–14', rangeFair: '15–20', rangeGood: '21–26', rangeExcellent: '27–30',
+        criteriaFail: 'Тест не пройден.', criteriaFair: 'Верно больше половины ответов.', criteriaGood: 'Верно большинство ответов.', criteriaExcellent: 'Верны почти все ответы.' },
+      { name: 'Итоговый зачёт', maxPoints: 30, rangeFail: '0–14', rangeFair: '15–20', rangeGood: '21–26', rangeExcellent: '27–30',
+        criteriaFail: 'Работа не сдана.', criteriaFair: 'Работа выполнена частично.', criteriaGood: 'Работа выполнена с мелкими замечаниями.', criteriaExcellent: 'Работа выполнена полностью.' },
+    ],
+    behavior: ['Приходить на пару вовремя.', 'Телефон в кабинете выключен, если задание не требует его.', 'Техника в кабинете остаётся в порядке.'],
+    ethics: ['Задания выполняются самостоятельно.', 'Чужие данные пациентов не копируются и не пересылаются.', 'Преподавателю и однокурсникам отвечают вежливо.'],
+    sanctionBehavior: 'Замечание, затем беседа с куратором группы.', sanctionEthics: 'Работа не засчитывается, пересдача по решению преподавателя.',
+  },
+  units: { units: [
+    { unit: 1, description: 'Рабочее место медсестры, защита данных и поиск медицинской информации.', questions: 'Что такое врачебная тайна в цифровой среде?\nКак проверить источник инструкции к препарату?',
+      guidance: '', results: '', literature: [BOOK('Асанов А.', 'Информатика для медицинских колледжей', '2022', 'Учебное издательство')] },
+    { unit: 2, description: 'Работа в МИС, документы и электронные таблицы.', questions: 'Как заполнить электронную карту пациента?\nКакие формулы нужны для расчёта дозы?',
+      guidance: '', results: '', literature: [BOOK('Исаев Р.', 'Основы работы с электронными таблицами', '2020', 'Городская типография')] },
+  ] },
+};
+
+// The anatomy syllabus (fictional): six lessons in two units, no control rows, no literature.
+const ANATOMY_PLAN = { units: [
+  { title: 'Строение тела', lecture: [{ name: 'Жалпы анатомия', hours: 2 }, { name: 'Скелет и суставы', hours: 2 }], practice: [{ name: 'Кости и суставы на муляже', hours: 2 }] },
+  { title: 'Системы органов', lecture: [{ name: 'Мышечная система', hours: 2 }], practice: [{ name: 'Мышцы на муляже', hours: 2 }, { name: 'Сердце и сосуды на муляже', hours: 2 }] },
+] };
+
+const staffOf = (store, login) => store.list('staff').find((s) => s.login === login);
+
+function sheetsApply(store, platform, subjectId, sheets, user) {
+  const done = uploadSyllabus(store, platform, { subjectId, sheets }, user, true);
+  if (!done.applied) throw new Error('seed: the sample syllabus is not applied: ' + JSON.stringify(done.errors));
+  return done.drafts[0].syllabusId;
+}
+
+// Saves a section of a version the way the form does: the stored section with the given fields over it.
+function writeSection(store, platform, user, syllabusId, section, patch) {
+  const doc = draftForm(store, platform, { syllabusId }, user).doc;
+  const base = section === 'plan' ? { units: doc.plan.units } : doc[section];
+  saveSection(store, platform, { syllabusId, section, data: { ...base, ...patch } }, user);
+}
+
+// The states of the syllabus the stand shows (all fictional), see the plan of unit 2, addendum 3:
+//   «Информатика» of teacher1, 1st half: version 1 approved with every section, version 2 returned with a remark; 2nd half: version 1 approved;
+//   «Анатомия» of teacher2: version 1 under review; «Информатика» in 03-1 (teacher3): a draft with the title only.
+function seedSyllabi(store, platform, subjects) {
+  const admin = { id: staffOf(store, 'admin').id, roles: ['admin'], kind: 'staff' };
+  const first = sheetsApply(store, platform, subjects.informatics, SYLLABUS_1, admin);
+  for (const section of ['title', 'goals', 'selfWork', 'literature', 'software', 'policies', 'units']) writeSection(store, platform, admin, first, section, SECTIONS_1[section]);
+  const approved = approveSyllabus(store, platform, { syllabusId: first }, admin);
+  if (!approved.approved) throw new Error('seed: the sample syllabus is not approved: ' + JSON.stringify(approved.checks.errors));
+
+  // the 2nd half: a file is not enough to approve — the department, the year and the goal are written the way a person would on the form
+  const { doc, errors } = parseSyllabus(SYLLABUS_2);
+  if (errors.length > 0) throw new Error('seed: the sample syllabus does not parse: ' + JSON.stringify(errors));
+  publishSyllabusDoc(store, platform, subjects.informatics, doc, admin, { department: SECTIONS_1.title.department, academicYear: '2026–2027' }, SECTIONS_1.goals.goal);
+
+  // version 2 of the 1st half: a copy with one lesson renamed, returned by the deanery
+  const second = startDraft(store, platform, { subjectId: subjects.informatics, semester: 1 }, admin).syllabusId;
+  const plan = draftForm(store, platform, { syllabusId: second }, admin).doc.plan.units;
+  plan[0].lecture[0] = { ...plan[0].lecture[0], name: `${plan[0].lecture[0].name} (новая редакция)` };
+  saveSection(store, platform, { syllabusId: second, section: 'plan', data: { units: plan } }, admin);
+  if (!submitSyllabus(store, platform, { syllabusId: second }, admin).submitted) throw new Error('seed: the second version is not submitted');
+  returnSyllabus(store, platform, { syllabusId: second, remark: 'Добавьте литературу к юниту 2' }, admin);
+
+  // «Анатомия»: under review
+  const anatomy = startDraft(store, platform, { subjectId: subjects.anatomy, semester: 1 }, admin).syllabusId;
+  writeSection(store, platform, admin, anatomy, 'title', { department: 'Кафедра анатомии и физиологии', faculty: 'Факультет сестринского дела', academicYear: '2026–2027', course: 1, credits: 2 });
+  writeSection(store, platform, admin, anatomy, 'goals', { goal: 'Дать будущему медику знание строения тела человека.' });
+  saveSection(store, platform, { syllabusId: anatomy, section: 'plan', data: ANATOMY_PLAN }, admin);
+  if (!submitSyllabus(store, platform, { syllabusId: anatomy }, admin).submitted) throw new Error('seed: the anatomy syllabus is not submitted');
+
+  // «Информатика» of teacher3 in 03-1: a draft with the title only
+  const draft = startDraft(store, platform, { subjectId: subjects.thirdInformatics, semester: 1 }, admin).syllabusId;
+  writeSection(store, platform, admin, draft, 'title', { department: 'Кафедра информатики и медицинской техники', academicYear: '2026–2027', course: 2 });
+}
+
 // Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
 export function seed(store, platform) {
   if (store.list('staff').length > 0) return;
@@ -78,7 +183,7 @@ export function seed(store, platform) {
   const rooms = {};
   for (const name of ['101', '204', '305']) rooms[name] = store.insert('rooms', { name });
 
-  let firstInformatics = null;
+  const subjects = {};
   GROUPS.forEach((def, g) => {
     const group = store.insert('groups', { name: def.name, course: def.course });
     const students = [];
@@ -101,7 +206,8 @@ export function seed(store, platform) {
     });
     const informatics = subject(disciplines['Информатика'], g < 2 ? teacher1 : teacher3);
     const anatomy = subject(disciplines['Анатомия'], teacher2);
-    if (g === 0) firstInformatics = informatics.id;
+    if (g === 0) Object.assign(subjects, { informatics: informatics.id, anatomy: anatomy.id });
+    if (g === 2) subjects.thirdInformatics = informatics.id;
     // Monday: informatics in room 204; Wednesday and Thursday: anatomy in room 101. The pair number is the group number.
     store.insertMany('weekTemplate', [
       { weekday: 1, slot: g + 1, subjectId: informatics.id, roomId: rooms['204'].id },
@@ -110,15 +216,7 @@ export function seed(store, platform) {
     ]);
   });
 
-  // The syllabus belongs to «Информатика» and teacher1: one upload serves both of his groups. teacher3 and «Анатомия» have none.
-  // A file is not enough to approve: the department, the academic year and the goal are written the way a person would on the form.
-  const admin = { id: staff.find((person) => person.login === 'admin').id, roles: ['admin'], kind: 'staff' };
-  for (const sheets of [SYLLABUS_1, SYLLABUS_2]) {
-    const { doc, errors } = parseSyllabus(sheets);
-    if (errors.length > 0) throw new Error('seed: the sample syllabus does not parse: ' + JSON.stringify(errors));
-    publishSyllabusDoc(store, platform, firstInformatics, doc, admin, { department: 'Кафедра информатики и медицинской техники', academicYear: '2026–2027' },
-      'Научить будущего медика уверенно работать с компьютером и медицинской информационной системой.');
-  }
+  seedSyllabi(store, platform, subjects);
   seedPairs(store, platform);
 }
 

@@ -120,7 +120,7 @@ test('teacher.mySubjects counts active students only', () => {
   const subjects = call('teacher.mySubjects', {}, teacher).data.subjects;
   assert.equal(subjects.length, 1);
   assert.deepEqual({ ...subjects[0], id: undefined },
-    { id: undefined, name: 'Math', groupId: group.id, groupName: '01-1', studentCount: 1 });
+    { id: undefined, name: 'Math', groupId: group.id, groupName: '01-1', studentCount: 1, syllabus: { approved: false, open: null } });
   assert.deepEqual(call('teacher.mySubjects', {}, dean).data.subjects, []);
 });
 

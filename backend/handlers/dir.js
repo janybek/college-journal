@@ -4,7 +4,8 @@ import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core
 import { readSettings } from '../../core/settings.js';
 import { USER_TABLES } from '../users.js';
 import { teacherHandover } from '../../core/schedule.js';
-import { relayout, todayOf } from '../scheduleData.js';
+import { versionsOf } from '../../core/syllabusFlow.js';
+import { loadSettings, relayout, todayOf } from '../scheduleData.js';
 
 const DIR_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'weekTemplate'];
 const LOGIN_TABLES = ['students', 'staff'];
@@ -159,18 +160,21 @@ function mySubjects(data, ctx, user) {
   const { store } = ctx;
   const groups = store.list('groups');
   const students = store.list('students').filter((s) => s.active === true);
-  const subjects = store.list('subjects')
-    .filter((s) => s.teacherId === user.id)
-    .map((s) => {
-      const group = groups.find((g) => g.id === s.groupId);
-      return {
-        id: s.id,
-        name: s.name,
-        groupId: s.groupId,
-        groupName: group ? group.name : '',
-        studentCount: students.filter((st) => st.groupId === s.groupId).length,
-      };
-    });
+  const mine = store.list('subjects').filter((s) => s.teacherId === user.id);
+  const syllabi = store.list('syllabi');
+  const half = loadSettings(store).semester;
+  const subjects = mine.map((s) => {
+    const group = groups.find((g) => g.id === s.groupId);
+    const { approved, open } = s.disciplineId ? versionsOf(syllabi, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester: half }) : { approved: null, open: null };
+    return {
+      id: s.id,
+      name: s.name,
+      groupId: s.groupId,
+      groupName: group ? group.name : '',
+      studentCount: students.filter((st) => st.groupId === s.groupId).length,
+      syllabus: { approved: approved !== null, open: open ? open.status : null },
+    };
+  });
   return { subjects };
 }
 
