@@ -96,3 +96,12 @@ test('plan row id: only undefined, null and exactly empty string mean a new row'
   assert.deepEqual([idErrors(undefined), idErrors(null), idErrors(''), idErrors('tp_1')], [[], [], [], []]);
   assert.equal(checkSection('plan', { units: [{ lecture: [{ name: 'a', hours: 2, id: '  ' }] }] }).value.units[0].lecture[0].id, '');
 });
+
+test('a unit with all fields empty and literature [] is dropped like {}; non-object items give one bad_value on field item', () => {
+  assert.deepEqual(checkSection('units', { units: [{ unit: null, description: '', literature: [] }, {}] }).value.units, []);
+  assert.deepEqual(errorsOf('units', { units: [{ literature: [] }] }), []);
+  assert.deepEqual(errorsOf('literature', { main: ['книга', 5, ['x']] }),
+    [0, 1, 2].map((index) => ({ list: 'main', index, field: 'item', code: 'bad_value' })));
+  assert.deepEqual(errorsOf('plan', { units: [{ lecture: ['тема', 7, [1]] }] }),
+    [0, 1, 2].map((index) => ({ unit: 1, list: 'lecture', index, field: 'item', code: 'bad_value' })));
+});

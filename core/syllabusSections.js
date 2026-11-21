@@ -17,6 +17,7 @@ const LINK_MAX = 500;
 
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const blank = (v) => v === undefined || v === null || (typeof v === 'string' && v.trim() === '');
+const empty = (v) => blank(v) || (Array.isArray(v) && v.length === 0);
 const textOf = (v) => (typeof v === 'string' ? v.trim() : typeof v === 'number' ? String(v) : '');
 
 export function plainId(value) {
@@ -92,11 +93,11 @@ function stringItem(max) {
 function objectItem(keys, read, keepBlank = false) {
   return (item, add) => {
     if (!isObject(item) && !blank(item)) {
-      add({ code: 'bad_value' });
+      add({ field: 'item', code: 'bad_value' });
       return undefined;
     }
     const o = isObject(item) ? item : {};
-    if (!keepBlank && keys.every((k) => blank(o[k]))) return undefined;
+    if (!keepBlank && keys.every((k) => empty(o[k]))) return undefined;
     return read(o, add);
   };
 }
@@ -152,8 +153,11 @@ function goalsSection(data) {
 
 function planRow(kind) {
   return (item, add) => {
+    if (!isObject(item) && !blank(item)) {
+      add({ field: 'item', code: 'bad_value' });
+      return undefined;
+    }
     const o = isObject(item) ? item : {};
-    if (!isObject(item) && !blank(item)) add({ code: 'bad_value' });
     const row = {};
     if (o.id === undefined || o.id === null || o.id === '') row.id = '';
     else {
