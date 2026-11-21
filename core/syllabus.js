@@ -34,7 +34,7 @@ export function subjectScope(subject, pairs, index, settings) {
   const all = pairs || [];
   const fixed = (p) => FIXED_STATUSES.includes(p.status);
   const clear = all
-    .filter((p) => !fixed(p) && !inSemester(p.date, settings) && p.topicId && (own.has(p.topicId) || !index.syllabusOf.has(p.topicId)))
+    .filter((p) => !fixed(p) && !inSemester(p.date, settings) && p.topicId && (own.has(p.topicId) || !index.syllabusOf.has(p.topicId) || index.syllabusOf.get(p.topicId).semester === settings.semester))
     .map((p) => p.id);
   const skip = all.filter((p) => {
     if (!fixed(p) || !inSemester(p.date, settings)) return false;
@@ -129,7 +129,7 @@ function planPart(half, fileRows, ctx, errors, warnings) {
     for (const lessonType of ['lecture', 'practice', 'control']) {
       const pairs = held.get(t.id).filter((p) => p.lessonType === lessonType);
       if (!pairs.length) continue;
-      const most = Math.max(...pairs.map((p) => p.part));
+      const most = Math.max(...pairs.map((p) => Number(p.part) || 1));
       if (most > partsOf(r, lessonType)) {
         partErrors.push({ sheet: 'plan', row: r.row, field: HELD_FIELD[lessonType], code: 'held_hours', held: most * HOURS_PER_PAIR, date: pairs[0].date });
       }
@@ -141,20 +141,18 @@ function planPart(half, fileRows, ctx, errors, warnings) {
   const toInsert = [];
   const toUpdate = [];
   let toRemove = [];
-  if (!partErrors.length) {
-    for (const r of file) {
-      const t = match.get(r.place);
-      const wanted = { order: r.place, unit: r.unit, label: r.label, name: r.name, lectureHours: r.lectureHours, practiceHours: r.practiceHours, practiceKind: r.practiceKind, selfHours: r.selfHours, description: r.description };
-      if (!t) {
-        toInsert.push({ syllabusId: syllabus ? syllabus.id : null, ...wanted, kind: r.kind });
-        continue;
-      }
-      const patch = {};
-      for (const field of ['order', ...ROW_FIELDS]) if (!same(field, t[field], wanted[field])) patch[field] = wanted[field];
-      if (Object.keys(patch).length) toUpdate.push({ id: t.id, patch });
+  for (const r of file) {
+    const t = match.get(r.place);
+    const wanted = { order: r.place, unit: r.unit, label: r.label, name: r.name, lectureHours: r.lectureHours, practiceHours: r.practiceHours, practiceKind: r.practiceKind, selfHours: r.selfHours, description: r.description };
+    if (!t) {
+      toInsert.push({ syllabusId: syllabus ? syllabus.id : null, ...wanted, kind: r.kind });
+      continue;
     }
-    toRemove = stored.filter((t) => !taken.has(t.id)).map((t) => t.id);
+    const patch = {};
+    for (const field of ['order', ...ROW_FIELDS]) if (!same(field, t[field], wanted[field])) patch[field] = wanted[field];
+    if (Object.keys(patch).length) toUpdate.push({ id: t.id, patch });
   }
+  toRemove = stored.filter((t) => !taken.has(t.id)).map((t) => t.id);
 
   const kindOf = new Map(stored.map((t) => [t.id, t.kind]));
   const totals = syllabusTotals(file.map((r) => ({ id: 'r' + r.place, order: r.place, ...r })));
@@ -172,7 +170,7 @@ function planPart(half, fileRows, ctx, errors, warnings) {
       semester: half, planSemester, replaces: syllabus !== null, topics: totals.topics, units: totals.units, lectureHours: totals.lectureHours,
       practiceHours: totals.practiceHours, controlHours: totals.controlHours, pairs: totals.pairs,
       added: toInsert.filter((r) => r.kind === 'topic').length,
-      changed: toUpdate.filter((u) => kindOf.get(u.id) === 'topic').length,
+      changed: toUpdate.filter((u) => kindOf.get(u.id) === 'topic' && Object.keys(u.patch).some((k) => k !== 'order')).length,
       removed: toRemove.filter((id) => kindOf.get(id) === 'topic').length,
     },
   };
@@ -187,7 +185,7 @@ export function planSyllabusUpload(doc, { discipline, teacher, syllabi, topics, 
     warnings.push({ code: 'discipline_differs', file: info.discipline, discipline: discipline.name });
   }
   const surname = norm(teacher.fullName).split(' ')[0];
-  if (norm(info.teacher) && !norm(info.teacher).includes(surname)) {
+  if (norm(info.teacher) && !norm(info.teacher).split(/[\s,;.]+/).includes(surname)) {
     warnings.push({ code: 'teacher_differs', file: info.teacher, teacher: teacher.fullName });
   }
 
@@ -199,5 +197,9 @@ export function planSyllabusUpload(doc, { discipline, teacher, syllabi, topics, 
   }
   const ctx = { doc, discipline, teacher, syllabi, topics, pairs, today };
   const parts = [...byHalf.keys()].sort((a, b) => a - b).map((half) => planPart(half, byHalf.get(half), ctx, errors, warnings));
+  // All or nothing: one error anywhere empties every part.
+  if (errors.length) {
+    for (const p of parts) Object.assign(p, { toInsert: [], toUpdate: [], toRemove: [] }, { summary: { ...p.summary, added: 0, changed: 0, removed: 0 } });
+  }
   return { errors, warnings, parts };
 }

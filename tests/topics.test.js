@@ -92,7 +92,8 @@ test('lessons of plan rows and their layout over pairs', () => {
   assert.deepEqual(lessonsOf(rows).map(lessonKey),
     ['t1|lecture|1', 't1|lecture|2', 't1|practice|1', 't2|lecture|1', 't2|practice|1', 't3|practice|1', 't3|practice|2', 'c2|control|1']);
   assert.deepEqual([partsOf(rows[2], 'lecture'), partsOf(rows[2], 'practice'), partsOf(rows[2], 'control'), partsOf(rows[4], 'control'), partsOf(rows[4], 'practice')], [2, 1, 0, 1, 0]);
-  assert.deepEqual([...controlMarks(rows)].map(([key, row]) => [key, row.id]), [['t2|practice|1', 'c1']]);
+  assert.deepEqual([...controlMarks(rows)].map(([key, list]) => [key, list.map((row) => row.id)]), [['t2|practice|1', ['c1']]]);
+  assert.deepEqual([...controlMarks([topic('t1', 1, 2, 0), control('ca', 2), control('cb', 3)])].map(([key, list]) => [key, list.map((row) => row.id)]), [['t1|lecture|1', ['ca', 'cb']]]);
   assert.equal(controlMarks([control('c0', 1), topic('t1', 2, 2, 0)]).size, 0);
   assert.deepEqual(lessonsOf([{ id: 'old', subjectId: 'sb_1', unit: 1, order: 1, name: 'Старая', lessonType: 'lecture' }]), []);
   assert.deepEqual([lessonKey(NO_LESSON), lessonKey(undefined), lessonKey({ topicId: '', lessonType: 'lecture', part: 1 }), lessonKey(L('t1', 'lecture', 2))], ['', '', '', 't1|lecture|2']);

@@ -108,10 +108,31 @@ test('planSyllabusUpload: held pairs protect their rows', () => {
   assert.deepEqual(cut.errors, [{ sheet: 'plan', row: 2, field: 'lectureHours', code: 'held_hours', held: 2, date: '2026-09-01' }]);
 });
 
+test('planSyllabusUpload: all-or-nothing across semesters, held part, changed count', () => {
+  const heldAutumn = { ...have, pairs: [{ id: 'p_1', subjectId: 'sb_7', date: '2026-09-01', slot: 1, status: 'closed', topicId: 'tp_1', lessonType: 'lecture', part: 1 }] };
+  const bad = planSyllabusUpload(doc([row('Введение', 0, 2, 2), row('Практикум', 0, 2, 3, {}), row('Весна', 2, 0, 4, { semester: 2 })], { semester: null }), heldAutumn);
+  assert.equal(bad.errors.length, 1);
+  assert.deepEqual(bad.parts.map((p) => [p.semester, p.toInsert, p.toUpdate, p.toRemove]), [[1, [], [], []], [2, [], [], []]]);
+  // part of a held pair missing: counts as the first
+  const noPart = { ...have, pairs: [{ id: 'p_1', subjectId: 'sb_7', date: '2026-09-01', slot: 1, status: 'closed', topicId: 'tp_1', lessonType: 'lecture', part: null }] };
+  assert.deepEqual(planSyllabusUpload(doc([row('Введение', 0, 2, 2), row('Практикум', 0, 2, 3), mod(4)]), noPart).errors,
+    [{ sheet: 'plan', row: 2, field: 'lectureHours', code: 'held_hours', held: 2, date: '2026-09-01' }]);
+  // a row inserted at the top only shifts the order: nothing changed
+  const five = ctx({ syllabi: syllabi.slice(0, 1), topics: [1, 2, 3, 4, 5].map((n) => ({ ...stored('T' + n, n, 2, 0), id: 'tp_' + n, syllabusId: 'sy_1' })) });
+  const top = planSyllabusUpload(doc([row('Новая', 2, 0, 2), ...[1, 2, 3, 4, 5].map((n) => row('T' + n, 2, 0, 2 + n))]), five).parts[0];
+  assert.deepEqual([top.summary.added, top.summary.changed, top.summary.removed, top.toUpdate.length], [1, 0, 0, 5]);
+});
+
+test('subjectScope clears the old lesson of another syllabus of the same semester outside the dates', () => {
+  const sc = subjectScope(subject, [pair('old', '2026-08-20', 'planned', L('c1', 'lecture')), pair('hold', '2026-08-21', 'closed', L('c1', 'lecture'))], index, S1);
+  assert.deepEqual(sc.clear, ['old']);
+});
+
 test('planSyllabusUpload: other discipline or teacher in the file, semesters', () => {
   // регистр, пробелы и инициалы не считаются
   assert.deepEqual(planSyllabusUpload(doc(base, { discipline: 'Анатомия', teacher: 'Петров П.' }), ctx()).warnings,
     [{ code: 'discipline_differs', file: 'Анатомия', discipline: 'Информатика' }, { code: 'teacher_differs', file: 'Петров П.', teacher: 'Асанов Айдар' }]);
+  assert.deepEqual(planSyllabusUpload(doc(base, { teacher: 'Колин А.' }), ctx({ teacher: { id: 'sf_1', fullName: 'Ли Анна' } })).warnings, [{ code: 'teacher_differs', file: 'Колин А.', teacher: 'Ли Анна' }]);
   assert.deepEqual(planSyllabusUpload(doc(base, { discipline: ' информатика ', teacher: 'асанов А. Б., Петров П.' }), ctx()).warnings, []);
 
   const springRows = base.map((r) => ({ ...r, semester: 2 }));

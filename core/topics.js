@@ -80,14 +80,17 @@ export function lessonsOf(rows) {
   return lessons;
 }
 
-// Modules without hours: Map(lessonKey -> module row); the mark sits on the last lesson of the nearest earlier row that has lessons.
+// Modules without hours: Map(lessonKey -> [module rows in row order]); the mark sits on the last lesson of the nearest earlier row that has lessons.
 export function controlMarks(rows) {
   const marks = new Map();
   let last = null;
   for (const row of [...(rows || [])].sort(byOrder)) {
     const own = lessonsOf([row]);
     if (own.length) last = own[own.length - 1];
-    else if (row.kind === 'control' && last) marks.set(lessonKey(last), row);
+    else if (row.kind === 'control' && last) {
+      const key = lessonKey(last);
+      marks.set(key, [...(marks.get(key) || []), row]);
+    }
   }
   return marks;
 }
