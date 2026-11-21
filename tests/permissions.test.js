@@ -67,15 +67,15 @@ test('can: schedule actions', () => {
   assert.ok(listPermissions(['dean']).includes('settings.save'));
 });
 
-test('the syllabus is uploaded by the deanery and the administrator; topics have no directory', () => {
-  for (const role of ['admin', 'dean']) assert.equal(can([role], 'syllabus.apply'), true);
-  for (const role of ['admin', 'dean']) assert.equal(can([role], 'syllabus.preview'), true);
-  for (const role of ['teacher', 'prorector', 'student']) assert.equal(can([role], 'syllabus.apply'), false);
-  for (const role of ['teacher', 'prorector', 'student']) assert.equal(can([role], 'syllabus.preview'), false);
+test('a file fills the draft: the deanery, the administrator and a teacher (of his own subject: the server checks); topics have no directory', () => {
+  for (const role of ['admin', 'dean', 'teacher']) assert.equal(can([role], 'syllabus.apply'), true);
+  for (const role of ['admin', 'dean', 'teacher']) assert.equal(can([role], 'syllabus.preview'), true);
+  for (const role of ['prorector', 'student']) assert.equal(can([role], 'syllabus.apply'), false);
+  for (const role of ['prorector', 'student']) assert.equal(can([role], 'syllabus.preview'), false);
   for (const role of ['admin', 'dean', 'teacher']) for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.apply']) assert.equal(can([role], action, 'topics'), false);
   assert.equal(can(['teacher'], 'dir.save', 'weekTemplate'), false);
   assert.deepEqual(listPermissions(['teacher']),
-    ['schedule.mine', 'syllabus.form', 'syllabus.get', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects']);
+    ['schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects']);
   assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.subjects', 'syllabus.get']);
   assert.equal(can(['dean'], 'topics.plan'), false);
   assert.equal(can(['student'], 'student.subjects'), true);

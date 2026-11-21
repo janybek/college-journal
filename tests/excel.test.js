@@ -182,8 +182,8 @@ test('fileData: both semesters of the year in one file — «1-2» in «Свед
 });
 
 test('round trip through the site: download → upload unchanged changes nothing, for one semester and for a whole year', () => {   // R2
-  const { send, call, dean, sb1 } = setup();
-  const upload = (sheets) => send('syllabus.apply', sb1, sheets, dean).data;
+  const { send, call, publish, dean, sb1 } = setup();
+  const upload = (sheets) => publish(sb1, sheets).data;
   const downloaded = () => {
     const view = call('syllabus.get', { subjectId: sb1, semester: 1 }, dean).data;
     const other = view.semesters.length === 2 ? call('syllabus.get', { subjectId: sb1, semester: 2 }, dean).data : null;
@@ -224,9 +224,9 @@ test('two halves uploaded from two files: the download changes nothing stored an
     ['identical numbers the year does not add up to', info(1, 2, 10, 4, 6), info(2, 2, 10, 4, 6), false],
     ['identical numbers of the whole year', info(1, 2, 12, 8, 4), info(2, 2, 12, 8, 4), true],
   ]) {
-    const { send, call, dean, sb1 } = setup();
-    const first = send('syllabus.apply', sb1, [{ name: 'Сведения', cells: autumn }, { name: 'Тематический план', cells: plan('Введение') }], dean).data;
-    assert.equal(send('syllabus.apply', sb1, [{ name: 'Сведения', cells: spring }, { name: 'Тематический план', cells: plan('Формулы') }], dean).data.applied, true, label);
+    const { send, call, publish, dean, sb1 } = setup();
+    const first = publish(sb1, [{ name: 'Сведения', cells: autumn }, { name: 'Тематический план', cells: plan('Введение') }]).data;
+    assert.equal(publish(sb1, [{ name: 'Сведения', cells: spring }, { name: 'Тематический план', cells: plan('Формулы') }]).data.applied, true, label);
     const get = (semester) => call('syllabus.get', { subjectId: sb1, semester }, dean).data;
     const stored = () => [1, 2].map((semester) => {
       const { planSemester, audience, credits, totalHours, classHours, selfHours, rows } = get(semester).syllabus;
@@ -235,11 +235,11 @@ test('two halves uploaded from two files: the download changes nothing stored an
     const before = stored();
     const data = fileData(get(1), get(2));
     assert.equal(data.info.semester, yearFile ? '1-2' : 1, label);
-    const again = send('syllabus.apply', sb1, reread(syllabusBook(XLSX, labels, data)).sheets.map(({ name, cells }) => ({ name, cells })), dean).data;
-    assert.equal(again.applied, true, label);
+    const again = send('syllabus.preview', sb1, reread(syllabusBook(XLSX, labels, data)).sheets.map(({ name, cells }) => ({ name, cells })), dean).data;
+    assert.equal(again.ok, true, label);
     // no remark the first upload of that semester did not have; nothing added, changed or removed; both semesters stored as before
     assert.deepEqual(again.warnings.filter((w) => !first.warnings.some((f) => JSON.stringify(f) === JSON.stringify(w))), [], label);
-    assert.deepEqual(again.summaries.map((s) => [s.added, s.changed, s.removed]), again.summaries.map(() => [0, 0, 0]), label);
+    assert.deepEqual(again.summaries.map((s) => s.added + s.changed + s.removed), again.summaries.map(() => 0), label);
     assert.deepEqual(stored(), before, label);
   }
 });

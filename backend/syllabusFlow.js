@@ -57,6 +57,7 @@ export function approveSyllabus(store, platform, data, user) {
   allow(version, user, subjects, 'approve');
   const { tables, pairs, approved, rows, previous, checks } = examine(store, version, syllabi);
   if (checks.errors.length > 0) return { approved: false, checks, changedPairs: 0 };
+  const settings = loadSettings(store);                     // every read goes before the first write
 
   const plan = approvalPlan({ version, approved, topics: rows.topics, approvedTopics: previous ? previous.topics : [], pairs, userId: user.id, today: todayOf(platform) });
   const changed = store.updateMany('syllabi', plan.syllabi);
@@ -66,7 +67,7 @@ export function approveSyllabus(store, platform, data, user) {
   const afterPairs = pairs.map((p) => (moved.has(p.id) ? { ...p, ...moved.get(p.id) } : p));
 
   const ids = subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId).map((s) => s.id);
-  const result = relayout(store, ids, { subjects, syllabi: after, topics: tables.topics, pairs: afterPairs, settings: loadSettings(store) }, plan.pairs);
+  const result = relayout(store, ids, { subjects, syllabi: after, topics: tables.topics, pairs: afterPairs, settings }, plan.pairs);
   return { approved: true, checks, changedPairs: result.changed };
 }
 

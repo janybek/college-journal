@@ -55,7 +55,7 @@ test('resolveRoute: my own schedule needs schedule.mine', () => {
 });
 
 test('resolveRoute: the syllabus is uploaded on its own page, the import screen has no syllabus mode', () => {
-  const teacher = { mustChangePassword: false, permissions: ['syllabus.get', 'schedule.mine', 'teacher.mySubjects'] };
+  const teacher = { mustChangePassword: false, permissions: ['syllabus.get', 'syllabus.preview', 'syllabus.apply', 'schedule.mine', 'teacher.mySubjects'] };
   const dean = { mustChangePassword: false, permissions: ['syllabus.get', 'syllabus.preview', 'syllabus.apply', 'import.preview:groups', 'import.apply:groups'] };
   assert.equal(resolveRoute('#/syllabus', teacher).view, 'home');
   assert.equal(resolveRoute('#/import', teacher).view, 'home');                                // общий импорт преподавателю не открывается

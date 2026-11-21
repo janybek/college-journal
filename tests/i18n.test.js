@@ -40,10 +40,10 @@ test('the sheets, lines, columns and kinds of the syllabus template are the name
 });
 
 test('every code of the syllabus check has a text; the old texts of the syllabus import are gone', () => {
-  for (const code of ['missing_sheet', 'missing_column', 'too_many_rows', 'empty', 'required', 'bad_value', 'too_long', 'bad_hours', 'no_hours', 'unit_order', 'semester_order', 'semester_clash', 'held_missing', 'held_hours', 'kind_needs_practice']) {
+  for (const code of ['missing_sheet', 'missing_column', 'too_many_rows', 'empty', 'required', 'bad_value', 'too_long', 'bad_hours', 'no_hours', 'unit_order', 'semester_order', 'semester_clash', 'held_missing', 'held_hours', 'kind_needs_practice', 'in_review']) {
     assert.ok(ru['syllabus.error.' + code], code);
   }
-  for (const code of ['ignored_sheets', 'ignored', 'info_empty', 'total_mismatch', 'class_mismatch', 'self_mismatch', 'no_control', 'discipline_differs', 'teacher_differs', 'held_renamed', 'semester_replaces', 'unit_title_differs']) {
+  for (const code of ['ignored_sheets', 'ignored', 'info_empty', 'total_mismatch', 'class_mismatch', 'self_mismatch', 'no_control', 'discipline_differs', 'teacher_differs', 'held_renamed', 'semester_replaces', 'unit_title_differs', 'units_removed']) {
     assert.ok(ru['syllabus.warning.' + code], code);
   }
   assert.ok(ru['syllabus.error.bad_hours'].includes('1 пара = 2 часа'));

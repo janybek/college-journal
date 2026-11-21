@@ -15,7 +15,7 @@ export const M = [1, '', '', '', '', 'модуль', ''];                       
 export const file = (rows, info = INFO) => [{ name: 'Сведения', cells: info }, { name: 'Тематический план', cells: [HEAD, ...rows] }];
 export const A = file([T('Введение', 2, 2), T('Практикум', '', 2), M]);             // lessons: Введение — lecture, practice; Практикум — practice
 export const FIRST = [['Введение', 'lecture', 1], ['Введение', 'practice', 1]];
-export const READS = { subjects: 1, staff: 1, groups: 1, syllabi: 1, topics: 1, pairs: 1, settings: 1 };      // sheets of one upload: each once
+export const READS = { subjects: 1, staff: 1, groups: 1, syllabi: 1, topics: 1, units: 1, literature: 1, pairs: 1 };      // sheets of one upload of a file: each once
 
 export const S = { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: ['2026-09-07'], bells: DEFAULT_BELLS, semester: 1 };
 
@@ -24,10 +24,12 @@ function spyOn(store) {
   const lists = {};
   const calls = {};
   const writes = {};
+  const order = [];
   const spy = {};
   for (const name of Object.keys(store)) {
     spy[name] = (...args) => {
       calls[name] = (calls[name] || 0) + 1;
+      order.push(`${name}:${args[0]}`);
       if (name === 'list') lists[args[0]] = (lists[args[0]] || 0) + 1;
       if (['insertMany', 'updateMany', 'removeMany'].includes(name)) writes[`${name}:${args[0]}`] = (writes[`${name}:${args[0]}`] || 0) + 1;
       return store[name](...args);
@@ -35,8 +37,9 @@ function spyOn(store) {
   }
   const reset = () => {
     for (const bag of [lists, calls, writes]) for (const k of Object.keys(bag)) delete bag[k];
+    order.length = 0;
   };
-  return { spy, lists, calls, writes, reset };
+  return { spy, lists, calls, writes, order, reset };
 }
 
 // A fresh store for every test: dean, prorector, teacher1, teacher2; students s1 (01-1) and s2 (02-1); disciplines «Информатика» (ds1) and «Анатомия» (ds2);
@@ -71,8 +74,18 @@ export function setup() {
   call('schedule.generate', {}, tokens.dean);
 
   const send = (action, subjectId, sheets, token) => call(action, { subjectId, sheets }, token);
-  // «the syllabus of the file is in force»: the file is applied and its version is the approved one (task 34: syllabus.apply does both)
-  const publish = (subjectId, sheets, token = tokens.dean) => send('syllabus.apply', subjectId, sheets, token);
+  // «the syllabus of the file is in force»: the file fills the draft (task 39), the draft gets what it lacks (fill) and the deanery approves it.
+  // The answer is the one of syllabus.apply.
+  const publish = (subjectId, sheets, token = tokens.dean) => {
+    const done = send('syllabus.apply', subjectId, sheets, token);
+    if (!done.ok || !done.data.applied) return done;
+    for (const { syllabusId } of done.data.drafts) {
+      fill(syllabusId, tokens.dean);
+      const approved = call('syllabus.approve', { syllabusId }, tokens.dean);
+      if (!approved.ok || !approved.data.approved) throw new Error('publish: not approved: ' + JSON.stringify(approved));
+    }
+    return done;
+  };
   const pairOf = (subjectId, date) => store.list('pairs').find((p) => p.subjectId === subjectId && p.date === date);
   // the pairs of a subject by date: [date, topic name, lesson type, part]
   const lessons = (subjectId) => {
@@ -102,7 +115,7 @@ export function setup() {
   // every sheet of the syllabi and the pairs as one text: a failed request must leave it as it was
   const snapshotAll = () => JSON.stringify([store.list('syllabi'), ...DOC_TABLES.map((name) => store.list(name)), store.list('pairs')]);
   return {
-    store, spy: spied.spy, call, send, publish, draft, save, fill, snapshotAll, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, reset: spied.reset,
+    store, spy: spied.spy, call, send, publish, draft, save, fill, snapshotAll, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, order: spied.order, reset: spied.reset,
     ...tokens, staff, ds1, ds2, g1, g2, sb1, sb2, sb3, S,
   };
 }

@@ -1,10 +1,11 @@
-import { studentSubjects, syllabusPage, uploadSyllabus } from '../syllabusData.js';
+import { studentSubjects, syllabusPage } from '../syllabusData.js';
+import { uploadSyllabus } from '../syllabusUpload.js';
 import { draftForm, saveSection, startDraft } from '../syllabusDraft.js';
 import { approveSyllabus, returnSyllabus, reviewQueue, submitSyllabus } from '../syllabusFlow.js';
 
 export const syllabusHandlers = {
-  'syllabus.preview': (data, ctx) => uploadSyllabus(ctx.store, ctx.platform, data, false),
-  'syllabus.apply': (data, ctx) => uploadSyllabus(ctx.store, ctx.platform, data, true),
+  'syllabus.preview': (data, ctx, user) => uploadSyllabus(ctx.store, ctx.platform, data, user, false),
+  'syllabus.apply': (data, ctx, user) => uploadSyllabus(ctx.store, ctx.platform, data, user, true),
   'syllabus.get': (data, ctx, user) => syllabusPage(ctx.store, ctx.platform, data, user),
   'syllabus.startDraft': (data, ctx, user) => startDraft(ctx.store, ctx.platform, data, user),
   'syllabus.form': (data, ctx, user) => draftForm(ctx.store, ctx.platform, data, user),

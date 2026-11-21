@@ -3,7 +3,7 @@ import { addDays, mondayOf } from '../core/dates.js';
 import { DEFAULT_BELLS, settingsToRows } from '../core/settings.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { generateSchedule, relayout, todayOf } from '../backend/scheduleData.js';
-import { saveSyllabusDoc } from '../backend/syllabusData.js';
+import { publishSyllabusDoc } from '../backend/syllabusUpload.js';
 
 // One password for every fictional person of the dev stand.
 export const DEV_PASSWORD = 'journal2026';
@@ -111,10 +111,13 @@ export function seed(store, platform) {
   });
 
   // The syllabus belongs to «Информатика» and teacher1: one upload serves both of his groups. teacher3 and «Анатомия» have none.
+  // A file is not enough to approve: the department, the academic year and the goal are written the way a person would on the form.
+  const admin = { id: staff.find((person) => person.login === 'admin').id, roles: ['admin'], kind: 'staff' };
   for (const sheets of [SYLLABUS_1, SYLLABUS_2]) {
     const { doc, errors } = parseSyllabus(sheets);
     if (errors.length > 0) throw new Error('seed: the sample syllabus does not parse: ' + JSON.stringify(errors));
-    saveSyllabusDoc(store, platform, firstInformatics, doc);
+    publishSyllabusDoc(store, platform, firstInformatics, doc, admin, { department: 'Кафедра информатики и медицинской техники', academicYear: '2026–2027' },
+      'Научить будущего медика уверенно работать с компьютером и медицинской информационной системой.');
   }
   seedPairs(store, platform);
 }

@@ -78,7 +78,7 @@ test('startDraft: a copy of the approved version with every section; pairs and t
   assert.equal(publish(sb1, A).data.applied, true);
   const approved = store.list('syllabi').find((s) => s.status === 'approved');
   const own = { syllabusId: approved.id };
-  store.insert('units', { ...own, unit: 1, title: 'Негиздер', description: 'О юните', questions: '', guidance: '', results: '' });
+  store.update('units', store.list('units').find((u) => u.syllabusId === approved.id && u.unit === 1).id, { title: 'Негиздер', description: 'О юните' });   // the file made the row of its unit
   store.insert('outcomes', { ...own, kind: 'knowledge', order: 1, text: 'Знает' });
   store.insert('selfWork', { ...own, order: 1, unit: 1, name: 'Реферат', tasks: '', hours: 2 });
   store.insert('literature', { ...own, kind: 'main', unit: null, order: 1, authors: '', title: 'Книга', year: '', publisher: '', availability: '' });

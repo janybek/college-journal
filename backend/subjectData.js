@@ -126,7 +126,7 @@ export function subjectsOverview(store) {
         scheduledPairs: scheduleFit([], pairsOf.get(s.id) || [], settings).pairs,
       })).sort((a, b) => byName(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId)),
       uploaded: current !== null,
-      otherSemester: syllabi.some((y) => y.disciplineId === disciplineId && y.teacherId === teacherId && y.semester !== settings.semester),
+      otherSemester: syllabi.some((y) => y.disciplineId === disciplineId && y.teacherId === teacherId && y.status === 'approved' && y.semester !== settings.semester),
       plannedHours: totals.hours, plannedPairs: totals.pairs,
     };
   }).sort((a, b) => byName(a.disciplineName, b.disciplineName) || byName(a.teacherName, b.teacherName) || cmp(a.teacherId, b.teacherId));

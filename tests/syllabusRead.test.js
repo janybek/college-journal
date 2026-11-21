@@ -53,7 +53,7 @@ test('syllabus.get: the page of a subject', () => {
 test('syllabus.get: who sees which subject', () => {
   const { call, get, pairOf, dean, prorector, teacher1, teacher2, s1, s2, staff, sb1, sb2, sb3 } = ready();
   for (const token of [dean, prorector, teacher1, s1]) assert.equal(get(token).ok, true);
-  assert.deepEqual([get(prorector).data.canUpload, get(teacher1).data.canUpload, get(s1).data.canUpload], [false, false, false]);
+  assert.deepEqual([get(prorector).data.canUpload, get(teacher1).data.canUpload, get(s1).data.canUpload], [false, true, false]);
   assert.deepEqual([get(teacher1).data.groups.length, get(s1).data.groups], [2, [{ subjectId: sb1, groupName: '01-1' }]]);
   for (const token of [teacher2, s2]) assert.deepEqual(get(token).error, { code: 'forbidden' });
   assert.equal(get(s2, { subjectId: sb3 }).ok, true);
@@ -127,4 +127,15 @@ test('two modules without hours on one pair: the pair view and the page carry bo
   // a pair with no mark has an empty list
   publish(sb1, file([T('Введение', 2, 2)]));
   assert.deepEqual(views().filter((p) => p.topic).map((p) => p.topic.controls), [[], []]);
+});
+
+test('only an approved version of another half of the year counts as otherSemester: a draft does not', () => {
+  const { publish, call, dean, teacher1, sb1 } = ready();
+  const overview = () => call('subjects.overview', {}, dean).data.rows.find((r) => r.disciplineName === 'Информатика');
+  publish(sb1, file([T('Осень', 2, ''), M]));
+  assert.equal(overview().otherSemester, false);
+  const draft = call('syllabus.startDraft', { subjectId: sb1, semester: 2 }, teacher1).data.syllabusId;       // a draft of the spring half
+  assert.deepEqual([draft !== undefined, overview().otherSemester], [true, false]);
+  publish(sb1, file([T('Весна', 2, ''), M], [['Семестр', 2]]));
+  assert.equal(overview().otherSemester, true);
 });

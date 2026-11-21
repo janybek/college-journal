@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup, FIRST } from './syllabusSetup.js';
+import { setup, FIRST, A } from './syllabusSetup.js';
 
 const book = { authors: 'Автор', title: 'Книга', year: '2020', publisher: 'Издат', availability: 'библиотека' };
 const warn = (section) => ({ section, code: 'empty' });
@@ -196,4 +196,15 @@ test('the queue: versions under review for the deanery, the administrator and th
   assert.deepEqual([call('syllabus.queue', {}, teacher1).error, call('syllabus.queue', {}, s1).error], [{ code: 'forbidden' }, { code: 'forbidden' }]);
   call('syllabus.return', { syllabusId, remark: 'x' }, dean);
   assert.equal(call('syllabus.queue', {}, dean).data.count, 0);
+});
+
+test('approving reads the settings before the first write', () => {
+  const { call, publish, order, reset, dean, sb1 } = setup();
+  publish(sb1, A);
+  const second = call('syllabus.startDraft', { subjectId: sb1, semester: 1 }, dean).data.syllabusId;
+  reset();
+  assert.equal(call('syllabus.approve', { syllabusId: second }, dean).data.approved, true);
+  const firstWrite = order.findIndex((entry) => /^(insert|update|remove)(Many)?:/.test(entry));
+  assert.equal(order.indexOf('list:settings') > -1, true);
+  assert.equal(order.indexOf('list:settings') < firstWrite, true, order.join(' '));
 });
