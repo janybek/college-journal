@@ -1,7 +1,7 @@
 // The journal of a subject: reading with points, units and rights. No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
-import { localDate, localDateTime, localTime } from '../core/dates.js';
-import { FIXED_STATUSES } from '../core/schema.js';
+import { isDate, localDate, localDateTime, localTime } from '../core/dates.js';
+import { FIXED_STATUSES, RESULT_FIELDS } from '../core/schema.js';
 import { readSettings } from '../core/settings.js';
 import { readScheme } from '../core/scoring.js';
 import { inSemester } from '../core/topics.js';
@@ -10,7 +10,7 @@ import { lessonNumbers } from '../core/syllabusPlan.js';
 import { compareNames } from '../core/names.js';
 import { isSubstitution } from '../core/schedule.js';
 import { firstPairId, studentResults } from '../core/grades.js';
-import { checkMark, checkReason, markChanges, markMode, markState, normalizeMark } from '../core/journal.js';
+import { checkMark, checkReason, checkResultValue, markChanges, markMode, markState, normalizeMark } from '../core/journal.js';
 
 export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'units', 'settings', 'attendance', 'unitResults'];
 
@@ -327,4 +327,149 @@ export function savePairMarks(store, platform, data, user) {
     pairs: rows.pairs.map((p) => (p.id === pair.id && written.closed ? { ...p, status: 'closed', substitute: isSubstitution(pair, subject) } : p)),
   };
   return { journal: journalView(after, platform, subject.id, user) };
+}
+
+const COLUMN_OF = { control: 'control', self: 'self', current: 'currentManual' };
+const logText = (value) => (value === null || value === undefined ? '' : String(value));
+
+// 'journal.saveResults': the control, self-work or manual current points of one unit for several students, all or nothing.
+// Returns { journal }.
+export function saveUnitResults(store, platform, data, user) {
+  const rows = readJournalRows(store);
+  const subject = typeof data.subjectId === 'string' ? rows.subjects.find((s) => s.id === data.subjectId) : undefined;
+  if (!subject) throw new AppError('not_found');
+  const field = data.field;
+  const items = data.items;
+  if (!RESULT_FIELDS.includes(field) || !Array.isArray(items) || items.length === 0 || items.length > MARKS_MAX) throw new AppError('bad_request');
+  const seen = new Set();
+  for (const item of items) {
+    if (item === null || typeof item !== 'object' || Array.isArray(item) || typeof item.studentId !== 'string' || seen.has(item.studentId)) throw new AppError('bad_request');
+    seen.add(item.studentId);
+  }
+
+  const viewer = viewerOf(user);
+  const owner = viewer.teacher && subject.teacherId === user.id;
+  if (!owner && !viewer.manager) throw new AppError('forbidden');
+
+  const settings = readSettings(rows.settings);
+  const scheme = readScheme(rows.settings);
+  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
+  if (!syllabus) throw new AppError('no_syllabus');
+  const planSemester = Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
+
+  const view = journalView(rows, platform, subject.id, user);
+  if (!Number.isInteger(data.unit) || !view.units.some((u) => u.unit === data.unit)) throw new AppError('invalid', { fields: [{ field: 'unit', code: 'bad_value' }] });
+
+  // the saved rows of this subject: of the rows of one student and unit the last one wins
+  const grouped = new Map();
+  const withRows = new Set();
+  for (const r of rows.unitResults) {
+    if (r.subjectId !== subject.id) continue;
+    withRows.add(r.studentId);
+    if ((r.planSemester ?? null) !== planSemester || r.unit !== data.unit) continue;
+    const list = grouped.get(r.studentId) || [];
+    list.push(r);
+    grouped.set(r.studentId, list);
+  }
+  const existing = new Map([...grouped].map(([id, list]) => [id, lastOf(list, 'updatedAt')]));
+
+  const active = new Set(rows.students.filter((s) => s.groupId === subject.groupId && s.active === true).map((s) => s.id));
+  const known = new Set(rows.students.map((s) => s.id));
+  const problems = [];
+  items.forEach((item, index) => {
+    if (!active.has(item.studentId) && !(withRows.has(item.studentId) && known.has(item.studentId))) problems.push(badRef(index));
+    else if (checkResultValue(field, item.value, scheme) !== null) problems.push({ index, field: 'value', code: 'bad_value' });
+  });
+  if (problems.length > 0) throw new AppError('invalid', { fields: problems });
+
+  const column = COLUMN_OF[field];
+  const changed = [];
+  for (const item of items) {
+    const row = existing.get(item.studentId);
+    const old = row && row[column] !== undefined ? row[column] : null;
+    if (old !== item.value) changed.push({ studentId: item.studentId, row, old, value: item.value });
+  }
+  if (changed.length === 0) return { journal: view };
+
+  let reason = '';
+  if (field === 'current' || !owner || changed.some((c) => c.old !== null)) {
+    const code = checkReason(data.reason);
+    if (code) throw new AppError('invalid', { fields: [{ field: 'reason', code }] });
+    reason = data.reason.trim();
+  }
+
+  const at = localDateTime(platform.now());
+  const stamp = { updatedBy: user.id, updatedAt: at };
+  const fresh = changed.filter((c) => !c.row).map((c) => ({
+    subjectId: subject.id, studentId: c.studentId, planSemester, unit: data.unit, control: null, self: null, currentManual: null, [column]: c.value, ...stamp,
+  }));
+  const patches = changed.filter((c) => c.row).map((c) => ({ id: c.row.id, patch: { [column]: c.value, ...stamp } }));
+  const inserted = fresh.length > 0 ? store.insertMany('unitResults', fresh) : [];
+  const updated = patches.length > 0 ? store.updateMany('unitResults', patches) : [];
+  store.insertMany('changeLog', changed.map((c) => ({
+    at, actorId: user.id, entity: 'unit', subjectId: subject.id, studentId: c.studentId, unit: data.unit, field,
+    before: logText(c.old), after: logText(c.value), reason, late: false,
+  })));
+
+  const replaced = new Map(updated.map((r) => [r.id, r]));
+  const after = { ...rows, unitResults: [...rows.unitResults.map((r) => replaced.get(r.id) || r), ...inserted] };
+  return { journal: journalView(after, platform, subject.id, user) };
+}
+
+const LOG_LIMIT = 200;
+const LOG_LIMIT_MAX = 500;
+
+// 'journal.log': the change log, the newest first. A teacher reads only the log of his own subject.
+export function changeLogView(store, platform, data, user) {
+  const viewer = viewerOf(user);
+  if (!viewer.manager && !viewer.reader && !viewer.teacher) throw new AppError('forbidden');
+  const given = (key) => data[key] !== undefined && data[key] !== null;
+  for (const key of ['subjectId', 'pairId', 'studentId']) if (given(key) && typeof data[key] !== 'string') throw new AppError('bad_request');
+  for (const key of ['from', 'to']) if (given(key) && !isDate(data[key])) throw new AppError('bad_request');
+  if (given('limit') && !(Number.isInteger(data.limit) && data.limit >= 1 && data.limit <= LOG_LIMIT_MAX)) throw new AppError('bad_request');
+  const limit = given('limit') ? data.limit : LOG_LIMIT;
+
+  const changeLog = store.list('changeLog');
+  const staff = store.list('staff');
+  const students = store.list('students');
+  const subjects = store.list('subjects');
+  const groups = store.list('groups');
+  const pairs = store.list('pairs');
+
+  if (!viewer.manager && !viewer.reader) {
+    const own = given('subjectId') && subjects.some((s) => s.id === data.subjectId && s.teacherId === user.id);
+    if (!own) throw new AppError('forbidden');
+  }
+
+  const byId = (list) => new Map(list.map((r) => [r.id, r]));
+  const staffOf = byId(staff);
+  const studentOf = byId(students);
+  const subjectOf = byId(subjects);
+  const groupOf = byId(groups);
+  const pairOf = byId(pairs);
+
+  const picked = changeLog.filter((r) => {
+    if (given('subjectId') && r.subjectId !== data.subjectId) return false;
+    if (given('pairId') && r.pairId !== data.pairId) return false;
+    if (given('studentId') && r.studentId !== data.studentId) return false;
+    const day = String(r.at || '').slice(0, 10);
+    if (given('from') && day < data.from) return false;
+    if (given('to') && day > data.to) return false;
+    return true;
+  }).sort((a, b) => cmp(b.at || '', a.at || '') || cmp(b.id, a.id));
+
+  const nameIn = (map, id) => (map.get(id) || {}).fullName || '';
+  const out = picked.slice(0, limit).map((r) => {
+    const subject = subjectOf.get(r.subjectId);
+    const pair = pairOf.get(r.pairId);
+    const group = subject ? groupOf.get(subject.groupId) : undefined;
+    return {
+      id: r.id, at: r.at, actorName: nameIn(staffOf, r.actorId), entity: r.entity, field: r.field,
+      before: r.before ?? '', after: r.after ?? '', reason: r.reason ?? '', late: r.late === true,
+      subjectId: r.subjectId || '', subjectName: subject ? subject.name : '', groupName: group ? group.name : '',
+      pairId: r.pairId || '', pairDate: pair ? pair.date : '', pairSlot: pair ? pair.slot : '',
+      studentId: r.studentId || '', studentName: nameIn(studentOf, r.studentId), unit: r.unit ?? null,
+    };
+  });
+  return { today: localDate(platform.now()), rows: out, more: picked.length > limit };
 }
