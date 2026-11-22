@@ -17,10 +17,12 @@ import * as mySchedule from './views/mySchedule.js';
 import * as syllabus from './views/syllabus.js';
 import * as subjects from './views/subjects.js';
 import * as syllabusForm from './views/syllabusForm.js';
+import * as review from './views/review.js';
+import { refreshReviewCount } from './reviewCount.js';
 
 // Puts the screen chosen by the router into its frame (shell.js: sign-in card, student bar or staff sidebar).
 // A screen may export leave(): it is called when another screen replaces it, to drop what it held.
-const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm };
+const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm, review };
 const page = document.getElementById('page');
 let shownView = null;
 let shownHash = location.hash;
@@ -41,6 +43,17 @@ function renderCurrent() {
   shownView = view;
   VIEWS[view].render(app, params);
   restoreFocus(focus);
+  askReviewCount(user);
+}
+
+// The number of the menu item «Силлабусы на утверждении»: read once per opening of the site (per session), by those
+// who have the queue.
+let reviewCountAsked = null;
+function askReviewCount(user) {
+  const token = getToken();
+  if (!user || token === reviewCountAsked || !Array.isArray(user.permissions) || !user.permissions.includes('syllabus.queue')) return;
+  reviewCountAsked = token;
+  refreshReviewCount();
 }
 
 // A click on the switcher is the person's explicit choice on this device: it is remembered, it wins over the

@@ -6,16 +6,19 @@ import {
 } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
-import { freeGroups, nextRow, addRequest, syllabusBadge, pairsNote, addedTeachers, withoutRow } from '../subjects.js';
+import { freeGroups, nextRow, addRequest, syllabusBadge, approvedNote, pairsNote, addedTeachers, withoutRow } from '../subjects.js';
+import { setReviewCount } from '../reviewCount.js';
 import { startUpload, renderUpload, leaveUpload } from './syllabusUpload.js';
 
-// «Предметы» of the deanery (#/subjects): who teaches which discipline in which group, and whose syllabus is in.
+// «Предметы» of the deanery (#/subjects): who teaches which discipline in which group, and where each syllabus stands.
 // One request (subjects.overview) draws it all: a row is a discipline and a teacher, a discipline with two teachers
 // is two rows under one name. The discipline carries the colour its pairs have in the schedule.
 // A group is a chip: with the right to edit it opens the group's window (another teacher, or the subject gone from
 // the group). «Добавить предмет» is one window in two steps: the discipline picked from «Дисциплины» (never typed)
 // and the groups with their teachers, then — the subjects saved — the syllabus of each teacher with its upload.
-// The upload itself (template, check window) is syllabusUpload.js. The server checks every right; the screen only
+// The syllabus of a row is one mark (subjects.js: an open version first, else the approved one); beside the mark of
+// an open version, in grey, what is approved meanwhile. «Загрузить (Excel)» fills the draft (never what is in effect);
+// once written, a note leads to the form. The upload itself (template, check window) is syllabusUpload.js. The server checks every right; the screen only
 // leaves out the buttons the person's `permissions` do not allow (the vice-rector reads the table).
 
 const RETRYABLE = ['network', 'internal'];
@@ -27,6 +30,7 @@ const blank = () => ({
   ticket: 0,
   status: null,        // { key, params, busy }: what the last change did; busy — pairs left with the old teacher
   freshIds: [],        // subjects just added or given another teacher: their rows are marked
+  uploaded: null,      // { syllabusId, disciplineName, teacherName }: the draft a file was just written into
   dialog: null,        // { kind: 'add' | 'group', ... }
 });
 let state = blank();
@@ -61,6 +65,7 @@ async function load() {
     const data = await call('subjects.overview', {});
     if (state !== owner || owner.ticket !== ticket) return;
     Object.assign(owner, { data, loadErrorKey: null });
+    setReviewCount(data.reviewCount);
   } catch (error) {
     if (state !== owner || owner.ticket !== ticket) return;
     owner.loadErrorKey = errorKey(error.code);
@@ -99,6 +104,7 @@ function body() {
   const { rows } = state.data;
   const notes = el('div', { class: 'notes', role: 'status' },
     state.status ? note('success', t(state.status.key, state.status.params)) : null,
+    uploadedNote('subjects-uploaded-form'),
     state.status && state.status.busy > 0 ? note('warning', tCount('subjects.edit.busy', state.status.busy)) : null);
   if (rows.length === 0) {
     return el('div', { class: 'stack' }, notes, reloadFailure('subjects-retry'),
@@ -193,15 +199,35 @@ function badgeText(shown) {
   return t(shown.key, { hours: shown.params.hours, pairs: tCount('syllabus.pairsCount', shown.params.pairs) });
 }
 
-// The state of the syllabus, and what to do about it: «Загрузить (Excel)» where there is none (with the right to
-// upload; uploadId null without it), «Открыть» always — the page offers the template while there is no syllabus.
-function syllabusState(row, uploadId, openId, describedBy) {
+// The mark of the syllabus and, beside the mark of an open version, in grey, the approved one («· утверждён: 36 ч, 18 пар»).
+function syllabusMark(row) {
   const shown = syllabusBadge(row);
-  return el('div', { class: 'syllabus-state' },
+  const also = approvedNote(row);
+  return el('span', { class: 'syllabus-mark' },
     badge(badgeText(shown), shown.tone, true),
+    also ? el('span', { class: 'syllabus-mark__note' }, badgeText(also)) : null);
+}
+
+// A file goes into the open version (made from the approved one when there is none); a version under review is the
+// deanery's to decide first, so it takes no file. An approved syllabus with nothing open is changed from its page.
+const takesFile = (row) => row.open !== 'review' && (row.syllabusStatus !== 'approved' || row.open !== null);
+
+// «Открыть»: the version someone has to act on — the new one while it is under review or while nothing is approved;
+// otherwise the approved one of the half of the year that is on.
+function syllabusHref(row) {
+  const subjectId = row.groups[0].subjectId;
+  if (row.open === 'review' || (row.open && row.syllabusStatus !== 'approved')) return `#/syllabus/${subjectId}/${state.data.currentSemester}/draft`;
+  return '#/syllabus/' + subjectId;
+}
+
+// The state of the syllabus, and what to do about it: «Загрузить (Excel)» into the draft (with the right to upload;
+// uploadId null without it), «Открыть» always — the page offers the template while there is no syllabus.
+function syllabusState(row, uploadId, openId, describedBy) {
+  return el('div', { class: 'syllabus-state' },
+    syllabusMark(row),
     el('div', { class: 'syllabus-state__actions' },
-      uploadId && !row.uploaded ? uploadButton(row, uploadId, openId, describedBy) : null,
-      el('a', { id: openId, class: 'syllabus-state__open', href: '#/syllabus/' + row.groups[0].subjectId, 'aria-describedby': describedBy },
+      uploadId && takesFile(row) ? uploadButton(row, uploadId, openId, describedBy) : null,
+      el('a', { id: openId, class: 'syllabus-state__open', href: syllabusHref(row), 'aria-describedby': describedBy },
         t('subjects.open'), icon('chevron'))));
 }
 
@@ -213,13 +239,31 @@ function uploadTarget(row) {
   };
 }
 
-// «Загрузить (Excel)»: the file of this teacher's syllabus, checked in the window of syllabusUpload.js. Once it is in,
-// the overview is read again and the button is gone: focus goes to «Открыть» of the same teacher.
+// «Загрузить (Excel)»: the file of this teacher's syllabus, checked in the window of syllabusUpload.js, fills the draft.
+// Once it is written, the overview is read again and a note leads to the form of the draft of the half of the year
+// that is on (or of the one the file held). Focus goes back to the button, or to «Открыть» of the same teacher.
 function upload(row, id, openId) {
-  const onDone = () => load().then(() => {
-    if (!document.getElementById(id)) focusById(openId);
-  });
-  startUpload(uploadTarget(row), onDone, [id, openId]);
+  const owner = state;
+  const onDone = (answer) => {
+    const drafts = answer && Array.isArray(answer.drafts) ? answer.drafts : [];
+    const draft = drafts.find((item) => item.semester === owner.data.currentSemester) || drafts[0];
+    if (state === owner && draft) owner.uploaded = { syllabusId: draft.syllabusId, disciplineName: row.disciplineName, teacherName: row.teacherName };
+    load().then(() => {
+      if (!document.getElementById(id)) focusById(openId);
+    });
+  };
+  owner.status = null;
+  owner.uploaded = null;
+  startUpload(uploadTarget(row), onDone, [id, openId], { intoDraft: true });
+}
+
+// The file is in the draft: what to do next, and the way to the form.
+function uploadedNote(linkId) {
+  const done = state.uploaded;
+  if (!done) return null;
+  const shown = note('success', t('subjects.uploadedDraft', { discipline: done.disciplineName, teacher: done.teacherName }), { class: 'note--with-link' });
+  shown.append(el('a', { id: linkId, class: 'note__link', href: '#/syllabus-form/' + done.syllabusId }, t('subjects.openForm'), icon('chevron')));
+  return shown;
 }
 
 function uploadButton(row, id, openId, describedBy) {
@@ -241,6 +285,7 @@ function closeDialog() {
 
 function openAdd() {
   state.status = null;
+  state.uploaded = null;
   state.freshIds = [];
   state.dialog = {
     kind: 'add', step: 1, disciplineId: '', items: [nextRow([])],
@@ -422,6 +467,7 @@ function addedList(d, close) {
   else content = el('p', { class: 'loading' }, t('common.loading'));
   return [
     note('success', t('subjects.add.saved'), { role: 'status' }),
+    uploadedNote('subjects-added-uploaded-form'),
     content,
     el('div', { class: 'dialog__actions' },
       el('button', { type: 'button', id: 'subjects-done', class: 'button button--primary', onclick: close }, t('subjects.add.done'))),
@@ -433,24 +479,24 @@ function addedItem(row, uploadRight) {
   const nameId = 'subjects-added-teacher-' + key;
   const uploadId = 'subjects-added-upload-' + key;
   const openId = 'subjects-added-open-' + key;
-  const shown = syllabusBadge(row);
   return el('li', { class: 'added__item' },
     person(row.teacherName, nameId,
       el('span', { class: 'added__groups' }, row.groups.map((group) => el('span', { class: 'group-chip group-chip--small' }, group.groupName || '—')))),
     el('div', { class: 'added__side' },
-      badge(badgeText(shown), shown.tone, true),
+      syllabusMark(row),
       el('span', { class: 'added__buttons' },
-        uploadRight && !row.uploaded ? el('button', {
+        uploadRight && takesFile(row) ? el('button', {
           type: 'button', id: uploadId, class: 'button button--primary', 'aria-describedby': nameId,
           onclick: () => upload(row, uploadId, openId),
         }, icon('upload'), t('syllabus.upload')) : null,
-        el('a', { id: openId, class: 'button button--secondary', href: '#/syllabus/' + row.groups[0].subjectId, 'aria-describedby': nameId }, t('subjects.open')))));
+        el('a', { id: openId, class: 'button button--secondary', href: syllabusHref(row), 'aria-describedby': nameId }, t('subjects.open')))));
 }
 
 // The window of a group: another teacher, or the subject gone from the group
 
 function openGroup(row, group) {
   state.status = null;
+  state.uploaded = null;
   state.freshIds = [];
   state.dialog = {
     kind: 'group', subjectId: group.subjectId, groupName: group.groupName, disciplineName: row.disciplineName,

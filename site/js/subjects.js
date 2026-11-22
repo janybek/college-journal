@@ -28,17 +28,36 @@ export function addRequest(disciplineId, items) {
   return { ready, data: { disciplineId, items: rows } };
 }
 
-// The syllabus of a «discipline + teacher» row for the semester that is on now.
+// The syllabus of a «discipline + teacher» row for the half of the year that is on now, as one mark. An open version
+// speaks first (it is what someone has to act on): returned, under review, draft. Then the approved one with its hours
+// and pairs, one for the other half of the year only, or none.
+const OPEN_TONES = { returned: 'warning', review: 'info', draft: 'neutral' };
+
 export function syllabusBadge(row) {
-  if (row.uploaded) return { tone: 'success', key: 'subjects.syllabus.uploaded', params: { hours: row.plannedHours, pairs: row.plannedPairs } };
+  if (OPEN_TONES[row.open]) return { tone: OPEN_TONES[row.open], key: 'subjects.syllabus.' + row.open };
+  if (row.syllabusStatus === 'approved') return { tone: 'success', key: 'subjects.syllabus.approved', params: { hours: row.plannedHours, pairs: row.plannedPairs } };
   if (row.otherSemester) return { tone: 'neutral', key: 'subjects.syllabus.other' };
-  return { tone: 'warning', key: 'subjects.syllabus.none' };
+  return { tone: 'danger', key: 'subjects.syllabus.none' };
+}
+
+// Beside the mark of an open version: the approved one that is on the pairs meanwhile («утверждён: 36 ч, 18 пар»).
+export function approvedNote(row) {
+  if (!OPEN_TONES[row.open] || row.syllabusStatus !== 'approved') return null;
+  return { key: 'subjects.syllabus.approvedNote', params: { hours: row.plannedHours, pairs: row.plannedPairs } };
+}
+
+// The mark of a subject in the teacher's «Мои предметы»: `syllabus` of teacher.mySubjects, { approved, open }.
+export function teacherBadge(syllabus) {
+  const open = syllabus ? syllabus.open : null;
+  if (OPEN_TONES[open]) return { tone: OPEN_TONES[open], key: 'home.syllabusState.' + open };
+  if (syllabus && syllabus.approved === true) return { tone: 'success', key: 'home.syllabusState.approved' };
+  return { tone: 'danger', key: 'home.syllabusState.none' };
 }
 
 // Under a group of the row: the schedule of the semester holds another number of pairs than the plan. A group with
 // no pairs at all has simply not had its schedule made yet: a calm line says so instead of «0 in the schedule».
 export function pairsNote(row, group) {
-  if (!row.uploaded || group.scheduledPairs === row.plannedPairs) return null;
+  if (row.syllabusStatus !== 'approved' || group.scheduledPairs === row.plannedPairs) return null;
   if (group.scheduledPairs === 0) return { key: 'subjects.notScheduled', calm: true };
   return { key: 'subjects.pairsDiffer', params: { planned: row.plannedPairs, scheduled: group.scheduledPairs } };
 }

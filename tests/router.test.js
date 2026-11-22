@@ -89,6 +89,12 @@ test('resolveRoute: «Предметы» of the deanery is a screen of its own; 
   assert.equal(resolveRoute('#/subjects', { mustChangePassword: false, permissions: ['teacher.mySubjects'] }).view, 'home');
 });
 
+test('resolveRoute: «Силлабусы на утверждении» (#/review) with the right to the queue, home without it', () => {
+  assert.deepEqual(resolveRoute('#/review', { mustChangePassword: false, permissions: ['syllabus.queue', 'subjects.overview'] }), { view: 'review', params: {} });
+  assert.equal(resolveRoute('#/review', { mustChangePassword: false, permissions: ['subjects.overview', 'teacher.mySubjects'] }).view, 'home');
+  assert.equal(resolveRoute('#/review/x', { mustChangePassword: false, permissions: ['syllabus.queue'] }).view, 'home');
+});
+
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {
   assert.deepEqual(resolveRoute('', dean), { view: 'home', params: {} });
   assert.equal(resolveRoute('#/dir/groups', { mustChangePassword: false }).view, 'home');

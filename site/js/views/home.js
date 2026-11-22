@@ -3,8 +3,9 @@ import { getUser } from '../session.js';
 import { t } from '../i18n.js';
 import { el, errorKey, avatar, badge, emptyState, pageHeader } from '../ui.js';
 import { icon } from '../icons.js';
-import { activeRole, menuParts, navFor } from '../shell.js';
+import { activeRole, menuParts, navFor, countBadge } from '../shell.js';
 import { pairCard, weekdayDate } from './pairParts.js';
+import { teacherBadge } from '../subjects.js';
 
 // Sections later units fill in; for now the student sees what is coming.
 const STUDENT_SECTIONS = [
@@ -176,7 +177,7 @@ function tile(item) {
   return el('li', {}, el('a', { class: 'card tile' + (item.name === 'import' ? ' tile--accent' : ''), href: item.href },
     el('span', { class: 'tile__icon' }, icon(item.icon)),
     el('span', { class: 'tile__text' },
-      el('span', { class: 'tile__title' }, t(item.textKey)),
+      el('span', { class: 'tile__title' }, t(item.textKey), item.count ? countBadge('nav-count tile__count') : null),
       el('span', { class: 'tile__hint' }, t(item.hintKey))),
     icon('chevron', 'tile__go')));
 }
@@ -193,14 +194,7 @@ function subjectsBody(user, redraw) {
   if (subjects.list) {
     if (subjects.list.length === 0) return emptyState('book', el('p', {}, t('home.noSubjects')));
     const plans = (Array.isArray(user.permissions) ? user.permissions : []).includes('syllabus.get');
-    return el('ul', { class: 'card list' }, subjects.list.map((subject) => el('li', { class: 'list__row subject' },
-      el('span', { class: 'list__icon' }, icon('book')),
-      el('span', { class: 'subject__name', id: 'subject-' + subject.id }, subject.name),
-      subject.groupName ? badge(subject.groupName, 'primary') : null,
-      el('span', { class: 'subject__count' }, t('home.studentCount', { count: subject.studentCount })),
-      plans ? el('a', {
-        class: 'button button--secondary subject__plan', href: '#/syllabus/' + subject.id, 'aria-describedby': 'subject-' + subject.id,
-      }, icon('clipboard'), t('home.syllabus')) : null)));
+    return el('ul', { class: 'card list' }, subjects.list.map((subject) => subjectRow(subject, plans)));
   }
   if (subjects.errorKey && !subjects.pending) {
     return emptyState('alert',
@@ -211,6 +205,27 @@ function subjectsBody(user, redraw) {
       }, t('common.retry')));
   }
   return el('p', { class: 'loading' }, t('common.loading'));
+}
+
+// A subject of the teacher: the group, the students, the state of the syllabus. A returned syllabus is the one thing
+// waiting on the teacher: its row carries the warning colour and says what to do; its button stands out.
+function subjectRow(subject, plans) {
+  const mark = teacherBadge(subject.syllabus);
+  const returned = mark.key === 'home.syllabusState.returned';
+  const nameId = 'subject-' + subject.id;
+  const markId = 'subject-mark-' + subject.id;
+  return el('li', { class: 'list__row subject' + (returned ? ' is-returned' : '') },
+    el('span', { class: 'list__icon' }, icon('book')),
+    el('span', { class: 'subject__main' },
+      el('span', { class: 'subject__name', id: nameId }, subject.name),
+      returned ? el('span', { class: 'subject__alert' }, t('home.syllabusReturned')) : null),
+    subject.groupName ? badge(subject.groupName, 'primary') : null,
+    el('span', { class: 'subject__count' }, t('home.studentCount', { count: subject.studentCount })),
+    el('span', { class: 'subject__mark', id: markId }, badge(t(mark.key), mark.tone, true)),
+    plans ? el('a', {
+      class: 'button subject__plan ' + (returned ? 'button--primary' : 'button--secondary'),
+      href: '#/syllabus/' + subject.id, 'aria-describedby': nameId + ' ' + markId,
+    }, icon('clipboard'), t('home.syllabus')) : null);
 }
 
 function loadSubjects(user) {

@@ -27,6 +27,8 @@ export function resolveRoute(hash, user) {
   if (path === '/schedule' && permissions.includes('schedule.list')) return { view: 'schedule', params: {} };
   // «Предметы» of the deanery: who teaches what and whose syllabus. Subjects are no longer an ordinary directory.
   if (path === '/subjects' && permissions.includes('subjects.overview')) return { view: 'subjects', params: {} };
+  // «Силлабусы на утверждении»: the versions sent to the deanery.
+  if (path === '/review' && permissions.includes('syllabus.queue')) return { view: 'review', params: {} };
   // #/template, #/template/<groupId>, #/template/<groupId>/<weekday 1–5>: the group to show and the day to mark.
   const template = /^\/template(?:\/([^/]+)(?:\/([1-5]))?)?$/.exec(path);
   if (template && permissions.includes('dir.list:weekTemplate')) {

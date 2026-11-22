@@ -85,6 +85,17 @@ test('navFor: «Предметы» of the deanery is in the schedule group, «Д
   assert.equal(navFor(['subjects.overview'], 'teacher').flatMap((g) => g.items).some((i) => i.name === 'subjects'), false);
 });
 
+test('navFor: «Силлабусы на утверждении» comes after «Предметы» with the right to the queue, and carries the count', () => {
+  const office = ['schedule.list', 'dir.list:weekTemplate', 'subjects.overview', 'settings.get'];
+  const nav = navFor([...office, 'syllabus.queue'], 'dean');
+  assert.deepEqual(nav.find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['schedule', 'weekTemplate', 'subjects', 'review', 'settings']);
+  assert.deepEqual(nav.find((g) => g.titleKey === 'nav.schedule').items[3],
+    { name: 'review', href: '#/review', textKey: 'review.title', icon: 'clipboard', hintKey: 'review.hint', count: true });
+  assert.deepEqual(navFor(office, 'dean').find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['schedule', 'weekTemplate', 'subjects', 'settings']);
+  assert.equal(navFor(['syllabus.queue', 'teacher.mySubjects'], 'teacher').flatMap((g) => g.items).some((i) => i.name === 'review'), false);
+  assert.deepEqual(navFor(['subjects.overview', 'syllabus.queue'], 'prorector').find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['subjects', 'review']);
+});
+
 test('navFor: the deanery menu has no «Темы» any more', () => {
   assert.equal(navFor(['schedule.list', 'dir.list:weekTemplate', 'dir.list:topics', 'settings.get'], 'dean').flatMap((g) => g.items).some((i) => i.name === 'topics'), false);
 });

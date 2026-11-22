@@ -6,11 +6,12 @@ import { icon } from '../icons.js';
 import { activeRole, menuParts } from '../shell.js';
 import { dayParts, isDate } from '../dates.js';
 import {
-  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, versionLine, pageActions, linesOf, safeLink,
+  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, versionLine, pageActions, linesOf, safeLink, keptDone,
 } from '../syllabus.js';
 import { TABS, checkLine, submitOutcome } from '../syllabusForm.js';
 import { topicText, lessonTypeKey } from '../pairs.js';
 import { uploadControls, renderUpload, leaveUpload, forgetUploadNote } from './syllabusUpload.js';
+import { refreshReviewCount } from '../reviewCount.js';
 
 // The syllabus of a subject (#/syllabus/<subjectId>/<1|2>, and its new version …/draft), the same page for the
 // deanery, the teacher and the student. Every section of the version shown, under a list of the sections: the title
@@ -40,7 +41,7 @@ const blank = () => ({
   submitAsk: null,     // { warnings }: the question before the version is sent
   approveAsk: null,    // { errors, errorKey }: the window «Утвердить силлабус?»
   actionError: null,   // a dictionary key: a button of the bar did not work
-  done: null,          // a dictionary key: what the last decision did («Силлабус утверждён…»)
+  done: null,          // { key, at }: what the last decision did («Силлабус утверждён…») and the address key it is shown on
 });
 let state = blank();
 
@@ -57,8 +58,8 @@ export function render(root, params) {
   const user = getUser();
   const key = [subjectId, semester ?? '', version].join('|');
   if (state.key !== key) {
-    Object.assign(state, { key, errorKey: null, errorCode: null, actionError: null, checks: null });
-    if (state.view && state.view.subject.id !== subjectId) state.done = null;
+    // The note of a decision stays only where the page went right after it (keptDone): not on another half of the year.
+    Object.assign(state, { key, errorKey: null, errorCode: null, actionError: null, checks: null, done: keptDone(state.done, key) });
     forgetUploadNote();
   }
   if (state.shownKey !== key && state.loadingKey !== key && state.errorKey === null) load(state, subjectId, semester, version);
@@ -139,7 +140,7 @@ function page(view, user) {
   return [
     head(view),
     staff ? versionBar(view) : null,
-    state.done ? note('success', t(state.done), { role: 'status', class: 'syllabus-done' }) : null,
+    state.done ? note('success', t(state.done.key), { role: 'status', class: 'syllabus-done' }) : null,
     staff ? checksPanel(view) : null,
     staff ? remark(view) : null,
     switches(view),
@@ -208,7 +209,8 @@ function actionButton(view, action, main) {
     approve: () => { state.approveAsk = { errors: null, errorKey: null }; state.actionError = null; refresh(); },
     giveBack: () => openReturnDialog(view.state.open.syllabusId, () => {
       if (state.view !== view) return;
-      Object.assign(state, { done: 'syllabus.return.done', checks: null });
+      Object.assign(state, { done: { key: 'syllabus.return.done', at: state.key }, checks: null });
+      refreshReviewCount();
       reload();
     }),
   };
@@ -283,9 +285,10 @@ async function send() {
       submitAsk: null, busy: null,
       checks: outcome === 'checks' ? result.checks : null,
       actionError: outcome === 'failed' ? 'sform.submit.notSent' : null,
-      done: outcome === 'sent' ? 'syllabus.submit.done' : null,
+      done: outcome === 'sent' ? { key: 'syllabus.submit.done', at: owner.key } : null,
     });
     if (outcome === 'sent') {
+      refreshReviewCount();
       reload();
       return;
     }
@@ -365,8 +368,10 @@ async function approve() {
     if (state !== owner) return;
     owner.busy = null;
     if (result.approved === true) {
-      Object.assign(owner, { approveAsk: null, done: 'syllabus.approve.done', checks: null });
-      // The version approved is the one the approved address shows now.
+      // The version approved is the one the approved address shows now: the note goes there with the page.
+      const at = view.shown === 'open' ? [view.subject.id, view.semester, 'approved'].join('|') : owner.key;
+      Object.assign(owner, { approveAsk: null, done: { key: 'syllabus.approve.done', at }, checks: null });
+      refreshReviewCount();
       if (view.shown === 'open') location.hash = approvedHref(view);
       else reload();
       return;
@@ -521,7 +526,7 @@ function noSyllabus(view, user) {
   if (user.kind === 'student') hint = 'syllabus.emptyHint.student';
   else if (view.can && (view.can.fill || view.can.edit)) hint = 'syllabus.emptyHint.staff';
   return emptyState('book',
-    el('p', { class: 'empty__title' }, t('syllabus.notUploaded')),
+    el('p', { class: 'empty__title' }, t('syllabus.none')),
     hint ? el('p', {}, t(hint)) : null);
 }
 

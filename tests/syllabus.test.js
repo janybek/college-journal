@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint, fileName, versionLine, pageActions, linesOf, safeLink,
+  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint, fileName, versionLine, pageActions, linesOf, safeLink, keptDone,
 } from '../site/js/syllabus.js';
 
 // A row of the syllabus page as syllabus.get gives it.
@@ -102,4 +102,17 @@ test('linesOf: a point per line, empty lines and edge spaces dropped', () => {
 test('safeLink: only http:// and https:// are links', () => {
   assert.deepEqual(['https://example.org/a', 'http://x.kg', 'javascript:alert(1)', ' https://x', 'example.org', ''].map(safeLink), ['https://example.org/a', 'http://x.kg', null, null, null, null]);
   assert.deepEqual([safeLink(null), safeLink(42), safeLink('data:text/html,x'), safeLink('https://')], [null, null, null, null]);
+});
+
+test('safeLink: the whole string is the address — a space inside or at the end is not a link (M2 of task 43)', () => {
+  assert.deepEqual(['https://a b', 'https://a.kg/x y', 'https://a.kg ', 'https://a.kg\nb','http://a.kg/путь'].map(safeLink), [null, null, null, null, 'http://a.kg/путь']);
+});
+
+test('keptDone: the note of a decision stays only on the address it was made for (M1 of task 43)', () => {
+  const done = { key: 'syllabus.approve.done', at: 'sb1|1|approved' };
+  // right after approving, the page goes to the approved address: the note is shown there
+  assert.equal(keptDone(done, 'sb1|1|approved'), done);
+  // the other half of the year of the same subject, the new version, another subject: gone
+  assert.deepEqual([keptDone(done, 'sb1|2|approved'), keptDone(done, 'sb1|1|open'), keptDone(done, 'sb2|1|approved'), keptDone(null, 'sb1|1|approved')],
+    [null, null, null, null]);
 });

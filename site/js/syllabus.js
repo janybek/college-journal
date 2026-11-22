@@ -93,7 +93,14 @@ export function linesOf(text) {
 // A link of «Программное обеспечение» is a link only when it starts with http:// or https://; anything else
 // (javascript:, a bare address, a space in front) is shown as text.
 export function safeLink(link) {
-  return typeof link === 'string' && /^https?:\/\/\S/.test(link) ? link : null;
+  return typeof link === 'string' && /^https?:\/\/\S+$/.test(link) ? link : null;
+}
+
+// The note of the last decision on the page («Силлабус утверждён…»): { key, at }, `at` the address key it was made for
+// ('subjectId|semester|version'). Another half of the year, version or subject drops it; the address the page goes
+// to right after the decision keeps it.
+export function keptDone(done, key) {
+  return done && done.at === key ? done : null;
 }
 
 // ---- The check window of an upload (syllabus.preview) ----

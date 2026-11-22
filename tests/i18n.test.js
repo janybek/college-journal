@@ -62,8 +62,10 @@ test('final fix wave: field texts of the file check, the replaced semester, unit
   // I2: the semester cell has its own text; the plan column (one number per row) another
   assert.equal(ru['syllabus.error.semester.bad_value'], 'Семестр — число от 1 до 8, как в учебном плане (например 3). Для курса на два семестра — «1-2».');
   // I3, M2, M13, R3, M4
-  assert.equal(ru['syllabus.warning.semester_replaces'],
-    'В журнале загружен силлабус {stored} семестра. Этот файл ({file} семестр) заменит его во всех группах: {groups}. Если это другой курс, заведите для него отдельную дисциплину.');
+  // task 44: a file changes the draft only; the groups get it once it is approved
+  assert.equal(ru['syllabus.warning.semester_replaces'].includes('во всех группах'), false);
+  assert.ok(ru['syllabus.warning.semester_replaces'].includes('черновик'));
+  for (const dict of [ru, ky, en]) for (const name of ['{stored}', '{file}', '{groups}']) assert.ok(dict['syllabus.warning.semester_replaces'].includes(name), name);
   for (const dict of [ru, ky, en]) {
     for (const key of ['syllabus.error.plan.semester.bad_value', 'syllabus.error.practiceKind.bad_value', 'syllabus.unitTitled', 'subjects.edit.busy.one', 'subjects.edit.busy.other']) assert.ok(dict[key], key);
     assert.match(dict['syllabus.error.semester_clash'], /3/);                                       // different academic years, e.g. 2 and 3
@@ -99,7 +101,7 @@ test('the subjects screen and the disciplines directory have their texts; the su
   for (const key of ['subjects.title', 'subjects.syllabus.none', 'subjects.add', 'dir.disciplines.hint', 'dir.inUse.disciplines', 'error.subjects.disciplineId.duplicate']) assert.ok(ru[key], key);
   for (const dict of [ru, ky, en]) for (const gone of ['dir.subjects.add', 'dir.subjects.new', 'error.subjects.name.duplicate']) assert.equal(gone in dict, false, gone);
   for (const key of ['dir.disciplines.add', 'dir.disciplines.new', 'error.disciplines.name.duplicate', 'error.subjects.disciplineId.bad_ref', 'error.subjects.disciplineId.in_use',
-    'subjects.hint', 'subjects.lead', 'subjects.syllabus.uploaded', 'subjects.syllabus.other', 'subjects.pairsDiffer', 'subjects.empty', 'subjects.edit.saved']) assert.ok(ru[key], key);
+    'subjects.hint', 'subjects.lead', 'subjects.syllabus.approved', 'subjects.syllabus.other', 'subjects.pairsDiffer', 'subjects.empty', 'subjects.edit.saved']) assert.ok(ru[key], key);
   assert.equal(ru['subjects.col.syllabus'], 'Силлабус ({n} семестр)');
   assert.equal(ru['syllabus.check.renamed'], 'Переименованная тема считается новой: даты её пар сохранятся.');
 });
@@ -251,4 +253,26 @@ test('task 43: the syllabus page has texts of the states, the buttons, the windo
   }
   // «Л1. Тема»: the label is the letter of the kind and the number of the journal
   for (const dict of [ru, ky, en]) assert.match(dict['pairs.topicLabel'], /\{label\}.*\{name\}/);
+});
+
+test('task 44: the review queue, the syllabus marks of the subject lists; the texts of the time of «загружен» are gone', () => {
+  assert.equal(ru['review.title'], 'Силлабусы на утверждении');
+  assert.equal(ru['review.empty'], 'Нет силлабусов, ожидающих утверждения');
+  assert.equal(ru['review.noSubjects'], 'у преподавателя больше нет групп по этой дисциплине');
+  assert.deepEqual(['approved', 'returned', 'review', 'draft', 'other', 'none', 'approvedNote'].map((k) => ru['subjects.syllabus.' + k]),
+    ['Утверждён: {hours} ч, {pairs}', 'Возвращён', 'На утверждении', 'Черновик', 'Есть только на другой семестр', 'Нет силлабуса', 'утверждён: {hours} ч, {pairs}']);
+  assert.deepEqual(['returned', 'review', 'draft', 'approved', 'none'].map((k) => ru['home.syllabusState.' + k]),
+    ['Возвращён', 'На утверждении', 'Черновик', 'Утверждён', 'Нет силлабуса']);
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    for (const key of ['review.title', 'review.hint', 'review.lead', 'review.empty', 'review.col.discipline', 'review.col.teacher', 'review.col.semester', 'review.col.sent',
+      'review.col.version', 'review.col.status', 'review.emptyHint', 'review.sentBy', 'review.version', 'review.noSubjects', 'review.openForm',
+      'subjects.syllabus.approvedNote', 'subjects.uploadedDraft', 'subjects.openForm']) assert.ok(dict[key], lang + ' ' + key);
+    for (const gone of ['subjects.syllabus.uploaded', 'syllabus.notUploaded']) assert.equal(gone in dict, false, lang + ' ' + gone);
+    assert.equal(Object.keys(dict).some((key) => key.startsWith('syllabus.notUploaded')), false, lang);
+    assert.match(dict['subjects.syllabus.approved'], /\{hours\}.*\{pairs\}/);
+  }
+  // nothing says the deanery uploads or that a file is «загружен» in effect
+  for (const key of ['subjects.lead', 'subjects.add.saved', 'syllabus.done', 'syllabus.check.first', 'syllabus.check.replace', 'syllabus.check.failed', 'home.noSyllabus']) {
+    assert.doesNotMatch(ru[key], /загружа?ен|загружает деканат/i, key);
+  }
 });

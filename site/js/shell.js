@@ -4,6 +4,7 @@ import { el, avatar, iconButton, refresh } from './ui.js';
 import { icon } from './icons.js';
 import { currentTheme, toggleTheme } from './theme.js';
 import { DIR_TABLES } from './views/directoryConfig.js';
+import { reviewCount, onReviewCount } from './reviewCount.js';
 
 // The frame around the screens: sign-in pages (a centred card), the student's phone bar, and the staff layout
 // with a sidebar (a drawer on narrow screens) and a top bar. The server checks every right itself; the
@@ -32,8 +33,8 @@ export function activeRole(user) {
   return roles.includes(saved) ? saved : roles[0];
 }
 
-// Navigation groups for a role: [{ titleKey, items: [{ name, href, textKey, icon, hintKey }] }]. Pure, for tests.
-// hintKey: the line under the item's tile on the home screen.
+// Navigation groups for a role: [{ titleKey, items: [{ name, href, textKey, icon, hintKey, count? }] }]. Pure, for tests.
+// hintKey: the line under the item's tile on the home screen; count: the item shows the number of reviewCount.js.
 // The teacher's home is the list of their subjects, so their first item is named after it.
 export function navFor(permissionList, role) {
   const list = Array.isArray(permissionList) ? permissionList : [];
@@ -54,6 +55,9 @@ export function navFor(permissionList, role) {
   }
   if (list.includes('subjects.overview')) {
     schedule.push({ name: 'subjects', href: '#/subjects', textKey: 'subjects.title', icon: 'book', hintKey: 'subjects.hint' });
+  }
+  if (list.includes('syllabus.queue')) {
+    schedule.push({ name: 'review', href: '#/review', textKey: 'review.title', icon: 'clipboard', hintKey: 'review.hint', count: true });
   }
   if (list.includes('settings.get')) {
     schedule.push({ name: 'settings', href: '#/settings', textKey: 'settings.title', icon: 'settings', hintKey: 'settings.hint' });
@@ -99,6 +103,18 @@ function listen() {
   // Widening the window turns the drawer back into a sidebar: nothing may stay inert.
   const wide = window.matchMedia(WIDE);
   wide.addEventListener('change', () => { if (wide.matches && drawerOpen) setDrawer(false, false); });
+  // A new number of versions under review changes the menu and the home tile in place.
+  onReviewCount(() => {
+    for (const shown of document.querySelectorAll('[data-review-count]')) shown.replaceWith(countBadge(shown.dataset.reviewCount));
+  });
+}
+
+// The number of versions under review beside an item of the menu (or its tile on the home screen). Nothing for 0
+// and while the number is not known yet: an empty placeholder keeps the place to fill in.
+export function countBadge(className = 'nav-count') {
+  const n = reviewCount();
+  if (n === null || n === 0) return el('span', { 'data-review-count': className, hidden: true });
+  return el('span', { class: className, 'data-review-count': className }, String(n));
 }
 
 // Builds the frame for this screen into `host` and returns the <main> element the screen draws into.
@@ -193,7 +209,7 @@ function navGroup(group, index, current) {
     group.titleKey ? el('p', { class: 'nav-group__title', id: titleId }, t(group.titleKey)) : null,
     el('ul', { class: 'nav-group__list', 'aria-labelledby': group.titleKey ? titleId : null }, group.items.map((item) => el('li', {},
       el('a', { class: 'nav-link', href: item.href, 'aria-current': item.name === current ? 'page' : null, onclick: closeDrawer },
-        icon(item.icon), el('span', {}, t(item.textKey)))))));
+        icon(item.icon), el('span', { class: 'nav-link__text' }, t(item.textKey)), item.count ? countBadge() : null)))));
 }
 
 // Several roles: a switcher that changes which menu is shown (and what the home screen offers).
@@ -247,6 +263,7 @@ function crumbs(groups, view, params, current, role) {
     else if (view === 'settings') [groupKey, pageKey] = ['nav.schedule', 'settings.title'];
     else if (view === 'weekTemplate') [groupKey, pageKey] = ['nav.schedule', 'template.title'];
     else if (view === 'subjects') [groupKey, pageKey] = ['nav.schedule', 'subjects.title'];
+    else if (view === 'review') [groupKey, pageKey] = ['nav.schedule', 'review.title'];
     else if (view === 'mySchedule') [groupKey, pageKey] = ['nav.teaching', 'my.title'];
     else pageKey = 'nav.home';
   }

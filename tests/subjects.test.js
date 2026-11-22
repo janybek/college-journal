@@ -1,12 +1,12 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freeGroups, nextRow, addRequest, syllabusBadge, pairsNote, addedTeachers, withoutRow } from '../site/js/subjects.js';
+import { freeGroups, nextRow, addRequest, syllabusBadge, approvedNote, teacherBadge, pairsNote, addedTeachers, withoutRow } from '../site/js/subjects.js';
 
 const groups = [{ id: 'g1', name: '01-1' }, { id: 'g2', name: '02-1' }, { id: 'g3', name: '03-1' }];
 const rows = [
-  { disciplineId: 'ds1', disciplineName: 'Информатика', teacherId: 't1', teacherName: 'Teacher One', uploaded: true, otherSemester: true, plannedHours: 36, plannedPairs: 18,
+  { disciplineId: 'ds1', disciplineName: 'Информатика', teacherId: 't1', teacherName: 'Teacher One', syllabusStatus: 'approved', open: null, otherSemester: true, plannedHours: 36, plannedPairs: 18,
     groups: [{ subjectId: 'sb1', groupId: 'g1', groupName: '01-1', scheduledPairs: 18 }, { subjectId: 'sb2', groupId: 'g2', groupName: '02-1', scheduledPairs: 17 }] },
-  { disciplineId: 'ds1', disciplineName: 'Информатика', teacherId: 't3', teacherName: 'Teacher Three', uploaded: false, otherSemester: false, plannedHours: 0, plannedPairs: 0,
+  { disciplineId: 'ds1', disciplineName: 'Информатика', teacherId: 't3', teacherName: 'Teacher Three', syllabusStatus: 'none', open: 'draft', otherSemester: false, plannedHours: 0, plannedPairs: 0,
     groups: [{ subjectId: 'sb3', groupId: 'g3', groupName: '03-1', scheduledPairs: 18 }] }];
 
 test('freeGroups: the groups that do not have the discipline yet and are not chosen in another row of the window', () => {
@@ -25,10 +25,28 @@ test('addRequest: fully empty rows are dropped; ready only with a discipline and
     [false, false, false]);
 });
 
-test('syllabusBadge: uploaded for the current semester, only for the other one, or none', () => {
-  assert.deepEqual(syllabusBadge(rows[0]), { tone: 'success', key: 'subjects.syllabus.uploaded', params: { hours: 36, pairs: 18 } });
-  assert.deepEqual(syllabusBadge(rows[1]), { tone: 'warning', key: 'subjects.syllabus.none' });
-  assert.deepEqual(syllabusBadge({ ...rows[1], otherSemester: true }), { tone: 'neutral', key: 'subjects.syllabus.other' });
+test('syllabusBadge: one mark — the open version first (returned, under review, draft), else the approved one, the other half of the year only, none', () => {
+  const row = (extra) => ({ syllabusStatus: 'approved', open: null, otherSemester: false, plannedHours: 36, plannedPairs: 18, ...extra });
+  assert.deepEqual([syllabusBadge(row()), syllabusBadge(row({ open: 'returned' })).key, syllabusBadge(row({ open: 'review' })).key, syllabusBadge(row({ syllabusStatus: 'none', open: 'draft' })).key,
+    syllabusBadge(row({ syllabusStatus: 'none', otherSemester: true })).key, syllabusBadge(row({ syllabusStatus: 'none' }))],
+  [{ tone: 'success', key: 'subjects.syllabus.approved', params: { hours: 36, pairs: 18 } }, 'subjects.syllabus.returned', 'subjects.syllabus.review', 'subjects.syllabus.draft',
+    'subjects.syllabus.other', { tone: 'danger', key: 'subjects.syllabus.none' }]);
+  assert.deepEqual([syllabusBadge(row({ open: 'returned' })).tone, syllabusBadge(row({ open: 'review' })).tone, syllabusBadge(row({ open: 'draft' })).tone,
+    syllabusBadge(row({ syllabusStatus: 'none', otherSemester: true })).tone], ['warning', 'info', 'neutral', 'neutral']);
+});
+
+test('approvedNote: beside the mark of an open version, what is approved now; nothing without an open or an approved version', () => {
+  const row = (extra) => ({ syllabusStatus: 'approved', open: null, otherSemester: false, plannedHours: 36, plannedPairs: 18, ...extra });
+  assert.deepEqual([approvedNote(row({ open: 'review' })), approvedNote(row()), approvedNote(row({ syllabusStatus: 'none', open: 'draft' }))],
+    [{ key: 'subjects.syllabus.approvedNote', params: { hours: 36, pairs: 18 } }, null, null]);
+});
+
+test('teacherBadge: the mark of a subject in «Мои предметы»', () => {
+  assert.deepEqual([teacherBadge({ approved: true, open: 'returned' }), teacherBadge({ approved: true, open: null }).key, teacherBadge({ approved: false, open: null }).key, teacherBadge(undefined).key],
+    [{ tone: 'warning', key: 'home.syllabusState.returned' }, 'home.syllabusState.approved', 'home.syllabusState.none', 'home.syllabusState.none']);
+  assert.deepEqual([teacherBadge({ approved: true, open: 'review' }), teacherBadge({ approved: false, open: 'draft' }), teacherBadge({ approved: true, open: null }), teacherBadge(null)],
+    [{ tone: 'info', key: 'home.syllabusState.review' }, { tone: 'neutral', key: 'home.syllabusState.draft' }, { tone: 'success', key: 'home.syllabusState.approved' },
+      { tone: 'danger', key: 'home.syllabusState.none' }]);
 });
 
 test('pairsNote: only where the schedule of a group holds another number of pairs than the plan', () => {
