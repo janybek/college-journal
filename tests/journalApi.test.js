@@ -114,3 +114,74 @@ test('journal.get: the semester dates cut the pairs; the settings are read as se
   assert.equal(journalOf(s, s.sb1, s.t.teacher1).pairs[2].topicName, 'Тема 3');
   assert.equal(journalOf(s, s.sb1, s.t.teacher1).pairs[2].number, 2);
 });
+
+test('journal.get: the former teacher of a subject sees only his own pairs, partly', () => {
+  const s = setup();
+  const { store, t, ids, sb1, p0915 } = s;
+  store.update('subjects', sb1, { teacherId: ids.teacher2 });
+  store.update('pairs', p0915, { teacherId: ids.teacher1, substitute: false });
+  const j = journalOf(s, sb1, t.teacher1);
+  assert.deepEqual([j.partial, j.results, j.units, j.can], [true, {}, [], { results: false, manage: false }]);
+  assert.equal(j.pairs.length > 0 && j.pairs.every((p) => p.teacherId === ids.teacher1), true);
+  assert.deepEqual(Object.keys(j.marks).sort(), [s.p0901, s.p0908].sort());
+  assert.equal(journalOf(s, sb1, t.teacher2).partial, false);
+});
+
+test('journal.get: a left student does not change the results of the others', () => {
+  const s = setup();
+  const { store, t, ids, sb1, a1, a2, a3, a4, p0901, p0908 } = s;
+  const before = journalOf(s, sb1, t.teacher1);
+  store.insert('attendance', { pairId: p0901, studentId: a4, status: 'present', noCoat: false, activity: null, source: 'teacher', markedBy: ids.teacher1, markedAt: '2026-09-01 08:10:00' });
+  store.insert('attendance', { pairId: p0908, studentId: a4, status: 'present', noCoat: false, activity: 9, source: 'teacher', markedBy: ids.teacher1, markedAt: '2026-09-08 08:10:00' });
+  const after = journalOf(s, sb1, t.teacher1);
+  assert.equal(after.students.at(-1).left, true);
+  for (const id of [a1, a2, a3]) assert.deepEqual(after.results[id], before.results[id]);
+});
+
+// ---- journal.list
+
+// A third subject: Информатика of teacher1 in the group 02-1, Wednesdays; its pair of 02.09 is past, of 09.09 is ahead at 08.09.
+function withSb3(s) {
+  const sb3 = s.store.insert('subjects', { name: 'Информатика', disciplineId: s.ds1, groupId: s.g2, teacherId: s.ids.teacher1, scheme: 'A' }).id;
+  s.store.insert('weekTemplate', { weekday: 3, slot: 1, subjectId: sb3, roomId: '' });
+  s.call('schedule.generate', {}, s.t.dean);
+  return sb3;
+}
+
+test('journal.list: counters, rights and the rows of a substitute', () => {
+  const s = setup();
+  const { call, t, at } = s;
+  withSb3(s);
+  at('2026-09-08', '08:05');
+  assert.deepEqual(call('journal.list', {}, t.teacher1).data.subjects.map((x) => [x.groupName, x.name, x.own, x.held, x.unfilled, x.overdue]),
+    [['01-1', 'Информатика', true, 2, 0, 0], ['02-1', 'Информатика', true, 0, 1, 1]]);
+  assert.deepEqual(call('journal.list', {}, t.teacher3).data.subjects.map((x) => [x.name, x.own, x.covers, x.held, x.unfilled, x.overdue]), [['Информатика', false, true, 0, 0, 0]]);
+  at('2026-09-20', '09:00');
+  assert.deepEqual(call('journal.list', {}, t.teacher3).data.subjects.map((x) => [x.held, x.unfilled, x.overdue]), [[0, 1, 1]]);
+  assert.equal(call('journal.list', {}, t.teacher2).data.subjects.length, 1);
+  assert.deepEqual(call('journal.list', {}, t.dean).data.subjects.map((x) => x.groupName), ['01-1', '02-1', '02-1']);
+  assert.equal(call('journal.list', {}, t.prorector).data.subjects.length, 3);
+  assert.equal(call('journal.list', {}, t.a1).error.code, 'forbidden');
+  assert.equal(typeof call('journal.list', {}, t.dean).data.today, 'string');
+  const text = JSON.stringify(call('journal.list', {}, t.teacher3).data);
+  for (const word of ['passwordHash', 'login', 'Анатомия']) assert.equal(text.includes(word), false, word);
+});
+
+test('journal.list: a former teacher is a substitute row; the dean who teaches sees all', () => {
+  const s = setup();
+  const { call, store, t, ids, sb1, at } = s;
+  store.update('subjects', sb1, { teacherId: ids.teacher2 });
+  at('2026-09-20', '09:00');
+  const row = call('journal.list', {}, t.teacher1).data.subjects.find((x) => x.subjectId === sb1);
+  assert.deepEqual([row.own, row.covers, row.teacherName], [false, true, 'Петров Эрмек']);
+  assert.equal(row.held, 2);                           // his own pairs: the two closed ones
+  assert.equal(call('journal.list', {}, t.dean).data.subjects.length, 2);
+});
+
+test('journal.list: each table is read once and nothing is written', () => {
+  const s = setup();
+  s.spy.reset();
+  s.call('journal.list', {}, s.t.dean);
+  for (const table of JOURNAL_TABLES) assert.equal(s.spy.lists[table] <= 1, true, table);
+  assert.deepEqual(Object.keys(s.spy.writes), []);
+});

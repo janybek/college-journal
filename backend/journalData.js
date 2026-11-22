@@ -166,3 +166,48 @@ export function journalView(rows, platform, subjectId, user) {
     results,
   };
 }
+
+// The list of journals: the subjects the person may open, with the counters of the pairs still to be marked.
+// A teacher who only substituted gets the counters of his own pairs, never the numbers of the whole subject.
+export function journalList(rows, platform, user) {
+  const viewer = viewerOf(user);
+  const settings = readSettings(rows.settings);
+  const scheme = readScheme(rows.settings);
+  const nowMs = platform.now();
+  const now = { date: localDate(nowMs), time: localTime(nowMs) };
+
+  const pairsOf = new Map();
+  for (const p of rows.pairs) {
+    if (!inSemester(p.date, settings)) continue;
+    if (!pairsOf.has(p.subjectId)) pairsOf.set(p.subjectId, []);
+    pairsOf.get(p.subjectId).push(p);
+  }
+  const groupName = (id) => (rows.groups.find((g) => g.id === id) || { name: '' }).name;
+
+  const list = [];
+  for (const subject of rows.subjects) {
+    const all = pairsOf.get(subject.id) || [];
+    const mine = viewer.teacher ? all.filter((p) => p.teacherId === viewer.id) : [];
+    const own = viewer.teacher && subject.teacherId === viewer.id;
+    const covers = mine.length > 0;
+    if (!viewer.manager && !viewer.reader && !own && !covers) continue;
+    const counted = viewer.manager || viewer.reader || own ? all : mine;
+    let heldCount = 0;
+    let unfilled = 0;
+    let overdue = 0;
+    for (const p of counted) {
+      if (FIXED_STATUSES.includes(p.status)) heldCount += 1;
+      if (p.status !== 'planned') continue;
+      const state = markState(p, now, scheme);
+      if (state === 'open' || state === 'late') unfilled += 1;
+      if (state === 'late') overdue += 1;
+    }
+    list.push({
+      subjectId: subject.id, name: subject.name, groupId: subject.groupId, groupName: groupName(subject.groupId),
+      teacherId: subject.teacherId, teacherName: nameOf(rows.staff, subject.teacherId),
+      own, covers, held: heldCount, unfilled, overdue,
+    });
+  }
+  list.sort((a, b) => compareNames(a.groupName, b.groupName) || compareNames(a.name, b.name) || cmp(a.subjectId, b.subjectId));
+  return { today: now.date, subjects: list };
+}
