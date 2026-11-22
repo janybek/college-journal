@@ -82,8 +82,10 @@ function dispatch(request, ctx) {
 // Never throws. Always returns { ok, data | error, serverTime }.
 export function handleRequest(raw, ctx) {
   const serverTime = ctx.platform.now();
+  // A store that has transactions (SQLite) runs the whole request as one; the others run it as it is.
+  const run = typeof ctx.store.transaction === 'function' ? (fn) => ctx.store.transaction(fn) : (fn) => fn();
   try {
-    const data = dispatch(parseRequest(raw), ctx);
+    const data = run(() => dispatch(parseRequest(raw), ctx));
     return { ok: true, data, serverTime };
   } catch (error) {
     if (error instanceof AppError) {

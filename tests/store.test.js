@@ -8,12 +8,19 @@ import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { createFileStore } from '../backend/store/fileStore.js';
 import { createSheetsStore, ensureSheets } from '../backend/store/sheetsStore.js';
+import { createSqliteStore, ensureTables, openDatabase } from '../backend/store/sqliteStore.js';
 import { createFakeSpreadsheet } from './fakes/fakeSpreadsheet.js';
 import { storeContract } from './storeContract.js';
 
 const platform = createNodePlatform({ now: () => 1000, secret: 's' });
 
 storeContract('memoryStore', () => createMemoryStore(SCHEMA, platform));
+
+storeContract('sqliteStore', () => {
+  const db = openDatabase(':memory:');
+  ensureTables(SCHEMA, db);
+  return createSqliteStore(SCHEMA, platform, db);
+});
 
 storeContract('sheetsStore', () => {
   const ss = createFakeSpreadsheet();

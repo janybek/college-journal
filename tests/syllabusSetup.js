@@ -27,6 +27,7 @@ function spyOn(store) {
   const order = [];
   const spy = {};
   for (const name of Object.keys(store)) {
+    if (name === 'transaction') { spy[name] = store[name]; continue; }
     spy[name] = (...args) => {
       calls[name] = (calls[name] || 0) + 1;
       order.push(`${name}:${args[0]}`);
@@ -45,9 +46,9 @@ function spyOn(store) {
 // A fresh store for every test: dean, prorector, teacher1, teacher2; students s1 (01-1) and s2 (02-1); disciplines «Информатика» (ds1) and «Анатомия» (ds2);
 // sb1 = ds1 + 01-1 + teacher1 (Tuesday, pair 1: 2026-09-01 and 09-08), sb3 = ds1 + 02-1 + teacher1 (Wednesday: 09-02 and 09-09),
 // sb2 = ds2 + 02-1 + teacher2 (Friday); semester 1, the schedule is made.
-export function setup() {
+export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform) } = {}) {
   const platform = createNodePlatform({ now: () => Date.UTC(2026, 7, 31, 6), secret: 'test-secret' });
-  const store = createMemoryStore(SCHEMA, platform);
+  const store = makeStore(SCHEMA, platform);
   const spied = spyOn(store);
   const ctx = { store: spied.spy, platform, log: () => {} };
   const call = (action, data, token) => handleRequest(JSON.stringify({ action, data, token }), ctx);
