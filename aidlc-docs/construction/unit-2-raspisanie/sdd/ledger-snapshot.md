@@ -467,3 +467,67 @@
 - Addendum 3 fix wave: re-review (fable) — I1, I2, M1-M5 ADDRESSED; adjusted p3/p9/p12 do not hide errors; 1070 keys same in ru/ky/en; npm test 495/495, build:gas ok. New: N1 Minor — after a failed «Силлабусы» write and before a retry, pairs stand on the «на утверждении» version's rows (students see its topics); returning instead of retrying and deleting a held topic leaves the pair topicless. Probes scratchpad/final3-recheck/r1-r3.
   - Ruling: N1 not fixed now — rare (a failed Google write mid-approval); goes to «Что перенести» with the advice «after an error press Утвердить again»; M6, M7 there too — cost: a deanery that ignores the error may leave one pair without a topic.
 - Addendum 3 fix wave: complete (commits 8128703..e356ce7). Final review of addendum 3 closed: 0 Critical, 0 Important open.
+
+## Addendum 4 (base and server on the owner's computer)
+- Owner: «база на компьютере», Tailscale, backups on C:; design aidlc-docs/construction/unit-2-raspisanie/design-local-server.md (commit c05409c). Plan of addendum 4 dispatched to fable (tasks 46+).
+- Owner installed Tailscale and signed in himself; HTTPS certificates enabled; machine renamed: public name journal.tail750a0e.ts.net (CertDomains confirmed by the controller). Funnel not yet enabled — after the server exists (owner approves via the link Tailscale prints).
+- To write into aidlc-state «Выкладка» after the plan agent commits: server address https://journal.tail750a0e.ts.net
+- Owner decision (to write into aidlc-state decisions + «Что перенести» and CLAUDE.md after the plan agent commits): AI is connected LAST; everything works by hand first. Later, after everything works, an AI is taught to check only chosen points on the site (e.g. read an uploaded syllabus into the title and the thematic plan as a draft; the teacher fixes by hand and submits; the AI never approves).
+- Plan of addendum 4: commit 9eea5f4 (tasks 46-52, port 5373, DB D:\Журнал колледжа — данные, backups C:\JournalBackups). C: and D: are different physical disks. Docs commit with AI-last and Tailscale address.
+- Owner: plan of addendum 4 approved with all six defaults; all 12 new rules accepted, rule 11 (AI) at the very end. Docs commit 39e3263 (decisions, «Что перенести», CLAUDE.md: syllabus filled on the site, Excel only for the first fill, real students after addendum 4, lighter per-task reviews from unit 3).
+  - Ruling: rule 1 (Excel only for the first fill, button «Заполнить из файла») goes into addendum 4 via the plan fixer after the pre-flight (task 52, Screens) — none.
+- Pre-flight of addendum 4: dispatched (journal-reviewer/fable)
+- Owner: «экономь токены» — from addendum 4: per-task reviews light (sonnet, short), Screens on sonnet for small edits, plan fixer on sonnet; final review stays strong. CLAUDE.md updated.
+- Pre-flight of addendum 4 (fable): preflight-addendum4.md — 1 Critical, 7 Important, 22 Minor; npm test 495/495; node:sqlite works without flags; probes scratchpad/preflight4/.
+  - Ruling: C1 — the working server runs from its own folder holding the released commit (not the dev checkout), updated only at a release — as proposed — none.
+  - Ruling: I1-I7 — as proposed in the report (VACUUM INTO; path check by real containment; env and serve.local.json not mixed, restore drill on its own folder; close DBs explicitly in tests; supervisor PID written and stop works during the restart pause; login limit cannot lock everyone out with invented logins; malformed URLs answered 400, process never dies on them) — none.
+  - Ruling: rule 1 — the cheaper variant: screens only, inside task 52 (the button reads «Заполнить из файла» and is offered for an empty or new draft; the server still accepts a file) — saves two tasks per the owner's «экономь токены» — cost: a user can still re-fill a non-empty draft from a file.
+  - Ruling: Minors — the fixer applies those that are one or two lines in the plan; others listed as skipped — none.
+- Plan fixer for addendum 4: dispatched (general-purpose/sonnet)
+- Plan of addendum 4 fixed: commit 65937a8 (C1, I1-I7, rule 1 inside task 52, most minors; skipped M6, M11). Shared sections saved as addendum4-shared.md.
+- Task 46: dispatched (BASE 65937a8, journal-logic/sonnet)
+- Task 46: implementer DONE, commit 6b14d23, 503/503; note for task 49: non-string logins share key '' — the login must decide what to do with it. Light review dispatched (sonnet).
+- Task 46: light review — accept; minors (deferred → final review): extra keyLength param; clock going back lengthens a block (time comes from the platform, task 49); full-table scan per failure (~13 s per 200k calls).
+- Task 46: complete (commits 65937a8..6b14d23)
+- Task 47: dispatched (BASE 6b14d23, journal-server/sonnet)
+- Task 47: implementer DONE, commit c7d736a, 517/517, build:gas ok; batch inside a transaction uses SAVEPOINT; no separate RED. Light review dispatched (sonnet).
+- Task 47: light review — accept (rollback incl. SAVEPOINT, SQL injection strings stored as-is, values equal to fileStore). Complete (commits 6b14d23..c7d736a).
+- Task 48: dispatched (BASE c7d736a, journal-server/sonnet)
+- Task 48: implementer DONE_WITH_CONCERNS (no RED step), commit 016acaf, 525/525; inside-repo check by relative path '..' + separator; resetAdminPassword opens the DB directly. Light review dispatched.
+- Task 48: light review — accept (inside_repo holds for case, slashes, '..'; password only returned to the caller; secret.key 0600 outside the repo; git check-ignore confirms). Minor: no test for an 8.3 short path. Complete (commits c7d736a..016acaf).
+- Task 49: dispatched (BASE 016acaf, journal-server/sonnet), note: non-string logins share key '' (task 46)
+- Task 49: implementer DONE_WITH_CONCERNS, commit 28ab95c, 541/541, build:gas ok; bypass tests on a real server (foreign Origin, ../, %2e%2e, //, ///, /\, //[, //@/api, guessing, 3 MB body, hang-up, garbage TCP) — process stays alive.
+  - Ruling: non-string logins answer bad_credentials then too_many_attempts under key '' (the brief), not bad_request (my dispatch note) — the brief wins; a test shows real logins are never locked — none.
+- Task 49: light review dispatched (sonnet, security focus)
+- Task 49: light review — accept (spoofed Origins 403, OPTIONS 405, foreign-secret token unauthorized, 50 parallel logins → 10 bad + 40 too_many, no passwordHash/paths/secrets in answers or log). Minor (known trade-off, tell the owner): 10 failures lock the real user for 15 min too. Complete (commits 016acaf..28ab95c).
+- Task 50: dispatched (BASE 28ab95c, journal-server/sonnet)
+- Task 50: implementer DONE_WITH_CONCERNS, commit 89fda91, 552/552; VACUUM INTO .tmp → verify → rename; copy at start before upgrade(); serve:backup. No RED run.
+  - Ruling: a pruning failure only logs «backup pruning failed» and the copy stays ok — the copy itself is what matters; disk filling shows in the log — none.
+- Task 50: light review dispatched
+- Task 50: light review — accept (WAL copy with open connection complete, no -wal/-shm; bad copy → ok:false + alarm file, cleared after a good one; 46 days → 30 copies, foreign files kept). Complete (commits 28ab95c..89fda91).
+- Task 51: dispatched (BASE 89fda91, journal-server/sonnet)
+- Task 51: implementer DONE, commit e15c2ff, 561/561; Windows check on temp folders/port 5399 (no window, restart after kill by own PID, serve:stop clears state, autostart.ps1 only in a temp folder). Extra: a second supervisor does not start or touch the first's file. Light review dispatched (PID reuse focus).
+- Task 51: light review — no foreign process is ever killed (stop via stopFile, child.kill only own child, no taskkill/Stop-Process). Important I1: supervisor.js:248-255 — when the PID in supervisorFile belongs to a foreign process, requestStop leaves stopFile after the timeout; the next supervisor start sees it in stopAsked() and exits silently (journal does not start). Minor: isAlive does not check start time, --status may say «работает» for a foreign PID.
+  - Ruling: fix round 1 to the same implementer: remove stopFile after the timeout + test; the minor folded in (status says «не наш процесс» when the PID does not answer as our server) — a journal that silently does not start after a reboot is the worst case for the owner — none.
+- Task 51: fix round 1 — commit 6ffb09e (stopFile removed after the timeout; --status names a foreign PID), 562/562. Controller accepted the small round itself: read the diff, supervisor tests 10/10, npm test 562/562. Complete (commits 89fda91..6ffb09e).
+- Owner's acceptance stand on 5273 stopped by the controller before the screens task (owner told).
+- Task 52: dispatched (BASE 6ffb09e, journal-screens/sonnet — small site edit per «экономь токены»)
+- Task 52: implementer DONE_WITH_CONCERNS, commit b64f4ce, 570/570, build:gas ok, stand and Chrome stopped by own PIDs. Deviations: «Предметы» treat any open version as filled (button only for a subject with no draft and no approved version); no «Скачать шаблон» in the form; help title says «файл — только для первого заполнения»; PRODUCTION_API_URL empty until task 13; «Скачать (Excel)» gone from the approved syllabus page (rule 1).
+  - Ruling: accepted by the controller without a separate reviewer (small site edit, «экономь токены»): no innerHTML in changed site files, all three dictionaries changed, tests 570/570, viewed login-server-down-dark — fine; the final review covers it — none.
+  - Note for the owner: the approved syllabus page no longer offers «Скачать (Excel)» (Excel is only for the first fill).
+- Task 52: complete (commits 6ffb09e..b64f4ce). All tasks 46-52 complete.
+- Final review of addendum 4: dispatched (journal-reviewer/fable, range 65937a8..b64f4ce)
+- Owner: «давай выкладывай после проверки» — direct request to deploy unit 2 + addenda 3-4 after the final review of addendum 4 (stand acceptance step skipped by the owner). Deployment per task 13 steps 3а-3з; owner-only steps: sleep off, journal-init.cmd (temp admin password), Funnel approval link if asked.
+- Final review of addendum 4 (fable): addendum4-final-review.md — 0 Critical, 3 Important, 15 Minor; 570/570; server defence, transaction, copy and addendum-3 rights held. Probes scratchpad/final4/p1-p12.
+  - Ruling: I1 (stale foreign PID in supervisor.state.json → supervisor exits 3, journal silently not started) → the supervisor checks the recorded PID is ours (health on our port / recorded start time) and otherwise removes the stale file and starts — fix wave.
+  - Ruling: I2 (restore from a copy not described; a leftover -wal corrupts a naive restore; losing disk D loses secret.key) → `serve:restore <copy>` (server stopped, -wal/-shm removed, copy verified) + secret.key copied next to the daily copies on C: — fix wave.
+  - Ruling: I3 (no rollback step; released commit not recorded; two owner phrases missing) → task 13 gets «записать выложенный коммит» and «как вернуться назад»; owner-summary-5 gets the two phrases — fix wave.
+  - Ruling: minors folded: a forgotten stop.request older than the supervisor start is ignored; a server that cannot start (missing data folder) leaves the Desktop alert file; the rest stay as known limits — none.
+- Addendum 4 fix wave: dispatched (journal-server/sonnet, may edit plan.md and owner-summary-5.md)
+- Addendum 4 fix wave: DONE, commits f4f7786 (code) + d82c85b (docs), 578/578, build:gas ok. Note: secret.key copy next to backups means C:\JournalBackups must stay private. Scoped re-review sent to the same final reviewer.
+- Addendum 4 re-review (fable): I1, I2, I3 and both minors ADDRESSED; 578/578. New: N1 restoring from a before-restore folder with a -wal loses the -wal rows (nothing deleted); N2 secret.key next to the copies; N3 empty before-restore folder after a refusal.
+  - Ruling: N1 parked — restore only from C:\JournalBackups copies (written into the deployment notes) — cost: a wrong manual restore needs a second restore.
+  - Ruling: N2 accepted — it was my I2 ruling; C:\JournalBackups stays private on the owner's computer (owner told) — cost: whoever reads that folder could forge a session.
+  - Ruling: N3 parked (cosmetic).
+- Addendum 4 complete (commits 65937a8..d82c85b). Deployment starts (owner's direct request).
+- DEPLOYED 22.11.2026: server worktree D:\Журнал колледжа — сервер at d82c85b, base created by the owner (journal-init.cmd), autostart shortcut «Journal server» installed, serve:status «работает», first copy in C:\JournalBackups; Funnel approved by the owner → https://journal.tail750a0e.ts.net; outside probes ok (403 without/with foreign Origin, own Origin 200 + ACAO, 404 on base/key/log/..%2f, 0.02 s); site commit 19904f5 + docs 828dc0d pushed (56d96bf..828dc0d); live config.js has the address, the page's API_URL resolves to it. The in-app browser pane blocks *.ts.net (ERR_BLOCKED_BY_CLIENT) — the owner checks the login in his own browser/phone.
