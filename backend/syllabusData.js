@@ -2,7 +2,7 @@
 // No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
 import { scheduleFit, subjectScope, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
-import { controlMarks, lessonKey, lessonTypeOf, lessonsOf } from '../core/topics.js';
+import { controlMarks, lessonKey, lessonsOf } from '../core/topics.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
 import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
 import { rightsOn, versionsOf } from '../core/syllabusFlow.js';
@@ -21,8 +21,7 @@ function shownSemester(asked, current, loaded) {
   return loaded.length === 1 ? loaded[0].semester : current;
 }
 
-// One row of the page: fields by name, hours as numbers, the pairs of THIS subject that stand on it. Besides the fields of a lesson
-// the row keeps the earlier fields (kind, label, lectureHours, practiceHours, practiceKind) for the screens that still read them.
+// One row of the page: fields by name, hours as numbers, the pairs of THIS subject that stand on it.
 function pageRow(row, own, marks, numbers) {
   const mine = [];
   for (const p of own) {
@@ -31,13 +30,9 @@ function pageRow(row, own, marks, numbers) {
     if (onRow) mine.push(p);
   }
   mine.sort((a, b) => cmp(a.date, b.date) || a.slot - b.slot);
-  const type = lessonTypeOf(row);
   return {
     id: row.id, lessonKind: row.lessonKind, number: numbers.get(row.id), unit: row.unit, unitTitle: row.unitTitle ?? '', name: row.name,
     hours: hours(row.hours), controlForms: row.controlForms ?? '', selfHours: nullable(row.selfHours), description: row.description,
-    kind: type === 'control' ? 'control' : 'topic', label: '', lectureHours: type === 'lecture' ? hours(row.hours) : 0,
-    practiceHours: type === 'practice' || type === 'control' ? hours(row.hours) : 0,
-    practiceKind: row.lessonKind === 'seminar' || row.lessonKind === 'lab' ? row.lessonKind : '',
     planned: lessonsOf([row]).length,
     pairs: mine.map((p) => ({ date: p.date, lessonType: p.lessonType, part: p.part, status: p.status })),
   };
@@ -146,7 +141,7 @@ export function syllabusPage(store, platform, data, user) {
         ? { syllabusId: open.id, status: open.status, version: open.version, remark: open.remark ?? '', submittedAt: open.submittedAt ?? '', updated: open.updated ?? '' }
         : null,
     },
-    can, canUpload: can.edit, syllabus,
+    can, syllabus,
   };
 }
 

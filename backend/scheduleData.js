@@ -3,7 +3,7 @@ import { AppError } from '../core/errors.js';
 import { localDate, addMinutes } from '../core/dates.js';
 import { readSettings, PAIR_MINUTES } from '../core/settings.js';
 import { planGeneration } from '../core/schedule.js';
-import { NO_LESSON, controlMarks, layoutLessons, lessonKey, lessonTypeOf, partsOf } from '../core/topics.js';
+import { NO_LESSON, controlMarks, layoutLessons, lessonKey, partsOf } from '../core/topics.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
 import { subjectScope, syllabusIndex } from '../core/syllabus.js';
 
@@ -124,8 +124,7 @@ export function pairViews(store, keep, rows = {}) {
       roomId: p.roomId, roomName: nameOf(rooms, p.roomId, 'name'),
       topic: topic ? {
         id: topic.id, unit: topic.unit, name: topic.name, lessonKind: topic.lessonKind, number: numberOf(topic), lessonType: p.lessonType, part: p.part,
-        parts: partsOf(topic, p.lessonType), controls: marksOn(topic, p), kind: lessonTypeOf(topic) === 'control' ? 'control' : 'topic', label: '',
-        practiceKind: topic.lessonKind === 'seminar' || topic.lessonKind === 'lab' ? topic.lessonKind : '',
+        parts: partsOf(topic, p.lessonType), controls: marksOn(topic, p),
       } : null,
       substitution: subject ? subject.teacherId !== p.teacherId : false,
       moved: p.date !== p.planDate || p.slot !== p.planSlot,

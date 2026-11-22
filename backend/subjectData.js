@@ -128,7 +128,7 @@ export function subjectsOverview(store, user) {
         subjectId: s.id, groupId: s.groupId, groupName: groupOf.has(s.groupId) ? groupOf.get(s.groupId).name : '',
         scheduledPairs: scheduleFit([], pairsOf.get(s.id) || [], settings).pairs,
       })).sort((a, b) => byName(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId)),
-      uploaded: current !== null, syllabusStatus: current !== null ? 'approved' : 'none', open: openStatus,
+      syllabusStatus: current !== null ? 'approved' : 'none', open: openStatus,
       otherSemester: syllabi.some((y) => y.disciplineId === disciplineId && y.teacherId === teacherId && y.status === 'approved' && y.semester !== settings.semester),
       plannedHours: totals.hours, plannedPairs: totals.pairs,
     };

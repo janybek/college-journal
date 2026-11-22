@@ -14,16 +14,16 @@ function ready() {
 test('syllabus.get: the page of a subject', () => {
   const { publish, call, send, get, pairOf, dean, staff, ds1, g1, sb1, sb2, sb3 } = ready();
   const d = get(dean).data;
-  assert.deepEqual([d.today, d.currentSemester, d.semesters, d.semester, d.canUpload], ['2026-08-31', 1, [{ semester: 1, planSemester: 1 }], 1, true]);
+  assert.deepEqual([d.today, d.currentSemester, d.semesters, d.semester], ['2026-08-31', 1, [{ semester: 1, planSemester: 1 }], 1]);
   assert.deepEqual(d.subject, { id: sb1, name: 'Информатика', disciplineId: ds1, groupId: g1, groupName: '01-1', course: 1, teacherId: staff.teacher1, teacherName: 'teacher1' });
   assert.deepEqual(d.groups, [{ subjectId: sb1, groupName: '01-1' }, { subjectId: sb3, groupName: '02-1' }]);
   const { rows, totals, schedule, title, goals, selfWork, literature, software, policies, units, ...info } = d.syllabus;
   assert.deepEqual(info, { planSemester: 1, audience: 'Сестринское дело', credits: 1, totalHours: 10, classHours: 6, selfHours: 4, updated: '2026-08-31' });
-  // a row is one lesson: its kind, the number of the kind (Л1, П1, П2), the hours; the earlier fields stay for the screens
-  assert.deepEqual(rows.map((r) => [r.lessonKind, r.number, r.name, r.hours, r.kind, r.lectureHours, r.practiceHours, r.label]),
-    [['lecture', 1, 'Введение', 2, 'topic', 2, 0, ''], ['practice', 1, 'Введение', 2, 'topic', 0, 2, ''], ['practice', 2, 'Практикум', 2, 'topic', 0, 2, ''], ['control', 1, '', 0, 'control', 0, 0, '']]);
-  assert.deepEqual(rows.map((r) => [r.unit, r.practiceKind, r.controlForms, r.selfHours, r.description]),
-    [[1, '', '', null, 'О теме Введение'], [1, '', '', null, ''], [1, '', '', null, 'О теме Практикум'], [1, '', '', null, '']]);
+  // a row is one lesson: its kind, the number of the kind (Л1, П1, П2), the hours
+  assert.deepEqual(rows.map((r) => [r.lessonKind, r.number, r.name, r.hours]),
+    [['lecture', 1, 'Введение', 2], ['practice', 1, 'Введение', 2], ['practice', 2, 'Практикум', 2], ['control', 1, '', 0]]);
+  assert.deepEqual(rows.map((r) => [r.unit, r.lessonKind, r.controlForms, r.selfHours, r.description]),
+    [[1, 'lecture', '', null, 'О теме Введение'], [1, 'practice', '', null, ''], [1, 'practice', '', null, 'О теме Практикум'], [1, 'control', '', null, '']]);
   assert.deepEqual(rows.map((r) => r.planned), [1, 1, 1, 0]);
   assert.deepEqual(rows.map((r) => r.pairs), [[{ date: '2026-09-01', lessonType: 'lecture', part: 1, status: 'planned' }],
     [{ date: '2026-09-08', lessonType: 'practice', part: 1, status: 'planned' }], [], []]);
@@ -53,7 +53,7 @@ test('syllabus.get: the page of a subject', () => {
 test('syllabus.get: who sees which subject', () => {
   const { call, get, pairOf, dean, prorector, teacher1, teacher2, s1, s2, staff, sb1, sb2, sb3 } = ready();
   for (const token of [dean, prorector, teacher1, s1]) assert.equal(get(token).ok, true);
-  assert.deepEqual([get(prorector).data.canUpload, get(teacher1).data.canUpload, get(s1).data.canUpload], [false, true, false]);
+  assert.deepEqual([get(prorector).data.can.edit, get(teacher1).data.can.edit, get(s1).data.can.edit], [false, true, false]);
   assert.deepEqual([get(teacher1).data.groups.length, get(s1).data.groups], [2, [{ subjectId: sb1, groupName: '01-1' }]]);
   for (const token of [teacher2, s2]) assert.deepEqual(get(token).error, { code: 'forbidden' });
   assert.equal(get(s2, { subjectId: sb3 }).ok, true);
@@ -76,17 +76,17 @@ test('subjects.overview and student.subjects', () => {
   assert.deepEqual([view.currentSemester, view.reviewCount], [1, 0]);
   assert.deepEqual(view.rows, [
     { disciplineId: ds2, disciplineName: 'Анатомия', teacherId: staff.teacher2, teacherName: 'teacher2',
-      groups: [{ subjectId: sb2, groupId: g2, groupName: '02-1', scheduledPairs: 2 }], uploaded: false, syllabusStatus: 'none', open: null, otherSemester: false, plannedHours: 0, plannedPairs: 0 },
+      groups: [{ subjectId: sb2, groupId: g2, groupName: '02-1', scheduledPairs: 2 }], syllabusStatus: 'none', open: null, otherSemester: false, plannedHours: 0, plannedPairs: 0 },
     { disciplineId: ds1, disciplineName: 'Информатика', teacherId: staff.teacher1, teacherName: 'teacher1',
       groups: [{ subjectId: sb1, groupId: g1, groupName: '01-1', scheduledPairs: 2 }, { subjectId: sb3, groupId: g2, groupName: '02-1', scheduledPairs: 2 }],
-      uploaded: true, syllabusStatus: 'approved', open: null, otherSemester: false, plannedHours: 6, plannedPairs: 3 }]);
+      syllabusStatus: 'approved', open: null, otherSemester: false, plannedHours: 6, plannedPairs: 3 }]);
   assert.deepEqual(view.disciplines, [{ id: ds2, name: 'Анатомия' }, { id: ds1, name: 'Информатика' }]);
   assert.deepEqual(view.groups, [{ id: g1, name: '01-1' }, { id: g2, name: '02-1' }]);
   assert.deepEqual(view.teachers, [{ id: staff.dean, fullName: 'dean' }, { id: staff.teacher1, fullName: 'teacher1' }, { id: staff.teacher2, fullName: 'teacher2' }]);
   // one discipline, two teachers: two rows; the second has no syllabus
   call('dir.save', { table: 'subjects', row: { id: sb3, teacherId: staff.teacher2 } }, dean);
-  assert.deepEqual(call('subjects.overview', {}, dean).data.rows.map((r) => [r.disciplineName, r.teacherName, r.groups.map((g) => g.groupName), r.uploaded]),
-    [['Анатомия', 'teacher2', ['02-1'], false], ['Информатика', 'teacher1', ['01-1'], true], ['Информатика', 'teacher2', ['02-1'], false]]);
+  assert.deepEqual(call('subjects.overview', {}, dean).data.rows.map((r) => [r.disciplineName, r.teacherName, r.groups.map((g) => g.groupName), r.syllabusStatus]),
+    [['Анатомия', 'teacher2', ['02-1'], 'none'], ['Информатика', 'teacher1', ['01-1'], 'approved'], ['Информатика', 'teacher2', ['02-1'], 'none']]);
   for (const token of [teacher1, s1]) assert.deepEqual(call('subjects.overview', {}, token).error, { code: 'forbidden' });
   assert.deepEqual(call('student.subjects', {}, s1).data, { subjects: [{ id: sb1, name: 'Информатика', teacherName: 'teacher1', hasSyllabus: true }] });
   assert.deepEqual(call('student.subjects', {}, s2).data, { subjects: [{ id: sb2, name: 'Анатомия', teacherName: 'teacher2', hasSyllabus: false },
@@ -100,7 +100,7 @@ test('a syllabus of another semester only counts as otherSemester in the overvie
   publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]]));
   call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: [], bells: ['08:00'], semester: 2 } }, dean);
   const row = call('subjects.overview', {}, dean).data.rows.find((r) => r.disciplineName === 'Информатика');
-  assert.deepEqual([row.uploaded, row.otherSemester, row.plannedPairs], [true, true, 1]);
+  assert.deepEqual([row.syllabusStatus, row.otherSemester, row.plannedPairs], ['approved', true, 1]);
 });
 
 test('reading: every sheet once, nothing written', () => {
@@ -220,7 +220,7 @@ test('can: what each person may do from the page', () => {
   assert.deepEqual([can(teacher1), can(dean)], ['edit,submit', 'edit,submit,approve']);
   call('syllabus.submit', { syllabusId: open }, dean);
   assert.deepEqual([can(teacher1), can(dean)], ['', 'approve,giveBack']);
-  assert.equal(call('syllabus.get', { subjectId: sb1 }, teacher1).data.canUpload, false);
+  assert.equal(call('syllabus.get', { subjectId: sb1 }, teacher1).data.can.edit, false);
 });
 
 test('statuses in the lists: the overview of the deanery and the subjects of a teacher', () => {
@@ -240,4 +240,15 @@ test('statuses in the lists: the overview of the deanery and the subjects of a t
   reset();
   call('teacher.mySubjects', {}, teacher1);
   assert.deepEqual([lists, writes, calls.get], [{ groups: 1, students: 1, subjects: 1, syllabi: 1, settings: 1 }, {}, 1]);
+});
+
+test('the earlier answer fields of the page, the pairs and the overview are gone', () => {
+  const { call, dean, sb1 } = ready();
+  const gone = ['kind', 'label', 'lectureHours', 'practiceHours', 'practiceKind'];
+  const page = call('syllabus.get', { subjectId: sb1 }, dean).data;
+  assert.deepEqual([gone.filter((k) => k in page.syllabus.rows[0]), 'canUpload' in page], [[], false]);
+  assert.deepEqual(Object.keys(page.syllabus.rows[0]).sort(), ['controlForms', 'description', 'hours', 'id', 'lessonKind', 'name', 'number', 'pairs', 'planned', 'selfHours', 'unit', 'unitTitle']);
+  const pair = call('schedule.list', { from: '2026-09-01', to: '2026-09-11' }, dean).data.pairs.find((p) => p.topic);
+  assert.deepEqual(Object.keys(pair.topic).sort(), ['controls', 'id', 'lessonKind', 'lessonType', 'name', 'number', 'part', 'parts', 'unit']);
+  assert.equal('uploaded' in call('subjects.overview', {}, dean).data.rows[0], false);
 });

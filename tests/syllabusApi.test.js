@@ -78,10 +78,10 @@ test('syllabus upload: one syllabus of a teacher; the file fills the draft, the 
 test('a module without hours marks the last pair of its unit; a module with hours is a pair of its own', () => {
   const { publish, send, call, dean, g1, sb1 } = setup();
   publish(sb1, file([T('Введение', 2, ''), T('Практикум', '', 2), M]));
-  const view = () => call('schedule.list', { from: '2026-09-01', to: '2026-09-11', groupId: g1 }, dean).data.pairs.map((p) => [p.topic.name, p.topic.kind, p.topic.lessonType, p.topic.controls]);
-  assert.deepEqual(view(), [['Введение', 'topic', 'lecture', []], ['Практикум', 'topic', 'practice', [{ name: '', unit: 1 }]]]);
+  const view = () => call('schedule.list', { from: '2026-09-01', to: '2026-09-11', groupId: g1 }, dean).data.pairs.map((p) => [p.topic.name, p.topic.lessonType, p.topic.controls]);
+  assert.deepEqual(view(), [['Введение', 'lecture', []], ['Практикум', 'practice', [{ name: '', unit: 1 }]]]);
   publish(sb1, file([T('Введение', 2, ''), [1, '', 'Сдача модуля', '', 2, 'модуль', '']]));
-  assert.deepEqual(view(), [['Введение', 'topic', 'lecture', []], ['Сдача модуля', 'control', 'control', []]]);
+  assert.deepEqual(view(), [['Введение', 'lecture', []], ['Сдача модуля', 'control', []]]);
 });
 
 test('syllabus upload: a file with an error writes nothing', () => {               // Review Focus 14
