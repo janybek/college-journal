@@ -6057,3 +6057,125 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 
   .mk-act__input { width: 4.5rem; }
 }
+
+/* Task 20: a cell of the grid opens the window of the mark of one student; the window and the history of its changes. */
+.jg-cell.is-open { position: relative; cursor: pointer; }
+
+.jg-cell-open {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.jg-cell.is-open:hover .jg-cell-open { background: var(--primary-wash); box-shadow: inset 0 0 0 1px var(--primary-line); }
+
+.jg-cell-open:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--primary-wash); }
+
+.jg-cell.is-open .jg-cell__in { pointer-events: none; position: relative; }
+
+.dialog--cell {
+  width: min(calc(100% - 1rem), 40rem);
+  overflow: hidden;
+}
+
+.dialog--cell .dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  max-height: calc(100vh - 2rem);
+  max-height: calc(100dvh - 2rem);
+  padding: var(--space-5);
+  overflow-y: auto;
+}
+
+.dialog--cell .button { min-height: 44px; font-size: 1rem; }
+
+.dialog--cell .dialog__kicker,
+.dialog--cell .badge { font-size: 1rem; }
+
+.cl-summary {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  background: var(--muted);
+}
+
+.cl-now { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin: 0; font-size: 1rem; }
+
+.cl-now__label { color: var(--text-muted); }
+
+.cl-now__extra { color: var(--text-muted); }
+
+.cl-points { margin: 0; font-size: 1rem; font-variant-numeric: tabular-nums; }
+
+.cl-form,
+.cl-editor { display: grid; gap: var(--space-3); }
+
+.cl-editor .mk-status { justify-self: start; flex-wrap: wrap; }
+
+.cl-extras { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-5); }
+
+.cl-extras [hidden] { display: none; }
+
+.cl-saved { margin: 0; color: var(--success); font-size: 1rem; font-weight: 600; }
+
+.cl-saved:empty { display: none; }
+
+.cl-history { display: grid; gap: var(--space-3); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+
+.cl-history[hidden] { display: none; }
+
+.cl-history__title { margin: 0; font-size: 1rem; font-weight: 600; }
+
+.cl-history__note { margin: 0; color: var(--text-muted); font-size: 1rem; }
+
+.cl-log { display: grid; gap: 0; margin: 0; padding: 0; list-style: none; border-left: 2px solid var(--primary-line); }
+
+.cl-log__item { display: grid; gap: 2px; padding: var(--space-2) 0 var(--space-3) var(--space-4); position: relative; }
+
+.cl-log__item::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 0.9rem;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--primary);
+  box-shadow: 0 0 0 3px var(--surface-raised);
+}
+
+.cl-log__head { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); margin: 0; font-size: 1rem; }
+
+.cl-log__who { font-weight: 600; overflow-wrap: anywhere; }
+
+.cl-log__time { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.cl-log__line { margin: 0; font-size: 1rem; overflow-wrap: anywhere; }
+
+.cl-log__reason { margin: 0; color: var(--text-muted); font-size: 1rem; font-style: italic; overflow-wrap: anywhere; white-space: pre-wrap; }
+
+@media (max-width: 30rem) {
+  .dialog--cell .dialog__body { padding: var(--space-4); }
+
+  .cl-editor .mk-status { justify-self: stretch; }
+
+  .cl-editor .mk-status__btn { flex: 1 1 30%; min-width: 0; padding: 0 var(--space-1); line-height: 1.2; white-space: normal; }
+}
+
+.dialog--cell .field__hint,
+.dialog--cell .return-count,
+.dialog--cell .field__error { font-size: 1rem; }
+
+.cl-extras .mk-act__input { width: 6rem; }
+
+.dialog--cell .field__label { font-size: 1rem; }

@@ -115,3 +115,63 @@ export function changedMarks(draft, journal, pairId) {
     })
     .map((m) => ({ studentId: m.studentId, status: m.status, noCoat: m.noCoat === true, activity: m.activity }));
 }
+
+// ---- The window of a cell (a student on a pair): late correction and the history of changes ----
+
+// After the term a teacher may only move «absent» to «excused» or «madeup», and «excused» to «madeup» (mode `limited`).
+export function lateOptions(mark) {
+  if (!mark) return [];
+  if (mark.status === 'absent') return ['excused', 'madeup'];
+  if (mark.status === 'excused') return ['madeup'];
+  return [];
+}
+
+// The points of a student for a pair, as the server counts them (core/grades.js pairPoints; the site cannot load core/).
+// null: no mark, the pair is not held, a control pair, or an excused student: the pair does not count.
+export function pairScore(mark, pair, scheme) {
+  if (!mark || !HELD.includes(pair.status) || pair.lessonType === 'control' || mark.status === 'excused') return null;
+  const possible = pair.first ? scheme.attendance : scheme.attendance + scheme.activity;
+  if (mark.status === 'absent') return { earned: 0, possible };
+  const activity = pair.first ? 0 : Math.min(Math.max(Number(mark.activity) || 0, 0), scheme.activity);
+  return { earned: scheme.attendance + activity, possible };
+}
+
+const STATUS_VALUES = ['present', 'late', 'absent', 'excused', 'madeup'];
+const PAIR_STATUS_VALUES = ['planned', 'running', 'closed', 'missed', 'cancelled'];
+const RESULT_VALUES = ['control', 'self', 'current'];
+
+// One line of the history (a row of journal.log) -> { key, params, keyParams }. keyParams names the params whose
+// value is a dictionary key; the screen translates them before filling the text in.
+export function logLine(row) {
+  const r = row || {};
+  const before = r.before === undefined || r.before === null ? '' : String(r.before);
+  const after = r.after === undefined || r.after === null ? '' : String(r.after);
+  const line = (key, params = {}, keyParams = []) => ({ key, params, keyParams });
+  const value = (text, known, prefix) => (known.includes(text) ? prefix + text : text);
+  const keyed = (params) => Object.keys(params).filter((name) => typeof params[name] === 'string' && params[name].startsWith('journal.'));
+  if (r.entity === 'mark') {
+    if (r.field === 'status') {
+      const p = { before: value(before, STATUS_VALUES, 'journal.marks.status.'), after: value(after, STATUS_VALUES, 'journal.marks.status.') };
+      if (before === '') return line('journal.log.mark.statusSet', { after: p.after }, keyed({ after: p.after }));
+      if (after === '') return line('journal.log.mark.cleared', { what: 'journal.log.field.status' }, ['what']);
+      return line('journal.log.mark.status', p, keyed(p));
+    }
+    if (r.field === 'noCoat') {
+      if (after === '') return line('journal.log.mark.cleared', { what: 'journal.log.field.noCoat' }, ['what']);
+      return line(after === 'yes' ? 'journal.log.mark.noCoatOn' : 'journal.log.mark.noCoatOff');
+    }
+    if (r.field === 'activity') {
+      if (after === '') return line('journal.log.mark.cleared', { what: 'journal.log.field.activity' }, ['what']);
+      if (before === '') return line('journal.log.mark.activitySet', { after });
+      return line('journal.log.mark.activity', { before, after });
+    }
+  }
+  if (r.entity === 'unit' && RESULT_VALUES.includes(r.field)) {
+    return line('journal.log.unit', { what: 'journal.log.field.' + r.field, unit: r.unit, before: before === '' ? '—' : before, after: after === '' ? '—' : after }, ['what']);
+  }
+  if (r.entity === 'pair' && r.field === 'status') {
+    const p = { before: value(before, PAIR_STATUS_VALUES, 'journal.log.pairStatus.'), after: value(after, PAIR_STATUS_VALUES, 'journal.log.pairStatus.') };
+    return line('journal.log.pair.status', p, keyed(p));
+  }
+  return line('journal.log.other', { field: r.field || '', before, after });
+}

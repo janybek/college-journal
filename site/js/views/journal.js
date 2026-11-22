@@ -3,6 +3,7 @@ import { t } from '../i18n.js';
 import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '../ui.js';
 import { journalColumns, cellView, pairHead, canMark, pairHint } from '../journal.js';
 import { openMarksDialog } from './journalPair.js';
+import { openCellDialog } from './journalCell.js';
 import { icon } from '../icons.js';
 import { getUser } from '../session.js';
 import { activeRole } from '../shell.js';
@@ -11,7 +12,7 @@ import { activeRole } from '../shell.js';
 // Rows are students (those who left stand last, dimmed); columns are pairs, and after the last pair of a unit
 // its four columns (current control, self-work, unit control, total), then the summary of attendance.
 // The head of a pair the person may fill in (mode `free` or `reason`) looks like a button and opens the window of its
-// marks; nothing else is clickable yet. The server decides what is
+// marks; a cell of a held pair opens the window of that student's mark (late correction and the history). The server decides what is
 // in the answer (a teacher who only substituted gets just their pairs, no unit totals); the screen only draws it.
 
 const blank = (subjectId = null) => ({
@@ -194,7 +195,7 @@ function studentRow(student, number, columns, journal, scheme) {
 }
 
 function cell(column, student, result, journal, scheme) {
-  if (column.type === 'pair') return markCell(column.pair, (journal.marks[column.pair.id] || {})[student.id]);
+  if (column.type === 'pair') return markCell(column.pair, (journal.marks[column.pair.id] || {})[student.id], student);
   if (!result) return el('td', { class: 'jg-empty' }, '—');
   if (column.type === 'unit') {
     const row = result.units.find((u) => u.unit === column.unit);
@@ -219,13 +220,38 @@ function unitCell(field, row, scheme) {
   return el('td', { class: `jg-num jg-pts jg-total${row.word === 'fail' ? ' is-low' : ''}`, title: t('journal.tip.total', { max: 100 }) + word }, pointText(row.total));
 }
 
-function markCell(pair, mark) {
+const cellId = (pair, student) => `journal-cell-${pair.id}-${student.id}`;
+
+// The window of the mark of a student on a held pair; the grid is drawn again from the answer to a save.
+function openCell(pair, student) {
+  const owner = state;
+  openCellDialog({
+    journal: owner.data.journal,
+    pair,
+    student,
+    onSaved: (data) => {
+      if (state !== owner) return;
+      owner.data = data;
+      refresh();
+    },
+    onClosed: () => focusById(cellId(pair, student)),
+  });
+}
+
+function markCell(pair, mark, student) {
   const view = cellView(mark, pair);
   const narrow = pair.status === 'cancelled' || pair.status === 'missed';
-  const className = `jg-cell${narrow ? ' is-narrow' : ''}`;
-  if (view === null) return el('td', { class: className });
-  const text = [t('journal.legend.' + mark.status), view.noCoat ? t('journal.legend.noCoat') : null, view.activity !== null ? t('journal.tip.activity', { n: view.activity }) : null].filter(Boolean).join(', ');
-  return el('td', { class: className, title: text, 'aria-label': text },
+  const openable = pair.status === 'running' || pair.status === 'closed';
+  const className = `jg-cell${narrow ? ' is-narrow' : ''}${openable ? ' is-open' : ''}`;
+  const text = view === null ? '' : [t('journal.legend.' + mark.status), view.noCoat ? t('journal.legend.noCoat') : null, view.activity !== null ? t('journal.tip.activity', { n: view.activity }) : null].filter(Boolean).join(', ');
+  const opener = openable ? el('button', {
+    type: 'button', class: 'jg-cell-open', id: cellId(pair, student), 'aria-haspopup': 'dialog',
+    'aria-label': `${t('journal.cell.open', { name: student.fullName || '—', date: dayMonth(pair.date) })}. ${text || t('journal.cell.noMark')}`,
+    onclick: () => openCell(pair, student),
+  }) : null;
+  if (view === null) return el('td', { class: className }, opener);
+  return el('td', { class: className, title: text, 'aria-label': openable ? null : text },
+    opener,
     el('span', { class: 'jg-cell__in' },
       el('span', { class: `jg-mark jg-mark--${view.tone}` }, t(view.key)),
       view.activity !== null ? el('span', { class: 'jg-act' }, String(view.activity)) : null,

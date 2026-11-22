@@ -330,3 +330,20 @@ test('task 19: the window of the marks of a pair has its texts in every language
   assert.equal(ru['journal.marks.notBegun'], 'Пара ещё не началась');
   assert.equal(ru['journal.marks.termPassed'], 'Срок заполнения прошёл. Обратитесь в деканат');
 });
+
+test('task 20: the window of a cell and the history of changes have their texts in every language', () => {
+  const keys = ['open', 'current', 'noMark', 'points', 'noPoints', 'readOnly', 'options', 'limited.hint', 'limited.none', 'limited.excused', 'limited.madeup',
+    'limited.choose', 'saved', 'history.title', 'history.loading', 'history.empty'].map((k) => 'journal.cell.' + k);
+  keys.push('journal.log.late', 'journal.log.reason', 'journal.log.other', 'journal.log.unit', 'journal.log.pair.status');
+  for (const k of ['status', 'statusSet', 'noCoatOn', 'noCoatOff', 'activity', 'activitySet', 'cleared']) keys.push('journal.log.mark.' + k);
+  for (const k of ['status', 'noCoat', 'activity', 'control', 'self', 'current']) keys.push('journal.log.field.' + k);
+  for (const k of ['planned', 'running', 'closed', 'missed', 'cancelled']) keys.push('journal.log.pairStatus.' + k);
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) {
+    assert.ok(dict['journal.cell.points'].includes('{earned}') && dict['journal.cell.points'].includes('{possible}'));
+    assert.ok(dict['journal.cell.open'].includes('{name}') && dict['journal.cell.open'].includes('{date}'));
+    assert.ok(dict['journal.log.reason'].includes('{reason}'));
+    assert.ok(dict['journal.log.unit'].includes('{what}') && dict['journal.log.unit'].includes('{unit}'));
+    for (const k of ['status', 'activity']) assert.ok(dict['journal.log.mark.' + k].includes('{before}') && dict['journal.log.mark.' + k].includes('{after}'));
+  }
+});

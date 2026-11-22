@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -93,4 +93,49 @@ test('canMark and pairHint: only free and reason heads open; the others say why'
   assert.equal(pairHint({ mode: 'none', state: 'future', status: 'planned' }, 'prorector'), 'journal.marks.notBegun');
   assert.equal(pairHint({ mode: 'limited', state: 'late', status: 'closed' }), null);
   assert.equal(pairHint({ mode: 'free', state: 'open', status: 'planned' }), null);
+});
+
+// ---- The window of a cell (task 20) ----
+
+test('lateOptions: after the term only «excused» and «madeup» for a student who was absent, «madeup» for an excused one', () => {
+  assert.deepEqual(lateOptions({ status: 'absent' }), ['excused', 'madeup']);
+  assert.deepEqual(lateOptions({ status: 'excused' }), ['madeup']);
+  assert.deepEqual(lateOptions({ status: 'present' }), []);
+  assert.deepEqual(lateOptions({ status: 'madeup' }), []);
+  assert.deepEqual(lateOptions(null), []);
+  assert.deepEqual(lateOptions(undefined), []);
+});
+
+test('logLine: a line of the history with the dictionary key, its numbers and the values that are keys themselves', () => {
+  assert.deepEqual(logLine({ entity: 'mark', field: 'status', before: 'absent', after: 'madeup' }),
+    { key: 'journal.log.mark.status', params: { before: 'journal.marks.status.absent', after: 'journal.marks.status.madeup' }, keyParams: ['before', 'after'] });
+  assert.deepEqual(logLine({ entity: 'mark', field: 'status', before: '', after: 'late' }),
+    { key: 'journal.log.mark.statusSet', params: { after: 'journal.marks.status.late' }, keyParams: ['after'] });
+  assert.deepEqual(logLine({ entity: 'mark', field: 'noCoat', before: 'no', after: 'yes' }), { key: 'journal.log.mark.noCoatOn', params: {}, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'mark', field: 'noCoat', before: 'yes', after: 'no' }), { key: 'journal.log.mark.noCoatOff', params: {}, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'mark', field: 'activity', before: '', after: '8' }), { key: 'journal.log.mark.activitySet', params: { after: '8' }, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'mark', field: 'activity', before: '3', after: '8' }), { key: 'journal.log.mark.activity', params: { before: '3', after: '8' }, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'mark', field: 'activity', before: '3', after: '' }),
+    { key: 'journal.log.mark.cleared', params: { what: 'journal.log.field.activity' }, keyParams: ['what'] });
+  assert.deepEqual(logLine({ entity: 'unit', field: 'control', unit: 2, before: '', after: '17' }),
+    { key: 'journal.log.unit', params: { what: 'journal.log.field.control', unit: 2, before: '—', after: '17' }, keyParams: ['what'] });
+  assert.deepEqual(logLine({ entity: 'unit', field: 'current', unit: 1, before: '20', after: '' }).params, { what: 'journal.log.field.current', unit: 1, before: '20', after: '—' });
+  assert.deepEqual(logLine({ entity: 'pair', field: 'status', before: 'closed', after: 'missed' }),
+    { key: 'journal.log.pair.status', params: { before: 'journal.log.pairStatus.closed', after: 'journal.log.pairStatus.missed' }, keyParams: ['before', 'after'] });
+  assert.deepEqual(logLine({ entity: 'x', field: 'y', before: 'a', after: 'b' }), { key: 'journal.log.other', params: { field: 'y', before: 'a', after: 'b' }, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'mark', field: 'status', before: 'weird', after: 'absent' }).params, { before: 'weird', after: 'journal.marks.status.absent' });
+  assert.deepEqual(logLine(null).key, 'journal.log.other');
+});
+
+test('pairScore: the points of a student for a pair as the server counts them; nothing for excused, control and unmarked', () => {
+  const scheme = { attendance: 10, activity: 20 };
+  const pair = { status: 'closed', lessonType: 'lecture', first: false };
+  assert.deepEqual(pairScore({ status: 'present', activity: 17 }, pair, scheme), { earned: 27, possible: 30 });
+  assert.deepEqual(pairScore({ status: 'late', activity: null }, pair, scheme), { earned: 10, possible: 30 });
+  assert.deepEqual(pairScore({ status: 'absent', activity: null }, pair, scheme), { earned: 0, possible: 30 });
+  assert.deepEqual(pairScore({ status: 'present', activity: 9 }, { ...pair, first: true }, scheme), { earned: 10, possible: 10 });
+  assert.equal(pairScore({ status: 'excused' }, pair, scheme), null);
+  assert.equal(pairScore({ status: 'present' }, { ...pair, lessonType: 'control' }, scheme), null);
+  assert.equal(pairScore({ status: 'present' }, { ...pair, status: 'planned' }, scheme), null);
+  assert.equal(pairScore(null, pair, scheme), null);
 });
