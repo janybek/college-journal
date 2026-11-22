@@ -6,7 +6,8 @@ import {
 import { icon } from '../icons.js';
 import { dayParts, isDate } from '../dates.js';
 import {
-  PLAN_KINDS, TABS, checkLine, checkTabs, emptyItem, errorKeyOf, errorMap, errorsAfterEdit, isDirty, placeErrors, sameValue, sectionData, statusKind,
+  PLAN_KINDS, TABS, checkLine, checkTabs, emptyItem, errorKeyOf, errorMap, errorsAfterEdit, isDirty, keptOrder, placeErrors, sameValue, sectionData, statusKind,
+  submitOutcome,
 } from '../syllabusForm.js';
 import { draftFileData, fileLabels, fileName } from '../syllabus.js';
 import { syllabusBook } from '../excel.js';
@@ -516,8 +517,9 @@ async function save(section) {
       if (untouched) owner.doc[section] = copy(result.doc);
     }
     if (result.lessons) {
+      // An order set on «Порядок пар» and not saved yet stays (still unsaved) on the lessons of the new plan.
+      owner.doc.lessons = copy(keptOrder(owner.doc.lessons, owner.saved.lessons, result.lessons));
       owner.saved.lessons = copy(result.lessons);
-      owner.doc.lessons = copy(result.lessons);
     }
     for (const doc of [owner.saved, owner.doc]) doc.plan.manualOrder = result.manualOrder === true;
     owner.form.syllabus.updated = result.updated;
@@ -600,14 +602,15 @@ async function send() {
   try {
     const result = await call('syllabus.submit', { syllabusId: owner.syllabusId });
     if (state !== owner) return;
-    if (result.submitted === true) {
+    const outcome = submitOutcome(result);
+    if (outcome === 'sent') {
       owner.submitAsk = null;
       release();
       location.hash = pageHref();
       return;
     }
-    // Something changed since the check: the list says what.
-    Object.assign(owner, { submitAsk: null, checks: result.checks.errors.length > 0 ? result.checks : null });
+    // Something changed since the check: the list says what. Not sent with nothing to fix: the head says so.
+    Object.assign(owner, { submitAsk: null, checks: outcome === 'checks' ? result.checks : null, actionError: outcome === 'failed' ? 'sform.submit.notSent' : null });
   } catch (error) {
     if (state !== owner) return;
     owner.submitAsk = null;

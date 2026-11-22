@@ -82,18 +82,21 @@ test('templateHref: a weekday of the schedule opens that day of the week templat
 });
 
 // The topic of a pair view (backend/scheduleData.js pairViews): a lesson of a syllabus row; `controls` — the modules without hours marked on it.
-const lesson = (over) => ({ unit: 2, label: '2.3', name: 'Документооборот', kind: 'topic', lessonType: 'practice', part: 1, parts: 2, practiceKind: '', controls: [], ...over });
+const lesson = (over) => ({ unit: 2, lessonKind: 'practice', number: 3, name: 'Документооборот', lessonType: 'practice', part: 1, parts: 2, controls: [], ...over });
 
-test('topicText: «№. name», the name alone, or the module of the unit when it has no name', () => {
-  assert.deepEqual(topicText(lesson()), { key: 'pairs.topicLabel', params: { label: '2.3', name: 'Документооборот' } });
-  assert.deepEqual(topicText(lesson({ label: '' })), { key: 'pairs.topicPlain', params: { name: 'Документооборот' } });
-  assert.deepEqual(topicText(lesson({ kind: 'control', label: '', name: 'Экзамен' })), { key: 'pairs.topicPlain', params: { name: 'Экзамен' } });
-  assert.deepEqual(topicText(lesson({ kind: 'control', label: '', name: '' })), { key: 'syllabus.controlN', params: { n: 2 } });
+test('topicText: «Л1. name» with the letter of the kind, or the module of the unit when it has no name', () => {
+  assert.deepEqual(topicText({ lessonKind: 'seminar', number: 2, name: 'Жалпы анатомия', unit: 1 }),
+    { key: 'pairs.topicLabel', params: { name: 'Жалпы анатомия' }, label: { key: 'lessonType.short.seminar', number: 2 } });
+  assert.deepEqual([topicText({ lessonKind: 'control', number: 1, name: '', unit: 2 }), topicText({ lessonKind: 'control', number: 1, name: 'Экзамен', unit: 2 })],
+    [{ key: 'syllabus.controlN', params: { n: 2 } }, { key: 'pairs.topicPlain', params: { name: 'Экзамен' } }]);
+  assert.deepEqual(topicText(lesson()), { key: 'pairs.topicLabel', params: { name: 'Документооборот' }, label: { key: 'lessonType.short.practice', number: 3 } });
+  // a lesson without a number of the journal is its name alone
+  assert.deepEqual(topicText(lesson({ number: undefined })), { key: 'pairs.topicPlain', params: { name: 'Документооборот' } });
 });
 
-test('lessonTypeKey: a practice is named by its kind; a lecture and a module by their type', () => {
-  assert.deepEqual([lesson(), lesson({ practiceKind: 'seminar' }), lesson({ practiceKind: 'lab' }), lesson({ lessonType: 'lecture', practiceKind: 'seminar' }), lesson({ lessonType: 'control' })].map(lessonTypeKey),
-    ['lessonType.practice', 'lessonType.seminar', 'lessonType.lab', 'lessonType.lecture', 'lessonType.control']);
+test('lessonTypeKey: the type of a lesson by its kind', () => {
+  assert.deepEqual(['lecture', 'seminar', 'lab', 'control'].map((lessonKind) => lessonTypeKey({ lessonKind })), ['lessonType.lecture', 'lessonType.seminar', 'lessonType.lab', 'lessonType.control']);
+  assert.equal(lessonTypeKey(lesson()), 'lessonType.practice');
 });
 
 test('lessonParts: only when the row has more than one pair of this type', () => {

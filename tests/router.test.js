@@ -71,6 +71,10 @@ test('resolveRoute: the syllabus page of a subject needs syllabus.get; the topic
   assert.deepEqual(resolveRoute('#/syllabus/sb_12ab34cd', viewer), { view: 'syllabus', params: { subjectId: 'sb_12ab34cd' } });
   assert.deepEqual(resolveRoute('#/syllabus/sb_12ab34cd/2', viewer), { view: 'syllabus', params: { subjectId: 'sb_12ab34cd', semester: 2 } });
   assert.equal(resolveRoute('#/syllabus/sb_12ab34cd/3', viewer).view, 'home');
+  // the new version of the syllabus (the open one) has its own address
+  assert.deepEqual(resolveRoute('#/syllabus/sb_1/1/draft', viewer), { view: 'syllabus', params: { subjectId: 'sb_1', semester: 1, version: 'open' } });
+  assert.deepEqual(resolveRoute('#/syllabus/sb_1/2/draft', viewer), { view: 'syllabus', params: { subjectId: 'sb_1', semester: 2, version: 'open' } });
+  for (const bad of ['#/syllabus/sb_1/draft', '#/syllabus/sb_1/1/open', '#/syllabus/sb_1/1/draft/x']) assert.equal(resolveRoute(bad, viewer).view, 'home', bad);
   assert.equal(resolveRoute('#/syllabus/sb_12ab34cd', { mustChangePassword: false, permissions: ['syllabus.apply'] }).view, 'home');
   for (const old of ['#/topics', '#/topics/sb_1', '#/plan/sb_1']) {
     assert.equal(resolveRoute(old, { mustChangePassword: false, permissions: ['dir.list:topics', 'syllabus.get'] }).view, 'home', old);

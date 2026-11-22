@@ -79,18 +79,20 @@ export function pairPatch(values, pair) {
 
 // ---- The lesson on a pair: `topic` of a pair view, a lesson of a syllabus row (no DOM) ----
 
-// What to write about the lesson, for t(): «№. name», the name alone, or «Модуль N (рубежный контроль)» for a
-// module without a name.
+// What to write about the lesson, for t(): «Л1. name», or «Модуль N (рубежный контроль)» for a module without a
+// name, a named module by its name alone. label: the letter of the kind (a key of the dictionary) and the number of
+// the journal; the screen writes them together («Л» + 1) as the {label} of 'pairs.topicLabel'.
 export function topicText(topic) {
-  if (topic.kind === 'control' && !topic.name) return { key: 'syllabus.controlN', params: { n: topic.unit } };
-  return topic.label ? { key: 'pairs.topicLabel', params: { label: topic.label, name: topic.name } } : { key: 'pairs.topicPlain', params: { name: topic.name } };
+  if (topic.lessonKind === 'control') {
+    return topic.name ? { key: 'pairs.topicPlain', params: { name: topic.name } } : { key: 'syllabus.controlN', params: { n: topic.unit } };
+  }
+  if (typeof topic.number !== 'number') return { key: 'pairs.topicPlain', params: { name: topic.name } };
+  return { key: 'pairs.topicLabel', params: { name: topic.name }, label: { key: 'lessonType.short.' + topic.lessonKind, number: topic.number } };
 }
 
-// The name of the type of the lesson: a practice is called after its kind (seminar, laboratory) when it has one.
-const PRACTICE_KINDS = ['seminar', 'lab'];
+// The name of the type of the lesson: its kind (lecture, practice, seminar, laboratory, module).
 export function lessonTypeKey(topic) {
-  if (topic.lessonType === 'practice' && PRACTICE_KINDS.includes(topic.practiceKind)) return 'lessonType.' + topic.practiceKind;
-  return 'lessonType.' + topic.lessonType;
+  return 'lessonType.' + topic.lessonKind;
 }
 
 // «Практика 1 из 2»: only when the row has more than one pair of this type.

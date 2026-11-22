@@ -1,5 +1,5 @@
-// The syllabus page of a subject (#/syllabus/<subjectId>) without the DOM: the rows are those of syllabus.get,
-// in the order of the plan, which is the order of the pairs.
+// The syllabus page of a subject (#/syllabus/<subjectId>) without the DOM: the rows are those of syllabus.get, one
+// lesson each (lessonKind, hours, number of the journal), in the order of the plan, which is the order of the pairs.
 
 // '2026-09-01' -> '01.09'
 export function shortDate(date) {
@@ -19,9 +19,9 @@ export function unitGroups(rows) {
   return groups;
 }
 
-// Topics (not modules) that have a description, in the order of the plan.
+// Lessons (not modules) that have a description, in the order of the plan.
 export function describedRows(rows) {
-  return rows.filter((row) => row.kind !== 'control' && typeof row.description === 'string' && row.description.trim() !== '');
+  return rows.filter((row) => row.lessonKind !== 'control' && typeof row.description === 'string' && row.description.trim() !== '');
 }
 
 // The plan has a column «СРС»: at least one row has a number there (zero is a number too).
@@ -46,6 +46,54 @@ export function scheduleNotes(view) {
   }
   if (schedule.withoutTopic > 0) notes.push({ tone: 'info', key: 'syllabus.spare', params: { count: schedule.withoutTopic } });
   return notes.length > 0 ? notes : [{ tone: 'success', key: 'syllabus.fits', params: { pairs: schedule.pairs }, counts: { pairs: 'syllabus.pairsCount' } }];
+}
+
+// ---- The version shown and what may be done with it ----
+
+const OPEN_TONES = { draft: 'neutral', review: 'primary', returned: 'warning' };
+
+// The line of the status of the version shown: { tone, key, params }. view: the answer of syllabus.get.
+export function versionLine(view) {
+  const { approved, open } = view.state || {};
+  if (view.shown === 'open') {
+    if (!open) return { tone: 'neutral', key: 'syllabus.state.noOpen', params: {} };
+    return { tone: OPEN_TONES[open.status] ?? 'neutral', key: 'syllabus.state.' + open.status, params: { version: open.version } };
+  }
+  if (!approved) return { tone: 'neutral', key: 'syllabus.state.none', params: {} };
+  return approved.decidedAt
+    ? { tone: 'success', key: 'syllabus.state.approved', params: { version: approved.version, date: shortDate(approved.decidedAt) } }
+    : { tone: 'success', key: 'syllabus.state.approvedUndated', params: { version: approved.version } };
+}
+
+// The buttons of the head of the page, in their order: into the form ('fill' while there is no version, 'continue'
+// while one is open, 'edit' to start a new one from the approved), 'submit' the open version, the decision of the
+// deanery on the version it is looking at ('approve', 'giveBack'), and the way to the other version ('showOpen',
+// 'showApproved'). The server gives the rights (view.can); the page only leaves out what is not there.
+export function pageActions(view) {
+  const can = view.can || {};
+  const { approved, open } = view.state || {};
+  const out = [];
+  if (can.fill) out.push('fill');
+  else if (can.edit) out.push(open ? 'continue' : 'edit');
+  if (can.submit && open) out.push('submit');
+  if (view.shown === 'open' && open) {
+    if (can.approve) out.push('approve');
+    if (can.giveBack) out.push('giveBack');
+  }
+  if (view.shown === 'open' ? approved : open) out.push(view.shown === 'open' ? 'showApproved' : 'showOpen');
+  return out;
+}
+
+// A text written «a point per line» -> the points: the lines without the spaces at their edges, empty ones left out.
+export function linesOf(text) {
+  if (typeof text !== 'string') return [];
+  return text.split(/\r?\n/).map((line) => line.trim()).filter((line) => line !== '');
+}
+
+// A link of «Программное обеспечение» is a link only when it starts with http:// or https://; anything else
+// (javascript:, a bare address, a space in front) is shown as text.
+export function safeLink(link) {
+  return typeof link === 'string' && /^https?:\/\/\S/.test(link) ? link : null;
 }
 
 // ---- The check window of an upload (syllabus.preview) ----
@@ -144,7 +192,7 @@ function yearInfo(autumn, spring) {
   if (Math.ceil(autumn.planSemester / 2) !== Math.ceil(spring.planSemester / 2)) return null;
   if (!YEAR_INFO.every((key) => asText(autumn[key]) === asText(spring[key]))) return null;
   const rows = [...autumn.rows, ...spring.rows];
-  const classHours = rows.reduce((n, row) => n + (Number(row.lectureHours) || 0) + (Number(row.practiceHours) || 0), 0);
+  const classHours = rows.reduce((n, row) => n + (Number(row.hours) || 0), 0);
   const selfRows = rows.filter((row) => typeof row.selfHours === 'number');
   if (present(autumn.classHours) && Number(autumn.classHours) !== classHours) return null;
   if (present(autumn.selfHours) && selfRows.length > 0 && Number(autumn.selfHours) !== selfRows.reduce((n, row) => n + row.selfHours, 0)) return null;

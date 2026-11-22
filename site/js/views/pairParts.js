@@ -48,14 +48,20 @@ export function weekNav({ from, onChange }) {
     el('button', { type: 'button', id: 'week-this', class: 'button button--secondary week-nav__this', onclick: () => onChange(null) }, t('pairs.thisWeek')));
 }
 
+// «Л1. Тема», «Модуль 2 (рубежный контроль)»: the lesson as text (topicText; its label is the letter of the kind
+// and the number of the journal written together).
+export function lessonText(topic) {
+  const { key, params, label } = topicText(topic);
+  return t(key, label ? { ...params, label: t(label.key) + label.number } : params);
+}
+
 // The lesson on a pair (`topic` of a pair view), as pieces to put in a line: its text, its type («Практика 1 из 2»
 // when the row has more than one pair of this type) and, when modules without hours are marked on it, their names
 // (two can stand after one lesson); a module without a name is the «Модуль» badge (controlLine).
 export function lessonPieces(topic) {
-  const { key, params } = topicText(topic);
   const controls = controlLine(topic.controls);
   return [
-    el('span', { class: 'lesson-text' }, t(key, params)),
+    el('span', { class: 'lesson-text' }, lessonText(topic)),
     typeBadge(topic),
     controls.badge || controls.names.length > 0 ? el('span', { class: 'lesson-controls' },
       controls.badge ? badge(t('pairs.unitControl'), 'warning') : null,
@@ -64,7 +70,7 @@ export function lessonPieces(topic) {
   ];
 }
 
-// «Лекция», «Семинар», «Практика 1 из 2»: the type of the lesson in its colour.
+// «Лекция», «Семинар», «Практика 1 из 2»: the type of the lesson (by its kind) in the colour of the type of the pair.
 function typeBadge(topic) {
   if (!LESSON_TYPES.includes(topic.lessonType)) return null;
   const type = t(lessonTypeKey(topic));
@@ -240,7 +246,7 @@ function briefCard(pair, row, { show, onOpen }) {
   const cancelled = flags.includes('cancelled');
   const who = whoAndWhere(pair, show);
   const topic = cancelled ? null : pair.topic;
-  const lesson = topic ? topicText(topic) : null;
+  const lesson = topic ? lessonText(topic) : null;
   const controls = controlLine(topic ? topic.controls : null);
   const marks = [
     topic ? typeBadge(topic) : null,
@@ -256,7 +262,7 @@ function briefCard(pair, row, { show, onOpen }) {
     el('span', { class: 'pair__subject', title: pair.subjectName }, hyphenate(pair.subjectName)),
     who.length > 0 ? el('span', { class: 'pair__line' }, who) : null,
     cancelled ? null : el('span', { class: 'pair__line pair__line--topic' + (lesson ? '' : ' is-none') },
-      lesson ? t(lesson.key, lesson.params) : t('pairs.noTopic')),
+      lesson ?? t('pairs.noTopic')),
     marks.length > 0 ? el('span', { class: 'pair__marks' }, marks) : null,
   ];
   return cardElement(pair, 'pair pair--brief' + (cancelled ? ' is-cancelled' : ''), parts, onOpen);
@@ -301,10 +307,9 @@ export function pairDetails(pair, { onClose }) {
 // «Модуль (рубежный контроль)»).
 function lessonFacts(topic) {
   if (!topic) return el('span', { class: 'muted' }, t('pairs.details.noTopic'));
-  const { key, params } = topicText(topic);
   const controls = controlLine(topic.controls);
   return [
-    el('span', { class: 'pair-facts__topic' }, t(key, params)),
+    el('span', { class: 'pair-facts__topic' }, lessonText(topic)),
     typeBadge(topic),
     controls.badge ? badge(t('pairs.details.control'), 'warning') : null,
     controls.names.map((name) => badge(t(name.key, name.params), 'warning')),

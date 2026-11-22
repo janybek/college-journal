@@ -2471,9 +2471,7 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   letter-spacing: -0.01em;
 }
 
-/* «Сведения»: a strip of five facts, each under a hairline; a row of the strip stretches to the edge. */
-.syllabus-info { overflow: hidden; }
-
+/* «Титул»: a strip of facts, each under a hairline; a row of the strip stretches to the edge. */
 .facts {
   display: flex;
   flex-wrap: wrap;
@@ -2553,13 +2551,6 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
 .plan-unit + .plan-unit .plan-unit__head th { border-top: 1px solid var(--border-strong); }
 
 .plan-row__title { line-height: 1.4; }
-
-.plan-row__label {
-  margin-right: var(--space-2);
-  color: var(--text-muted);
-  font-weight: 500;
-  font-variant-numeric: tabular-nums;
-}
 
 .plan-row__name { font-weight: 500; }
 
@@ -2805,6 +2796,676 @@ button.pair.is-cancelled:hover { border-color: var(--danger-line); box-shadow: i
   }
 
   .about { padding-inline: var(--space-4); }
+}
+
+/* The syllabus page, task 43: the bar of the version, the list of sections, every section of the syllabus.
+   The bar reads like the spine of a file folder: a rail in the colour of the status on its left (approved green,
+   under review blue, returned amber, a draft grey), the status in words, the switch to the other version, the
+   buttons. Everything written in the syllabus is plain text in the colours of the theme. */
+
+.version-bar {
+  --tone: var(--text-muted);
+  --tone-wash: var(--muted);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  padding: var(--space-3) var(--space-4) var(--space-3) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: linear-gradient(90deg, var(--tone-wash), transparent 18rem), var(--surface);
+  box-shadow: inset 4px 0 0 var(--tone), var(--shadow-card);
+}
+
+.version-bar[data-tone="success"] { --tone: var(--success); --tone-wash: var(--success-wash); }
+.version-bar[data-tone="primary"] { --tone: var(--primary); --tone-wash: var(--primary-wash); }
+.version-bar[data-tone="warning"] { --tone: var(--warning); --tone-wash: var(--warning-wash); }
+
+.version-bar__status {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  margin-right: auto;
+  font-weight: 600;
+}
+
+.version-bar__dot {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--tone);
+  box-shadow: 0 0 0 4px var(--tone-wash);
+}
+
+.version-bar__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.version-bar__error { flex: 1 1 100%; }
+
+/* «Утверждённая / Новая версия»: the version shown is the pressed one; the new one carries its status. */
+.version-switch .segmented__button {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  text-decoration: none;
+}
+
+.version-switch .segmented__button[aria-current="page"] {
+  background: var(--seg-active);
+  box-shadow: var(--seg-shadow);
+  color: var(--text);
+}
+
+.version-switch__status {
+  padding: 0 0.375rem;
+  border-radius: 999px;
+  background: var(--muted);
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.version-switch__status[data-status="review"] { background: var(--primary-wash); color: var(--primary-ink); }
+.version-switch__status[data-status="returned"] { background: var(--warning-wash); color: var(--warning); }
+
+.syllabus-remark .sform-remark__title { margin: 0; }
+
+.syllabus-open-note { max-width: 60rem; }
+
+/* «Разделы»: the sections shown, as quiet chips in one wrapping row. */
+.syllabus-toc {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+}
+
+.syllabus-toc__title {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.syllabus-toc__list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.syllabus-toc__link {
+  display: inline-flex;
+  align-items: center;
+  min-height: var(--control-h);
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: var(--control-fs);
+  font-weight: 500;
+}
+
+.syllabus-toc__link:hover { border-color: var(--primary-line); background: var(--primary-wash); color: var(--primary-ink); }
+
+/* A section: a card under its title; the title is where the list of sections lands, clear of the top bar. */
+.syllabus-sec { overflow: hidden; scroll-margin-top: calc(var(--topbar-h) + var(--space-4)); }
+
+.syllabus-sec .syllabus-card__title:focus { outline: none; }
+
+.syllabus-sec .syllabus-card__title:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.syllabus-sec > .facts { margin-bottom: 0; }
+
+.syllabus-sec__body {
+  display: grid;
+  gap: var(--space-5);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.fact--wide { flex-basis: 100%; }
+
+.fact__value.is-pre { white-space: pre-line; overflow-wrap: anywhere; }
+
+/* «Цель и результаты»: the aim as a short lead, the outcomes side by side. */
+.goal {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: var(--space-4);
+  border-left: 3px solid var(--primary);
+}
+
+.goal__title,
+.outcomes__title,
+.syl-points__title,
+.unit-card__label {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.goal__text {
+  max-width: 52rem;
+  font-size: 1.0625rem;
+  line-height: 1.6;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.outcomes {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.outcomes__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+  gap: var(--space-3);
+}
+
+.outcomes__grid .syl-points {
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  background: var(--surface-raised);
+}
+
+.syl-points {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+
+.syl-points__list {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: 1.25rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+ul.syl-points__list { list-style: disc; }
+
+ol.syl-points__list { padding-left: 1.5rem; list-style: decimal; }
+
+.syl-points__list li::marker { color: var(--primary-ink); font-weight: 600; }
+
+/* Inside a box of outcomes the name of the list is a plain heading: the eyebrow above the boxes names the group. */
+.outcomes__grid .syl-points__title {
+  color: var(--text);
+  font-size: 0.9375rem;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+/* «Тематический план»: the number of the journal as a small chip in the colour of the kind. */
+.syllabus-plan .syllabus-notes { padding: 0 var(--space-5) var(--space-3); }
+
+.lesson-no {
+  --kind: var(--primary-ink);
+  --kind-wash: var(--primary-wash);
+  display: inline-block;
+  min-width: 2rem;
+  margin-right: var(--space-2);
+  padding: 0 0.3125rem;
+  border-radius: 5px;
+  background: var(--kind-wash);
+  color: var(--kind);
+  font-size: 0.75rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5rem;
+  text-align: center;
+  vertical-align: 0.0625rem;
+}
+
+.lesson-no[data-kind="practice"],
+.lesson-no[data-kind="seminar"],
+.lesson-no[data-kind="lab"] { --kind: var(--success); --kind-wash: var(--success-wash); }
+
+.lesson-no[data-kind="control"] { --kind: var(--warning); --kind-wash: var(--warning-wash); }
+
+.plan-table .plan-table__kind {
+  width: 1%;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.plan-table td.plan-table__kind { padding-top: calc(var(--space-3) + 0.0625rem); }
+
+.plan-table .plan-row__kind {
+  display: inline;
+  font-size: inherit;
+}
+
+.plan-row__forms {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+/* «Описание юнитов»: a card for each unit, its number as an eyebrow, the key questions numbered. */
+.unit-cards {
+  display: grid;
+  gap: var(--space-4);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+}
+
+.unit-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+  background: var(--surface-raised);
+}
+
+.unit-card__title {
+  display: grid;
+  gap: var(--space-1);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.unit-card__no {
+  color: var(--primary-ink);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.unit-card__lead,
+.unit-card__text {
+  max-width: 52rem;
+  line-height: 1.55;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.unit-card__block {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.unit-card__questions {
+  display: grid;
+  gap: var(--space-2);
+  padding-left: 1.5rem;
+  list-style: decimal;
+  line-height: 1.5;
+}
+
+.unit-card__questions li::marker { color: var(--primary-ink); font-weight: 700; }
+
+.unit-card .about { padding: 0; }
+
+.unit-card .about__item { grid-template-columns: minmax(0, 15rem) minmax(0, 1fr); padding: var(--space-3) 0; }
+
+/* «СРС»: each work as a row: its name and where it belongs, then its tasks. */
+.self-works {
+  display: grid;
+  padding: var(--space-2) var(--space-5) var(--space-4);
+}
+
+.self-work {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.self-work:first-child { border-top: 0; }
+
+.self-work__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+}
+
+.self-work__name {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.self-work__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.self-work__tasks {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: 1.25rem;
+  color: var(--text-muted);
+  list-style: disc;
+  line-height: 1.5;
+}
+
+/* «Литература»: a book as a library card writes it. */
+.books {
+  display: grid;
+  gap: var(--space-3);
+  counter-reset: book;
+}
+
+.book {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  padding-left: 2rem;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  counter-increment: book;
+}
+
+.book::before {
+  position: absolute;
+  left: 0;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  content: counter(book) ".";
+}
+
+.book__authors { color: var(--text-muted); }
+
+.book__title { font-weight: 600; }
+
+.book__imprint { color: var(--text-muted); }
+
+.book__have {
+  display: inline-flex;
+  flex-basis: 100%;
+  align-items: center;
+  gap: var(--space-1);
+  color: var(--success);
+  font-size: var(--hint-fs);
+}
+
+.book__have .icon {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
+.books-block {
+  display: grid;
+  gap: var(--space-3);
+}
+
+/* «Программное обеспечение» */
+.software {
+  display: grid;
+  padding: var(--space-2) var(--space-5) var(--space-4);
+}
+
+.software__item {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+}
+
+.software__item:first-child { border-top: 0; }
+
+.software__name { font-weight: 600; overflow-wrap: anywhere; }
+
+.software__link {
+  min-width: 0;
+  color: var(--primary-ink);
+  overflow-wrap: anywhere;
+}
+
+.software__url.is-text { color: var(--text-muted); overflow-wrap: anywhere; }
+
+/* «Политики»: the grading scale as a table, each grade under a hairline in its colour (as in the form). */
+.grading {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.grading .table-scroll {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+}
+
+.grading-table { min-width: 48rem; }
+
+.grading-table th,
+.grading-table td { vertical-align: top; }
+
+.grading-table thead .grading-table__grade { box-shadow: inset 0 3px 0 var(--grade); }
+
+.grading-table [data-grade="fail"] { --grade: var(--danger); }
+.grading-table [data-grade="fair"] { --grade: var(--warning); }
+.grading-table [data-grade="good"] { --grade: var(--primary); }
+.grading-table [data-grade="excellent"] { --grade: var(--success); }
+
+.table.grading-table th.grading-table__name {
+  height: auto;
+  color: var(--text);
+  font-size: 0.875rem;
+  font-weight: 600;
+  white-space: normal;
+}
+
+.grading-table__max { font-weight: 600; }
+
+.grade-cell__name { display: none; }
+
+.grade-cell__range {
+  display: block;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.grade-cell__criteria {
+  display: block;
+  margin-top: var(--space-1);
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  line-height: 1.45;
+  white-space: pre-line;
+}
+
+.rules {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(18rem, 1fr));
+  gap: var(--space-5);
+}
+
+.rule-block {
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+}
+
+.rule-block__sanction {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--danger-line);
+  border-radius: var(--radius-inner);
+  background: var(--danger-wash);
+  color: var(--danger);
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.rule-block__sanction .icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+}
+
+/* The windows of the deanery: what stops the approval, and the remark of a return. */
+.dialog--approve { width: min(calc(100% - 2rem), 34rem); }
+
+.approve-checks {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.approve-checks__lead {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.approve-checks__lead .icon { width: 1rem; height: 1rem; }
+
+.approve-checks .sform-checks__list {
+  max-height: 16rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-inner);
+}
+
+.approve-checks__hint { color: var(--text-muted); font-size: var(--hint-fs); }
+
+.dialog--return { width: min(calc(100% - 2rem), 36rem); }
+
+.return-lead { color: var(--text-muted); }
+
+.dialog--return .field__textarea { min-height: 9rem; resize: vertical; }
+
+.return-under {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.return-under .field__error[hidden] { display: none; }
+
+.return-count {
+  margin-left: auto;
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+/* On the student's phone nothing is smaller than 16 px and nothing to tap is lower than 44 px. */
+.student .syllabus-toc__title,
+.student .syllabus-toc__link,
+.student .lesson-no,
+.student .plan-row__forms,
+.student .goal__title,
+.student .outcomes__title,
+.student .syl-points__title,
+.student .unit-card__label,
+.student .unit-card__no,
+.student .book__have,
+.student .grade-cell__criteria,
+.student .self-work__name,
+.student .version-switch__status,
+.student .grade-cell__name { font-size: 1rem; }
+
+.student .grading-table,
+.student .table.grading-table th.grading-table__name { font-size: 1rem; }
+
+.student .syllabus-toc__link { min-height: 2.75rem; padding-inline: var(--space-4); }
+
+.student .software__link { display: inline-flex; align-items: center; min-height: 2.75rem; }
+
+.student .syllabus-plan .plan-row__summary { font-size: 1rem; }
+
+.student .lesson-no { line-height: 1.75rem; }
+
+/* A narrow window: the bar stacks, the kind of a lesson goes into its line of hours, the grading scale becomes a
+   card per kind of control with its four grades. */
+@media (max-width: 36rem) {
+  .version-bar { padding-left: var(--space-4); }
+
+  .version-bar__status { flex: 1 1 100%; }
+
+  .version-switch { width: 100%; }
+
+  .version-switch .segmented__button { flex: 1 1 0; justify-content: center; }
+
+  .version-bar__actions,
+  .version-bar__actions .button { width: 100%; }
+
+  .syllabus-plan .plan-table .plan-table__kind { display: none; }
+
+  .syllabus-sec__body,
+  .unit-cards,
+  .self-works,
+  .software { padding-inline: var(--space-4); }
+
+  .syllabus-plan .syllabus-notes { padding-inline: var(--space-4); }
+
+  .unit-card { padding: var(--space-3) var(--space-4) var(--space-4); }
+
+  .unit-card .about__item { grid-template-columns: minmax(0, 1fr); }
+
+  .grading .table-scroll { overflow: visible; border: 0; }
+
+  .grading-table,
+  .grading-table tbody { display: block; min-width: 0; }
+
+  .grading-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .grading-table tr {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: var(--space-2) var(--space-3);
+    margin-bottom: var(--space-3);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-inner);
+  }
+
+  .table.grading-table th,
+  .table.grading-table td {
+    display: block;
+    height: auto;
+    padding: 0;
+    border: 0;
+  }
+
+  .table.grading-table .grading-table__grade {
+    grid-column: 1 / -1;
+    padding-left: var(--space-3);
+    box-shadow: inset 3px 0 0 var(--grade);
+  }
+
+  .grade-cell__name {
+    display: block;
+    color: var(--text-muted);
+    font-size: var(--hint-fs);
+    font-weight: 600;
+  }
 }
 
 @media (max-width: 36rem) {

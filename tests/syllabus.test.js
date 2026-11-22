@@ -1,9 +1,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint, fileName } from '../site/js/syllabus.js';
+import {
+  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint, fileName, versionLine, pageActions, linesOf, safeLink,
+} from '../site/js/syllabus.js';
 
 // A row of the syllabus page as syllabus.get gives it.
-const R = (over) => ({ id: 'tp_1', kind: 'topic', unit: 1, label: '', name: 'Т', lectureHours: 2, practiceHours: 0, practiceKind: '', selfHours: null, description: '', planned: 1, pairs: [], ...over });
+const R = (over) => ({ id: 'tp_1', lessonKind: 'lecture', number: 1, unit: 1, unitTitle: '', name: 'Т', hours: 2, controlForms: '', selfHours: null, description: '', planned: 1, pairs: [], ...over });
 
 test('shortDate: day and month', () => {
   assert.equal(shortDate('2026-09-01'), '01.09');
@@ -17,8 +19,8 @@ test('unitGroups: rows of one unit in a row', () => {
     [[1, 'Основы'], [2, ''], [3, '']]);
 });
 
-test('describedRows: topics with a description, modules left out', () => {
-  assert.deepEqual(describedRows([R({ id: 'a', description: 'О теме' }), R({ id: 'b' }), R({ id: 'c', kind: 'control', description: 'мимо' })]).map((r) => r.id), ['a']);
+test('describedRows: lessons with a description, modules left out', () => {
+  assert.deepEqual(describedRows([R({ id: 'a', description: 'О теме' }), R({ id: 'b' }), R({ id: 'c', lessonKind: 'control', description: 'мимо' })]).map((r) => r.id), ['a']);
 });
 
 test('hasSelfHours: a number at any row, zero included', () => {
@@ -57,4 +59,47 @@ test('fileName: «Силлабус — дисциплина — преподав
   assert.equal(fileName(['Силлабус', 'Химия: органика/неорганика', 'Ли "А." <И>|?*']), 'Силлабус — Химия органика неорганика — Ли А. И.xlsx');
   assert.equal(fileName(['Силлабус', '', '  ']), 'Силлабус.xlsx');
   assert.equal(fileName(['Силлабус', 'Т'.repeat(300)]).length <= 160, true);
+});
+
+// ---- Task 43: the status of the version shown, the buttons of the page, the texts of the sections ----
+
+const view = (extra) => ({ shown: 'approved', hidden: false, state: { approved: { version: 2, decidedAt: '2026-11-20' }, open: null },
+  can: { fill: false, edit: false, submit: false, approve: false, giveBack: false }, ...extra });
+const open = { syllabusId: 'sy_2', status: 'returned', version: 3, remark: 'Допишите' };
+
+test('versionLine: the status of the version shown', () => {
+  assert.deepEqual(versionLine(view()), { tone: 'success', key: 'syllabus.state.approved', params: { version: 2, date: '20.11' } });
+  assert.deepEqual(versionLine(view({ shown: 'open', state: { ...view().state, open } })).key, 'syllabus.state.returned');
+  assert.deepEqual(versionLine(view({ shown: 'open', state: { ...view().state, open } })), { tone: 'warning', key: 'syllabus.state.returned', params: { version: 3 } });
+  assert.deepEqual(versionLine(view({ shown: 'open', state: { ...view().state, open: { ...open, status: 'review' } } })), { tone: 'primary', key: 'syllabus.state.review', params: { version: 3 } });
+  assert.deepEqual(versionLine(view({ shown: 'open', state: { ...view().state, open: { ...open, status: 'draft' } } })), { tone: 'neutral', key: 'syllabus.state.draft', params: { version: 3 } });
+  // nothing approved yet; no open version on the address of the new one
+  assert.deepEqual(versionLine(view({ state: { approved: null, open: null } })), { tone: 'neutral', key: 'syllabus.state.none', params: {} });
+  assert.deepEqual(versionLine(view({ shown: 'open' })), { tone: 'neutral', key: 'syllabus.state.noOpen', params: {} });
+  // an approved version without a date of the decision (a stand of the earlier shape) has no date
+  assert.deepEqual(versionLine(view({ state: { approved: { version: 1, decidedAt: '' }, open: null } })), { tone: 'success', key: 'syllabus.state.approvedUndated', params: { version: 1 } });
+});
+
+test('pageActions: the buttons of the head in their order', () => {
+  assert.deepEqual(pageActions(view()), []);                                                                          // студент
+  assert.deepEqual(pageActions(view({ state: { approved: null, open: null }, can: { ...view().can, fill: true, edit: true } })), ['fill']);
+  assert.deepEqual(pageActions(view({ can: { ...view().can, edit: true } })), ['edit']);
+  assert.deepEqual(pageActions(view({ state: { ...view().state, open }, can: { ...view().can, edit: true, submit: true } })), ['continue', 'submit', 'showOpen']);
+  assert.deepEqual(pageActions(view({ shown: 'open', state: { ...view().state, open: { ...open, status: 'review' } }, can: { ...view().can, approve: true, giveBack: true } })),
+    ['approve', 'giveBack', 'showApproved']);
+  // the deanery decides on the version it sees: on the approved one it is shown the way to the new one
+  assert.deepEqual(pageActions(view({ state: { ...view().state, open: { ...open, status: 'review' } }, can: { ...view().can, approve: true, giveBack: true } })), ['showOpen']);
+  // the vice-rector only looks; a version under review is edited by nobody
+  assert.deepEqual(pageActions(view({ shown: 'open', state: { approved: null, open: { ...open, status: 'review' } } })), []);
+});
+
+test('linesOf: a point per line, empty lines and edge spaces dropped', () => {
+  assert.deepEqual(linesOf(' Что такое МИС? \n\n  Кто отвечает за карту?\n'), ['Что такое МИС?', 'Кто отвечает за карту?']);
+  assert.deepEqual(linesOf('один\r\nдва'), ['один', 'два']);
+  assert.deepEqual([linesOf(''), linesOf(null), linesOf(undefined)], [[], [], []]);
+});
+
+test('safeLink: only http:// and https:// are links', () => {
+  assert.deepEqual(['https://example.org/a', 'http://x.kg', 'javascript:alert(1)', ' https://x', 'example.org', ''].map(safeLink), ['https://example.org/a', 'http://x.kg', null, null, null, null]);
+  assert.deepEqual([safeLink(null), safeLink(42), safeLink('data:text/html,x'), safeLink('https://')], [null, null, null, null]);
 });

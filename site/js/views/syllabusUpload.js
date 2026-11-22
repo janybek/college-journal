@@ -8,8 +8,8 @@ import { bookSheets, syllabusBook, READ_OPTIONS } from '../excel.js';
 import { fileLabels, fileData, fileName, renamedHint } from '../syllabus.js';
 import { dayMonth } from './pairParts.js';
 
-// The Excel file of a syllabus, for the screens that show one (the syllabus page; «Предметы» of the deanery):
-// the template and «Скачать (Excel)» for the staff, «Загрузить (Excel)» for the deanery and the admin. A chosen
+// The Excel file of a syllabus, for the screens that show one: the template and «Скачать (Excel)» on the syllabus
+// page for the staff; a file into the draft from the syllabus form and from «Предметы» of the deanery. A chosen
 // file is read here (every sheet, dates caught before anything is sent), checked by syllabus.preview and shown in
 // the check window: whose syllabus it is, what each semester holds and what it changes, remarks, errors with their
 // sheet and Excel row. «Загрузить» is there only when the file has no errors; nothing is written before it.
@@ -19,7 +19,7 @@ import { dayMonth } from './pairParts.js';
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_ERRORS_SHOWN = 200;
 const RETRYABLE = ['network', 'internal'];
-const HELP = [['order', 'layers'], ['hours', 'clock'], ['semester', 'calendar'], ['control', 'checkCircle'], ['columns', 'grid'], ['self', 'book']];
+const HELP = [['order', 'layers'], ['hours', 'clock'], ['semester', 'calendar'], ['control', 'checkCircle'], ['columns', 'grid']];
 
 const blank = () => ({
   check: null,             // the open check window, see readFile
@@ -39,13 +39,12 @@ export function forgetUploadNote() {
   state.done = null;
 }
 
-// The buttons for the head of the syllabus page. view: the answer of syllabus.get; onDone(): read it again.
-export function uploadControls(view, onDone) {
+// The file of the syllabus page for the staff: «Как заполнить шаблон» and the template (no syllabus yet) or the version
+// shown as a file. A file is uploaded from the form now («Загрузить из Excel» there fills the draft).
+export function uploadControls(view) {
   const user = getUser();
   if (!user || user.kind === 'student') return null;
-  const { subject, groups, syllabus, canUpload } = view;
-  const target = { subjectId: subject.id, disciplineName: subject.name, teacherName: subject.teacherName, groupNames: groups.map((g) => g.groupName) };
-  // The upload is the main thing to do while there is no syllabus; afterwards it is how a corrected file comes back.
+  const { subject, syllabus } = view;
   return el('div', { class: 'syllabus-tools' },
     el('div', { class: 'syllabus-tools__row' },
       el('button', {
@@ -54,17 +53,13 @@ export function uploadControls(view, onDone) {
       }, icon('info'), el('span', {}, t('syllabus.help.title')), icon('chevron', 'help-toggle__chevron')),
       el('span', { class: 'syllabus-tools__buttons' },
         el('button', { type: 'button', id: 'syllabus-download', class: 'button button--secondary', onclick: () => download(view) },
-          icon('download'), t(syllabus === null ? 'syllabus.template' : 'syllabus.download')),
-        canUpload ? el('button', {
-          type: 'button', id: 'syllabus-upload', class: 'button ' + (syllabus === null ? 'button--primary' : 'button--secondary'),
-          onclick: () => startUpload(target, onDone),
-        }, icon('upload'), t('syllabus.upload')) : null)),
+          icon('download'), t(syllabus === null ? 'syllabus.template' : 'syllabus.download')))),
     state.downloadErrorKey ? note('error', t(state.downloadErrorKey), { role: 'alert' }) : null,
     state.done === subject.id ? note('success', t('syllabus.done'), { role: 'status' }) : null,
     helpPanel());
 }
 
-// «Как заполнить шаблон»: six rules, each beside the sign of what it is about.
+// «Как заполнить шаблон»: the rules of the template, each beside the sign of what it is about.
 function helpPanel() {
   return el('section', { class: 'syllabus-help', id: 'syllabus-help', hidden: !state.helpOpen, 'aria-labelledby': 'syllabus-help-toggle' },
     el('ul', { class: 'syllabus-help__list' }, HELP.map(([key, iconName]) => el('li', { class: 'syllabus-help__item' },
@@ -86,9 +81,10 @@ async function download(view) {
     refresh();
     return;
   }
-  // Both semesters of the year are stored: the file holds the whole syllabus, so the other semester is read too.
+  // Both semesters of the year are approved: the file holds the whole syllabus, so the other semester is read too.
+  // A new version is a file of its own semester.
   let other = null;
-  if (view.syllabus !== null && view.semesters.length === 2) {
+  if (view.syllabus !== null && view.shown !== 'open' && view.semesters.length === 2) {
     try {
       other = await call('syllabus.get', { subjectId: view.subject.id, semester: view.semester === 1 ? 2 : 1 });
     } catch (error) {

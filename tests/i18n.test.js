@@ -51,7 +51,7 @@ test('every code of the syllabus check has a text; the old texts of the syllabus
   for (const key of ['syllabus.upload', 'syllabus.template', 'syllabus.download', 'syllabus.check.title', 'syllabus.check.whose', 'syllabus.check.summary',
     'syllabus.check.first', 'syllabus.check.replace', 'syllabus.check.failed', 'syllabus.check.apply', 'syllabus.done', 'syllabus.where', 'syllabus.whereSheet',
     'syllabus.fileError.dateCell', 'syllabus.fileError.tooMany', 'syllabus.help.title']) assert.ok(ru[key], key);
-  for (const key of ['order', 'hours', 'semester', 'control', 'columns', 'self']) assert.ok(ru['syllabus.help.' + key], key);
+  for (const key of ['order', 'hours', 'semester', 'control', 'columns']) assert.ok(ru['syllabus.help.' + key], key);
   assert.equal(ru['syllabus.upload'], 'Загрузить (Excel)');
   for (const dict of [ru, ky, en]) {
     for (const gone of ['syllabus.lead', 'syllabus.step.subject', 'syllabus.subjectHint', 'syllabus.sheet', 'syllabus.back', 'topics.import']) assert.equal(gone in dict, false, gone);
@@ -225,4 +225,30 @@ test('the syllabus form of task 42: the checks before submitting, the file into 
   for (const dict of [ru, ky, en]) {
     for (const kind of ['lecture', 'practice']) assert.equal(KIND_WORDS[dict['syllabus.file.kind.' + kind].toLowerCase()], '', kind);
   }
+});
+
+test('task 43: the syllabus page has texts of the states, the buttons, the windows of approval and return, the sections', () => {
+  const keys = [
+    'syllabus.state.approved', 'syllabus.state.approvedUndated', 'syllabus.state.draft', 'syllabus.state.review', 'syllabus.state.returned', 'syllabus.state.none', 'syllabus.state.noOpen',
+    'syllabus.action.approve', 'syllabus.action.giveBack', 'syllabus.version.switch', 'syllabus.version.approved', 'syllabus.version.open',
+    'syllabus.openNote', 'syllabus.hidden', 'syllabus.hiddenHint', 'syllabus.emptyHint.staff', 'syllabus.emptyHint.student', 'syllabus.noOpen', 'syllabus.toApproved', 'syllabus.toOpen',
+    'syllabus.approve.title', 'syllabus.approve.text', 'syllabus.approve.go', 'syllabus.approve.busy', 'syllabus.approve.failed', 'syllabus.approve.done',
+    'syllabus.return.title', 'syllabus.return.lead', 'syllabus.return.label', 'syllabus.return.hint', 'syllabus.return.go', 'syllabus.return.busy',
+    'syllabus.return.required', 'syllabus.return.tooLong', 'syllabus.return.count', 'syllabus.return.done', 'syllabus.submit.done', 'sform.submit.notSent',
+    'syllabus.toc', 'syllabus.sec.title', 'syllabus.sec.goals', 'syllabus.sec.units', 'syllabus.sec.selfWork', 'syllabus.sec.literature', 'syllabus.sec.software', 'syllabus.sec.policies',
+    'syllabus.info.year', 'syllabus.info.groups', 'syllabus.goals.results', 'syllabus.goals.links', 'syllabus.col.kind', 'syllabus.col.hours', 'syllabus.controlForms',
+    'syllabus.self.unit', 'syllabus.book.availability', 'syllabus.software.newTab', 'syllabus.sanction',
+  ];
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  assert.equal(ru['syllabus.hidden'], 'Силлабус обновляется: новая версия на утверждении в деканате.');
+  assert.equal(ru['syllabus.emptyHint.staff'], 'Заполните силлабус на сайте или загрузите файл Excel.');
+  assert.equal(ru['syllabus.emptyHint.student'], 'Преподаватель ещё не заполнил силлабус.');
+  assert.equal(ru['syllabus.approve.text'], 'Версия станет действующей: темы лягут на будущие пары всех групп преподавателя. Проведённые пары не изменятся.');
+  // the texts of the time when the deanery uploaded the file and the teacher only looked are gone
+  for (const dict of [ru, ky, en]) {
+    for (const gone of ['syllabus.notUploadedHint.student', 'syllabus.notUploadedHint.teacher', 'syllabus.notUploadedHint.office', 'syllabus.help.self',
+      'syllabus.col.lecture', 'syllabus.col.practice']) assert.equal(gone in dict, false, gone);
+  }
+  // «Л1. Тема»: the label is the letter of the kind and the number of the journal
+  for (const dict of [ru, ky, en]) assert.match(dict['pairs.topicLabel'], /\{label\}.*\{name\}/);
 });

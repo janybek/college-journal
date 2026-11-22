@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   TABS, tabOf, listAdd, listRemove, listMove, emptyItem, sectionData, isDirty, errorMap, tableNumbers, unitHasContent, withoutBlankRows,
-  pairNumbers, canMove, moveLesson, checkTabs, checkLine, placeErrors, errorsAfterEdit, statusKind,
+  pairNumbers, canMove, moveLesson, checkTabs, checkLine, placeErrors, errorsAfterEdit, statusKind, keptOrder, submitOutcome,
 } from '../site/js/syllabusForm.js';
 
 const units = [{ unit: 1, title: 'Основы', lecture: [{ id: 'tp_1', name: 'Л', hours: 2, controlForms: '', selfHours: null, description: '', number: 1 }], practice: [], seminar: [], lab: [], control: [] },
@@ -154,4 +154,34 @@ test('M5: the form sends without the empty rows but keeps them; the errors of th
     [{ unit: 2, list: 'literature', index: 1, field: 'title', code: 'required' }]);
   const lit = { main: [book, { ...book, year: '1999' }], extra: [] };
   assert.deepEqual(placeErrors('literature', lit, [{ list: 'main', index: 0, field: 'title', code: 'required' }]), [{ list: 'main', index: 1, field: 'title', code: 'required' }]);
+});
+
+// ---- Task 43: the review of task 42 ----
+
+const L = (id, unit, lessonKind = 'lecture', hours = 2) => ({ id, unit, lessonKind, hours, name: id, number: 1 });
+
+test('M1 (task 42): saving the plan keeps the order the person set on «Порядок пар» and has not saved yet', () => {
+  const saved = [L('a', 1), L('b', 1, 'practice'), L('c', 1, 'seminar'), L('d', 2), L('e', 2, 'practice')];
+  const unsaved = [saved[2], saved[0], saved[1], saved[4], saved[3]];                       // c a b | e d — moved, not saved
+  // the plan saved: «b» renamed (the same id), «x» added at the end of unit 1, «d» removed
+  const fresh = [L('a', 1), { ...L('b', 1, 'practice'), name: 'Новое' }, L('c', 1, 'seminar'), L('x', 1, 'lab'), L('e', 2, 'practice')];
+  const kept = keptOrder(unsaved, saved, fresh);
+  assert.deepEqual(kept.map((l) => l.id), ['c', 'a', 'b', 'x', 'e']);
+  assert.equal(kept[2].name, 'Новое');                                                       // the lessons are those of the answer
+  // nothing moved by hand: the order of the answer as it is
+  assert.deepEqual(keptOrder(saved, saved, fresh).map((l) => l.id), ['a', 'b', 'c', 'x', 'e']);
+  assert.deepEqual(keptOrder(null, saved, fresh).map((l) => l.id), ['a', 'b', 'c', 'x', 'e']);
+  // a unit would start with a module without hours (its lecture is gone): that unit keeps the order of the answer
+  const before = [L('q', 1), L('p', 1, 'practice'), L('m', 1, 'control', 0)];
+  const moved = [before[0], before[2], before[1]];                                           // q m p — moved, not saved
+  assert.deepEqual(keptOrder(moved, before, [L('p', 1, 'practice'), L('m', 1, 'control', 0)]).map((l) => l.id), ['p', 'm']);
+});
+
+test('M2 (task 42): what an answer of syllabus.submit means for the form', () => {
+  assert.equal(submitOutcome({ submitted: true, checks: { errors: [], warnings: [] } }), 'sent');
+  assert.equal(submitOutcome({ submitted: false, checks: { errors: [{ section: 'goals', field: 'goal', code: 'required' }], warnings: [] } }), 'checks');
+  // not sent and nothing to fix: the form must not close silently
+  assert.equal(submitOutcome({ submitted: false, checks: { errors: [], warnings: [] } }), 'failed');
+  assert.equal(submitOutcome({ submitted: false }), 'failed');
+  assert.equal(submitOutcome(null), 'failed');
 });

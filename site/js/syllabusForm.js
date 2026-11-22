@@ -212,6 +212,35 @@ export function moveLesson(lessons, index, step) {
   return canMove(lessons, index, step) ? listMove(lessons, index, step) : [...(lessons || [])];
 }
 
+// The lessons after the plan is saved, in the order the person set on «Порядок пар» and has not saved yet.
+// unsaved: the lessons of the form before the save; saved: the lessons as last saved; fresh: those of the answer.
+// Nothing moved by hand: the order of the answer. Otherwise each unit of the answer keeps its places: the places of
+// the lessons the person had arranged take them in the person's order, a new lesson stays where the answer put it
+// (the end of its unit), a removed one is gone. A unit that would start with a module without hours (the server
+// refuses that order) keeps the order of the answer.
+export function keptOrder(unsaved, saved, fresh) {
+  const list = Array.isArray(fresh) ? fresh : [];
+  const ids = (lessons) => (Array.isArray(lessons) ? lessons.map((lesson) => lesson.id) : []);
+  if (!Array.isArray(unsaved) || sameValue(ids(unsaved), ids(saved))) return [...list];
+  const place = new Map(unsaved.map((lesson, i) => [lesson.id, { i, unit: lesson.unit }]));
+  const known = (lesson) => place.has(lesson.id) && place.get(lesson.id).unit === lesson.unit;
+  const units = [...new Set(list.map((lesson) => lesson.unit))];
+  return units.flatMap((unit) => {
+    const own = list.filter((lesson) => lesson.unit === unit);
+    const arranged = own.filter(known).sort((a, b) => place.get(a.id).i - place.get(b.id).i);
+    const out = own.map((lesson) => (known(lesson) ? arranged.shift() : lesson));
+    return markOnly(out[0]) && !markOnly(own[0]) ? own : out;
+  });
+}
+
+// What an answer of syllabus.submit means: 'sent'; 'checks' — not sent, the list says what to fix; 'failed' — not
+// sent and nothing to fix (the form says so instead of closing silently).
+export function submitOutcome(result) {
+  if (result && result.submitted === true) return 'sent';
+  const errors = result && result.checks && Array.isArray(result.checks.errors) ? result.checks.errors : [];
+  return errors.length > 0 ? 'checks' : 'failed';
+}
+
 // ---- The checks before submitting (syllabus.submit with dryRun) ----
 
 // { errors, warnings } -> Map(tab -> { errors, warnings }) with the numbers, in the order of the tabs; the tab of

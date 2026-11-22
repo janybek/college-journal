@@ -12,11 +12,13 @@ export function resolveRoute(hash, user) {
   const dir = /^\/dir\/([^/]+)$/.exec(path);
   if (dir && DIR_TABLES.includes(dir[1]) && permissions.includes('dir.list:' + dir[1])) return { view: 'directory', params: { table: dir[1] } };
   if (path === '/import' && permissions.some((p) => p.startsWith('import.apply:'))) return { view: 'import', params: {} };
-  // #/syllabus/<subjectId>, #/syllabus/<subjectId>/<1|2>: the syllabus of a subject, in that semester of the year.
-  const syllabus = /^\/syllabus\/([^/]+)(?:\/([12]))?$/.exec(path);
+  // #/syllabus/<subjectId>, #/syllabus/<subjectId>/<1|2>: the syllabus of a subject, in that semester of the year;
+  // #/syllabus/<subjectId>/<1|2>/draft: its new version (the open one), not yet approved.
+  const syllabus = /^\/syllabus\/([^/]+)(?:\/([12])(\/draft)?)?$/.exec(path);
   if (syllabus && permissions.includes('syllabus.get')) {
     const params = { subjectId: syllabus[1] };
     if (syllabus[2]) params.semester = Number(syllabus[2]);
+    if (syllabus[3]) params.version = 'open';
     return { view: 'syllabus', params };
   }
   // #/syllabus-form/<syllabusId>, #/syllabus-form/<syllabusId>/<tab>: the form of a syllabus version, on that tab.
