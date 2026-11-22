@@ -130,3 +130,25 @@ test('i18n.overrides is public and returns key/ky/ru/en', () => {
   store.insert('translations', { key: 'k', ky: 'a', ru: 'b', en: 'c' });
   assert.deepEqual(call('i18n.overrides', {}).data, { rows: [{ key: 'k', ky: 'a', ru: 'b', en: 'c' }] });
 });
+
+test('remove: marks, unit results and the change log keep students, staff and subjects', () => {
+  const { call, store, group, admin, teacherRow } = setup();
+  const mk = (n) => store.insert('students', { fullName: n, cardNo: n, groupId: group.id, passwordHash: 'x', active: true });
+  const mkStaff = (n) => store.insert('staff', { fullName: n, login: n, passwordHash: 'x', roles: 'dean', active: true });
+  const st = mk('c1');
+  const st2 = mk('c2');
+  const free = store.insert('subjects', { name: 'Free', teacherId: 'nobody', groupId: 'nogroup', scheme: 'A' });
+  store.insert('attendance', { pairId: 'p_x', studentId: st.id, status: 'present', markedBy: teacherRow.id });
+  assert.equal(call('dir.remove', { table: 'students', id: st.id }, admin).error.code, 'in_use');
+  assert.equal(call('dir.remove', { table: 'staff', id: teacherRow.id }, admin).error.code, 'in_use');
+  const dean2 = mkStaff('d2');
+  const dean3 = mkStaff('d3');
+  store.insert('changeLog', { actorId: dean2.id, entity: 'unit', field: 'control', studentId: st2.id });
+  assert.equal(call('dir.remove', { table: 'staff', id: dean2.id }, admin).error.code, 'in_use');
+  assert.equal(call('dir.remove', { table: 'students', id: st2.id }, admin).error.code, 'in_use');
+  store.insert('unitResults', { subjectId: free.id, studentId: 'st_x', unit: 1, control: 30, updatedBy: dean3.id });
+  assert.equal(call('dir.remove', { table: 'subjects', id: free.id }, admin).error.code, 'in_use');
+  assert.equal(call('dir.remove', { table: 'staff', id: dean3.id }, admin).error.code, 'in_use');
+  const clean = mk('c3');
+  assert.deepEqual(call('dir.remove', { table: 'students', id: clean.id }, admin).data, {});
+});

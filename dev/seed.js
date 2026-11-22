@@ -278,7 +278,7 @@ function seedPairs(store, platform) {
   const substitute = pairOf('Анатомия', '01-1', addDays(nextMonday, 3));
   const cancelled = pairOf('Информатика', '02-1', nextMonday);
   const teacher3 = store.list('staff').find((s) => s.login === 'teacher3');
-  store.update('pairs', substitute.id, { teacherId: teacher3.id, changed: true, note: 'Замена' });
+  store.update('pairs', substitute.id, { teacherId: teacher3.id, changed: true, substitute: true, note: 'Замена' });
   store.update('pairs', cancelled.id, { status: 'cancelled', changed: true });
   relayout(store);
 }

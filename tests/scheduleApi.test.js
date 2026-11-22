@@ -211,3 +211,14 @@ test('semester switch and pair changes read each sheet at most once', () => {
   check('cancel', call('schedule.cancelPair', { id: moved }, dean));
   check('restore', call('schedule.restorePair', { id: moved }, dean));
 });
+
+test('generate: a pair with marks is not removed by a restart', () => {
+  const { store, call, dean } = setup();
+  call('schedule.generate', {}, dean);
+  const [held] = store.list('pairs');
+  store.update('pairs', held.id, { status: 'closed' });
+  store.insert('attendance', { pairId: held.id, studentId: 'st_x', status: 'present' });
+  assert.equal(call('schedule.generate', { restart: true }, dean).error.code, 'in_use');
+  call('schedule.generate', {}, dean);
+  assert.deepEqual([store.get('pairs', held.id).status, store.list('attendance').length], ['closed', 1]);
+});

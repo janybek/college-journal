@@ -49,8 +49,8 @@ function saved(store, pairs, id, patch, rows, relay, settings) {
   if (Object.keys(patch).length > 0) store.update('pairs', id, patch);
   const after = pairs.map((p) => (p.id === id ? { ...p, ...patch } : p));
   const pair = after.find((p) => p.id === id);
-  const result = relay ? relayout(store, [pair.subjectId], { pairs: after, settings }) : { subjects: undefined, topics: undefined, pairs: after };
-  return { pair: pairViews(store, (p) => p.id === id, { ...rows, pairs: result.pairs, topics: result.topics, subjects: result.subjects })[0] };
+  const result = relay ? relayout(store, [pair.subjectId], { pairs: after, settings, subjects: rows.subjects }) : { subjects: undefined, topics: undefined, pairs: after };
+  return { pair: pairViews(store, (p) => p.id === id, { ...rows, pairs: result.pairs, topics: result.topics, subjects: result.subjects ?? rows.subjects })[0] };
 }
 
 function changePair(data, ctx) {
@@ -64,13 +64,15 @@ function changePair(data, ctx) {
   for (const key of PATCH_FIELDS) if (data[key] !== undefined) patch[key] = data[key];
   const staff = store.list('staff');
   const rooms = store.list('rooms');
+  const subjects = store.list('subjects');
   const settings = loadSettings(store);
-  const { next, errors } = checkPairChange(pair, patch, { settings, today, staff, rooms, pairs });
+  const subject = subjects.find((s) => s.id === pair.subjectId);
+  const { next, errors } = checkPairChange(pair, patch, { settings, today, staff, rooms, pairs, subject });
   if (errors.length > 0) throw new AppError('invalid', { fields: errors });
   const placeChanged = next.date !== pair.date || next.slot !== pair.slot;
   const changes = {};
-  for (const key of Object.keys(next)) if (next[key] !== (pair[key] ?? '')) changes[key] = next[key];
-  return saved(store, pairs, pair.id, changes, { staff, rooms }, placeChanged, settings);
+  for (const key of Object.keys(next)) if (next[key] !== (key === 'substitute' ? pair.substitute === true : (pair[key] ?? ''))) changes[key] = next[key];
+  return saved(store, pairs, pair.id, changes, { staff, rooms, subjects }, placeChanged, settings);
 }
 
 function cancelPair(data, ctx) {

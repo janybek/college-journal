@@ -214,3 +214,32 @@ test('a note-only edit keeps the pair free and writes only the note; a room chan
   assert.equal(call('schedule.changePair', { id: x.pair22 }, x.dean).ok, true);
   assert.deepEqual(updates, []);
 });
+
+test('a pair given to another teacher is stored as a substitution; giving it back clears it', () => {
+  const x = setup();
+  const { call, store } = x;
+  const sub = call('schedule.changePair', { id: x.pair15, teacherId: x.ids.teacher3 }, x.dean).data.pair;
+  assert.deepEqual([sub.substitution, store.get('pairs', x.pair15).substitute], [true, true]);
+  const back = call('schedule.changePair', { id: x.pair15, teacherId: x.ids.teacher1 }, x.dean).data.pair;
+  assert.deepEqual([back.substitution, store.get('pairs', x.pair15).substitute], [false, false]);
+});
+
+test('a new teacher of a subject: held and past pairs of the old one are no substitution, busy ones are, a return clears it', () => {
+  const x = setup();
+  const { call, store } = x;
+  store.update('pairs', x.pair1, { status: 'closed' });
+  // teacher3 is busy at the time of pair15 (another group)
+  store.insert('pairs', { date: '2026-09-15', slot: 1, planDate: '2026-09-15', planSlot: 1, startTime: '08:00', status: 'planned',
+    groupId: x.g2, subjectId: x.sb2, teacherId: x.ids.teacher3, roomId: '', topicId: '', lessonType: '', part: null, note: '', changed: false, substitute: false });
+  const subject = store.get('subjects', x.sb1);
+  const saved = call('dir.save', { table: 'subjects', row: { ...subject, teacherId: x.ids.teacher3 } }, x.dean);
+  assert.equal(saved.ok, true);
+  assert.equal(saved.data.skippedBusy, 1);
+  const view = (id) => call('schedule.list', { from: '2026-09-01', to: '2026-09-25', groupId: x.g1 }, x.dean).data.pairs.find((p) => p.id === id);
+  assert.deepEqual([view(x.pair1).substitution, store.get('pairs', x.pair1).substitute, store.get('pairs', x.pair1).teacherId], [false, false, x.ids.teacher1]);
+  assert.deepEqual([view(x.pair15).substitution, store.get('pairs', x.pair15).substitute, store.get('pairs', x.pair15).teacherId], [true, true, x.ids.teacher1]);
+  assert.deepEqual([view(x.pair8).substitution, store.get('pairs', x.pair8).teacherId], [false, x.ids.teacher3]);
+  const back = call('dir.save', { table: 'subjects', row: { ...store.get('subjects', x.sb1), teacherId: x.ids.teacher1 } }, x.dean);
+  assert.equal(back.ok, true);
+  assert.deepEqual([store.get('pairs', x.pair15).substitute, view(x.pair15).substitution], [false, false]);
+});
