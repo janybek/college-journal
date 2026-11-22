@@ -7,7 +7,7 @@ import { createNodePlatform } from '../platform/nodePlatform.js';
 import { readConfig, ConfigError, START_ALERT_FILE } from './config.js';
 import { restoreBase, BaseError } from './base.js';
 import { createLogger } from './log.js';
-import { EXIT } from './server.js';
+import { EXIT } from './exit.js';
 
 // Start, restart after a crash, stop and state of the working server. Node only: this file is not bundled for Apps Script.
 // stateFile belongs to the server that wrote it, supervisorFile to the supervisor. A process is never ended by its number here:

@@ -12,10 +12,11 @@ import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from './http.js';
 import { createLogger } from './log.js';
 import { backupNow, startBackups } from './backup.js';
 import { runDemo } from './demo.js';
+import { EXIT } from './exit.js';
 
 // The working server: answers only its own site, serves no files, limits login attempts, keeps a work log.
 // Node only: this file is not bundled for Apps Script.
-export const EXIT = { ok: 0, crash: 1, config: 2, portBusy: 3 };
+export { EXIT };
 
 const MIN_NODE = 24;
 const SERVER_ERROR = { ok: false, error: { code: 'internal' } };

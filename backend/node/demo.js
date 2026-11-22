@@ -6,6 +6,7 @@ import { localDate } from '../../core/dates.js';
 import { seedDemo } from '../../dev/seed.js';
 import { openBase } from './base.js';
 import { verifyCopy } from './backup.js';
+import { isOurSupervisor, answers } from './supervisor.js';
 
 // The demo data of the working base: the fictional people and data of the stand, with Cyrillic names and one random password
 // that goes only into a file in the alert folder. Node only: this file is not bundled for Apps Script.
@@ -78,7 +79,6 @@ export async function runDemo(config, { out = console.log, now, logger }) {
     return { code: DEMO_EXIT.config };
   }
   // the same check as the restore: a running server or its supervisor would meet the new rows half way
-  const { isOurSupervisor, answers } = await import('./supervisor.js');
   if (isOurSupervisor(readJson(config.supervisorFile)) || (await answers(readJson(config.stateFile)?.port))) {
     out('Сначала остановите сервер: npm run serve:stop');
     return { code: DEMO_EXIT.config };

@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import { spawn } from 'node:child_process';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { handleRequest } from '../backend/api.js';
@@ -143,4 +144,31 @@ test('the stand is as before: Latin names and the stand password', () => {
   seed(store, platform);
   assert.deepEqual(store.list('staff').map((s) => s.fullName), ['Admin Demo', 'Dean Demo', 'Prorector Demo', 'Teacher One', 'Teacher Two', 'Teacher Three']);
   assert.equal(handleRequest({ action: 'auth.login', data: { login: 'dean', password: DEV_PASSWORD } }, { store, platform }).ok, true);
+});
+
+// the real process: the entry point with its top-level await, not main() called from a test
+function spawnDemo(config) {
+  return new Promise((resolve, reject) => {
+    const child = spawn(process.execPath, [path.join(import.meta.dirname, '..', 'backend', 'node', 'server.js'), '--demo'], { env: { ...process.env, ...envOf(config) }, windowsHide: true });
+    let text = '';
+    child.stdout.on('data', (c) => { text += c; });
+    child.stderr.on('data', (c) => { text += c; });
+    const timer = setTimeout(() => { child.kill(); reject(new Error('the process did not finish: ' + text)); }, 20000);
+    child.on('exit', (code) => { clearTimeout(timer); resolve({ code, text }); });
+  });
+}
+
+test('the real process: node server.js --demo finishes with 0, writes the file, prints no password; a second run ends with 2', async (t) => {
+  const config = emptyBase(t);
+  const first = await spawnDemo(config);
+  assert.equal(first.code, 0, first.text);
+  assert.match(first.text, /Пробные данные залиты/);
+  assert.equal(first.text.includes(passwordOf(config)), false);
+  const second = await spawnDemo(config);
+  assert.equal(second.code, 2, second.text);
+  assert.equal(second.text.includes(passwordOf(config)), false);
+  const { config: other } = tempBase(t);
+  const third = await spawnDemo(other);
+  assert.equal(third.code, 2, third.text);
+  assert.match(third.text, /только в пустую базу/);
 });
