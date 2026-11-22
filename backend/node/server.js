@@ -10,6 +10,7 @@ import { readConfig, ConfigError } from './config.js';
 import { initBase, openBase, resetAdminPassword, BaseError } from './base.js';
 import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from './http.js';
 import { createLogger } from './log.js';
+import { backupNow, startBackups } from './backup.js';
 
 // The working server: answers only its own site, serves no files, limits login attempts, keeps a work log.
 // Node only: this file is not bundled for Apps Script.
@@ -123,7 +124,7 @@ export async function main(argv, { env = process.env, root, out = console.log, n
     return { code: EXIT.config };
   }
   const command = argv[0];
-  if (argv.length > 1 || (command !== undefined && command !== '--init' && command !== '--admin-password')) {
+  if (argv.length > 1 || (command !== undefined && command !== '--init' && command !== '--admin-password' && command !== '--backup')) {
     out(`Неизвестный параметр: ${argv.join(' ')}`);
     return { code: EXIT.config };
   }
@@ -145,15 +146,31 @@ export async function main(argv, { env = process.env, root, out = console.log, n
       return { code: EXIT.ok };
     }
 
+    if (command === '--backup') {
+      const base = openBase(config, { now });
+      try {
+        const made = await backupNow({ db: base.db, config, now: clock, logger });
+        out(made.ok ? `Копия сделана: ${made.file}` : `Копия не сделана: ${made.error}`);
+        return { code: made.ok ? EXIT.ok : EXIT.crash };
+      } finally {
+        base.close();
+      }
+    }
+
     const base = openBase(config, { now });
     let server;
+    let backups;
     try {
+      // the copy of the base as it was, before new sheets are added to it; a failed copy does not stop the start
+      backups = startBackups({ db: base.db, config, now: clock, logger });
+      await backups.first;
       const upgraded = base.upgrade();
       if (upgraded.created.length > 0 || upgraded.added.length > 0) {
         logger.info(`base upgraded: ${upgraded.created.length} tables made, ${upgraded.added.length} columns added`);
       }
       server = await startServer({ config, base, logger });
     } catch (error) {
+      backups?.stop();
       base.close();
       throw error;
     }
@@ -165,6 +182,7 @@ export async function main(argv, { env = process.env, root, out = console.log, n
     let stopped = null;
     const stop = () => {
       stopped ??= (async () => {
+        backups.stop();
         await server.close();
         base.close();
         fs.rmSync(config.stateFile, { force: true });
