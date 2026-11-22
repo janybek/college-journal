@@ -6442,3 +6442,158 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 }
 
 .scoring__failed { display: grid; gap: var(--space-3); justify-items: start; }
+
+/* Student home: the one tile that is already a link (the others still say «soon»). */
+.soon--link {
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+
+.soon--link:hover { border-color: var(--primary-line); }
+
+.soon__go {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-left: auto;
+  color: var(--primary-ink);
+}
+
+/* Screens: the student's «Оценки» (#/grades, #/grades/<subjectId>) */
+.gr { display: grid; gap: var(--space-4); min-width: 0; }
+
+.gr-list { display: grid; gap: var(--space-3); }
+
+.gr-card {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  color: inherit;
+  text-decoration: none;
+}
+
+a.gr-card:hover { border-color: var(--primary-line); }
+
+.gr-card--static { border-top: 3px solid var(--primary-fill); }
+
+.gr-card__head { display: flex; align-items: center; gap: var(--space-3); }
+
+.gr-card__titles { display: grid; gap: var(--space-1); min-width: 0; flex: 1; }
+
+.gr-card__name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  letter-spacing: -0.015em;
+  line-height: 1.3;
+  overflow-wrap: anywhere;
+}
+
+.gr-card__teacher { color: var(--text-muted); }
+
+.gr-card__go { flex: none; width: 1.25rem; height: 1.25rem; color: var(--primary-ink); }
+
+.gr-summary { display: grid; gap: var(--space-3); }
+
+.gr-final {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  font-size: 1.25rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.3;
+}
+
+.gr-units { display: grid; gap: var(--space-3); }
+
+.gr-unit {
+  display: grid;
+  gap: var(--space-1);
+  padding-left: var(--space-3);
+  border-left: 3px solid var(--border);
+}
+
+.gr-unit__name {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-weight: 600;
+}
+
+.gr-unit__line, .gr-outside { overflow-wrap: anywhere; }
+
+.gr-low {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.gr-low__icon { flex: none; width: 1.25rem; height: 1.25rem; margin-top: 0.125rem; }
+
+.gr-attendance { color: var(--text-muted); }
+
+.gr-none { padding: var(--space-2) 0; }
+
+.gr-section { display: grid; gap: var(--space-3); }
+
+.gr-section__title { font-size: 1.125rem; font-weight: 600; letter-spacing: -0.015em; }
+
+.gr-pairs { display: grid; gap: var(--space-2); }
+
+.gr-pair {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface-raised);
+}
+
+.gr-pair__top, .gr-pair__bottom {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.gr-pair__bottom { justify-content: flex-end; }
+
+.gr-pair__date { font-weight: 600; }
+
+.gr-pair__topic { overflow-wrap: anywhere; }
+
+.gr-pair__points { font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.gr-pair__points.is-muted { color: var(--text-muted); font-weight: 400; }
+
+.gr-how { padding: 0; }
+
+.gr-how__summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-3) var(--space-4);
+  font-weight: 600;
+  cursor: pointer;
+  list-style: none;
+}
+
+.gr-how__summary::-webkit-details-marker { display: none; }
+
+.gr-how__go { flex: none; width: 1.25rem; height: 1.25rem; color: var(--primary-ink); transition: transform 0.15s; }
+
+.gr-how[open] .gr-how__go { transform: rotate(90deg); }
+
+.gr-how__body { display: grid; gap: var(--space-3); padding: 0 var(--space-4) var(--space-4); color: var(--text-muted); }
+
+.gr-back { justify-self: stretch; min-height: 2.75rem; }
+
+.soon--link .soon__icon { background: var(--primary-wash); color: var(--primary-ink); }

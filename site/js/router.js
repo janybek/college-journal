@@ -46,6 +46,10 @@ export function resolveRoute(hash, user) {
   if (path === '/journal-log' && office && permissions.includes('journal.log')) return { view: 'journalLog', params: {} };
   const log = /^\/journal-log\/([^/]+)$/.exec(path);
   if (log && permissions.includes('journal.log')) return { view: 'journalLog', params: { subjectId: log[1] } };
+  // «Оценки» of a student: all subjects; #/grades/<subjectId>: one of them (the screen looks it up in its own answer).
+  if (path === '/grades' && permissions.includes('student.grades')) return { view: 'grades', params: {} };
+  const grades = /^\/grades\/([^/]+)$/.exec(path);
+  if (grades && permissions.includes('student.grades')) return { view: 'grades', params: { subjectId: grades[1] } };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
   return { view: 'home', params: {} };

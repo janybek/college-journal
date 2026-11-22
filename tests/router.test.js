@@ -136,3 +136,13 @@ test('resolveRoute: the change log is for the deanery, the admin and the vice-re
   assert.equal(resolveRoute('#/journal-log/sb_1', student).view, 'home');
   assert.equal(resolveRoute('#/journal-log/sb_1/x', office).view, 'home');
 });
+
+test('resolveRoute: the grades of a student need student.grades', () => {
+  const student = { mustChangePassword: false, permissions: ['student.grades', 'schedule.mine'] };
+  const staff = { mustChangePassword: false, permissions: ['journal.list', 'journal.get'] };
+  assert.deepEqual(resolveRoute('#/grades', student), { view: 'grades', params: {} });
+  assert.deepEqual(resolveRoute('#/grades/sb_1', student), { view: 'grades', params: { subjectId: 'sb_1' } });
+  assert.equal(resolveRoute('#/grades/sb_1/x', student).view, 'home');
+  assert.equal(resolveRoute('#/grades', staff).view, 'home');
+  assert.equal(resolveRoute('#/grades/sb_1', staff).view, 'home');
+});

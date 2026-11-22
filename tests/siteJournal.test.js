@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, absenceList, pointsText } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -188,4 +188,28 @@ test('pairActions: the deanery actions on a pair by its status and state; none w
     assert.deepEqual(pairActions({ status: 'planned', state: 'open' }, none), []);
     assert.deepEqual(pairActions({ status: 'closed', state: 'open' }, none), []);
   }
+});
+
+test('unitLine: all three results, only the current control, nothing yet', () => {
+  assert.deepEqual(unitLine({ unit: 1, current: 38, self: 16, control: 30, total: 84 }),
+    { key: 'grades.unit.full', params: { current: 38, self: 16, control: 30, total: 84 } });
+  assert.deepEqual(unitLine({ unit: 2, current: 31, self: null, control: null, total: null }), { key: 'grades.unit.partial', params: { current: 31 } });
+  assert.deepEqual(unitLine({ unit: 2, current: 31, self: 10, control: null, total: null }), { key: 'grades.unit.partial', params: { current: 31 } });
+  assert.deepEqual(unitLine({ unit: 3, current: null, self: null, control: null, total: null }), { key: 'grades.unit.empty', params: {} });
+});
+
+test('absenceList: only absent, excused and madeup, the newest first', () => {
+  const pairs = [
+    { date: '2026-09-01', slot: 1, status: 'present' }, { date: '2026-09-03', slot: 2, status: 'absent' },
+    { date: '2026-09-02', slot: 1, status: 'late' }, { date: '2026-09-03', slot: 1, status: 'excused' }, { date: '2026-09-05', slot: 1, status: 'madeup' },
+  ];
+  assert.deepEqual(absenceList(pairs).map((p) => p.date + '/' + p.slot), ['2026-09-05/1', '2026-09-03/2', '2026-09-03/1']);
+  assert.deepEqual(absenceList(undefined), []);
+  assert.equal(pairs.length, 5);
+});
+
+test('pointsText: the points of a pair, or «not counted»', () => {
+  assert.deepEqual(pointsText({ earned: 27, possible: 30 }), { key: 'grades.points', params: { earned: 27, possible: 30 } });
+  assert.deepEqual(pointsText({ earned: 0, possible: 30 }), { key: 'grades.points', params: { earned: 0, possible: 30 } });
+  assert.deepEqual(pointsText({ earned: null, possible: null }), { key: 'grades.notCounted', params: {} });
 });

@@ -9,7 +9,6 @@ import { teacherBadge } from '../subjects.js';
 
 // Sections later units fill in; for now the student sees what is coming.
 const STUDENT_SECTIONS = [
-  ['home.grades', 'home.gradesSoon', 'chart'],
   ['home.homework', 'home.homeworkSoon', 'clipboard'],
   ['home.news', 'home.newsSoon', 'bell'],
 ];
@@ -39,6 +38,12 @@ function renderStudent(root, user) {
           user.groupName ? badge(user.groupName, 'primary') : el('span', { class: 'muted' }, t('home.noGroup'))))),
     todaySection(user),
     studentSubjectsSection(user),
+    el('a', { class: 'card soon soon--link', href: '#/grades' },
+      el('span', { class: 'soon__icon' }, icon('chart')),
+      el('div', { class: 'soon__body' },
+        el('h2', { class: 'soon__title' }, t('home.grades')),
+        el('p', { class: 'soon__text' }, t('home.gradesLead'))),
+      icon('chevron', 'soon__go')),
     el('ul', { class: 'soon-list' }, STUDENT_SECTIONS.map(([title, text, iconName]) => el('li', { class: 'card soon' },
       el('span', { class: 'soon__icon' }, icon(iconName)),
       el('div', { class: 'soon__body' },

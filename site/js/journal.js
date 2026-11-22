@@ -223,3 +223,27 @@ export function needsReason(items, journal, unit, field, isOwnTeacher) {
   if (field === 'current' || !isOwnTeacher) return true;
   return items.some((item) => savedResult(journal, item.studentId, unit, field) !== null);
 }
+
+// ---- The student's «Оценки» (#/grades): the lines of the screen, from student.grades ----
+
+const ABSENCE_STATUSES = ['absent', 'excused', 'madeup'];
+
+// The line of a unit: all three results and the total, only the current control, or nothing yet.
+export function unitLine(unit) {
+  const { current, self, control, total } = unit;
+  if (current === null || current === undefined) return { key: 'grades.unit.empty', params: {} };
+  if (self === null || self === undefined || control === null || control === undefined) return { key: 'grades.unit.partial', params: { current } };
+  return { key: 'grades.unit.full', params: { current, self, control, total } };
+}
+
+// The pairs the student was away from (or made up for), the newest first.
+export function absenceList(pairs) {
+  const list = Array.isArray(pairs) ? pairs.filter((pair) => ABSENCE_STATUSES.includes(pair.status)) : [];
+  return list.sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.slot || 0) - (a.slot || 0)));
+}
+
+// «27 из 30», or «не входит в расчёт» for a pair that gives no points (a control pair, an excused absence).
+export function pointsText(pair) {
+  if (pair.earned === null || pair.earned === undefined) return { key: 'grades.notCounted', params: {} };
+  return { key: 'grades.points', params: { earned: pair.earned, possible: pair.possible } };
+}
