@@ -11,6 +11,7 @@ import { initBase, openBase, resetAdminPassword, BaseError } from './base.js';
 import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from './http.js';
 import { createLogger } from './log.js';
 import { backupNow, startBackups } from './backup.js';
+import { runDemo } from './demo.js';
 
 // The working server: answers only its own site, serves no files, limits login attempts, keeps a work log.
 // Node only: this file is not bundled for Apps Script.
@@ -124,7 +125,7 @@ export async function main(argv, { env = process.env, root, out = console.log, n
     return { code: EXIT.config };
   }
   const command = argv[0];
-  if (argv.length > 1 || (command !== undefined && command !== '--init' && command !== '--admin-password' && command !== '--backup')) {
+  if (argv.length > 1 || (command !== undefined && command !== '--init' && command !== '--admin-password' && command !== '--backup' && command !== '--demo')) {
     out(`Неизвестный параметр: ${argv.join(' ')}`);
     return { code: EXIT.config };
   }
@@ -145,6 +146,8 @@ export async function main(argv, { env = process.env, root, out = console.log, n
       showPassword(out, made);
       return { code: EXIT.ok };
     }
+
+    if (command === '--demo') return await runDemo(config, { out, now, logger });
 
     if (command === '--backup') {
       const base = openBase(config, { now });

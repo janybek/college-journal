@@ -31,12 +31,24 @@ const STAFF = [
   { login: 'teacher3', fullName: 'Teacher Three', roles: 'teacher' },
 ];
 
+// The names of the fictional people: Latin for the dev stand, Cyrillic for the demo data of the working base (same sets, same order).
+const NAMES = {
+  latin: { given: GIVEN, surnames: SURNAMES, staff: Object.fromEntries(STAFF.map((p) => [p.login, p.fullName])) },
+  cyrillic: {
+    given: ['Айдар', 'Айзада', 'Бакыт', 'Бегимай', 'Чынгыз', 'Динара', 'Эльдар', 'Эльмира', 'Канат', 'Мээрим', 'Нурлан',
+      'Нурзат', 'Руслан', 'Сезим', 'Талант', 'Улан', 'Жылдыз', 'Адилет', 'Гульнара', 'Искендер', 'Кымбат', 'Тилек'],
+    surnames: ['Асанов', 'Беков', 'Чыныбеков', 'Дуйшенов', 'Эрмеков', 'Исаев', 'Жумабаев', 'Касымов', 'Мамытов', 'Орозов',
+      'Садыков', 'Токтогулов', 'Усенов'],
+    staff: { admin: 'Администратор Демо', dean: 'Деканат Демо', prorector: 'Проректор Демо', teacher1: 'Преподаватель Один', teacher2: 'Преподаватель Два', teacher3: 'Преподаватель Три' },
+  },
+};
+
 const PLAN_HEAD = ['Юнит', '№', 'Тема', 'Лекция, ч (1 пара = 2 ч)', 'Практика, ч (1 пара = 2 ч)', 'Вид занятия', 'СРС, ч', 'Описание'];
 const sheetsOf = (info, rows) => [{ name: 'Сведения', cells: info }, { name: 'Тематический план', cells: [PLAN_HEAD, ...rows] }];
 
 // The sample syllabus of «Информатика», semester 1 (fictional): 10 topics, 2 units, 18 pairs; the modules take no hours.
-const SYLLABUS_1 = sheetsOf([
-  ['Дисциплина', 'Информатика'], ['Преподаватель', 'Teacher One'], ['Курс', 1], ['Семестр', 1], ['Специальность', 'Сестринское дело'],
+const syllabus1 = (teacher) => sheetsOf([
+  ['Дисциплина', 'Информатика'], ['Преподаватель', teacher], ['Курс', 1], ['Семестр', 1], ['Специальность', 'Сестринское дело'],
   ['Кредиты', 2], ['Всего часов', 60], ['Аудиторных часов', 36], ['СРС, часов', 24],
 ], [
   [1, '1.1', 'Цифровой пост медсестры: введение в IT', 2, '', '', 2, 'Зачем медсестре компьютер: рабочее место, учётные записи, правила работы в кабинете.'],
@@ -54,8 +66,8 @@ const SYLLABUS_1 = sheetsOf([
 ]);
 
 // Semester 2 (plan semester 2) of the same discipline: laid over pairs only when the owner switches the semester.
-const SYLLABUS_2 = sheetsOf([
-  ['Дисциплина', 'Информатика'], ['Преподаватель', 'Teacher One'], ['Курс', 1], ['Семестр', 2], ['Специальность', 'Сестринское дело'],
+const syllabus2 = (teacher) => sheetsOf([
+  ['Дисциплина', 'Информатика'], ['Преподаватель', teacher], ['Курс', 1], ['Семестр', 2], ['Специальность', 'Сестринское дело'],
   ['Кредиты', 1], ['Всего часов', 30], ['Аудиторных часов', 16], ['СРС, часов', 14],
 ], [
   [1, '1.1', 'Электронные рецепты и льготные лекарства', 2, 2, '', 4, 'Как выписывается и проверяется электронный рецепт.'],
@@ -118,8 +130,6 @@ const ANATOMY_PLAN = { units: [
   { title: 'Системы органов', lecture: [{ name: 'Мышечная система', hours: 2 }], practice: [{ name: 'Мышцы на муляже', hours: 2 }, { name: 'Сердце и сосуды на муляже', hours: 2 }] },
 ] };
 
-const staffOf = (store, login) => store.list('staff').find((s) => s.login === login);
-
 function sheetsApply(store, platform, subjectId, sheets, user) {
   const done = uploadSyllabus(store, platform, { subjectId, sheets }, user, true);
   if (!done.applied) throw new Error('seed: the sample syllabus is not applied: ' + JSON.stringify(done.errors));
@@ -136,15 +146,15 @@ function writeSection(store, platform, user, syllabusId, section, patch) {
 // The states of the syllabus the stand shows (all fictional), see the plan of unit 2, addendum 3:
 //   «Информатика» of teacher1, 1st half: version 1 approved with every section, version 2 returned with a remark; 2nd half: version 1 approved;
 //   «Анатомия» of teacher2: version 1 under review; «Информатика» in 03-1 (teacher3): a draft with the title only.
-function seedSyllabi(store, platform, subjects) {
-  const admin = { id: staffOf(store, 'admin').id, roles: ['admin'], kind: 'staff' };
-  const first = sheetsApply(store, platform, subjects.informatics, SYLLABUS_1, admin);
+function seedSyllabi(store, platform, subjects, teacherName, adminRow) {
+  const admin = { id: adminRow.id, roles: ['admin'], kind: 'staff' };
+  const first = sheetsApply(store, platform, subjects.informatics, syllabus1(teacherName), admin);
   for (const section of ['title', 'goals', 'selfWork', 'literature', 'software', 'policies', 'units']) writeSection(store, platform, admin, first, section, SECTIONS_1[section]);
   const approved = approveSyllabus(store, platform, { syllabusId: first }, admin);
   if (!approved.approved) throw new Error('seed: the sample syllabus is not approved: ' + JSON.stringify(approved.checks.errors));
 
   // the 2nd half: a file is not enough to approve — the department, the year and the goal are written the way a person would on the form
-  const { doc, errors } = parseSyllabus(SYLLABUS_2);
+  const { doc, errors } = parseSyllabus(syllabus2(teacherName));
   if (errors.length > 0) throw new Error('seed: the sample syllabus does not parse: ' + JSON.stringify(errors));
   publishSyllabusDoc(store, platform, subjects.informatics, doc, admin, { department: SECTIONS_1.title.department, academicYear: '2026–2027' }, SECTIONS_1.goals.goal);
 
@@ -168,14 +178,12 @@ function seedSyllabi(store, platform, subjects) {
   writeSection(store, platform, admin, draft, 'title', { department: 'Кафедра информатики и медицинской техники', academicYear: '2026–2027', course: 2 });
 }
 
-// Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
-export function seed(store, platform) {
-  if (store.list('staff').length > 0) return;
-  // The stored hash carries its own salt, so one hash serves every person.
-  const passwordHash = hashPassword(platform, DEV_PASSWORD);
+// The common filling: groups, students, disciplines, subjects, the week, syllabi, pairs. The staff of the stand
+// (everyone except the administrator) is made here; the administrator is made by the caller or already is in the store.
+function fill(store, platform, { passwordHash, names, studentsMustChange, admin }) {
   const common = { passwordHash, mustChangePassword: false, active: true };
-
-  const staff = STAFF.map((person) => store.insert('staff', { ...person, ...common, lang: 'ru' }));
+  const staff = STAFF.filter((person) => person.login !== 'admin')
+    .map((person) => store.insert('staff', { ...person, fullName: names.staff[person.login], ...common, lang: 'ru' }));
   const teacher1 = staff.find((person) => person.login === 'teacher1');
   const teacher2 = staff.find((person) => person.login === 'teacher2');
   const teacher3 = staff.find((person) => person.login === 'teacher3');
@@ -191,11 +199,11 @@ export function seed(store, platform) {
       const cardNo = `S${def.card}${String(i + 1).padStart(3, '0')}`;
       const number = g * STUDENTS_PER_GROUP + i;
       students.push({
-        fullName: `${SURNAMES[(number * 5 + g) % SURNAMES.length]} ${GIVEN[number % GIVEN.length]}`,
+        fullName: `${names.surnames[(number * 5 + g) % names.surnames.length]} ${names.given[number % names.given.length]}`,
         groupId: group.id,
         cardNo,
         ...common,
-        mustChangePassword: cardNo === 'S1002',
+        mustChangePassword: studentsMustChange && cardNo === 'S1002',
         lang: 'ky',
       });
     }
@@ -216,8 +224,31 @@ export function seed(store, platform) {
     ]);
   });
 
-  seedSyllabi(store, platform, subjects);
+  seedSyllabi(store, platform, subjects, teacher1.fullName, admin);
   seedPairs(store, platform);
+}
+
+// Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
+export function seed(store, platform) {
+  if (store.list('staff').length > 0) return;
+  // The stored hash carries its own salt, so one hash serves every person.
+  const passwordHash = hashPassword(platform, DEV_PASSWORD);
+  const admin = store.insert('staff', { ...STAFF[0], passwordHash, mustChangePassword: false, active: true, lang: 'ru' });
+  fill(store, platform, { passwordHash, names: NAMES.latin, studentsMustChange: true, admin });
+}
+
+// The demo data for the working base (Cyrillic names, one password given by the caller): the same data set as the stand, but on a base
+// that already has its administrator. The administrator is not touched: no password, no roles, no name. Everything is one transaction
+// when the store has them. Does nothing but refuse (returns false) when the store has anyone besides one administrator.
+export function seedDemo(store, platform, { password }) {
+  const staff = store.list('staff');
+  const admin = staff.find((person) => person.login === 'admin');
+  if (!admin || staff.length !== 1 || !String(admin.roles).split(',').includes('admin')) return false;
+  const passwordHash = hashPassword(platform, password);
+  const run = () => fill(store, platform, { passwordHash, names: NAMES.cyrillic, studentsMustChange: false, admin });
+  if (typeof store.transaction === 'function') store.transaction(run);
+  else run();
+  return true;
 }
 
 // The one account of the stand with real data: the administrator, nothing else. Does nothing when `staff` already has rows.

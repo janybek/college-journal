@@ -160,7 +160,7 @@ export function runSupervised({ config, logger, command = process.execPath, args
   };
 }
 
-async function answers(port) {
+export async function answers(port) {
   if (!Number.isInteger(port)) return false;
   try {
     const res = await fetch(`http://127.0.0.1:${port}/health`, { signal: AbortSignal.timeout(1000) });

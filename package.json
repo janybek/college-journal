@@ -13,6 +13,7 @@
     "serve:init": "node backend/node/server.js --init",
     "serve:admin-password": "node backend/node/server.js --admin-password",
     "serve:backup": "node backend/node/server.js --backup",
+    "serve:demo": "node backend/node/server.js --demo",
     "serve:restore": "node backend/node/supervisor.js --restore",
     "serve:start": "wscript scripts/serve-hidden.vbs",
     "serve:stop": "node backend/node/supervisor.js --stop",
