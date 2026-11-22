@@ -14,6 +14,7 @@ import { createFileStore } from '../backend/store/fileStore.js';
 import { pairViews } from '../backend/scheduleData.js';
 import { verifyPassword } from '../core/auth.js';
 import { readSettings, DEFAULT_BELLS } from '../core/settings.js';
+import { LOGIN_LIMIT } from '../core/loginGuard.js';
 
 function tempDirs(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'journal-dev-'));
@@ -281,4 +282,16 @@ test('a freshly seeded stand is not upgraded on the second start: same bytes, no
   const saved = fs.readFileSync(dataFile, 'utf8');
   await (await startDevServer({ port: 0, dataFile, siteDir })).close();
   assert.deepEqual([fs.readFileSync(dataFile, 'utf8'), fs.existsSync(dataFile + '.before-addendum-3.bak')], [saved, false]);
+});
+
+test('the stand limits login attempts by the same rule; a restart clears the count', async (t) => {
+  const { dataFile, siteDir } = tempDirs(t);
+  const { post, srv } = await start(t, { dataFile, siteDir });
+  const wrong = JSON.stringify({ action: 'auth.login', data: { login: 'teacher1', password: 'x' } });
+  for (let i = 0; i < LOGIN_LIMIT.attempts; i++) assert.equal((await post(wrong)).error.code, 'bad_credentials');
+  const right = JSON.stringify({ action: 'auth.login', data: { login: 'teacher1', password: DEV_PASSWORD } });
+  assert.deepEqual([(await post(right)).error.code, (await post(JSON.stringify({ action: 'auth.login', data: { login: 'dean', password: DEV_PASSWORD } }))).ok], ['too_many_attempts', true]);
+  await srv.close();
+  const again = await start(t, { dataFile, siteDir });
+  assert.equal((await again.post(right)).ok, true);
 });

@@ -5,6 +5,7 @@ import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { SCHEMA } from '../core/schema.js';
 import { hashPassword } from '../core/auth.js';
 import { handleRequest, withHandlers, publicUser } from '../backend/api.js';
+import { createLoginGuard, LOGIN_LIMIT } from '../core/loginGuard.js';
 
 const STUDENT_TEMP = 'temp4567';
 
@@ -194,4 +195,43 @@ test('publicUser', () => {
   const student = publicUser(studentRow, 'student');
   assert.equal(student.groupId, 'g_1');
   assert.equal(student.groupName, null);
+});
+
+test('login guard: after the limit even the right password is refused, the wait ends by the clock, a success clears the count', () => {
+  const { ctx, call, clock } = setup();
+  ctx.loginGuard = createLoginGuard({ ...LOGIN_LIMIT, attempts: 3 });
+  const tryLogin = (login, password) => { const r = call('auth.login', { login, password }); return r.ok ? 'ok' : r.error.code; };
+  assert.deepEqual([tryLogin('admin', 'x'), tryLogin('admin', 'x'), tryLogin('admin', 'secret12'), tryLogin('admin', 'x'), tryLogin('admin', 'x')],
+    ['bad_credentials', 'bad_credentials', 'ok', 'bad_credentials', 'bad_credentials']);          // a success cleared the count
+  assert.deepEqual([tryLogin('admin', 'x'), tryLogin('admin', 'secret12')], ['bad_credentials', 'too_many_attempts']);
+  assert.equal(tryLogin('S1001', STUDENT_TEMP), 'ok');                                             // another login is not touched
+  clock.t += LOGIN_LIMIT.blockMs - 1;
+  assert.equal(tryLogin('admin', 'secret12'), 'too_many_attempts');
+  clock.t += 1;
+  assert.equal(tryLogin('admin', 'secret12'), 'ok');
+});
+
+test('login guard cannot be walked around: letter case, spaces, a card number, a non-string login or password, a disabled and an unknown login', () => {
+  const { ctx, call, store, student } = setup();
+  ctx.loginGuard = createLoginGuard({ ...LOGIN_LIMIT, attempts: 3 });
+  const codes = (attempts) => attempts.map(([login, password]) => call('auth.login', { login, password }).error?.code ?? 'ok');
+  assert.deepEqual(codes([['ADMIN', 'x'], [' admin ', 'x'], ['Admin', ['secret12']], ['admin', 'secret12']]), ['bad_credentials', 'bad_credentials', 'bad_credentials', 'too_many_attempts']);
+  assert.deepEqual(codes([['s1001', 'x'], [' S1001', 'x'], ['S1001 ', 'x'], ['S1001', STUDENT_TEMP]]), ['bad_credentials', 'bad_credentials', 'bad_credentials', 'too_many_attempts']);
+  assert.deepEqual(codes([['nobody', 'x'], ['NOBODY', 'x'], ['nobody ', 'x'], ['nobody', 'x']]).at(-1), 'too_many_attempts');     // the answer does not tell whether the login exists
+  assert.deepEqual(codes([[['admin'], 'x'], [7, 'x'], [null, 'x'], [undefined, 'x']]).at(-1), 'too_many_attempts');              // all non-strings are one key ''
+  store.update('students', student.id, { active: false });
+  assert.equal(ctx.loginGuard.blockedFor('s1001', ctx.platform.now()) > 0, true);                                                // disabling does not reset the count
+});
+
+test('non-string logins share one key and never close a real login', () => {
+  const { ctx, call } = setup();
+  ctx.loginGuard = createLoginGuard({ ...LOGIN_LIMIT, attempts: 3 });
+  for (let i = 0; i < 5; i++) call('auth.login', { login: { x: i }, password: 'x' });
+  assert.equal(call('auth.login', { login: 'admin', password: 'secret12' }).ok, true);
+});
+
+test('without a guard in ctx nothing is limited (Apps Script)', () => {
+  const { call } = setup();
+  for (let i = 0; i < 30; i++) assert.equal(call('auth.login', { login: 'admin', password: 'x' }).error.code, 'bad_credentials');
+  assert.equal(call('auth.login', { login: 'admin', password: 'secret12' }).ok, true);
 });

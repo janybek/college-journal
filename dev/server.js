@@ -6,14 +6,15 @@ import { SCHEMA } from '../core/schema.js';
 import { createFileStore } from '../backend/store/fileStore.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { handleRequest } from '../backend/api.js';
+import { createLoginGuard } from '../core/loginGuard.js';
+import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from '../backend/node/http.js';
 import { seed, seedAdmin } from './seed.js';
 import { upgradeFile } from './upgrade.js';
 
 // Local stand: serves the static site and answers the production API from a JSON file. Node only.
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-export const MAX_BODY_BYTES = 20 * 1024 * 1024;
+export { MAX_BODY_BYTES };
 export const DATA_FILES = { demo: 'dev/data/db.json', real: 'dev/data/real.json' };
-const TOO_LARGE = Symbol('too large');
 const TYPES = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -25,36 +26,10 @@ const TYPES = {
   '.woff2': 'font/woff2',
   '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
 };
-const JSON_TYPE = 'application/json; charset=utf-8';
-
-function sendJson(res, status, body, extraHeaders = {}) {
-  res.writeHead(status, { 'Content-Type': JSON_TYPE, 'Cache-Control': 'no-store', ...extraHeaders });
-  res.end(JSON.stringify(body));
-}
 
 function sendNotFound(res) {
   res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
   res.end('Not found');
-}
-
-// Resolves with the UTF-8 body, or TOO_LARGE once the limit is passed (the rest of the upload is discarded).
-function readBody(req, maxBytes) {
-  return new Promise((resolve, reject) => {
-    const chunks = [];
-    let size = 0;
-    let tooLarge = false;
-    req.on('data', (chunk) => {
-      size += chunk.length;
-      if (size > maxBytes) {
-        tooLarge = true;
-        chunks.length = 0;
-      } else if (!tooLarge) {
-        chunks.push(chunk);
-      }
-    });
-    req.on('end', () => resolve(tooLarge ? TOO_LARGE : Buffer.concat(chunks).toString('utf8')));
-    req.on('error', reject);
-  });
 }
 
 function serveFile(req, res, siteDir, pathname) {
@@ -106,7 +81,7 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   }
   const store = createFileStore(SCHEMA, platform, dataPath);
   if (fresh) seederFor(dataPath, mode)(store, platform);
-  const ctx = { store, platform, log: (error) => console.error(error) };
+  const ctx = { store, platform, loginGuard: createLoginGuard(), log: (error) => console.error(error) };
 
   const server = http.createServer(async (req, res) => {
     try {

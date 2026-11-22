@@ -1,5 +1,6 @@
 import { AppError } from '../../core/errors.js';
 import { LANGS } from '../../core/schema.js';
+import { loginKey } from '../../core/loginGuard.js';
 import { hashPassword, verifyPassword, passwordVersion, passwordProblem, issueToken } from '../../core/auth.js';
 import { USER_TABLES, isUsable, loginOf, publicUser } from '../users.js';
 
@@ -18,11 +19,20 @@ function sessionFor(ctx, row, kind) {
   return { token, user: publicUser(row, kind, ctx.store) };
 }
 
+// ctx.loginGuard is optional: Apps Script has none and login works there as before.
 function login(data, ctx) {
+  const guard = ctx.loginGuard;
+  const key = loginKey(data.login);
+  const now = ctx.platform.now();
+  if (guard && guard.blockedFor(key, now) > 0) throw new AppError('too_many_attempts');
   const typed = typeof data.login === 'string' ? data.login.trim().toLowerCase() : '';
   const found = findByLogin(ctx.store, typed);
   const ok = found !== null && isUsable(found.row) && verifyPassword(ctx.platform, data.password, found.row.passwordHash);
-  if (!ok) throw new AppError('bad_credentials');
+  if (!ok) {
+    if (guard) guard.fail(key, now);
+    throw new AppError('bad_credentials');
+  }
+  if (guard) guard.success(key);
   return sessionFor(ctx, found.row, found.kind);
 }
 

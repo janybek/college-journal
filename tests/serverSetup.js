@@ -6,7 +6,10 @@ import { hashPassword } from '../core/auth.js';
 import { normalizeRow } from '../core/validate.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createSqliteStore, openDatabase } from '../backend/store/sqliteStore.js';
+import http from 'node:http';
 import { initBase, openBase } from '../backend/node/base.js';
+import { createLogger } from '../backend/node/log.js';
+import { startServer } from '../backend/node/server.js';
 
 // Helpers of the server tests. Everything lives in a temporary folder that the test removes.
 
@@ -126,3 +129,48 @@ function withStore(config, fn) {
 export const snapshotStaff = (config, filter = () => true) => withStore(config, (store) => store.list('staff').filter(filter));
 export const roomsIn = (config) => withStore(config, (store) => store.list('rooms'));
 export const dropTable = (config, name) => withStore(config, (store, db) => db.exec(`DROP TABLE "${name}"`));
+
+export const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+// Waits until fn() returns something non-empty.
+export async function until(fn, ms = 5000) {
+  const end = Date.now() + ms;
+  for (;;) {
+    const value = await fn();
+    if (value) return value;
+    if (Date.now() > end) throw new Error('until: timed out');
+    await sleep(20);
+  }
+}
+
+// A log in memory: lines look like 'INFO ...' and 'ERROR ...'.
+export function quiet() {
+  const lines = [];
+  return { lines, info: (text) => lines.push('INFO ' + text), error: (text) => lines.push('ERROR ' + text) };
+}
+
+export const login = (password, name = PERSON.login) => ({ action: 'auth.login', data: { login: name, password } });
+
+// A real working server on port 0 over a temporary base; post and raw send headers and path exactly as given.
+export async function start(t, options = {}) {
+  const { config } = tempBase(t);
+  const base = open(t, config, { now: options.now });
+  base.upgrade();
+  const logger = createLogger(config.logFile, { now: base.platform.now });
+  const srv = keep(t, await startServer({ config, base, logger, guard: options.guard, maxBodyBytes: options.maxBodyBytes }));
+  const send = (method, requestPath, headers, body) => new Promise((resolve, reject) => {
+    const req = http.request({ host: '127.0.0.1', port: srv.port, path: requestPath, method, headers, agent: false }, (res) => {
+      const chunks = [];
+      res.on('data', (c) => chunks.push(c));
+      res.on('end', () => resolve({ status: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
+    });
+    req.on('error', reject);
+    req.end(body);
+  });
+  const post = async (request, headers = {}) => {
+    const res = await send('POST', '/api', { 'Content-Type': 'text/plain;charset=utf-8', ...headers }, JSON.stringify(request));
+    return { status: res.status, headers: { get: (name) => res.headers[name.toLowerCase()] ?? null }, json: async () => JSON.parse(res.body) };
+  };
+  const raw = (method, requestPath, headers = {}) => send(method, requestPath, headers);
+  return { srv, config, base, logger, post, raw };
+}
