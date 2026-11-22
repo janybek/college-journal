@@ -121,6 +121,21 @@ const usedRows = (cells) => {
 };
 const inRange = (n, min, max) => n !== null && n >= min && n <= max;
 
+// The semester by the plan of study (1-8) from the semester of the year of study and the course: «2 course, semester 1» is 3.
+// A course that is no whole number >= 1, or a semester of 3 and more, stays as it is. Above 8 (course 5 and up) the file is not accepted.
+export function planSemesterOf(semester, course) {
+  if (!Number.isInteger(course) || course < 1) return semester;
+  return (semester === 1 || semester === 2) && course >= 2 ? (course - 1) * 2 + semester : semester;
+}
+
+// The course of a semester of the plan of study; null for anything but a whole 1-8.
+export function courseOf(planSemester) {
+  return Number.isInteger(planSemester) && planSemester >= 1 && planSemester <= 8 ? Math.ceil(planSemester / 2) : null;
+}
+
+// A semester of 3 and more that is not of the course the file names.
+const disagrees = (planSemester, course) => planSemester >= 3 && course !== null && courseOf(planSemester) !== course;
+
 const BAD = { ok: false, value: null };
 // A number with an ordinal ending of three languages: «3», «3-й», «3 й», «3rd», «3-чү».
 const ONE_SEMESTER = /^(\d+)(?:\s*-?\s*(?:й|ий|ый|ой|th|st|nd|rd|чи|нчи|инчи|ынчы|үнчү|унчу|чү))?$/;
@@ -129,18 +144,22 @@ const TWO_SEMESTERS = /^(\d+)\s*(?:-|–|—|,|;|\/|и)\s*(\d+)$/;
 // The semester as title pages write it: «3», «3 семестр», «3-семестр», «3-й», «4 (Весенний)», «1 курс 1 семестр», «Семестр 5».
 // A range («1-2», «1 и 2», «1, 2») only where `range` allows it: then value is null and the rows give the semester.
 function readSemester(value, range) {
-  if (isEmpty(value)) return { ok: true, value: null };
-  if (typeof value === 'number') return inRange(toInt(value), 1, 8) ? { ok: true, value } : BAD;
+  if (isEmpty(value)) return { ok: true, value: null, course: null };
+  if (typeof value === 'number') return inRange(toInt(value), 1, 8) ? { ok: true, value, course: null } : BAD;
   if (typeof value !== 'string') return BAD;
-  const text = value.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim()
-    .replace(/\s*\([^()]*\)$/, '')                                  // «4 (Весенний)»
+  const whole = value.toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+  const written = /^(\d+)\s*-?\s*(?:й\s*)?курс/.exec(whole);                // the course written in the cell: «2 курс 1 семестр»
+  const course = written ? +written[1] : null;
+  if (written && !inRange(course, 1, 6)) return BAD;
+  const text = whole
+    .replace(/\s*\([^()]*\)$/, '')                               // «4 (Весенний)»
     .replace(/^\d+\s*-?\s*(?:й\s*)?курс\S*[\s,;]*/, '')                // «1 курс 1 семестр», «2 курс, 3 семестр»
     .replace(/^(?:семестр\S*|semester)[\s:]*/, '')                   // «Семестр 5»
     .replace(/[\s-]*(?:семестр\S*|semester)$/, '');                  // «3 семестр», «3-семестр», «1 и 2 семестры»
   const one = ONE_SEMESTER.exec(text);
-  if (one) return inRange(+one[1], 1, 8) ? { ok: true, value: +one[1] } : BAD;
+  if (one) return inRange(+one[1], 1, 8) ? { ok: true, value: +one[1], course } : BAD;
   const two = range ? TWO_SEMESTERS.exec(text) : null;
-  return two && inRange(+two[1], 1, 8) && inRange(+two[2], 1, 8) ? { ok: true, value: null } : BAD;
+  return two && inRange(+two[1], 1, 8) && inRange(+two[2], 1, 8) ? { ok: true, value: null, course } : BAD;
 }
 
 function findSheet(sheets, kind) {
@@ -152,10 +171,12 @@ function readInfo(sheet, errors, ignored) {
   let semesterBad = false;
   let semesterRow = 0;
   let semesterEmpty = true;
+  let cellCourse = null;
+  let courseRow = 0;
   const used = usedRows(sheet.cells);
   if (used > MAX_SHEET_ROWS) {
     errors.push({ sheet: 'info', row: 0, field: '', code: 'too_many_rows' });
-    return { info, semesterBad, semesterRow, semesterEmpty };
+    return { info, semesterBad, semesterRow, semesterEmpty, course: null, courseRow, notice: null };
   }
   const seen = new Set();
   sheet.cells.slice(0, used).forEach((cells, i) => {
@@ -171,17 +192,35 @@ function readInfo(sheet, errors, ignored) {
       semesterRow = row;
       semesterEmpty = isEmpty(value);
       const parsed = readSemester(value, true);
-      if (parsed.ok) info.semester = parsed.value; else { semesterBad = true; bad(key); }
+      if (parsed.ok) { info.semester = parsed.value; cellCourse = parsed.course; } else { semesterBad = true; bad(key); }
     } else if (key === 'discipline' || key === 'teacher' || key === 'audience') {
       const text = toText(value);
       if (text.length > TEXT_MAX) errors.push({ sheet: 'info', row, field: key, code: 'too_long' }); else info[key] = text;
     } else if (!isEmpty(value)) {
       const n = toInt(value);
       const [min, max] = key === 'course' ? [1, 6] : key === 'credits' ? [1, 60] : key === 'totalHours' ? [1, 2000] : [0, 2000];
+      if (key === 'course') courseRow = row;
       if (inRange(n, min, max)) info[key] = n; else bad(key);
     }
   });
-  return { info, semesterBad, semesterRow, semesterEmpty };
+  // Rule 7: the semester is counted by the plan of study; the course is the one written in the semester cell, else the «Курс» line.
+  const course = cellCourse ?? info.course;
+  let notice = null;
+  if (info.semester !== null) {
+    const written = info.semester;
+    const plan = planSemesterOf(written, course);
+    if (plan > 8) {
+      info.semester = null;
+      semesterBad = true;
+      errors.push({ sheet: 'info', row: semesterRow, field: 'semester', code: 'bad_value' });
+    } else {
+      info.semester = plan;
+      if (plan !== written) notice = { code: 'semester_by_course', course, semester: written, plan };
+      if (disagrees(plan, course)) errors.push({ sheet: 'info', row: semesterRow, field: 'semester', code: 'course_semester' });
+    }
+    errors.sort((a, b) => a.row - b.row);
+  }
+  return { info, semesterBad, semesterRow, semesterEmpty, course, courseRow, notice };
 }
 
 // «2», «2 ч», «2ч», «2 ч.», «2,0», «2.0», «2 часа», «2 час.», «2 саат», «2 h», «2 hours»
@@ -196,7 +235,8 @@ function readHours(value) {
   return n !== null && HOURS_ALLOWED.includes(n) ? { ok: true, value: n } : { ok: false, value: 0 };
 }
 
-// semesterInfo: { value, bad, empty } of the «Семестр» line of the info sheet. -> { rows, noSemester, titleWarnings }
+// semesterInfo: { value, bad, empty, course, notice, disagrees } of the «Семестр» line of the info sheet (notice and disagrees are set here).
+// -> { rows, noSemester, titleWarnings }
 function readPlan(sheet, semesterInfo, errors, ignored) {
   const infoSemester = semesterInfo.value;
   const rows = [];
@@ -248,7 +288,16 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
     const semesterValue = cell('semester');
     if (!isEmpty(semesterValue)) {
       const parsed = readSemester(semesterValue, false);
-      if (parsed.ok) semester = parsed.value; else fail('semester', 'bad_value');
+      if (parsed.ok) {
+        const course = parsed.course ?? semesterInfo.course;
+        const plan = planSemesterOf(parsed.value, course);
+        if (plan > 8) fail('semester', 'bad_value');
+        else {
+          semester = plan;
+          if (plan !== parsed.value && !semesterInfo.notice) semesterInfo.notice = { code: 'semester_by_course', course, semester: parsed.value, plan };
+          if (disagrees(plan, course)) semesterInfo.disagrees = true;
+        }
+      } else fail('semester', 'bad_value');
     } else if (infoSemester !== null) {
       semester = infoSemester;
     } else if (needSemester) {
@@ -376,15 +425,24 @@ export function parseSyllabus(sheets) {
   let semesterBad = false;
   let semesterRow = 0;
   let semesterEmpty = true;
+  let semesterCourse = null;
+  let courseRow = 0;
+  let notice = null;
   let noSemester = false;
   let titleWarnings = [];
-  if (infoSheet) ({ info, semesterBad, semesterRow, semesterEmpty } = readInfo(infoSheet, infoErrors, infoIgnored));
+  if (infoSheet) ({ info, semesterBad, semesterRow, semesterEmpty, course: semesterCourse, courseRow, notice } = readInfo(infoSheet, infoErrors, infoIgnored));
   else infoErrors.push({ sheet: 'info', row: 0, field: '', code: 'missing_sheet' });
 
   let rows = [];
   let selfFilled = false;
   if (planSheet) {
-    ({ rows, noSemester, titleWarnings } = readPlan(planSheet, { value: info ? info.semester : null, bad: semesterBad, empty: semesterEmpty }, planErrors, planIgnored));
+    const semesterInfo = { value: info ? info.semester : null, bad: semesterBad, empty: semesterEmpty, course: semesterCourse, notice, disagrees: false };
+    ({ rows, noSemester, titleWarnings } = readPlan(planSheet, semesterInfo, planErrors, planIgnored));
+    notice = semesterInfo.notice;
+    if (semesterInfo.disagrees && !infoErrors.some((e) => e.field === 'semester' && e.code === 'course_semester')) {
+      infoErrors.push({ sheet: 'info', row: semesterRow || courseRow || 1, field: 'semester', code: 'course_semester' });
+      infoErrors.sort((a, b) => a.row - b.row);
+    }
     selfFilled = rows.some((r) => r.selfHours !== null);
   } else {
     planErrors.push({ sheet: 'plan', row: 0, field: '', code: 'missing_sheet' });
@@ -400,6 +458,7 @@ export function parseSyllabus(sheets) {
 
   if (result.errors.length === 0) {
     result.doc = { info, rows };
+    if (notice) result.warnings.push(notice);
     result.warnings.push(...titleWarnings, ...planWarnings(info, rows, selfFilled));
   }
   return result;

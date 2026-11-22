@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  parseSyllabus, MAX_SHEET_ROWS, HOURS_ALLOWED, DESCRIPTION_MAX, SYLLABUS_SHEETS, INFO_ROWS, PLAN_COLUMNS, KIND_WORDS,
+  parseSyllabus, planSemesterOf, courseOf, MAX_SHEET_ROWS, HOURS_ALLOWED, DESCRIPTION_MAX, SYLLABUS_SHEETS, INFO_ROWS, PLAN_COLUMNS, KIND_WORDS,
 } from '../core/syllabusFile.js';
 import { HOURS_PER_PAIR } from '../core/topics.js';
 import { docLessons } from '../core/syllabusPlan.js';
@@ -101,10 +101,10 @@ test('info sheet errors', () => {
   assert.deepEqual(codes(parseSyllabus(book([['Семестр', 1], ['Кредиты', 'два'], ['Всего часов', 0]]))), [['info', 2, 'credits', 'bad_value'], ['info', 3, 'totalHours', 'bad_value']]);
 });
 
-test('the course of the info sheet: 1-6 or none; another value is a bad value', () => {
+test('the course of the info sheet: 1-6 or none; another value is a bad value (a course of 5 and 6 has no semester 1 or 2 in the plan, rule 7)', () => {
   const course = (value) => { const r = parseSyllabus(book([['Семестр', 1], ['Курс', value]])); return [r.errors.map((e) => [e.row, e.field, e.code]), r.doc && r.doc.info.course]; };
   assert.deepEqual([course(1), course(6), course('3'), course(''), course(7), course(0), course('первый')],
-    [[[], 1], [[], 6], [[], 3], [[], null], [[[2, 'course', 'bad_value']], null], [[[2, 'course', 'bad_value']], null], [[[2, 'course', 'bad_value']], null]]);
+    [[[], 1], [[[1, 'semester', 'bad_value']], null], [[], 3], [[], null], [[[2, 'course', 'bad_value']], null], [[[2, 'course', 'bad_value']], null], [[[2, 'course', 'bad_value']], null]]);
   assert.equal(parseSyllabus(book([['Семестр', 1]])).doc.info.course, null);
 });
 
@@ -285,4 +285,34 @@ test('a module without hours first in its unit is an error of the row; with hour
   assert.deepEqual(codes(one([[1, '', 'А', 2, '', ''], [1, '', '', '', '', 'модуль'], [2, '', 'Б', 2, '', ''], [2, '', '', '', '', 'модуль']])), []);
   // no «Юнит» column: the module after the topics of the one unit
   assert.deepEqual(codes(one([['', '', 'А', 2, '', ''], ['', '', '', '', '', 'модуль']])), []);
+});
+
+test('planSemesterOf and courseOf: the course of a syllabus and its plan semester', () => {
+  assert.deepEqual([planSemesterOf(1, 2), planSemesterOf(2, 2), planSemesterOf(1, 1), planSemesterOf(3, 2), planSemesterOf(1, null), planSemesterOf(2, 4), planSemesterOf(1, 5)], [3, 4, 1, 3, 1, 8, 9]);
+  assert.deepEqual([courseOf(1), courseOf(4), courseOf(7), courseOf(9), courseOf('3')], [1, 2, 4, null, null]);
+});
+
+test('parseSyllabus: a semester of the year of study is counted by the plan (rule 7)', () => {
+  const A = [['', '', 'А', 2, '', '']];
+  const byCourse = one(A, [['Курс', 2], ['Семестр', 1]]);
+  assert.equal(byCourse.doc.info.semester, 3);
+  assert.equal(byCourse.doc.rows[0].semester, 3);
+  assert.deepEqual(byCourse.warnings.filter((w) => w.code === 'semester_by_course'), [{ code: 'semester_by_course', course: 2, semester: 1, plan: 3 }]);
+  for (const text of ['2 курс 1 семестр', '2 курс, 1 семестр']) {
+    const r = one(A, [['Семестр', text]]);
+    assert.equal(r.doc.info.semester, 3, text);
+    assert.deepEqual(r.warnings.filter((w) => w.code === 'semester_by_course'), [{ code: 'semester_by_course', course: 2, semester: 1, plan: 3 }], text);
+  }
+  const first = one(A, [['Семестр', '1 курс 1 семестр']]);
+  assert.deepEqual([first.doc.info.semester, first.warnings.some((w) => w.code === 'semester_by_course')], [1, false]);
+  const bad = one(A, [['Курс', 2], ['Семестр', 5]]);
+  assert.deepEqual([codes(bad), bad.doc], [[['info', 2, 'semester', 'course_semester']], null]);
+  const good = one(A, [['Курс', 2], ['Семестр', 3]]);
+  assert.deepEqual([good.errors, good.warnings.some((w) => w.code === 'semester_by_course')], [[], false]);
+  assert.deepEqual(codes(one(A, [['Курс', 5], ['Семестр', 1]])), [['info', 2, 'semester', 'bad_value']]);
+  assert.deepEqual(codes(one(A, [['Курс', 5], ['Семестр', '6 курс 2 семестр']])), [['info', 2, 'semester', 'bad_value']]);
+  const TWO = ['Семестр', ...SHORT];
+  const year = parseSyllabus(book([['Курс', 2], ['Семестр', '1-2']], [TWO, [1, '', '', 'А', 2, '', ''], [2, '', '', 'Б', 2, '', '']]));
+  assert.deepEqual([year.errors, year.doc.rows.map((r) => r.semester)], [[], [3, 4]]);
+  assert.deepEqual(year.warnings.filter((w) => w.code === 'semester_by_course'), [{ code: 'semester_by_course', course: 2, semester: 1, plan: 3 }]);
 });

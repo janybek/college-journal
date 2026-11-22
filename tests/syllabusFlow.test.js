@@ -176,3 +176,13 @@ test('checkSubmit: a checkpoint without hours first in its unit and a lesson of 
   odd.lessons = [lesson('a', 1, 'lecture'), lesson('x', 1, 'практика')];
   assert.deepEqual(checkSubmit(odd).errors, [{ section: 'plan', code: 'bad_kind', id: 'x', name: 'Тема x' }]);
 });
+
+test('checkSubmit: the course must match the plan semester (rule 7); a group of another course is a warning', () => {
+  const doc = (course, planSemester) => ({ ...fullDoc, title: { ...fullDoc.title, course, planSemester } });
+  assert.deepEqual(checkSubmit(doc(2, 1)).errors, [{ section: 'title', field: 'planSemester', code: 'course_semester', course: 2 }]);
+  assert.deepEqual(checkSubmit(doc(2, 3)).errors, []);
+  const of = (groups) => checkSubmit(doc(1, 1), [], groups).warnings.filter((w) => w.code === 'group_course');
+  assert.deepEqual(of([{ name: '03-1', course: 2 }, { name: '01-1', course: 1 }]), [{ section: 'title', code: 'group_course', groups: ['03-1'] }]);
+  assert.deepEqual(of([{ name: '01-1', course: 1 }]), []);
+  assert.deepEqual(of([{ name: '03-1', course: 2 }, { name: '02-1', course: 3 }]), [{ section: 'title', code: 'group_course', groups: ['02-1', '03-1'] }]);
+});

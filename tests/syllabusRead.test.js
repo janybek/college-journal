@@ -35,7 +35,7 @@ test('syllabus.get: the page of a subject', () => {
   // a subject without a syllabus; another semester
   assert.deepEqual([get(dean, { subjectId: sb2 }).data.syllabus, get(dean, { subjectId: sb2 }).data.semesters], [null, []]);
   assert.deepEqual([get(dean, { subjectId: sb1, semester: 2 }).data.semester, get(dean, { subjectId: sb1, semester: 2 }).data.syllabus], [2, null]);
-  publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]]));
+  publish(sb1, file([T('Таблицы', 2, ''), M], [['Курс', 2], ['Семестр', 4]]));
   const other = get(dean, { subjectId: sb1, semester: 2 }).data;
   assert.deepEqual([other.semesters, other.syllabus.planSemester, other.syllabus.schedule, other.syllabus.rows[0].pairs],
     [[{ semester: 1, planSemester: 1 }, { semester: 2, planSemester: 4 }], 4, null, []]);
@@ -97,7 +97,7 @@ test('subjects.overview and student.subjects', () => {
 
 test('a syllabus of another semester only counts as otherSemester in the overview', () => {
   const { publish, call, send, dean, sb1 } = ready();
-  publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]]));
+  publish(sb1, file([T('Таблицы', 2, ''), M], [['Курс', 2], ['Семестр', 4]]));
   call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: [], bells: ['08:00'], semester: 2 } }, dean);
   const row = call('subjects.overview', {}, dean).data.rows.find((r) => r.disciplineName === 'Информатика');
   assert.deepEqual([row.syllabusStatus, row.otherSemester, row.plannedPairs], ['approved', true, 1]);

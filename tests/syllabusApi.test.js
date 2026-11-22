@@ -146,7 +146,7 @@ test('syllabus upload: semesters as in the curriculum; the spring file leaves th
   const { publish, store, send, call, lessons, writes, reset, dean, sb1, sb3, S } = setup();
   publish(sb1, A);
   reset();
-  assert.equal(publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 4]])).data.applied, true);      // 4-й семестр по плану — весенний
+  assert.equal(publish(sb1, file([T('Таблицы', 2, ''), M], [['Курс', 2], ['Семестр', 4]])).data.applied, true);      // 4-й семестр по плану — весенний
   assert.equal(writes['updateMany:pairs'] || 0, 0);
   assert.deepEqual([store.list('syllabi').map((s) => [s.semester, s.planSemester]), store.list('topics').length], [[[1, 1], [2, 4]], 6]);
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);

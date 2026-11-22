@@ -1,5 +1,7 @@
 // Versions of a syllabus and what may be done with them. No storage, no network.
 import { FIXED_STATUSES, LESSON_KINDS, OPEN_STATUSES } from './schema.js';
+import { compareNames } from './names.js';
+import { courseOf } from './syllabusFile.js';
 import { HOURS_PER_PAIR, NO_LESSON, lessonTypeOf, partsOf } from './topics.js';
 
 // The greater version wins, then the greater id: two matching rows (two simultaneous «Fill» on Google) give one answer.
@@ -100,12 +102,17 @@ const blank = (v) => v === undefined || v === null || (typeof v === 'string' && 
 const LESSON_LISTS = ['lecture', 'practice', 'seminar', 'lab'];
 
 // Errors that stop the submitting and warnings that do not. doc — from buildDoc; held — errors of checkHeld.
-export function checkSubmit(doc, held = []) {
+// groups: [{ name, course }] — the groups where the teacher leads the discipline.
+export function checkSubmit(doc, held = [], groups = []) {
   const errors = [];
   const warnings = [];
   const title = doc?.title || {};
   for (const field of ['department', 'academicYear', 'course', 'planSemester', 'credits']) {
     if (blank(title[field])) errors.push({ section: 'title', field, code: 'required' });
+  }
+  const { course, planSemester } = title;
+  if (Number.isInteger(course) && Number.isInteger(planSemester) && courseOf(planSemester) !== course) {
+    errors.push({ section: 'title', field: 'planSemester', code: 'course_semester', course });
   }
   if (blank(doc?.goals?.goal)) errors.push({ section: 'goals', field: 'goal', code: 'required' });
 
@@ -145,6 +152,10 @@ export function checkSubmit(doc, held = []) {
     warnings.push({ section: 'policies', code: 'empty' });
   }
   if (!(doc?.units?.units || []).some((u) => !blank(u.description))) warnings.push({ section: 'units', code: 'empty' });
+  if (Number.isInteger(course)) {
+    const other = (groups || []).filter((g) => Number.isInteger(g.course) && g.course !== course).map((g) => g.name).sort(compareNames);
+    if (other.length) warnings.push({ section: 'title', code: 'group_course', groups: other });
+  }
   return { errors, warnings };
 }
 
