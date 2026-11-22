@@ -99,3 +99,17 @@ test('docLessons: a control in the middle of the plan stays where the file has i
     [1, 'Первая', 2, '', ''], [1, '', '', 2, 'модуль'], [2, 'Вторая', 2, '', '']] }]);
   assert.deepEqual(docLessons(doc)[0].rows.map((r) => [r.unit, r.lessonKind, r.name, r.hours]), [[1, 'lecture', 'Первая', 2], [1, 'control', '', 2], [2, 'lecture', 'Вторая', 2]]);
 });
+
+test('planWrites, manual order: a new lesson stands before the closing checkpoint of its unit; without one, at the end of the unit', () => {      // final M1
+  const hand = [row('a', 1, 'lecture', 1), row('b', 1, 'practice', 2), row('m', 1, 'control', 3), row('x', 2, 'lecture', 4)];
+  const plan = planWrites({ units: [
+    unit({ lecture: [item('a'), item('', 'Новая лекция')], practice: [item('b'), item('', 'Новая практика')], control: [item('m'), item('', 'Ещё контроль', 0)] }),
+    unit({ lecture: [item('x'), item('', 'Вторая')] }),
+  ] }, hand, true);
+  assert.deepEqual(plan.errors, []);
+  assert.deepEqual(plan.insert.map((r) => [r.name, r.unit, r.order]), [['Новая лекция', 1, 3], ['Новая практика', 1, 4], ['Ещё контроль', 1, 6], ['Вторая', 2, 8]]);
+  assert.deepEqual(plan.update, [{ id: 'm', patch: { order: 5 } }, { id: 'x', patch: { order: 7 } }]);
+  // a unit whose only lesson was its checkpoint: the new lesson comes first
+  const lone = planWrites({ units: [unit({ lecture: [item('', 'Первая')], control: [item('m')] })] }, [row('m', 1, 'control', 1)], true);
+  assert.deepEqual([lone.insert.map((r) => [r.name, r.order]), lone.update], [[['Первая', 1]], [{ id: 'm', patch: { order: 2 } }]]);
+});

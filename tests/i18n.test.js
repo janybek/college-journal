@@ -41,7 +41,7 @@ test('the sheets, lines, columns and kinds of the syllabus template are the name
 });
 
 test('every code of the syllabus check has a text; the old texts of the syllabus import are gone', () => {
-  for (const code of ['missing_sheet', 'missing_column', 'too_many_rows', 'empty', 'required', 'bad_value', 'too_long', 'bad_hours', 'no_hours', 'unit_order', 'semester_order', 'semester_clash', 'held_missing', 'held_hours', 'kind_needs_practice', 'in_review']) {
+  for (const code of ['missing_sheet', 'missing_column', 'too_many_rows', 'empty', 'required', 'bad_value', 'too_long', 'bad_hours', 'no_hours', 'unit_order', 'semester_order', 'semester_clash', 'held_missing', 'held_hours', 'kind_needs_practice', 'kind_is_lecture', 'kind_is_practice', 'control_first', 'in_review']) {
     assert.ok(ru['syllabus.error.' + code], code);
   }
   for (const code of ['ignored_sheets', 'ignored', 'info_empty', 'total_mismatch', 'class_mismatch', 'self_mismatch', 'no_control', 'discipline_differs', 'teacher_differs', 'held_renamed', 'semester_replaces', 'unit_title_differs', 'units_removed']) {
@@ -215,9 +215,11 @@ test('the syllabus form has its texts: the tabs, the statuses, the errors of a s
 
 test('the syllabus form of task 42: the checks before submitting, the file into the draft, no «soon» any more', () => {
   const CHECK_KEYS = ['title.department', 'title.academicYear', 'title.course', 'title.planSemester', 'title.credits', 'goals.goal', 'plan.empty', 'plan.unit_empty',
-    'plan.bad_hours', 'plan.held_missing', 'plan.held_hours', 'plan.held_kind', 'selfWork.bad_unit', 'literature.empty', 'software.empty', 'policies.empty', 'units.empty'];
+    'plan.bad_hours', 'plan.held_missing', 'plan.held_hours', 'plan.held_kind', 'selfWork.bad_unit', 'literature.empty', 'software.empty', 'policies.empty', 'units.empty',
+    'plan.bad_kind', 'order.control_first'];
   for (const dict of [ru, ky, en]) {
     for (const key of CHECK_KEYS) assert.ok(dict['sform.checks.' + key], key);
+    assert.ok(dict['home.syllabusUpdating']);
     assert.equal('sform.soon' in dict, false);
   }
   assert.ok(ru['syllabus.check.intoDraft']);

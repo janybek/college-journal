@@ -146,6 +146,7 @@ export function syllabusPage(store, platform, data, user) {
 }
 
 // 'student.subjects': the subjects of the student's group by name; a syllabus exists when the teacher has one for the discipline in any semester.
+// hasSyllabus: an approved version of a half of the year is shown; updating: none is shown, but one is hidden while its new version is under review.
 export function studentSubjects(store, user) {
   const subjects = store.list('subjects');
   const staff = store.list('staff');
@@ -153,13 +154,16 @@ export function studentSubjects(store, user) {
   const groupId = user.row.groupId;
   const mine = typeof groupId === 'string' && groupId !== '' ? subjects.filter((s) => s.groupId === groupId) : [];
   const teacherName = (id) => (staff.find((s) => s.id === id) || { fullName: '' }).fullName;
-  // an approved version of any half of the year that is not hidden (the open version of that half is not under review)
-  const has = (s) => typeof s.disciplineId === 'string' && s.disciplineId !== '' && [1, 2].some((semester) => {
+  // the approved versions of both halves of the year: 'shown', 'hidden' (the open version of that half is under review) or null
+  const states = (s) => (typeof s.disciplineId === 'string' && s.disciplineId !== '' ? [1, 2] : []).map((semester) => {
     const { approved, open } = versionsOf(syllabi, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester });
-    return approved !== null && !(open !== null && open.status === 'review');
+    if (approved === null) return null;
+    return open !== null && open.status === 'review' ? 'hidden' : 'shown';
   });
-  return {
-    subjects: mine.sort((a, b) => cmp(String(a.name).toLowerCase(), String(b.name).toLowerCase()) || cmp(a.id, b.id))
-      .map((s) => ({ id: s.id, name: s.name, teacherName: teacherName(s.teacherId), hasSyllabus: has(s) })),
+  const row = (s) => {
+    const halves = states(s);
+    const hasSyllabus = halves.includes('shown');
+    return { id: s.id, name: s.name, teacherName: teacherName(s.teacherId), hasSyllabus, updating: !hasSyllabus && halves.includes('hidden') };
   };
+  return { subjects: mine.sort((a, b) => cmp(String(a.name).toLowerCase(), String(b.name).toLowerCase()) || cmp(a.id, b.id)).map(row) };
 }

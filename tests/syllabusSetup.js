@@ -115,7 +115,7 @@ export function setup() {
   // every sheet of the syllabi and the pairs as one text: a failed request must leave it as it was
   const snapshotAll = () => JSON.stringify([store.list('syllabi'), ...DOC_TABLES.map((name) => store.list(name)), store.list('pairs')]);
   return {
-    store, spy: spied.spy, call, send, publish, draft, save, fill, snapshotAll, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, order: spied.order, reset: spied.reset,
+    store, spy: spied.spy, platform, call, send, publish, draft, save, fill, snapshotAll, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, order: spied.order, reset: spied.reset,
     ...tokens, staff, ds1, ds2, g1, g2, sb1, sb2, sb3, S,
   };
 }

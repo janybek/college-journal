@@ -1,7 +1,7 @@
 import { t } from '../i18n.js';
 import { el, badge, emptyState, iconButton, note } from '../ui.js';
 import { icon } from '../icons.js';
-import { PLAN_KINDS, canMove, emptyItem, listAdd, moveLesson, pairNumbers, tableNumbers, unitHasContent } from '../syllabusForm.js';
+import { PLAN_KINDS, canMove, emptyItem, listAdd, moveLesson, pairNumbers, tableNumbers, unitAbout, unitHasContent } from '../syllabusForm.js';
 import { boundField, entryField, entryList, lessonTable, listError, numberOf, pointList } from './syllabusFormParts.js';
 
 // The tabs of the syllabus form. renderTab(tab, ctx) draws the body of one tab from ctx.doc (the document being
@@ -100,6 +100,9 @@ function planTab(ctx) {
   const units = plan.units;
   const numbers = tableNumbers(units);
   const last = units[units.length - 1];
+  // the lessons of the last unit, its description and its books go with it: then the form asks first
+  const about = unitAbout(ctx.doc.units, units.length);
+  const asks = unitHasContent(last) || about.texts || about.books > 0;
   return [
     el('div', { class: 'units-bar' },
       el('p', { class: 'units-bar__count', id: 'sf-plan-count' }, t('sform.plan.units', { n: units.length })),
@@ -110,7 +113,7 @@ function planTab(ctx) {
         }, icon('plus'), t('sform.plan.addUnit')),
         el('button', {
           type: 'button', id: 'sf-plan-remove-unit', class: 'button button--secondary', disabled: units.length <= 1,
-          onclick: () => (unitHasContent(last) ? ctx.confirmRemoveUnit(units.length) : ctx.change(() => { plan.units = plan.units.slice(0, -1); }, 'sf-plan-remove-unit', 'remove')),
+          onclick: () => (asks ? ctx.confirmRemoveUnit(units.length) : ctx.change(() => { plan.units = plan.units.slice(0, -1); }, 'sf-plan-remove-unit', 'remove')),
         }, icon('trash'), t('sform.plan.removeUnit'))),
       listError(ctx, 'units', 'sf-plan-units-error')),
     units.map((unit, i) => unitCard(ctx, unit, i + 1, numbers)),

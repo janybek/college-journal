@@ -87,9 +87,14 @@ export function planWrites(value, stored, manualOrder) {
       const slots = placed.map((w) => w.old).sort(byOrder).map((r) => r.lessonKind);
       const queues = {};
       for (const w of placed) (queues[w.lessonKind] ||= []).push(w);
-      ordered.push(...slots.map((kind) => queues[kind].shift()));
+      const stay = slots.map((kind) => queues[kind].shift());
+      // новые занятия встают перед замыкающим рубежным контролем юнита (контроль остаётся последним), новый контроль — в самый конец
+      let closing = stay.length;
+      while (closing > 0 && stay[closing - 1].lessonKind === 'control') closing -= 1;
       for (const w of mine) if (!placed.includes(w)) (lists[kindKey(w.lessonKind)] ||= []).push(w);
-      ordered.push(...interleave(lists));
+      const controls = lists.control || [];
+      delete lists.control;
+      ordered.push(...stay.slice(0, closing), ...interleave(lists), ...stay.slice(closing), ...controls);
     }
     for (const r of kept.filter((k) => k.unit === unit)) ordered.push({ unit, lessonKind: r.lessonKind, item: r, title, old: r });
   }

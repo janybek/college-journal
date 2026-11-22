@@ -60,14 +60,16 @@ export function approveSyllabus(store, platform, data, user) {
   const settings = loadSettings(store);                     // every read goes before the first write
 
   const plan = approvalPlan({ version, approved, topics: rows.topics, approvedTopics: previous ? previous.topics : [], pairs, userId: user.id, today: todayOf(platform) });
-  const changed = store.updateMany('syllabi', plan.syllabi);
   const patched = new Map(plan.syllabi.map((u) => [u.id, u.patch]));
-  const after = syllabi.map((s) => changed.find((c) => c.id === s.id) ?? (patched.has(s.id) ? { ...s, ...patched.get(s.id) } : s));
+  const after = syllabi.map((s) => (patched.has(s.id) ? { ...s, ...patched.get(s.id) } : s));
   const moved = new Map(plan.pairs.map((u) => [u.id, u.patch]));
   const afterPairs = pairs.map((p) => (moved.has(p.id) ? { ...p, ...moved.get(p.id) } : p));
 
+  // «Пары» go first, «Силлабусы» second: if the second write fails, the version stays open with the pairs already on its rows,
+  // and «Утвердить» again finishes the job (approvalPlan moves nothing, the layout is the same).
   const ids = subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId).map((s) => s.id);
   const result = relayout(store, ids, { subjects, syllabi: after, topics: tables.topics, pairs: afterPairs, settings }, plan.pairs);
+  store.updateMany('syllabi', plan.syllabi);
   return { approved: true, checks, changedPairs: result.changed };
 }
 

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  TABS, tabOf, listAdd, listRemove, listMove, emptyItem, sectionData, isDirty, errorMap, tableNumbers, unitHasContent, withoutBlankRows,
+  TABS, tabOf, listAdd, listRemove, listMove, emptyItem, sectionData, isDirty, errorMap, tableNumbers, unitHasContent, unitAbout, withoutBlankRows,
   pairNumbers, canMove, moveLesson, checkTabs, checkLine, placeErrors, errorsAfterEdit, statusKind, keptOrder, submitOutcome,
 } from '../site/js/syllabusForm.js';
 
@@ -70,6 +70,15 @@ test('tableNumbers: Л1, Л2… by kind, one after another through the units', (
 
 test('a unit with a row asks before it is removed', () => {
   assert.deepEqual([unitHasContent(units[0]), unitHasContent(emptyItem('unit'))], [true, false]);
+});
+
+test('a unit with a description or books of its own asks too: they go with it', () => {      // final M4
+  const about = (fields) => ({ units: [{ unit: 1, title: '', description: '', questions: '', guidance: '', results: '', literature: [] },
+    { unit: 2, title: '', description: '', questions: '', guidance: '', results: '', literature: [], ...fields }] });
+  assert.deepEqual(unitAbout(about({}), 2), { texts: false, books: 0 });
+  assert.deepEqual(unitAbout(about({ questions: ' Вопросы ' }), 2), { texts: true, books: 0 });
+  assert.deepEqual(unitAbout(about({ description: '   ', literature: [{ title: 'Книга' }, { title: 'Ещё' }] }), 2), { texts: false, books: 2 });
+  assert.deepEqual([unitAbout(about({ results: 'Итог' }), 3), unitAbout(undefined, 1)], [{ texts: false, books: 0 }, { texts: false, books: 0 }]);
 });
 
 // ---- Task 42: «Порядок пар», the checks before submitting, the fixes after the review of task 41 ----

@@ -299,8 +299,11 @@ test('the order of the file is the order of the pairs: a module stays where the 
   const other = draft(sb1, 1, teacher1);
   assert.equal(other, first);
   save(first, 'plan', { units: [{ lecture: [{ name: 'Б', hours: 2 }, { name: 'А', hours: 2 }], control: [{ name: '', hours: 0 }] }] }, teacher1);
-  assert.equal(send('syllabus.apply', sb1, file([M, T('А', 2, ''), T('Б', 2, '')]), teacher1).data.applied, true);
-  assert.deepEqual(orderOf(), [[1, 'control', ''], [2, 'lecture', 'А'], [3, 'lecture', 'Б']]);
+  assert.deepEqual(orderOf(), [[1, 'lecture', 'Б'], [2, 'lecture', 'А'], [3, 'control', '']]);
+  assert.equal(send('syllabus.apply', sb1, file([T('А', 2, ''), T('Б', 2, ''), M]), teacher1).data.applied, true);
+  assert.deepEqual(orderOf(), [[1, 'lecture', 'А'], [2, 'lecture', 'Б'], [3, 'control', '']]);
+  // a module without hours first in its unit is an error of the file (final M2): its mark would stand on no pair
+  assert.deepEqual(send('syllabus.preview', sb1, file([M, T('А', 2, '')]), teacher1).data.errors.map((e) => [e.row, e.field, e.code]), [[2, 'practiceKind', 'control_first']]);
 });
 
 test('a file with fewer units: a remark before writing; the units and their books go away', () => {

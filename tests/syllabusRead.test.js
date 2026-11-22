@@ -88,9 +88,9 @@ test('subjects.overview and student.subjects', () => {
   assert.deepEqual(call('subjects.overview', {}, dean).data.rows.map((r) => [r.disciplineName, r.teacherName, r.groups.map((g) => g.groupName), r.syllabusStatus]),
     [['Анатомия', 'teacher2', ['02-1'], 'none'], ['Информатика', 'teacher1', ['01-1'], 'approved'], ['Информатика', 'teacher2', ['02-1'], 'none']]);
   for (const token of [teacher1, s1]) assert.deepEqual(call('subjects.overview', {}, token).error, { code: 'forbidden' });
-  assert.deepEqual(call('student.subjects', {}, s1).data, { subjects: [{ id: sb1, name: 'Информатика', teacherName: 'teacher1', hasSyllabus: true }] });
-  assert.deepEqual(call('student.subjects', {}, s2).data, { subjects: [{ id: sb2, name: 'Анатомия', teacherName: 'teacher2', hasSyllabus: false },
-    { id: sb3, name: 'Информатика', teacherName: 'teacher2', hasSyllabus: false }] });
+  assert.deepEqual(call('student.subjects', {}, s1).data, { subjects: [{ id: sb1, name: 'Информатика', teacherName: 'teacher1', hasSyllabus: true, updating: false }] });
+  assert.deepEqual(call('student.subjects', {}, s2).data, { subjects: [{ id: sb2, name: 'Анатомия', teacherName: 'teacher2', hasSyllabus: false, updating: false },
+    { id: sb3, name: 'Информатика', teacherName: 'teacher2', hasSyllabus: false, updating: false }] });
   assert.deepEqual(call('student.subjects', {}, teacher1).error, { code: 'forbidden' });
   assert.deepEqual(call('topics.plan', { subjectId: sb1 }, dean).error, { code: 'bad_request' });       // the action is gone
 });
@@ -166,16 +166,18 @@ test('who sees which version: a student never sees an open version or a remark; 
   assert.deepEqual([page(prorector).data.state.open, page(prorector, { version: 'open' }).error], [null, { code: 'forbidden' }]);
   assert.deepEqual(page(teacher1, { version: 'open' }).data.syllabus.schedule, null);
   assert.deepEqual(page(teacher1, { version: 'open' }).data.syllabus.rows.map((r) => r.pairs), [[], [], [], []]);
-  // under review: the student sees no syllabus at all, nor in the list of subjects; the lessons on the pairs stay
+  const listed = () => { const x = call('student.subjects', {}, s1).data.subjects.find((r) => r.id === sb1); return [x.hasSyllabus, x.updating]; };
+  assert.deepEqual(listed(), [true, false]);
+  // under review: the student sees no syllabus at all; on the list of subjects it is «updating» and leads to its page; the lessons on the pairs stay
   call('syllabus.submit', { syllabusId: open }, teacher1);
-  assert.deepEqual([page(s1).data.syllabus, page(s1).data.hidden, call('student.subjects', {}, s1).data.subjects.find((x) => x.id === sb1).hasSyllabus], [null, true, false]);
+  assert.deepEqual([page(s1).data.syllabus, page(s1).data.hidden, listed()], [null, true, [false, true]]);
   assert.deepEqual(lessons(sb1).map((x) => x[1]), ['Введение', 'Введение']);
   assert.deepEqual([page(teacher1).data.hidden, page(prorector, { version: 'open' }).data.shown], [false, 'open']);
   // returned: the student sees the approved version again; the remark is in no field of his answer nor of the replacing teacher's
   call('syllabus.return', { syllabusId: open, remark: 'ТАЙНОЕ-ЗАМЕЧАНИЕ' }, dean);
   call('schedule.changePair', { id: pairOf(sb1, '2026-09-08').id, teacherId: staff.teacher2 }, dean);
   for (const token of [s1, teacher2]) assert.equal(JSON.stringify(page(token)).includes('ТАЙНОЕ-ЗАМЕЧАНИЕ'), false);
-  assert.deepEqual([page(s1).data.hidden, page(s1).data.shown, page(teacher2, { version: 'open' }).error], [false, 'approved', { code: 'forbidden' }]);
+  assert.deepEqual([page(s1).data.hidden, page(s1).data.shown, page(teacher2, { version: 'open' }).error, listed()], [false, 'approved', { code: 'forbidden' }, [true, false]]);
   for (const token of [teacher1, dean, prorector]) assert.equal(page(token).data.state.open.remark, 'ТАЙНОЕ-ЗАМЕЧАНИЕ');
   assert.equal(page(teacher1).data.state.open.status, 'returned');
   for (const version of [['open'], 'draft', 'archived', ' open', 5, null]) assert.deepEqual(page(dean, { version }).error, { code: 'bad_request' });

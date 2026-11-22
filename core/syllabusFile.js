@@ -53,8 +53,10 @@ export const PLAN_COLUMNS = [
 // Cell text and the keys below are compared in this form: lower case, digits, dots and «№» removed, spaces squeezed.
 const kindWord = (text) => String(text ?? '').toLowerCase().replace(/[0-9.№]/g, '').replace(/\s+/g, ' ').trim();
 
-const ORDINARY = ['', 'практика', 'практическое', 'практическое занятие', 'пз', 'лекция', 'теория', 'practice', 'lecture',
-  'практикалык', 'практикалык сабак'];
+// A lecture or a practice word only names the column the hours stand in: the word and the column must agree.
+const LECTURE = ['лекция', 'теория', 'lecture'];
+const PRACTICE = ['практика', 'практическое', 'практическое занятие', 'пз', 'practice', 'практикалык', 'практикалык сабак'];
+const ORDINARY = ['', ...LECTURE, ...PRACTICE];
 const SEMINAR = ['семинар', 'семинарское занятие', 'seminar', 'семинардык сабак'];
 const LAB = ['лабораторная', 'лабораторное', 'лабораторное занятие', 'лабораторная работа', 'лаб работа', 'lab', 'laboratory',
   'лабораториялык', 'лабораториялык иш', 'лабораториялык сабак'];
@@ -65,6 +67,8 @@ export const KIND_WORDS = {};
 for (const [kind, words] of [['', ORDINARY], ['seminar', SEMINAR], ['lab', LAB], [KIND_CONTROL, CONTROL]]) {
   for (const word of words) KIND_WORDS[kindWord(word)] = kind;
 }
+const PLAIN_WORDS = {};
+for (const [kind, words] of [['lecture', LECTURE], ['practice', PRACTICE]]) for (const word of words) PLAIN_WORDS[kindWord(word)] = kind;
 
 const normTitle = (value) => String(value ?? '').toLowerCase().replace(/\s+/g, ' ').trim().replace(/\s*:$/, '');
 
@@ -221,6 +225,7 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
   const lacking = [];
   const colIndex = (key) => PLAN_COLUMNS.findIndex((c) => c.key === key);
   const lastUnit = {};
+  const started = new Set();                                    // `${semester}:${unit}` of the units that already have a row
   let lastSemester = 0;
   const rowErrors = [];
   for (let i = 1; i < used; i += 1) {
@@ -281,6 +286,14 @@ function readPlan(sheet, semesterInfo, errors, ignored) {
     if (!practice.ok || (isControl && practice.value > HOURS_PER_PAIR)) fail('practiceHours', 'bad_hours');
     if (!isControl && lecture.ok && practice.ok && lecture.value + practice.value === 0) fail('lectureHours', 'no_hours');
     if (!isControl && known && wordKind !== '' && practice.ok && practice.value === 0) fail('practiceKind', 'kind_needs_practice');
+    // «лекция» with hours in «Практика», «практика» with hours only in «Лекция»: the file contradicts itself, the journal does not guess
+    const plain = PLAIN_WORDS[word] ?? '';
+    if (plain === 'lecture' && practice.ok && practice.value > 0) fail('practiceKind', 'kind_is_lecture');
+    if (plain === 'practice' && lecture.ok && practice.ok && lecture.value > 0 && practice.value === 0) fail('practiceKind', 'kind_is_practice');
+    // a module without hours first in its unit: its mark has no pair of the unit to stand on
+    const unitKey = `${semester}:${unit}`;
+    if (isControl && practice.ok && practice.value === 0 && unit !== null && !started.has(unitKey)) fail('practiceKind', 'control_first');
+    started.add(unitKey);
 
     let selfHours = null;
     if (!isEmpty(cell('selfHours'))) {

@@ -1,5 +1,5 @@
 // Versions of a syllabus and what may be done with them. No storage, no network.
-import { FIXED_STATUSES, OPEN_STATUSES } from './schema.js';
+import { FIXED_STATUSES, LESSON_KINDS, OPEN_STATUSES } from './schema.js';
 import { HOURS_PER_PAIR, NO_LESSON, lessonTypeOf, partsOf } from './topics.js';
 
 // The greater version wins, then the greater id: two matching rows (two simultaneous «Fill» on Google) give one answer.
@@ -114,8 +114,17 @@ export function checkSubmit(doc, held = []) {
   if (!units.some((u) => lessonsOf(u).length > 0)) errors.push({ section: 'plan', code: 'empty' });
   else for (const u of units) if (lessonsOf(u).length === 0) errors.push({ section: 'plan', unit: u.unit, code: 'unit_empty' });
   // занятие с юнитом не 1, 2, 3… в плане не показывается: сохранить такой план нельзя, отправить тоже
+  // занятие неизвестного вида (в листе «Темы» вписали «практика» вместо кода) тоже не видно в плане и не встаёт на пары
   for (const l of doc?.lessons || []) {
     if (!Number.isInteger(l.unit) || l.unit < 1) errors.push({ section: 'plan', code: 'bad_unit', id: l.id, name: l.name });
+    else if (!LESSON_KINDS.includes(l.lessonKind)) errors.push({ section: 'plan', code: 'bad_kind', id: l.id, name: l.name });
+  }
+  // рубежный контроль без часов первым в юните: его отметке не на какую пару встать (вкладка «Порядок пар» его так и не сохранит)
+  const firstOf = new Map();
+  for (const l of doc?.lessons || []) if (!firstOf.has(l.unit)) firstOf.set(l.unit, l);
+  for (const u of units) {
+    const first = firstOf.get(u.unit);
+    if (first && first.lessonKind === 'control' && !(first.hours > 0) && lessonsOf(u).length > 0) errors.push({ section: 'order', unit: u.unit, code: 'control_first' });
   }
   for (const u of units) {
     for (const kind of [...LESSON_LISTS, 'control']) {

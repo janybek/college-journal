@@ -7,7 +7,7 @@ import { icon } from '../icons.js';
 import { dayParts, isDate } from '../dates.js';
 import {
   PLAN_KINDS, TABS, checkLine, checkTabs, emptyItem, errorKeyOf, errorMap, errorsAfterEdit, isDirty, keptOrder, placeErrors, sameValue, sectionData, statusKind,
-  submitOutcome,
+  submitOutcome, unitAbout,
 } from '../syllabusForm.js';
 import { draftFileData, fileLabels, fileName } from '../syllabus.js';
 import { syllabusBook } from '../excel.js';
@@ -429,10 +429,11 @@ function leaveDialog() {
   return dialog;
 }
 
-// Removing the last unit that has lessons: they go with it when the tab is saved.
+// Removing the last unit that has lessons, a description or books: they go with it when the tab is saved.
 function confirmDialog({ unit }) {
   const units = state.doc.plan.units;
   const rows = PLAN_KINDS.reduce((n, kind) => n + (units[unit - 1][kind] || []).length, 0);
+  const about = unitAbout(state.doc.units, unit);
   const close = (focusId) => {
     state.confirm = null;
     refresh();
@@ -440,7 +441,9 @@ function confirmDialog({ unit }) {
   };
   const dialog = modal({ id: 'sf-confirm', labelledBy: 'sf-confirm-title', className: 'dialog--confirm', onClose: () => close('sf-plan-remove-unit') },
     el('h2', { class: 'dialog__title', id: 'sf-confirm-title' }, t('sform.plan.removeUnit.title', { n: unit })),
-    el('p', {}, t('sform.plan.removeUnit.text', { n: unit, count: rows })),
+    rows > 0 ? el('p', {}, t('sform.plan.removeUnit.text', { n: unit, count: rows })) : null,
+    about.texts || about.books > 0 ? el('p', {}, t('sform.plan.removeUnit.about', { n: unit })) : null,
+    about.books > 0 ? el('p', {}, t('sform.plan.removeUnit.books', { count: about.books })) : null,
     el('div', { class: 'dialog__actions' },
       el('button', { type: 'button', class: 'button button--secondary', autofocus: true, onclick: () => dialog.close() }, t('common.cancel')),
       el('button', {

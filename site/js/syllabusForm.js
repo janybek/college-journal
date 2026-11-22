@@ -288,3 +288,16 @@ export function tableNumbers(units) {
 export function unitHasContent(unit) {
   return PLAN_KINDS.some((kind) => Array.isArray(unit[kind]) && unit[kind].length > 0);
 }
+
+const ABOUT_FIELDS = ['description', 'questions', 'guidance', 'results'];
+
+// What the tab «Описание юнитов» holds for unit n (units: doc.units): the plan saved without the unit removes it too.
+// -> { texts: a filled description, key questions, guidance or results; books: the number of its books }
+export function unitAbout(units, n) {
+  const entry = ((units && units.units) || []).find((u) => u.unit === n);
+  if (!entry) return { texts: false, books: 0 };
+  return {
+    texts: ABOUT_FIELDS.some((f) => typeof entry[f] === 'string' && entry[f].trim() !== ''),
+    books: Array.isArray(entry.literature) ? entry.literature.length : 0,
+  };
+}

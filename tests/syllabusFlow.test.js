@@ -156,3 +156,23 @@ test('approvalPlan: the new version is approved, the previous one archived, the 
   assert.deepEqual(approvalPlan({ version: v('review'), approved: null, topics: [copyOf('a')], approvedTopics: [], pairs, userId: 'sf_d', today: '2026-09-10' }),
     { syllabi: [{ id: 'sy_review', patch: { status: 'approved', decidedBy: 'sf_d', decidedAt: '2026-09-10', remark: '' } }], pairs: [] });
 });
+
+test('checkSubmit: a checkpoint without hours first in its unit and a lesson of an unknown kind are named', () => {      // final M2, M3
+  const lesson = (id, unit, lessonKind, hours = 2) => ({ id, unit, lessonKind, number: 1, name: 'Тема ' + id, hours });
+  const doc = structuredClone(fullDoc);
+  doc.plan.units.push({ unit: 2, title: '', lecture: [row('Л2')], practice: [], seminar: [], lab: [], control: [row('М2', 0)] });
+  doc.lessons = [lesson('a', 1, 'lecture'), lesson('m1', 1, 'control', 0), lesson('m2', 2, 'control', 0), lesson('b', 2, 'lecture')];
+  assert.deepEqual(checkSubmit(doc).errors, [{ section: 'order', unit: 2, code: 'control_first' }]);
+  // a checkpoint of two hours is a pair of its own: it may come first
+  doc.lessons[2].hours = 2;
+  assert.deepEqual(checkSubmit(doc).errors, []);
+  // a unit of nothing but a checkpoint is only «unit_empty»
+  const lone = structuredClone(fullDoc);
+  lone.plan.units.push({ unit: 2, title: '', lecture: [], practice: [], seminar: [], lab: [], control: [row('М2', 0)] });
+  lone.lessons = [lesson('a', 1, 'lecture'), lesson('m2', 2, 'control', 0)];
+  assert.deepEqual(checkSubmit(lone).errors, [{ section: 'plan', unit: 2, code: 'unit_empty' }]);
+  // «практика» typed by hand in the sheet instead of the code: not in any table of the plan, never a pair
+  const odd = structuredClone(fullDoc);
+  odd.lessons = [lesson('a', 1, 'lecture'), lesson('x', 1, 'практика')];
+  assert.deepEqual(checkSubmit(odd).errors, [{ section: 'plan', code: 'bad_kind', id: 'x', name: 'Тема x' }]);
+});

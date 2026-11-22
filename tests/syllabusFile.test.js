@@ -266,3 +266,23 @@ test('unit titles: the first title of a unit names every row of it; a second one
   assert.equal(one([[1, '', 'А', 2, '', '']]).doc.rows[0].unitTitle, '');
   assert.deepEqual(codes(parseSyllabus(book([['Семестр', 1]], [HEAD_T, [1, 'x'.repeat(201), 'А', 2, '']]))), [['plan', 2, 'unitTitle', 'too_long']]);
 });
+
+test('the word of the class type agrees with the column of its hours', () => {                         // final M5
+  assert.deepEqual(codes(one([[1, 'Л1', 'А', '', 2, 'лекция']])), [['plan', 2, 'practiceKind', 'kind_is_lecture']]);
+  assert.deepEqual(codes(one([[1, 'Л1', 'А', 2, 2, 'Лекция']])), [['plan', 2, 'practiceKind', 'kind_is_lecture']]);
+  assert.deepEqual(codes(one([[1, 'П1', 'А', 2, '', 'практика']])), [['plan', 2, 'practiceKind', 'kind_is_practice']]);
+  assert.deepEqual(codes(one([[1, 'П1', 'А', 2, '', 'практикалык сабак']])), [['plan', 2, 'practiceKind', 'kind_is_practice']]);
+  // agreeing words, and a lecture with a practice under «практика» (as with a seminar), are read
+  for (const row of [[1, '', 'А', 2, '', 'лекция'], [1, '', 'А', '', 2, 'практика'], [1, '', 'А', 2, 2, 'практика'], [1, '', 'А', 2, '', 'теория']]) {
+    assert.deepEqual(codes(one([row])), [], row.join('|'));
+  }
+});
+
+test('a module without hours first in its unit is an error of the row; with hours, or after a topic, it is read', () => {      // final M2
+  assert.deepEqual(codes(one([[1, '', 'А', 2, '', ''], [2, '', '', '', '', 'модуль'], [2, '', 'Б', 2, '', '']])), [['plan', 3, 'practiceKind', 'control_first']]);
+  assert.deepEqual(codes(one([[1, '', 'М', '', '', 'аралык көзөмөл'], [1, '', 'А', 2, '', '']])), [['plan', 2, 'practiceKind', 'control_first']]);
+  assert.deepEqual(codes(one([[1, '', 'А', 2, '', ''], [2, '', 'М', '', 2, 'модуль'], [2, '', 'Б', 2, '', '']])), []);
+  assert.deepEqual(codes(one([[1, '', 'А', 2, '', ''], [1, '', '', '', '', 'модуль'], [2, '', 'Б', 2, '', ''], [2, '', '', '', '', 'модуль']])), []);
+  // no «Юнит» column: the module after the topics of the one unit
+  assert.deepEqual(codes(one([['', '', 'А', 2, '', ''], ['', '', '', '', '', 'модуль']])), []);
+});

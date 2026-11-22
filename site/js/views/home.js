@@ -117,11 +117,14 @@ function studentSubjectsBody(user, redraw) {
   if (groupSubjects.list) {
     if (groupSubjects.list.length === 0) return el('p', { class: 'today__none' }, t('home.subjectsNone'));
     return el('ul', { class: 'courses__list' }, groupSubjects.list.map((subject) => {
+      // a syllabus hidden while its new version is under review still leads to its page, which says «updating»
+      const link = subject.hasSyllabus || subject.updating;
+      const note = subject.hasSyllabus ? null : subject.updating ? t('home.syllabusUpdating') : t('home.noSyllabus');
       const text = el('span', { class: 'course__text' },
         el('span', { class: 'course__name' }, subject.name),
         subject.teacherName ? el('span', { class: 'course__teacher' }, subject.teacherName) : null,
-        subject.hasSyllabus ? null : el('span', { class: 'course__none' }, t('home.noSyllabus')));
-      return el('li', {}, subject.hasSyllabus
+        note ? el('span', { class: 'course__none' }, note) : null);
+      return el('li', {}, link
         ? el('a', { class: 'course is-link', href: '#/syllabus/' + subject.id }, text, icon('chevron', 'course__go'))
         : el('div', { class: 'course' }, text));
     }));

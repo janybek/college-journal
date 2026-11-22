@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup, FIRST, A } from './syllabusSetup.js';
+import { handleRequest } from '../backend/api.js';
 
 const book = { authors: 'Автор', title: 'Книга', year: '2020', publisher: 'Издат', availability: 'библиотека' };
 const warn = (section) => ({ section, code: 'empty' });
@@ -207,4 +208,56 @@ test('approving reads the settings before the first write', () => {
   const firstWrite = order.findIndex((entry) => /^(insert|update|remove)(Many)?:/.test(entry));
   assert.equal(order.indexOf('list:settings') > -1, true);
   assert.equal(order.indexOf('list:settings') < firstWrite, true, order.join(' '));
+});
+
+// A store over the one of the test whose write of `table` fails `times` times (a timeout of Google between the two writes of the approval).
+function failingOn(store, table, times = 1) {
+  let left = times;
+  return { ...store, updateMany: (name, rows) => {
+    if (name === table && left > 0) {
+      left -= 1;
+      throw new Error('Service Spreadsheets timed out');
+    }
+    return store.updateMany(name, rows);
+  } };
+}
+
+test('approving writes «Пары» first: a failed write of «Силлабусы» leaves the version under review, «Утвердить» again gives the same end', () => {
+  const { store, spy, platform, call, save, draft, pairOf, lessons, nameOf, versionOf, approveFirst, teacher1, dean, sb1, ds1, S } = ready();
+  approveFirst();
+  store.update('pairs', pairOf(sb1, '2026-09-01').id, { status: 'closed' });              // «Введение» held
+  const second = draft(sb1, 1, teacher1);
+  const units = call('syllabus.form', { syllabusId: second }, teacher1).data.doc.plan.units;
+  units[0].lecture.unshift({ id: '', name: 'Новая в начале', hours: 2 });
+  save(second, 'plan', { units }, teacher1);
+  assert.equal(call('syllabus.submit', { syllabusId: second }, teacher1).data.submitted, true);
+  const order = [];
+  const watched = { ...spy, updateMany: (name, rows) => { order.push(name); return spy.updateMany(name, rows); } };
+  const failed = handleRequest(JSON.stringify({ action: 'syllabus.approve', data: { syllabusId: second }, token: dean }), { store: failingOn(watched, 'syllabi'), platform, log: () => {} });
+  assert.equal(failed.ok, false);
+  assert.deepEqual(order, ['pairs']);                                                     // «Пары» were written, «Силлабусы» were not
+  const statuses = () => store.list('syllabi').filter((s) => s.disciplineId === ds1 && s.semester === 1).map((s) => [s.version, s.status]).sort();
+  assert.deepEqual(statuses(), [[1, 'approved'], [2, 'review']]);
+  const held = pairOf(sb1, '2026-09-01');
+  assert.deepEqual([nameOf(held.topicId), versionOf(held.topicId)], ['Введение', second]);
+  const again = call('syllabus.approve', { syllabusId: second }, dean);
+  assert.deepEqual([again.ok, again.data.approved], [true, true]);
+  assert.deepEqual(statuses(), [[1, 'archived'], [2, 'approved']]);
+  const after = pairOf(sb1, '2026-09-01');
+  assert.deepEqual([after.status, nameOf(after.topicId), versionOf(after.topicId), after.lessonType, after.part], ['closed', 'Введение', second, 'lecture', 1]);
+  const end = lessons(sb1);
+  call('settings.save', { settings: S }, dean);
+  assert.deepEqual(lessons(sb1), end);                                                    // the next layout moves nothing
+  assert.deepEqual(end.map((l) => l[1]), ['Введение', 'Новая в начале']);
+});
+
+test('a row of an unknown kind (typed by hand in the sheet) is named and stops both sending and approving', () => {      // final M3
+  const { store, call, snapshotAll, syllabusId, teacher1, dean } = ready();
+  const row = store.list('topics').find((t) => t.syllabusId === syllabusId && t.name === 'Практикум');
+  store.update('topics', row.id, { lessonKind: 'практика' });
+  const before = snapshotAll();
+  const expected = [{ section: 'plan', code: 'bad_kind', id: row.id, name: 'Практикум' }];
+  assert.deepEqual([call('syllabus.submit', { syllabusId }, teacher1).data.checks.errors, call('syllabus.approve', { syllabusId }, dean).data], [expected,
+    { approved: false, checks: { errors: expected, warnings: FOUR_EMPTY }, changedPairs: 0 }]);
+  assert.equal(snapshotAll(), before);
 });
