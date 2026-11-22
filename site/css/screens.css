@@ -6365,3 +6365,80 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 .jlog-table .jlog-table__reason { min-width: 12rem; overflow-wrap: anywhere; color: var(--text-muted); }
 
 .jlog-table .person { min-width: 0; }
+
+/* Screens: scoring scheme card under the semester panels (settings) */
+
+.settings-form {
+  display: grid;
+  gap: var(--space-6);
+  min-width: 0;
+}
+
+.scoring__form {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.scoring__group {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.scoring__legend {
+  padding: 0;
+  margin-bottom: var(--space-3);
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.scoring__fields {
+  align-items: start;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 13rem), 1fr));
+  gap: var(--space-4);
+}
+
+.scoring .field__input { font-variant-numeric: tabular-nums; }
+
+.scoring .field__input[readonly] {
+  border-color: var(--border);
+  background: transparent;
+  cursor: default;
+}
+
+.scoring .field__input[readonly]:focus { box-shadow: none; }
+
+.scoring__example {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--primary);
+  border-radius: var(--radius-control);
+  background: var(--primary-wash);
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+  line-height: 1.5;
+}
+
+.scoring__actions {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.scoring__actions .notes { display: grid; gap: var(--space-2); }
+.scoring__actions .notes:empty { display: none; }
+
+.scoring__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.scoring__failed { display: grid; gap: var(--space-3); justify-items: start; }

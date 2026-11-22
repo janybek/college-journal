@@ -377,3 +377,17 @@ test('task 23: the change log screen has its texts in every language', () => {
   for (const dict of [ru, ky, en]) assert.ok(dict['journalLog.pairWhen'].includes('{date}') && dict['journalLog.pairWhen'].includes('{slot}'));
   assert.equal(ru['journalLog.title'], 'Журнал изменений');
 });
+
+test('task 24: the scoring card of the settings has its texts in every language', () => {
+  const keys = ['title', 'hint', 'example', 'warning', 'reset', 'saved']
+    .concat(['attendance', 'activity', 'current', 'self', 'control', 'minimum', 'fair', 'good', 'excellent', 'editDays'].map((k) => 'field.' + k))
+    .concat(['pair', 'unit', 'grades', 'edit'].map((k) => 'group.' + k))
+    .concat(['sum', 'order', 'too_big', 'bad_value'].map((k) => 'error.' + k))
+    .map((k) => 'scoring.' + k);
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) {
+    for (const p of ['{pair}', '{first}', '{current}', '{self}', '{control}', '{total}']) assert.ok(dict['scoring.example'].includes(p), p);
+    assert.ok(dict['scoring.error.bad_value'].includes('{min}') && dict['scoring.error.bad_value'].includes('{max}'));
+  }
+  assert.equal(ru['scoring.title'], 'Баллы и журнал');
+});

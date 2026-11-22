@@ -8,6 +8,7 @@ import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { isDate, isTime, minutesOf, addMinutes, dayParts } from '../dates.js';
 import { bellOptions, nextBell } from '../bells.js';
+import { scoringCard, leaveScoringCard } from './scoringCard.js';
 
 // Semester settings (#/settings): the semester dates and which semester is on, the days off and the bell times.
 // Drawn from `state`, so a redraw (language switch) keeps what was typed. What depends on a typed value (the date
@@ -48,6 +49,7 @@ const isDirty = () => !sameValues(state.values, state.loaded.settings);
 export function leave() {
   state = blank();
   live = null;
+  leaveScoringCard();
 }
 
 export function render(root) {
@@ -62,8 +64,11 @@ export function render(root) {
   const panels = el('div', { class: 'settings' },
     el('div', { class: 'settings__column' }, semesterPanel(editable), holidaysPanel(editable)),
     el('div', { class: 'settings__column' }, bellsPanel(editable)));
-  if (editable) root.append(panels, ...saveBar());
-  else root.append(note('info', t('settings.readOnly')), panels);
+  // The semester form is wrapped so that its sticky save bar stays above the scoring card, not over it.
+  const semesterForm = editable ? el('div', { class: 'settings-form' }, panels, ...saveBar())
+    : el('div', { class: 'settings-form' }, note('info', t('settings.readOnly')), panels);
+  const scoring = scoringCard();
+  root.append(semesterForm, ...(scoring ? [scoring] : []));
   syncAll();
 }
 
