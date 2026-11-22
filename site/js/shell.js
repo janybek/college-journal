@@ -48,7 +48,9 @@ export function navFor(permissionList, role) {
   const groups = [{ titleKey: null, items: [HOME] }];
   if (!parts.includes('office')) return groups;
   if (list.includes('journal.list')) {
-    groups.push({ titleKey: 'nav.journal', items: [{ name: 'journalList', href: '#/journal', textKey: 'journal.list.title', icon: 'table', hintKey: 'journal.hint' }] });
+    const items = [{ name: 'journalList', href: '#/journal', textKey: 'journal.list.title', icon: 'table', hintKey: 'journal.hint' }];
+    if (list.includes('journal.log')) items.push({ name: 'journalLog', href: '#/journal-log', textKey: 'journalLog.title', icon: 'clipboard', hintKey: 'journalLog.hint' });
+    groups.push({ titleKey: 'nav.journal', items });
   }
   const schedule = [];
   if (list.includes('schedule.list')) {
@@ -187,6 +189,7 @@ function currentName(view, params, role) {
   if (view === 'directory') return params.table;
   // A journal of a subject belongs to the list of journals.
   if (view === 'journal') return 'journalList';
+  if (view === 'journalLog') return menuParts(role).includes('office') ? 'journalLog' : 'journalList';
   if (view === 'syllabus' || view === 'syllabusForm') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;
 }
@@ -271,6 +274,7 @@ function crumbs(groups, view, params, current, role) {
     else if (view === 'subjects') [groupKey, pageKey] = ['nav.schedule', 'subjects.title'];
     else if (view === 'review') [groupKey, pageKey] = ['nav.schedule', 'review.title'];
     else if (view === 'mySchedule') [groupKey, pageKey] = ['nav.teaching', 'my.title'];
+    else if (view === 'journalLog') [groupKey, pageKey] = ['nav.journal', 'journalLog.title'];
     else if (view === 'journalList' || view === 'journal') [groupKey, pageKey] = ['nav.journal', 'journal.list.title'];
     else pageKey = 'nav.home';
   }

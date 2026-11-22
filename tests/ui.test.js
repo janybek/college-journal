@@ -144,3 +144,13 @@ test('navFor: the teacher gets «Журнал» after «Моё расписан�
   assert.equal(navFor(['schedule.list'], 'dean').some((g) => g.titleKey === 'nav.journal'), false);
   assert.equal(navFor(['journal.list', 'schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'journalList'), false);
 });
+
+test('navFor: the group «Журнал» of the office has «Журнал изменений» as the second item; the teacher has none', () => {
+  const office = navFor(['schedule.list', 'journal.list', 'journal.get', 'journal.log'], 'dean');
+  const group = office.find((g) => g.titleKey === 'nav.journal');
+  assert.deepEqual(group.items.map((i) => i.name), ['journalList', 'journalLog']);
+  assert.equal(group.items[1].href, '#/journal-log');
+  assert.equal(group.items[1].textKey, 'journalLog.title');
+  assert.equal(navFor(['journal.list', 'journal.log'], 'teacher').flatMap((g) => g.items).some((i) => i.name === 'journalLog'), false);
+  assert.equal(navFor(['journal.list'], 'dean').find((g) => g.titleKey === 'nav.journal').items.length, 1);
+});

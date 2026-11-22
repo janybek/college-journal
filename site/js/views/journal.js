@@ -38,6 +38,7 @@ export function render(root, params) {
       id: 'journal-title',
       title: subject ? `${subject.name} · ${subject.groupName}` : t('journal.title'),
       lead: subject && subject.teacherName ? t('journal.teacherLine', { name: subject.teacherName }) : null,
+      actions: subject && canSeeLog(state.data.journal) ? el('a', { class: 'button button--secondary', id: 'journal-log-link', href: '#/journal-log/' + subject.id }, t('journalLog.link')) : null,
     }),
     state.data === null ? loadingBody() : body(state.data.journal));
 }
@@ -250,6 +251,14 @@ const currentOpenId = (unit, student) => `journal-current-open-${unit}-${student
 function isOwnTeacher(journal) {
   const user = getUser();
   return !!user && Array.isArray(user.roles) && user.roles.includes('teacher') && journal.subject.teacherId === user.id;
+}
+
+// «История изменений»: the log of the subject for its teacher, the deanery, the admin and the vice-rector; not in a partial journal.
+function canSeeLog(journal) {
+  const user = getUser();
+  if (journal.partial || !user || !Array.isArray(user.permissions) || !user.permissions.includes('journal.log')) return false;
+  const roles = Array.isArray(user.roles) ? user.roles : [];
+  return roles.some((role) => ['admin', 'dean', 'prorector'].includes(role)) || isOwnTeacher(journal);
 }
 
 // The window of the unit control or the self-work of a unit; the grid is drawn again from the answer.

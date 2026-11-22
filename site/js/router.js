@@ -41,6 +41,11 @@ export function resolveRoute(hash, user) {
   if (path === '/journal' && permissions.includes('journal.list')) return { view: 'journalList', params: {} };
   const journal = /^\/journal\/([^/]+)$/.exec(path);
   if (journal && permissions.includes('journal.get')) return { view: 'journal', params: { subjectId: journal[1] } };
+  // «Журнал изменений»: the whole log is for the admin, the deanery and the vice-rector; the log of one subject also for its teacher.
+  const office = Array.isArray(user.roles) && user.roles.some((role) => ['admin', 'dean', 'prorector'].includes(role));
+  if (path === '/journal-log' && office && permissions.includes('journal.log')) return { view: 'journalLog', params: {} };
+  const log = /^\/journal-log\/([^/]+)$/.exec(path);
+  if (log && permissions.includes('journal.log')) return { view: 'journalLog', params: { subjectId: log[1] } };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
   return { view: 'home', params: {} };

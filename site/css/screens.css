@@ -6329,3 +6329,39 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
   min-height: 1.25rem;
   transform: translateX(-50%);
 }
+
+/* Task 23: «Журнал изменений». A table of changes; a row after the deadline carries an amber rail. The table scrolls
+   inside its block, the page does not. */
+
+.jlog__toolbar { border-bottom: 1px solid var(--border); align-items: flex-end; }
+
+.jlog__toolbar > .field { flex: 1 1 11rem; max-width: 16rem; }
+
+.jlog__empty { padding: var(--space-4); }
+
+.jlog__more { display: flex; justify-content: center; padding: var(--space-4); border-top: 1px solid var(--border); }
+
+.jlog-table { min-width: 56rem; }
+
+.jlog-table--subject { min-width: 46rem; }
+
+.jlog-table tbody .jlog-row.is-late td:first-child { box-shadow: inset 3px 0 0 var(--warning); }
+
+.jlog-table td { vertical-align: top; }
+
+.jlog-table .jlog-table__when,
+.jlog-table .jlog-table__pair { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.jlog-table__stack { display: grid; gap: var(--space-1); justify-items: start; }
+
+.jlog-table .jlog-table__subject { min-width: 9rem; }
+
+.jlog-table .jlog-table__change { min-width: 11rem; }
+
+.jlog-table__name { font-weight: 600; overflow-wrap: break-word; }
+
+.jlog-table .person__name { white-space: nowrap; }
+
+.jlog-table .jlog-table__reason { min-width: 12rem; overflow-wrap: anywhere; color: var(--text-muted); }
+
+.jlog-table .person { min-width: 0; }

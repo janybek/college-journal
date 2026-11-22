@@ -369,3 +369,11 @@ test('task 22: the deanery actions on a pair have their texts in every language'
   for (const dict of [ru, ky, en]) assert.ok(dict['journal.action.menu'].includes('{date}'));
   assert.equal(ru['journal.action.miss'], 'Не проведена');
 });
+
+test('task 23: the change log screen has its texts in every language', () => {
+  const keys = ['title', 'hint', 'lead', 'leadSubject', 'from', 'to', 'group', 'subject', 'allGroups', 'allSubjects', 'last30', 'empty', 'emptyHint', 'more',
+    'col.when', 'col.who', 'col.subject', 'col.student', 'col.pair', 'col.change', 'col.reason', 'pairWhen', 'link', 'back'].map((k) => 'journalLog.' + k);
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) assert.ok(dict['journalLog.pairWhen'].includes('{date}') && dict['journalLog.pairWhen'].includes('{slot}'));
+  assert.equal(ru['journalLog.title'], 'Журнал изменений');
+});

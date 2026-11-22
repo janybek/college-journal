@@ -120,3 +120,19 @@ test('resolveRoute: the list of journals needs journal.list, a journal of a subj
   assert.equal(resolveRoute('#/journal/sb_1', { mustChangePassword: false, permissions: ['journal.list'] }).view, 'home');
   assert.equal(resolveRoute('#/journal/sb_1/x', teacher).view, 'home');
 });
+
+test('resolveRoute: the change log is for the deanery, the admin and the vice-rector; a teacher only reaches the log of a subject', () => {
+  const office = { mustChangePassword: false, roles: ['dean'], permissions: ['journal.log', 'journal.list'] };
+  const both = { mustChangePassword: false, roles: ['dean', 'teacher'], permissions: ['journal.log'] };
+  const teacher = { mustChangePassword: false, roles: ['teacher'], permissions: ['journal.log', 'journal.list'] };
+  const student = { mustChangePassword: false, roles: ['student'], permissions: ['schedule.mine'] };
+  assert.deepEqual(resolveRoute('#/journal-log', office), { view: 'journalLog', params: {} });
+  assert.deepEqual(resolveRoute('#/journal-log', both), { view: 'journalLog', params: {} });
+  for (const role of ['admin', 'prorector']) assert.equal(resolveRoute('#/journal-log', { ...office, roles: [role] }).view, 'journalLog', role);
+  assert.equal(resolveRoute('#/journal-log', teacher).view, 'home');
+  assert.deepEqual(resolveRoute('#/journal-log/sb_1', teacher), { view: 'journalLog', params: { subjectId: 'sb_1' } });
+  assert.deepEqual(resolveRoute('#/journal-log/sb_1', office), { view: 'journalLog', params: { subjectId: 'sb_1' } });
+  assert.equal(resolveRoute('#/journal-log', student).view, 'home');
+  assert.equal(resolveRoute('#/journal-log/sb_1', student).view, 'home');
+  assert.equal(resolveRoute('#/journal-log/sb_1/x', office).view, 'home');
+});
