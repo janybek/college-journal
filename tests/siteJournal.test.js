@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -43,4 +43,51 @@ test('cellView and pairHead: the mark of a cell and the head of a pair', () => {
   assert.equal(pairHead({ lessonType: 'lecture', status: 'cancelled', state: 'cancelled' }).stateKey, 'journal.state.cancelled');
   assert.equal(pairHead({ lessonType: 'lecture', status: 'missed', state: 'missed' }).stateKey, 'journal.state.missed');
   assert.equal(pairHead({ lessonType: 'lecture', status: 'planned', state: 'future' }).stateKey, 'journal.state.future');
+});
+
+// ---- Task 19: the marks of a pair ----
+
+const MJ = {
+  pairs: [{ id: 'a', status: 'planned' }, { id: 'b', status: 'closed' }],
+  students: [{ id: 's1', fullName: 'Асанов Аман', left: false }, { id: 's2', fullName: 'Бекова Бермет', left: false }, { id: 's3', fullName: 'Выбыл Студент', left: true }],
+  marks: { b: { s1: { status: 'late', noCoat: true, activity: 3 }, s2: { status: 'absent', noCoat: false, activity: null }, s3: { status: 'present', noCoat: false, activity: null } } },
+};
+
+test('draftMarks: an unfilled pair starts with everybody present; a held pair with the saved marks; students who left are not on the list', () => {
+  assert.deepEqual(draftMarks(MJ, 'a'), [
+    { studentId: 's1', fullName: 'Асанов Аман', status: 'present', noCoat: false, activity: null },
+    { studentId: 's2', fullName: 'Бекова Бермет', status: 'present', noCoat: false, activity: null },
+  ]);
+  assert.deepEqual(draftMarks(MJ, 'b').map((m) => [m.studentId, m.status, m.noCoat, m.activity]), [['s1', 'late', true, 3], ['s2', 'absent', false, null]]);
+});
+
+test('changedMarks: all marks of an unfilled pair; only the changed ones of a held pair', () => {
+  assert.equal(changedMarks(draftMarks(MJ, 'a'), MJ, 'a').length, 2);
+  assert.deepEqual(changedMarks(draftMarks(MJ, 'b'), MJ, 'b'), []);
+  const draft = draftMarks(MJ, 'b');
+  draft[0].activity = 5;
+  assert.deepEqual(changedMarks(draft, MJ, 'b'), [{ studentId: 's1', status: 'late', noCoat: true, activity: 5 }]);
+});
+
+test('activityAllowed and coatAllowed follow the rules of the server', () => {
+  assert.equal(activityAllowed('absent', {}), false);
+  assert.equal(activityAllowed('excused', {}), false);
+  assert.equal(activityAllowed('present', { first: true }), false);
+  assert.equal(activityAllowed('present', { lessonType: 'control' }), false);
+  assert.equal(activityAllowed('late', { lessonType: 'practice' }), true);
+  assert.equal(activityAllowed('madeup', {}), true);
+  assert.equal(coatAllowed({ lessonType: 'lecture' }), false);
+  assert.equal(coatAllowed({ lessonType: 'practice' }), true);
+  assert.equal(coatAllowed({ lessonType: '' }), true);
+});
+
+test('canMark and pairHint: only free and reason heads open; the others say why', () => {
+  assert.equal(canMark({ mode: 'free' }), true);
+  assert.equal(canMark({ mode: 'reason' }), true);
+  assert.equal(canMark({ mode: 'limited' }), false);
+  assert.equal(canMark({ mode: 'none' }), false);
+  assert.equal(pairHint({ mode: 'none', state: 'future', status: 'planned' }), 'journal.marks.notBegun');
+  assert.equal(pairHint({ mode: 'none', state: 'late', status: 'planned' }), 'journal.marks.termPassed');
+  assert.equal(pairHint({ mode: 'limited', state: 'late', status: 'closed' }), null);
+  assert.equal(pairHint({ mode: 'free', state: 'open', status: 'planned' }), null);
 });

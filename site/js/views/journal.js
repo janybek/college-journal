@@ -1,12 +1,14 @@
 import { call } from '../api.js';
 import { t } from '../i18n.js';
-import { el, errorKey, emptyState, note, pageHeader, refresh } from '../ui.js';
-import { journalColumns, cellView, pairHead } from '../journal.js';
+import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '../ui.js';
+import { journalColumns, cellView, pairHead, canMark, pairHint } from '../journal.js';
+import { openMarksDialog } from './journalPair.js';
 
 // The journal of a subject (#/journal/<subjectId>): the grid of students and pairs, read only (journal.get).
 // Rows are students (those who left stand last, dimmed); columns are pairs, and after the last pair of a unit
 // its four columns (current control, self-work, unit control, total), then the summary of attendance.
-// Nothing here is clickable yet: marks and results are entered by the next tasks. The server decides what is
+// The head of a pair the person may fill in (mode `free` or `reason`) opens the window of its marks; nothing else is
+// clickable yet. The server decides what is
 // in the answer (a teacher who only substituted gets just their pairs, no unit totals); the screen only draws it.
 
 const blank = (subjectId = null) => ({
@@ -141,13 +143,36 @@ function pairHeadCell(pair) {
   const { kindKey, stateKey } = pairHead(pair);
   const narrow = pair.status === 'cancelled' || pair.status === 'missed';
   const topic = pair.topicName ? t('journal.topic', { n: pair.number === '' ? '' : pair.number, name: pair.topicName }) : t('journal.topicNone');
-  const tipText = [topic, stateKey ? t(stateKey) : null, pair.substitution ? t('journal.sub', { name: pair.teacherName }) : null].filter(Boolean).join(' · ');
-  return el('th', { scope: 'col', class: `jg-pair-head${narrow ? ' is-narrow' : ''}${pair.status === 'planned' ? ' is-planned' : ''}`, tabindex: '0', 'data-pair': pair.id },
+  const hint = pairHint(pair);
+  const tipText = [topic, stateKey ? t(stateKey) : null, pair.substitution ? t('journal.sub', { name: pair.teacherName }) : null, hint ? t(hint) : null].filter(Boolean).join(' · ');
+  const open = canMark(pair);
+  return el('th', { scope: 'col', class: `jg-pair-head${narrow ? ' is-narrow' : ''}${pair.status === 'planned' ? ' is-planned' : ''}${open ? ' is-open' : ''}`, tabindex: open ? null : '0', 'data-pair': pair.id },
+    open ? el('button', {
+      type: 'button', class: 'jg-open', id: openId(pair), 'aria-haspopup': 'dialog',
+      'aria-label': t('journal.marks.open', { date: dayMonth(pair.date), kind: t(kindKey) }), onclick: () => openMarks(pair),
+    }) : null,
     el('span', { class: 'jg-pair-head__date' }, dayMonth(pair.date)),
     el('span', { class: `jg-pair-head__kind jg-kind--${pair.lessonType || 'none'}` }, t(kindKey)),
     stateKey ? el('span', { class: `jg-state jg-state--${stateKey.slice('journal.state.'.length)}`, 'aria-hidden': 'true' }) : null,
     pair.substitution ? el('span', { class: 'jg-pair-head__sub' }, surname(pair.teacherName)) : null,
     tip(tipText));
+}
+
+const openId = (pair) => `journal-open-${pair.id}`;
+
+// The window of the marks of a pair; the grid is drawn again from the answer to the save.
+function openMarks(pair) {
+  const owner = state;
+  openMarksDialog({
+    journal: owner.data.journal,
+    pair,
+    onSaved: (data) => {
+      if (state !== owner) return;
+      owner.data = data;
+      refresh();
+    },
+    onClosed: () => focusById(openId(pair)),
+  });
 }
 
 const surname = (fullName) => String(fullName || '').trim().split(/\s+/)[0] || '—';

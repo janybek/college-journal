@@ -313,3 +313,20 @@ test('task 18: the grid of a journal has its texts in every language', () => {
     for (const key of ['journal.tip.current', 'journal.tip.self', 'journal.tip.control', 'journal.tip.total']) assert.ok(dict[key].includes('{max}'), key);
   }
 });
+
+test('task 19: the window of the marks of a pair has its texts in every language', () => {
+  const keys = ['title', 'when', 'open', 'list', 'kind.none', 'hint', 'allPresent', 'coat', 'activity', 'activityPlaceholder', 'reason.label', 'reason.hint', 'reason.count',
+    'unsaved', 'stay', 'discard', 'notBegun', 'termPassed', 'error.reason.required', 'error.reason.too_long', 'error.activity.bad_value', 'error.studentId.bad_ref']
+    .map((k) => 'journal.marks.' + k);
+  for (const s of ['present', 'late', 'absent', 'excused', 'madeup']) keys.push('journal.marks.status.' + s);
+  keys.push('error.too_early', 'error.journal_closed', 'error.no_syllabus', 'error.has_marks', 'error.incomplete', 'error.not_allowed', 'error.locked');
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) {
+    for (const p of ['{date}', '{slot}', '{time}']) assert.ok(dict['journal.marks.when'].includes(p), p);
+    assert.ok(dict['journal.marks.activityPlaceholder'].includes('{max}'));
+    assert.ok(dict['journal.marks.reason.count'].includes('{n}') && dict['journal.marks.reason.count'].includes('{max}'));
+  }
+  assert.equal(ru['journal.marks.unsaved'], 'Отметки не сохранены. Закрыть?');
+  assert.equal(ru['journal.marks.notBegun'], 'Пара ещё не началась');
+  assert.equal(ru['journal.marks.termPassed'], 'Срок заполнения прошёл. Обратитесь в деканат');
+});

@@ -65,3 +65,53 @@ export function pairHead(pair) {
   else if (pair.status === 'planned') stateKey = pair.state === 'late' ? 'journal.state.overdue' : pair.state === 'future' ? STATES.future : 'journal.state.unfilled';
   return { kindKey, stateKey };
 }
+
+// ---- The marks of a pair (the window «Отметки пары») ----
+
+const NO_ACTIVITY = ['absent', 'excused'];
+
+// Whether the head of a pair opens the window: only the pairs the person may fill in freely or with a reason.
+export const canMark = (pair) => pair.mode === 'free' || pair.mode === 'reason';
+
+// The hint of a head that does not open: the pair has not begun; the term has passed (a teacher goes to the deanery).
+export function pairHint(pair) {
+  if (canMark(pair)) return null;
+  if (pair.state === 'future') return 'journal.marks.notBegun';
+  if (pair.status === 'planned' && pair.state === 'late' && pair.mode === 'none') return 'journal.marks.termPassed';
+  return null;
+}
+
+// No points for activity: for those who were not there, on the first pair of the subject and on a unit control pair.
+export function activityAllowed(status, pair) {
+  return !NO_ACTIVITY.includes(status) && !(pair && (pair.first === true || pair.lessonType === 'control'));
+}
+
+// The lab coat is asked only on practice pairs and pairs without a topic.
+export function coatAllowed(pair) {
+  return !pair || pair.lessonType === 'practice' || !pair.lessonType;
+}
+
+// The list of the window: the active students with their marks; a student without a mark is «present».
+export function draftMarks(journal, pairId) {
+  const saved = (journal.marks && journal.marks[pairId]) || {};
+  return journal.students.filter((student) => !student.left).map((student) => {
+    const mark = saved[student.id];
+    return {
+      studentId: student.id, fullName: student.fullName,
+      status: mark ? mark.status : 'present', noCoat: mark ? mark.noCoat === true : false, activity: mark && mark.activity !== undefined ? mark.activity : null,
+    };
+  });
+}
+
+// The marks for journal.savePair: every mark of a pair not yet held; of a held one only those that differ from the saved.
+export function changedMarks(draft, journal, pairId) {
+  const pair = journal.pairs.find((p) => p.id === pairId);
+  const held = pair && (pair.status === 'running' || pair.status === 'closed');
+  const base = new Map(draftMarks(journal, pairId).map((m) => [m.studentId, m]));
+  return draft
+    .filter((m) => {
+      const old = base.get(m.studentId);
+      return !held || !old || old.status !== m.status || old.noCoat !== m.noCoat || old.activity !== m.activity;
+    })
+    .map((m) => ({ studentId: m.studentId, status: m.status, noCoat: m.noCoat === true, activity: m.activity }));
+}
