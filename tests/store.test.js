@@ -76,3 +76,16 @@ test('fileStore: updateMany and removeMany are written to the file', () => {
   a.removeMany('rooms', [x.id, x.id]);
   assert.deepEqual(createFileStore(SCHEMA, platform, file).list('rooms').map((r) => r.name), ['Y2', 'Z']);
 });
+
+test('fileStore: a stand file without the tables of unit 3 opens; the new tables are empty and take rows', () => {
+  const file = tmpFile();
+  fs.mkdirSync(path.dirname(file), { recursive: true });
+  const old = { groups: [{ id: 'g_1', name: '01-1', course: 1 }], pairs: [{ id: 'p_1', date: '2026-09-01', slot: 1, groupId: 'g_1', status: 'planned' }] };
+  fs.writeFileSync(file, JSON.stringify(old), 'utf8');
+  const s = createFileStore(SCHEMA, platform, file);
+  for (const table of ['attendance', 'unitResults', 'changeLog']) assert.deepEqual(s.list(table), [], table);
+  assert.equal(s.get('pairs', 'p_1').substitute, false);
+  const row = s.insert('attendance', { pairId: 'p_1', studentId: 'st_1', status: 'present' });
+  assert.deepEqual(createFileStore(SCHEMA, platform, file).list('attendance').map((r) => r.id), [row.id]);
+  assert.equal(createFileStore(SCHEMA, platform, file).insert('changeLog', { entity: 'mark' }).entity, 'mark');
+});
