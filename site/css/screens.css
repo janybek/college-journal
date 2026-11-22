@@ -5589,3 +5589,238 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
   flex-wrap: wrap;
   gap: var(--space-2);
 }
+
+/* Task 18: the grid of a journal (read only). Rows are students, columns are pairs; after the last pair of a unit stand
+   its four columns, tinted so the eye finds where a unit ends. The first column stays while the table scrolls inside its
+   block; the page itself never scrolls sideways. */
+
+.journal { display: grid; gap: var(--space-4); min-width: 0; }
+
+.journal__scheme { margin: 0; color: var(--text-muted); font-size: 0.875rem; }
+
+.journal-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-5);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+}
+
+.journal-legend__item { display: inline-flex; align-items: center; gap: var(--space-2); }
+
+.journal-card { width: fit-content; min-width: 0; max-width: 100%; overflow: hidden; padding: 0; }
+
+.journal-scroll { max-width: 100%; }
+
+.journal-scroll:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.journal-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.journal-grid th,
+.journal-grid td {
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  background: var(--surface);
+}
+
+.journal-grid tbody tr:last-child th,
+.journal-grid tbody tr:last-child td { border-bottom: 0; }
+
+.journal-grid tbody tr { height: 2.5rem; }
+
+.journal-grid tbody tr:hover td,
+.journal-grid tbody tr:hover th { background-color: var(--muted); }
+
+/* The names: stuck to the left edge. */
+.journal-grid .jg-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 15rem;
+  max-width: 19rem;
+  padding: 0 var(--space-4);
+  border-right: 1px solid var(--border-strong);
+  text-align: left;
+  font-weight: 500;
+}
+
+.journal-grid thead th {
+  height: 3.5rem;
+  position: relative;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--surface-raised);
+}
+
+.journal-grid thead .jg-name { position: sticky; z-index: 3; }
+
+.jg-name__no { display: inline-block; min-width: 1.5rem; color: var(--text-muted); font-weight: 400; }
+
+.jg-name__text { overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; display: inline-block; max-width: 13rem; }
+
+.jg-name__left {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.journal-grid .is-left td,
+.journal-grid .is-left th { color: var(--text-muted); }
+
+.journal-grid .is-left .jg-name__text { text-decoration: line-through; text-decoration-color: var(--border-strong); }
+
+/* The head of a pair: date, kind of lesson, state dot. */
+.jg-pair-head { min-width: 4rem; cursor: default; }
+
+.jg-pair-head > span:not(.jg-tip) { display: block; }
+
+.jg-pair-head__date { color: var(--text); font-size: 0.8125rem; }
+
+.jg-pair-head__kind { margin-top: 1px; font-size: 0.6875rem; letter-spacing: 0.02em; }
+
+.jg-pair-head__sub { max-width: 4.5rem; overflow: hidden; text-overflow: ellipsis; color: var(--primary-ink); font-size: 0.625rem; font-weight: 500; }
+
+.jg-kind--control { color: var(--primary-ink); }
+
+.jg-pair-head .jg-state { position: absolute; top: 5px; right: 4px; width: 7px; height: 7px; }
+
+.jg-state {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--text-muted);
+  flex: none;
+}
+
+.jg-state--unfilled { background: var(--warning); }
+.jg-state--overdue { background: var(--danger); }
+.jg-state--missed,
+.jg-state--cancelled { background: var(--border-strong); }
+.jg-state--future { background: transparent; box-shadow: inset 0 0 0 1.5px var(--text-muted); }
+
+.journal-grid thead .is-narrow,
+.journal-grid .jg-cell.is-narrow { min-width: 0; width: 2rem; padding: 0; }
+
+.journal-grid thead .is-narrow { opacity: 0.75; }
+
+.journal-grid .jg-cell.is-narrow { background: var(--muted); }
+
+.journal-grid .is-narrow .jg-pair-head__kind,
+.journal-grid .is-narrow .jg-pair-head__sub { display: none; }
+
+/* A cell of a mark. */
+.jg-cell { min-width: 3.5rem; }
+
+.jg-cell__in { display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+
+.jg-mark {
+  display: inline-block;
+  min-width: 1.75rem;
+  padding: 1px 5px;
+  border-radius: var(--radius-inner);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  line-height: 1.35;
+  text-align: center;
+}
+
+.jg-mark--neutral { color: var(--text-muted); font-weight: 700; }
+.jg-mark--warning { background: var(--warning-wash); color: var(--warning); }
+.jg-mark--danger { background: var(--danger-wash); color: var(--danger); }
+.jg-mark--info { background: var(--primary-wash); color: var(--primary-ink); }
+.jg-mark--success { background: var(--success-wash); color: var(--success); }
+
+.jg-act { color: var(--text); font-size: 0.75rem; font-weight: 600; }
+
+.journal-legend .jg-act { color: var(--text-muted); }
+
+.jg-coat {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border: 1.5px solid var(--warning);
+  border-radius: 2px;
+  transform: rotate(45deg);
+  flex: none;
+}
+
+.jg-star { margin-left: 1px; color: var(--primary-ink); font-weight: 700; }
+
+/* The columns of a unit and the summary: tinted, numbers aligned. */
+.journal-grid thead .jg-unit-head { min-width: 4rem; cursor: default; background: var(--primary-wash); }
+
+.jg-unit-head > span:not(.jg-tip) { display: block; }
+
+.jg-unit-head__unit { color: var(--primary-ink); font-size: 0.625rem; font-weight: 500; text-transform: uppercase; letter-spacing: 0.04em; }
+
+.jg-unit-head__label { color: var(--text); }
+
+.jg-sum-head { min-width: 5rem; cursor: default; }
+
+.jg-unit-head--total,
+.jg-sum-head--absences { border-left: 1px solid var(--border-strong); }
+
+.journal-grid .jg-pts { background: var(--primary-wash); }
+
+.journal-grid tbody tr:hover .jg-pts { background: var(--primary-line); }
+
+.jg-num { font-weight: 500; }
+
+.jg-total,
+.jg-sum--final { font-weight: 700; }
+
+.journal-grid .jg-pts.is-low { color: var(--danger); font-weight: 700; }
+
+.jg-empty { color: var(--text-muted); }
+
+.journal-grid .jg-sum--absences { border-left: 1px solid var(--border-strong); }
+
+/* Tooltips of the heads: on hover and on keyboard focus. */
+.jg-tip {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  width: max-content;
+  max-width: 15rem;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-inner);
+  background: var(--surface-raised);
+  color: var(--text);
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.28);
+}
+
+.journal-grid th:hover > .jg-tip,
+.journal-grid th:focus > .jg-tip,
+.journal-grid th:focus-visible > .jg-tip { display: block; }
+
+.jg-sum-head .jg-tip,
+.jg-unit-head--total .jg-tip { left: auto; right: 0; }
+
+.journal-grid th:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }

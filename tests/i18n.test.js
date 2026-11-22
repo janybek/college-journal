@@ -296,3 +296,20 @@ test('task 17: the list of journals and its menu items have their texts in every
   assert.equal(ru['journal.list.empty'], 'Журналов пока нет');
   assert.equal(ru['journal.loading'], 'Журнал загружается');
 });
+
+test('task 18: the grid of a journal has its texts in every language', () => {
+  const keys = [];
+  for (const s of ['present', 'late', 'absent', 'excused', 'madeup']) keys.push('journal.short.' + s, 'journal.legend.' + s);
+  for (const k of ['lecture', 'practice', 'control', 'none']) keys.push('journal.kind.' + k);
+  for (const k of ['unfilled', 'overdue', 'missed', 'cancelled', 'future']) keys.push('journal.state.' + k);
+  for (const k of ['student', 'unit', 'current', 'self', 'control', 'total', 'outside', 'absences', 'percent', 'preliminary']) keys.push('journal.col.' + k);
+  for (const k of ['current', 'self', 'control', 'total', 'manual', 'absences', 'percent', 'preliminary', 'outside', 'activity']) keys.push('journal.tip.' + k);
+  for (const k of ['excellent', 'good', 'fair', 'fail']) keys.push('journal.grade.' + k);
+  keys.push('journal.legend.title', 'journal.legend.noCoat', 'journal.legend.activity', 'journal.legend.manual', 'journal.scheme', 'journal.noSyllabus', 'journal.partial',
+    'journal.left', 'journal.sub', 'journal.topic', 'journal.topicNone', 'journal.teacherLine', 'journal.notFound', 'journal.back', 'journal.emptyPairs', 'journal.emptyStudents');
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) {
+    assert.ok(dict['journal.scheme'].includes('{attendance}') && dict['journal.scheme'].includes('{activity}'));
+    for (const key of ['journal.tip.current', 'journal.tip.self', 'journal.tip.control', 'journal.tip.total']) assert.ok(dict[key].includes('{max}'), key);
+  }
+});
