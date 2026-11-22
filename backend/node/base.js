@@ -1,4 +1,7 @@
 import fs from 'node:fs';
+import path from 'node:path';
+import { TZ_OFFSET_MS } from '../../core/dates.js';
+import { verifyCopy, SECRET_COPY } from './backup.js';
 import { SCHEMA } from '../../core/schema.js';
 import { hashPassword, generateTempPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { normalizeRow } from '../../core/validate.js';
@@ -106,4 +109,74 @@ export function resetAdminPassword(config) {
   } finally {
     db.close();
   }
+}
+
+const COPY_TABLES = ['staff'];
+const clock = () => new Date().getTime();
+
+// A folder name for what the restore moves aside: the Bishkek date and time, one digit group.
+function stampOf(ms) {
+  return new Date(ms + TZ_OFFSET_MS).toISOString().slice(0, 19).replace(/\D/g, '').replace(/^(\d{8})/, '$1-');
+}
+
+function secretIsGood(file) {
+  try {
+    return fs.readFileSync(file, 'utf8').trim().length >= MIN_SECRET;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Puts a checked copy in the place of the working base. The caller has made sure that no server runs.
+// -wal and -shm of the old base go away with it: left in place they would be replayed over the copy.
+// The old files are kept in a folder beside the base, nothing is deleted. The secret stays, or comes from the folder of copies,
+// or is made anew (then only the open sessions end).
+export function restoreBase(config, copyFile, { now = clock } = {}) {
+  if (!fs.existsSync(copyFile)) throw new BaseError('no_copy');
+  try {
+    verifyCopy(copyFile, COPY_TABLES);
+  } catch (error) {
+    throw new BaseError('bad_copy', String(error?.message || error).replace(/[\r\n]+/g, ' '));
+  }
+  fs.mkdirSync(config.dataDir, { recursive: true });
+  const tmp = config.dbFile + '.restore.tmp';
+  const old = ['', '-wal', '-shm'].map((suffix) => config.dbFile + suffix).filter((file) => fs.existsSync(file));
+  let before = null;
+  const moved = [];
+  try {
+    fs.rmSync(tmp, { force: true });
+    fs.copyFileSync(copyFile, tmp);
+    verifyCopy(tmp, COPY_TABLES);
+    for (const suffix of ['-wal', '-shm', '-journal']) fs.rmSync(tmp + suffix, { force: true });
+    if (old.length > 0) {
+      const stamp = `before-restore-${stampOf(now())}`;
+      for (let n = 1; before === null; n += 1) {
+        const folder = path.join(config.dataDir, n === 1 ? stamp : `${stamp}-${n}`);
+        if (!fs.existsSync(folder)) { fs.mkdirSync(folder); before = folder; }
+      }
+      for (const file of old) {
+        fs.renameSync(file, path.join(before, path.basename(file)));
+        moved.push(file);
+      }
+    }
+    fs.renameSync(tmp, config.dbFile);
+  } catch (error) {
+    for (const file of moved) {
+      try { fs.renameSync(path.join(before, path.basename(file)), file); } catch (backError) { /* the folder keeps it */ }
+    }
+    fs.rmSync(tmp, { force: true });
+    throw new BaseError('cannot_replace', String(error?.message || error));
+  }
+  let secret = 'kept';
+  if (!secretIsGood(config.secretFile)) {
+    const spare = path.join(config.backupDir, SECRET_COPY);
+    if (secretIsGood(spare)) {
+      fs.copyFileSync(spare, config.secretFile);
+      secret = 'copies';
+    } else {
+      fs.writeFileSync(config.secretFile, createNodePlatform().randomHex(32), { mode: 0o600 });
+      secret = 'new';
+    }
+  }
+  return { before, secret };
 }

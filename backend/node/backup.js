@@ -9,6 +9,7 @@ import { localDate } from '../../core/dates.js';
 export const KEEP_DAYS = 30;
 export const CHECK_EVERY_MS = 30 * 60000;
 export const ALERT_FILE = 'Журнал — копия не сделана.txt';
+export const SECRET_COPY = 'secret.key';
 export const copyName = (date) => `journal-${date}.sqlite`;
 
 const COPY_PATTERN = /^journal-\d{4}-\d\d-\d\d\.sqlite$/;
@@ -72,6 +73,12 @@ export async function backupNow({ db, config, now = clock, logger }) {
     verifyCopy(tmp, tables);
     fs.renameSync(tmp, file);
     tmp = null;
+    try {
+      // the folder of copies is meant for the day the disk of the base is lost, and the secret is lost with it: it lies beside the copies
+      if (fs.existsSync(config.secretFile)) fs.copyFileSync(config.secretFile, path.join(config.backupDir, SECRET_COPY));
+    } catch (error) {
+      logger.error(`secret copy failed: ${reason(error)}`);
+    }
     let removed = [];
     try {
       removed = pruneCopies(config.backupDir, KEEP_DAYS, now);

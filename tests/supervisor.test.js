@@ -6,7 +6,8 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createLogger } from '../backend/node/log.js';
 import { main, EXIT } from '../backend/node/server.js';
-import { nextDelay, isAlive, runSupervised, requestStop, readStatus, cli } from '../backend/node/supervisor.js';
+import { nextDelay, isAlive, isOurSupervisor, runSupervised, requestStop, readStatus, cli } from '../backend/node/supervisor.js';
+import { START_ALERT_FILE } from '../backend/node/config.js';
 import { PERSON, envOf, keep, quiet, sleep, tempBase, tempConfig, tempDir, until } from './serverSetup.js';
 
 const LIMITS = { firstMs: 10, maxMs: 40, stableMs: 60000 };
@@ -137,17 +138,72 @@ test('a second supervisor beside a living one does not start a server and leaves
   assert.deepEqual([await second.done, runsOf(dir, 8), fs.readFileSync(config.supervisorFile, 'utf8')], [EXIT.portBusy, 0, note]);
 });
 
-test('a stop request that nobody carried out is taken back after the timeout: the next supervisor starts; --status tells a foreign process from ours', async (t) => {
+test('a stop request that nobody carried out is taken back after the timeout, and the next supervisor starts', async (t) => {
   const { config } = tempBase(t);
   const dir = tempDir(t);
   const other = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true });
-  t.after(() => other.kill());
-  fs.writeFileSync(config.supervisorFile, JSON.stringify({ pid: other.pid, startedAt: 0 }));                              // a number that went to a foreign process
+  t.after(() => other.kill());     // stands for a supervisor that is alive but does not carry out requests
+  fs.writeFileSync(config.supervisorFile, JSON.stringify({ pid: other.pid, startedAt: new Date().getTime() }));
   assert.deepEqual([await requestStop(config, { waitMs: 200 }), fs.existsSync(config.stopFile)], [{ stopped: false, reason: 'timeout' }, false]);
+  fs.writeFileSync(config.supervisorFile, JSON.stringify({ pid: other.pid, startedAt: 0 }));        // the note grew old: the number is not a supervisor any more
   const next = runSupervised({ config, logger: quiet(), command: process.execPath, args: [exitWith(dir, 0)], limits: LIMITS });
   assert.deepEqual([await next.done, runsOf(dir, 0)], [EXIT.ok, 1]);
-  fs.writeFileSync(config.stateFile, JSON.stringify({ pid: other.pid, port: 1, startedAt: 0 }));
+});
+
+test('a number in supervisor.state.json that went to a foreign program: the supervisor starts, --status says it is not ours, --stop clears the file and kills nobody', async (t) => {
+  const { config } = tempBase(t);
+  const dir = tempDir(t);
+  const foreign = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true });
+  t.after(() => foreign.kill());
+  const old = JSON.stringify({ pid: foreign.pid, startedAt: new Date().getTime() - 3600000, seenAt: new Date().getTime() - 60000 });
+  fs.writeFileSync(config.supervisorFile, old);
+  const env = envOf(config);
   const lines = [];
-  await cli(['--status'], { env: envOf(config), root: config.root, out: (l) => lines.push(l) });
-  assert.equal(lines.some((l) => l.includes('не наш процесс')), true);
+  await cli(['--status'], { env, root: config.root, out: (l) => lines.push(l) });
+  assert.deepEqual([lines.some((l) => /Процесс присмотра: \d+ \(не работает: .*чужой\)/.test(l)), (await readStatus(config)).supervisor], [true, { running: false, pid: null }]);
+  const out = [];
+  assert.deepEqual([(await cli(['--stop'], { env, root: config.root, out: (l) => out.push(l) })).code, out, fs.existsSync(config.supervisorFile), fs.existsSync(config.stopFile), isAlive(foreign.pid)],
+    [EXIT.ok, ['Сервер не запущен'], false, false, true]);
+  fs.writeFileSync(config.supervisorFile, old);
+  const sup = runSupervised({ config, logger: quiet(), command: process.execPath, args: [exitWith(dir, 0)], limits: LIMITS });
+  assert.deepEqual([await sup.done, runsOf(dir, 0), isAlive(foreign.pid)], [EXIT.ok, 1, true]);
+});
+
+test('the supervisor renews seenAt in its file while it works, so that a living supervisor is told from a number left behind', async (t) => {
+  const { config } = tempBase(t);
+  const dir = tempDir(t);
+  const hang = path.join(dir, 'hang.mjs');
+  fs.writeFileSync(hang, 'setInterval(() => {}, 1000);\n');
+  const sup = keep(t, runSupervised({ config, logger: quiet(), command: process.execPath, args: [hang], limits: { ...LIMITS, heartbeatMs: 20 } }));
+  const note = () => JSON.parse(fs.readFileSync(config.supervisorFile, 'utf8'));
+  const first = await until(() => (fs.existsSync(config.supervisorFile) ? note() : null));
+  const later = await until(() => { const n = note(); return n.seenAt > first.seenAt ? n : null; });
+  assert.deepEqual([later.pid, later.startedAt, isOurSupervisor(later)], [process.pid, first.startedAt, true]);
+  assert.equal(isOurSupervisor({ ...later, seenAt: later.seenAt - 31000 }), false);
+  assert.equal(isOurSupervisor({ pid: later.pid }), false);
+  await sup.stop();
+});
+
+test('a stop request left from before the start does not stop the new supervisor', async (t) => {
+  const { config } = tempBase(t);
+  const dir = tempDir(t);
+  fs.writeFileSync(config.stopFile, '');
+  const sup = runSupervised({ config, logger: quiet(), command: process.execPath, args: [exitWith(dir, 0)], limits: LIMITS });
+  assert.deepEqual([await sup.done, runsOf(dir, 0), fs.existsSync(config.stopFile)], [EXIT.ok, 1, false]);       // the child ran once and ended by itself
+});
+
+test('a server that cannot start leaves the alarm file on the desktop; a server that does start removes it; a second start beside a running journal leaves none', async (t) => {
+  const { config } = tempBase(t);
+  const dir = tempDir(t);
+  const alarm = path.join(config.alertDir, START_ALERT_FILE);
+  const gone = runSupervised({ config, logger: quiet(), command: process.execPath, args: [exitWith(dir, EXIT.config)], limits: LIMITS });
+  assert.deepEqual([await gone.done, fs.existsSync(alarm)], [EXIT.config, true]);
+  assert.equal(fs.readFileSync(alarm, 'utf8').includes(PERSON.fullName), false);
+  const run = keep(t, await main([], { env: envOf(config), root: config.root, out: () => {}, stopCheckMs: 60000 }));
+  assert.equal(fs.existsSync(alarm), false);
+  const second = runSupervised({ config, logger: quiet(), command: process.execPath, args: [exitWith(dir, EXIT.portBusy)], limits: LIMITS });
+  assert.deepEqual([await second.done, fs.existsSync(alarm), (await fetch(run.server.url + '/health')).status], [EXIT.portBusy, false, 200]);
+  fs.rmSync(config.stateFile, { force: true });                                                            // nothing answers now: the port is held by something else
+  const busy = runSupervised({ config, logger: quiet(), command: process.execPath, args: [exitWith(dir, EXIT.portBusy)], limits: LIMITS });
+  assert.deepEqual([await busy.done, fs.existsSync(alarm)], [EXIT.portBusy, true]);
 });

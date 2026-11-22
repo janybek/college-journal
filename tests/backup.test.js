@@ -17,7 +17,8 @@ test('a copy is a whole base in one file: it opens, is intact and holds the same
   const base = open(t, config);
   base.store.insertMany('rooms', [{ name: 'Ауд. 1' }, { name: 'Ауд. 2' }]);
   const res = await backupNow({ db: base.db, config, now: at(22), logger: quiet() });
-  assert.deepEqual([res.ok, path.basename(res.file), fs.readdirSync(config.backupDir)], [true, 'journal-2026-11-22.sqlite', ['journal-2026-11-22.sqlite']]);
+  assert.deepEqual([res.ok, path.basename(res.file), fs.readdirSync(config.backupDir)], [true, 'journal-2026-11-22.sqlite', ['journal-2026-11-22.sqlite', 'secret.key']]);
+  assert.equal(fs.readFileSync(path.join(config.backupDir, 'secret.key'), 'utf8'), fs.readFileSync(config.secretFile, 'utf8'));      // the secret is kept beside the copies: with the disk of the base it would be lost too
   // учение восстановления: копию кладём на место базы в новой папке данных вместе с secret.key — администратор входит, строки на месте
   const restored = tempConfig(t);
   fs.mkdirSync(restored.dataDir, { recursive: true });
@@ -73,7 +74,7 @@ test('a copy that does not pass the check is not kept and replaces nothing', asy
   const log = quiet();
   const res = await backupNow({ db: base.db, config, now: at(22, 6), logger: log });
   assert.deepEqual([res.ok, fs.readFileSync(good.file).equals(bytes), fs.readdirSync(config.backupDir), log.lines.some((l) => /BACKUP FAILED/.test(l))],
-    [false, true, ['journal-2026-11-22.sqlite'], true]);
+    [false, true, ['journal-2026-11-22.sqlite', 'secret.key'], true]);
 });
 
 test('verifyCopy refuses a cut file, a text file, a base without a sheet and a base without staff; a good copy leaves no -wal or -shm beside it', async (t) => {

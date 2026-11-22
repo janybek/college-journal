@@ -6,7 +6,7 @@ import { handleRequest } from '../api.js';
 import { actionKind } from '../../core/permissions.js';
 import { createLoginGuard } from '../../core/loginGuard.js';
 import { createNodePlatform } from '../platform/nodePlatform.js';
-import { readConfig, ConfigError } from './config.js';
+import { readConfig, ConfigError, START_ALERT_FILE } from './config.js';
 import { initBase, openBase, resetAdminPassword, BaseError } from './base.js';
 import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from './http.js';
 import { createLogger } from './log.js';
@@ -176,6 +176,9 @@ export async function main(argv, { env = process.env, root, out = console.log, n
     }
     // the port is ours now: a request left from the last time is stale, a request meant for another server is not touched before this point
     fs.rmSync(config.stopFile, { force: true });
+    try {
+      if (config.alertDir) fs.rmSync(path.join(config.alertDir, START_ALERT_FILE), { force: true });      // the journal runs: the alarm "did not start" is over
+    } catch (error) { /* the folder of the alert is not there */ }
     fs.writeFileSync(config.stateFile, JSON.stringify({ pid: process.pid, port: server.port, startedAt: clock() }));
     logger.info(`server started on port ${server.port}`);
     out(`Сервер журнала: ${server.url}  база: ${config.dbFile}`);

@@ -6,6 +6,7 @@ import path from 'node:path';
 
 export const DEFAULTS = { port: 5373, origins: ['https://janybek.github.io'] };
 export const LOCAL_CONFIG = 'serve.local.json';
+export const START_ALERT_FILE = 'Журнал — не запустился.txt';
 
 const REPO_ROOT = path.resolve(import.meta.dirname, '..', '..');
 const STAND_PORTS = [5173, 5273];
