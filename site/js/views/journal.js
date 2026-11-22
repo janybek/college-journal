@@ -1,8 +1,8 @@
 import { call } from '../api.js';
 import { t } from '../i18n.js';
 import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '../ui.js';
-import { journalColumns, cellView, pairHead, canMark, pairHint } from '../journal.js';
-import { openMarksDialog } from './journalPair.js';
+import { journalColumns, cellView, pairHead, canMark, pairHint, pairActions } from '../journal.js';
+import { openMarksDialog, openPairActionDialog } from './journalPair.js';
 import { openCellDialog } from './journalCell.js';
 import { openUnitDialog, openCurrentDialog } from './journalUnit.js';
 import { icon } from '../icons.js';
@@ -128,7 +128,7 @@ function tip(text) {
 }
 
 function head(column, journal) {
-  if (column.type === 'pair') return pairHeadCell(column.pair);
+  if (column.type === 'pair') return pairHeadCell(column.pair, journal.can);
   if (column.type === 'unit') {
     const label = t('journal.col.' + column.field);
     const unit = journal.units.find((u) => u.unit === column.unit);
@@ -151,14 +151,15 @@ function head(column, journal) {
     tipKey ? tip(t(tipKey)) : null);
 }
 
-function pairHeadCell(pair) {
+function pairHeadCell(pair, can) {
   const { kindKey, stateKey } = pairHead(pair);
   const narrow = pair.status === 'cancelled' || pair.status === 'missed';
   const topic = pair.topicName ? t('journal.topic', { n: pair.number === '' ? '' : pair.number, name: pair.topicName }) : t('journal.topicNone');
   const hint = pairHint(pair, activeRole(getUser()));
   const tipText = [topic, stateKey ? t(stateKey) : null, pair.substitution ? t('journal.sub', { name: pair.teacherName }) : null, hint ? t(hint) : null].filter(Boolean).join(' · ');
   const open = canMark(pair);
-  return el('th', { scope: 'col', class: `jg-pair-head${narrow ? ' is-narrow' : ''}${pair.status === 'planned' ? ' is-planned' : ''}${open ? ' is-open' : ''}`, tabindex: open ? null : '0', 'data-pair': pair.id },
+  const menu = pairActions(pair, can);
+  return el('th', { scope: 'col', class: `jg-pair-head${menu.length > 0 ? ' has-menu' : ''}${narrow ? ' is-narrow' : ''}${pair.status === 'planned' ? ' is-planned' : ''}${open ? ' is-open' : ''}`, tabindex: open ? null : '0', 'data-pair': pair.id },
     open ? el('button', {
       type: 'button', class: 'jg-open', id: openId(pair), 'aria-haspopup': 'dialog',
       'aria-label': t('journal.marks.open', { date: dayMonth(pair.date), kind: t(kindKey) }), onclick: () => openMarks(pair),
@@ -169,7 +170,76 @@ function pairHeadCell(pair) {
     pair.substitution ? el('span', { class: 'jg-pair-head__sub' }, surname(pair.teacherName)) : null,
     open ? el('span', { class: 'jg-pair-head__act', 'aria-hidden': 'true' }, icon('pencil'),
       pair.status === 'planned' ? el('span', { class: 'jg-pair-head__act-text' }, t('journal.markAction')) : null) : null,
+    menu.length > 0 ? actionMenuButton(pair, menu) : null,
     tip(tipText));
+}
+
+const menuId = (pair) => `journal-menu-${pair.id}`;
+
+// The button «…» in the head of a pair (the deanery only): a small menu with the actions of pairActions.
+function actionMenuButton(pair, actions) {
+  return el('button', {
+    type: 'button', class: 'jg-menu-btn', id: menuId(pair), 'aria-haspopup': 'menu', 'aria-expanded': 'false',
+    'aria-label': t('journal.action.menu', { date: dayMonth(pair.date) }),
+    onclick: (event) => openActionMenu(event.currentTarget, pair, actions),
+  }, '…');
+}
+
+// The menu hangs on the document (the table scrolls and would cut it); it closes on a choice, Escape, a click elsewhere or a scroll.
+function openActionMenu(button, pair, actions) {
+  const was = document.getElementById('journal-menu');
+  if (was) { was.dispatchEvent(new Event('dismiss')); if (was.dataset.pair === pair.id) return; }
+  const close = (focusBack) => {
+    menu.remove();
+    button.setAttribute('aria-expanded', 'false');
+    document.removeEventListener('pointerdown', onOutside, true);
+    document.removeEventListener('keydown', onKey, true);
+    window.removeEventListener('hashchange', close);
+    window.removeEventListener('resize', close);
+    document.removeEventListener('scroll', close, true);
+    if (focusBack === true) button.focus();
+  };
+  const onOutside = (event) => { if (!menu.contains(event.target) && !button.contains(event.target)) close(); };
+  const onKey = (event) => {
+    if (event.key === 'Escape') { event.stopPropagation(); close(true); return; }
+    const items = [...menu.querySelectorAll('[role="menuitem"]')];
+    const at = items.indexOf(document.activeElement);
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      items[(at + (event.key === 'ArrowDown' ? 1 : items.length - 1)) % items.length].focus();
+    } else if (event.key === 'Tab') close();
+  };
+  const menu = el('div', { class: 'jg-menu', id: 'journal-menu', role: 'menu', 'data-pair': pair.id, 'aria-label': t('journal.action.menu', { date: dayMonth(pair.date) }) },
+    actions.map((action) => el('button', {
+      type: 'button', role: 'menuitem', class: `jg-menu__item${action === 'clear' ? ' is-danger' : ''}`, 'data-action': action,
+      onclick: () => { close(); openAction(pair, action); },
+    }, t('journal.action.' + action))));
+  menu.addEventListener('dismiss', () => close());
+  document.body.append(menu);
+  const box = button.getBoundingClientRect();
+  menu.style.top = `${Math.round(box.bottom + 4)}px`;
+  menu.style.left = `${Math.max(8, Math.round(Math.min(box.right - menu.offsetWidth, window.innerWidth - menu.offsetWidth - 8)))}px`;
+  button.setAttribute('aria-expanded', 'true');
+  document.addEventListener('pointerdown', onOutside, true);
+  document.addEventListener('keydown', onKey, true);
+  window.addEventListener('hashchange', close);
+  window.addEventListener('resize', close);
+  document.addEventListener('scroll', close, true);
+  menu.querySelector('[role="menuitem"]').focus();
+}
+
+// The window of a deanery action on a pair; the grid is drawn again from the answer.
+function openAction(pair, action) {
+  const owner = state;
+  openPairActionDialog({
+    pair, action,
+    onSaved: (data) => {
+      if (state !== owner) return;
+      owner.data = data;
+      refresh();
+    },
+    onClosed: () => focusById(menuId(pair), openId(pair)),
+  });
 }
 
 const openId = (pair) => `journal-open-${pair.id}`;

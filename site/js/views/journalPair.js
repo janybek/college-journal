@@ -259,3 +259,100 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
   dialog.showModal();
   focusById(held ? 'journal-marks-cancel' : 'journal-marks-all', 'journal-marks-cancel');
 }
+
+// ---- The window of a deanery action on a pair: «Не проведена», «Вернуть в расписание», «Сбросить отметки» ----
+
+const ACTION_CALL = { miss: 'journal.missPair', reopen: 'journal.reopenPair', clear: 'journal.reopenPair' };
+
+// action: 'miss' | 'reopen' | 'clear' (see pairActions); the reason is always required. onSaved(data) gets the new journal answer
+// and is called before anything that touches the window (the grid is drawn again from it); onClosed() gives the focus back.
+export function openPairActionDialog({ pair, action, onSaved, onClosed }) {
+  document.getElementById('journal-action')?.remove();
+  let busy = false;
+  const reasonArea = el('textarea', {
+    id: 'journal-action-reason', name: 'reason', class: 'field__input field__textarea', rows: '3', maxlength: String(REASON_MAX),
+    'aria-describedby': 'journal-action-reason-hint journal-action-reason-count', 'aria-required': 'true',
+  });
+  const reasonCount = el('span', { class: 'return-count', id: 'journal-action-reason-count', 'aria-live': 'polite' }, t('journal.marks.reason.count', { n: 0, max: REASON_MAX }));
+  const reasonError = el('p', { class: 'field__error', id: 'journal-action-reason-error', hidden: true });
+  const problem = el('div', { class: 'mk-problem' });
+
+  const showReasonError = (key) => {
+    reasonError.replaceChildren(icon('alert'), t(key));
+    reasonError.hidden = false;
+    reasonArea.setAttribute('aria-invalid', 'true');
+    reasonArea.setAttribute('aria-describedby', 'journal-action-reason-hint journal-action-reason-count journal-action-reason-error');
+  };
+  const clearReasonError = () => {
+    reasonError.hidden = true;
+    reasonArea.removeAttribute('aria-invalid');
+    reasonArea.setAttribute('aria-describedby', 'journal-action-reason-hint journal-action-reason-count');
+  };
+  reasonArea.addEventListener('input', () => {
+    reasonCount.textContent = t('journal.marks.reason.count', { n: reasonArea.value.length, max: REASON_MAX });
+    clearReasonError();
+    problem.replaceChildren();
+  });
+
+  const goLabel = t(`journal.action.${action}.go`);
+  const go = el('button', { type: 'button', id: 'journal-action-go', class: `button ${action === 'clear' ? 'button--danger' : 'button--primary'}` }, goLabel);
+
+  async function save() {
+    if (busy) return;
+    problem.replaceChildren();
+    const text = reasonArea.value.trim();
+    if (text === '') { showReasonError('journal.marks.error.reason.required'); reasonArea.focus(); return; }
+    if (text.length > REASON_MAX) { showReasonError('journal.marks.error.reason.too_long'); reasonArea.focus(); return; }
+    busy = true;
+    markBusy(go, 'common.saving');
+    try {
+      const data = await call(ACTION_CALL[action], { pairId: pair.id, reason: text });
+      busy = false;
+      onSaved(data);
+      if (!dialog.isConnected) return;
+      dialog.close();
+    } catch (error) {
+      if (!dialog.isConnected) return;
+      busy = false;
+      go.classList.remove('is-busy');
+      go.removeAttribute('aria-disabled');
+      go.removeAttribute('aria-busy');
+      go.textContent = goLabel;
+      const reasonField = error.code === 'invalid' && Array.isArray(error.fields) ? error.fields.find((f) => f.field === 'reason') : null;
+      if (reasonField) { showReasonError(reasonField.code === 'too_long' ? 'journal.marks.error.reason.too_long' : 'journal.marks.error.reason.required'); reasonArea.focus(); }
+      else problem.replaceChildren(note('error', t(errorKey(error.code)), { role: 'alert' }));
+    }
+  }
+  go.addEventListener('click', save);
+
+  const onHash = () => dialog.close();
+  const kind = pair.lessonType ? t('lessonType.' + pair.lessonType) : t('journal.marks.kind.none');
+  const topic = pair.topicName ? t('journal.topic', { n: pair.number, name: pair.topicName }) : t('journal.topicNone');
+  const dialog = modal({
+    id: 'journal-action', labelledBy: 'journal-action-title', className: 'dialog--action',
+    onClose: () => {
+      window.removeEventListener('hashchange', onHash);
+      dialog.remove();
+      if (onClosed) onClosed();
+    },
+    canCancel: () => !busy,
+  },
+  el('div', { class: 'mk-head' },
+    el('p', { class: 'dialog__kicker' }, t('journal.marks.when', { date: dateText(pair.date), slot: pair.slot, time: pair.startTime })),
+    el('h2', { class: 'dialog__title', id: 'journal-action-title' }, t(`journal.action.${action}.title`)),
+    el('p', { class: 'mk-topic' }, badge(kind, pair.lessonType === 'control' ? 'primary' : 'neutral'), el('span', {}, topic))),
+  note(action === 'clear' ? 'warning' : 'info', t(`journal.action.${action}.note`), { id: 'journal-action-note' }),
+  el('div', { class: 'field mk-reason' },
+    el('label', { class: 'field__label', for: 'journal-action-reason' }, t('journal.marks.reason.label')),
+    el('p', { class: 'field__hint', id: 'journal-action-reason-hint' }, t('journal.action.reason.hint')),
+    el('div', { class: 'field__control' }, reasonArea),
+    el('div', { class: 'return-under' }, reasonError, reasonCount)),
+  problem,
+  el('div', { class: 'dialog__actions mk-actions' },
+    el('button', { type: 'button', id: 'journal-action-cancel', class: 'button button--secondary', onclick: () => { if (!busy) dialog.close(); } }, t('common.cancel')),
+    go));
+  window.addEventListener('hashchange', onHash);
+  document.body.append(dialog);
+  dialog.showModal();
+  focusById('journal-action-reason');
+}

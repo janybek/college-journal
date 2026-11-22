@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -173,4 +173,19 @@ test('needsReason: the first value of the own teacher needs none; a change, the 
   assert.equal(needsReason([{ studentId: 'c', value: 7 }, { studentId: 'a', value: 31 }], RJ, 1, 'control', true), true);
   assert.equal(needsReason([{ studentId: 'c', value: 7 }], RJ, 1, 'control', false), true);
   assert.equal(needsReason([{ studentId: 'c', value: 7 }], RJ, 1, 'current', true), true);
+});
+
+test('pairActions: the deanery actions on a pair by its status and state; none without can.manage', () => {
+  const can = { manage: true };
+  assert.deepEqual(pairActions({ status: 'planned', state: 'open' }, can), ['miss']);
+  assert.deepEqual(pairActions({ status: 'planned', state: 'late' }, can), ['miss']);
+  assert.deepEqual(pairActions({ status: 'planned', state: 'future' }, can), []);
+  assert.deepEqual(pairActions({ status: 'missed', state: 'missed' }, can), ['reopen']);
+  assert.deepEqual(pairActions({ status: 'closed', state: 'open' }, can), ['clear']);
+  assert.deepEqual(pairActions({ status: 'cancelled', state: 'cancelled' }, can), []);
+  assert.deepEqual(pairActions({ status: 'running', state: 'open' }, can), []);
+  for (const none of [{ manage: false }, {}, undefined]) {
+    assert.deepEqual(pairActions({ status: 'planned', state: 'open' }, none), []);
+    assert.deepEqual(pairActions({ status: 'closed', state: 'open' }, none), []);
+  }
 });

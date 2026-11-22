@@ -360,3 +360,12 @@ test('task 21: the windows of the results of a unit have their texts in every la
     assert.ok(dict['journal.unit.open.current'].includes('{name}'));
   }
 });
+
+test('task 22: the deanery actions on a pair have their texts in every language', () => {
+  const keys = ['menu', 'miss', 'reopen', 'clear', 'miss.title', 'miss.note', 'reopen.title', 'reopen.note', 'clear.title', 'clear.note', 'miss.go', 'reopen.go', 'clear.go', 'reason.hint']
+    .map((k) => 'journal.action.' + k);
+  keys.push('error.pair_locked', 'error.too_early', 'error.has_marks');
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) assert.ok(dict['journal.action.menu'].includes('{date}'));
+  assert.equal(ru['journal.action.miss'], 'Не проведена');
+});

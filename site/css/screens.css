@@ -6250,3 +6250,82 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 @media (max-width: 600px) {
   .dialog--unit .ju-list { max-height: none; overflow: visible; padding-right: 0; }
 }
+
+/* Task 22: the menu «…» in the head of a pair and the window of a deanery action. */
+.jg-pair-head.has-menu { min-width: 5.5rem; }
+
+.jg-menu-btn {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  min-height: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0 0.25rem;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.jg-menu-btn:hover,
+.jg-menu-btn[aria-expanded="true"] { background: var(--primary-line); color: var(--text); }
+
+.jg-menu-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.jg-menu {
+  position: fixed;
+  z-index: 60;
+  min-width: 12rem;
+  padding: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-inner);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-pop);
+}
+
+.jg-menu__item {
+  display: block;
+  width: 100%;
+  min-height: 2.5rem;
+  padding: 0 var(--space-3);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9375rem;
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.jg-menu__item:hover,
+.jg-menu__item:focus-visible { background: var(--primary-wash); outline: none; }
+
+.jg-menu__item:focus-visible { box-shadow: inset 0 0 0 2px var(--primary); }
+
+.jg-menu__item.is-danger { color: var(--danger); }
+
+.dialog--action { width: min(calc(100% - 1rem), 34rem); }
+
+.dialog--action .dialog__body { display: flex; flex-direction: column; gap: var(--space-4); }
+
+/* A narrow head (missed pair) has no room at the side: the button goes under the date. */
+.jg-pair-head.is-narrow .jg-menu-btn {
+  top: auto;
+  bottom: 0;
+  left: 50%;
+  height: 1.25rem;
+  min-height: 1.25rem;
+  transform: translateX(-50%);
+}

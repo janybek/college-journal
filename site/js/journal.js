@@ -66,6 +66,16 @@ export function pairHead(pair) {
   return { kindKey, stateKey };
 }
 
+// The deanery actions on a pair (the menu «…» of its head): «not held» for a pair that may still be missed, «back to the
+// schedule» for a missed one, «reset the marks» for a held one. Nothing for the roles that only fill in or look.
+export function pairActions(pair, can) {
+  if (!can || can.manage !== true) return [];
+  if (pair.status === 'planned' && (pair.state === 'open' || pair.state === 'late')) return ['miss'];
+  if (pair.status === 'missed') return ['reopen'];
+  if (pair.status === 'closed') return ['clear'];
+  return [];
+}
+
 // ---- The marks of a pair (the window «Отметки пары») ----
 
 const NO_ACTIVITY = ['absent', 'excused'];
