@@ -96,6 +96,24 @@ test('student results: preliminary is the mean of unit totals', () => {
   assert.equal(r.word, 'good');
 });
 
+test('student results: self above the maximum is capped, total stays within 100', () => {
+  const u = run({ unitRows: rows({ self: 25, control: 40, currentManual: 40 }) }).units[0];
+  assert.equal(u.self, 20);
+  assert.equal(u.total, 100);
+});
+
+test('student results: the minimum is the border of the low flags', () => {
+  const at = run({ unitRows: rows({ currentManual: 24, control: 24 }) }).units[0];
+  assert.deepEqual([at.currentLow, at.controlLow], [false, false]);
+  const below = run({ unitRows: rows({ currentManual: 23, control: 23 }) }).units[0];
+  assert.deepEqual([below.currentLow, below.controlLow], [true, true]);
+});
+
+test('attendance percent rounds half up', () => {
+  assert.equal(attendanceStats([m('present'), m('present'), m('absent')]).percent, 67);
+  assert.equal(attendanceStats([m('present'), m('absent'), m('absent'), m('absent'), m('absent'), m('absent'), m('absent'), m('absent')]).percent, 13);
+});
+
 test('student results: a shrunk scheme caps stored values, total never above 100', () => {
   const scheme = { ...S, current: 50, self: 20, control: 30 };
   const capped = run({ scheme, unitRows: rows({ control: 40, self: 20, currentManual: 55 }) }).units[0];
