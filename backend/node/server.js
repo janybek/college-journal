@@ -118,7 +118,7 @@ function showPassword(out, { adminLogin, adminTempPassword }) {
   out('Запишите пароль: он показан один раз и нигде не сохранён. При первом входе журнал попросит его сменить.');
 }
 
-export async function main(argv, { env = process.env, root, out = console.log, now, nodeVersion = process.versions.node } = {}) {
+export async function main(argv, { env = process.env, root, out = console.log, now, nodeVersion = process.versions.node, stopCheckMs = 2000 } = {}) {
   if (Number.parseInt(nodeVersion, 10) < MIN_NODE) {
     out(`Нужен Node 24 или новее (сейчас ${nodeVersion})`);
     return { code: EXIT.config };
@@ -174,14 +174,18 @@ export async function main(argv, { env = process.env, root, out = console.log, n
       base.close();
       throw error;
     }
+    // the port is ours now: a request left from the last time is stale, a request meant for another server is not touched before this point
+    fs.rmSync(config.stopFile, { force: true });
     fs.writeFileSync(config.stateFile, JSON.stringify({ pid: process.pid, port: server.port, startedAt: clock() }));
     logger.info(`server started on port ${server.port}`);
     out(`Сервер журнала: ${server.url}  база: ${config.dbFile}`);
     let finish;
     const done = new Promise((resolve) => { finish = resolve; });
     let stopped = null;
+    let watcher = null;
     const stop = () => {
       stopped ??= (async () => {
+        clearInterval(watcher);
         backups.stop();
         await server.close();
         base.close();
@@ -191,6 +195,13 @@ export async function main(argv, { env = process.env, root, out = console.log, n
       })();
       return stopped;
     };
+    watcher = setInterval(() => {
+      if (!fs.existsSync(config.stopFile)) return;
+      logger.info('stop requested');
+      fs.rmSync(config.stopFile, { force: true });
+      stop();
+    }, stopCheckMs);
+    watcher.unref();
     return { code: EXIT.ok, server, base, stop, done };
   } catch (error) {
     if (error instanceof ConfigError || error instanceof BaseError) {
