@@ -1,4 +1,4 @@
-import { getToken } from './session.js';
+import { getToken, getUser } from './session.js';
 
 // The number beside «Силлабусы на утверждении» in the menu: the versions under review. Read with one light request
 // (syllabus.queue { countOnly }) once per opening of the site, and again after a version is approved or returned;
@@ -21,9 +21,12 @@ export function setReviewCount(n) {
   if (before !== n) for (const listener of listeners) listener(n);
 }
 
-// A failed request leaves the number as it was.
+// Only someone with the queue (syllabus.queue) asks: a teacher who sends a version sends no request at all. A failed
+// request leaves the number as it was.
 export async function refreshReviewCount() {
   const token = getToken();
+  const user = getUser();
+  if (token === null || !user || !Array.isArray(user.permissions) || !user.permissions.includes('syllabus.queue')) return;
   try {
     const { call } = await import('./api.js');
     const { count } = await call('syllabus.queue', { countOnly: true });

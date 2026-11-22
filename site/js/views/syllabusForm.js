@@ -14,6 +14,7 @@ import { syllabusBook } from '../excel.js';
 import { loadXlsx } from '../xlsxLoader.js';
 import { renderTab } from './syllabusFormTabs.js';
 import { leaveUpload, renderUpload, startUpload } from './syllabusUpload.js';
+import { refreshReviewCount } from '../reviewCount.js';
 
 // The form of a syllabus version (#/syllabus-form/<syllabusId>/<tab>): the head with the status and the buttons of the
 // version (the file into the draft, the draft as a file, «Отправить на утверждение»), the remark of the deanery on a
@@ -601,6 +602,8 @@ async function send() {
   refresh();
   try {
     const result = await call('syllabus.submit', { syllabusId: owner.syllabusId });
+    // The queue grew: the number of the menu is read again (only by those who have the queue; reviewCount.js checks).
+    if (submitOutcome(result) === 'sent') refreshReviewCount();
     if (state !== owner) return;
     const outcome = submitOutcome(result);
     if (outcome === 'sent') {

@@ -4,7 +4,7 @@ import { el, errorKey, avatar, avatarTone, badge, emptyState, note, pageHeader, 
 import { icon } from '../icons.js';
 import { isDate, dayParts } from '../dates.js';
 import { permissions } from '../shell.js';
-import { setReviewCount, refreshReviewCount } from '../reviewCount.js';
+import { setReviewCount } from '../reviewCount.js';
 import { openReturnDialog } from './syllabus.js';
 
 // «Силлабусы на утверждении» (#/review): the versions teachers sent to the deanery, the oldest first (syllabus.queue).
@@ -148,13 +148,12 @@ function orphanActions(row, nameId) {
     }, icon('pencil'), t('syllabus.action.giveBack')) : null);
 }
 
-// After the return the version leaves the queue: the queue and the number of the menu are read again.
+// After the return the version leaves the queue: the queue is read again, and its answer gives the menu its number.
 function giveBack(row) {
   const owner = state;
   openReturnDialog(row.syllabusId, () => {
     if (state !== owner) return;
     owner.doneKey = 'syllabus.return.done';
-    refreshReviewCount();
     load().then(() => focusById('app'));
   });
 }
