@@ -37,6 +37,16 @@ export function baseIsEmpty(db) {
   return true;
 }
 
+// Deletes every row of every table of the schema except the administrator. Returns [[table, count]] of what was erased.
+function wipeBase(db) {
+  const erased = [];
+  for (const table of Object.keys(SCHEMA)) {
+    const result = table === 'staff' ? db.prepare(`DELETE FROM "staff" WHERE "login" <> 'admin'`).run() : db.prepare(`DELETE FROM "${table}"`).run();
+    if (result.changes > 0) erased.push([table, Number(result.changes)]);
+  }
+  return erased;
+}
+
 // A checked copy under a name of its own: the daily copy of the same date is rewritten by the next start of the server and must not take the demo data.
 function copyBefore(db, config, now) {
   fs.mkdirSync(config.backupDir, { recursive: true });
@@ -72,7 +82,7 @@ function passwordText(password) {
 }
 
 // Returns { code }. The caller has checked nothing: the stop of the server, the settings, the empty base are all checked here.
-export async function runDemo(config, { out = console.log, now, logger }) {
+export async function runDemo(config, { out = console.log, now, logger, wipe = false }) {
   const clock = now ?? clockNow;
   if (!config.alertDir) {
     out('Не указана папка тревог (alertDir) в настройках: пароль пробных людей некуда записать. Ничего не изменено');
@@ -88,7 +98,13 @@ export async function runDemo(config, { out = console.log, now, logger }) {
   let wroteFile = false;
   try {
     base.upgrade();
-    if (!baseIsEmpty(base.db)) {
+    if (wipe) {
+      const admins = base.db.prepare(`SELECT count(*) AS n FROM "staff" WHERE "login" = 'admin'`).get().n;
+      if (admins !== 1) {
+        out('В базе нет администратора (admin): ничего не изменено');
+        return { code: DEMO_EXIT.config };
+      }
+    } else if (!baseIsEmpty(base.db)) {
       out('В базе уже есть данные - пробные данные заливаются только в пустую базу');
       return { code: DEMO_EXIT.config };
     }
@@ -114,13 +130,22 @@ export async function runDemo(config, { out = console.log, now, logger }) {
       return { code: DEMO_EXIT.config };
     }
     // the file is there before the people: people without a known password are worse than a file without people
-    if (!seedDemo(base.store, base.platform, { password })) {
+    let erased = [];
+    const ok = base.store.transaction(() => {
+      if (wipe) erased = wipeBase(base.db);
+      const done = seedDemo(base.store, base.platform, { password });
+      if (wipe && !done) throw new Error('the demo data are not added after the wipe');       // rolls the wipe back too
+      return done;
+    });
+    if (!ok) {
       fs.rmSync(passwordFile, { force: true });
       out('В базе уже есть данные - пробные данные заливаются только в пустую базу');
       return { code: DEMO_EXIT.config };
     }
     wroteFile = false;
-    logger?.info('demo data added');
+    const total = erased.reduce((sum, [, n]) => sum + n, 0);
+    if (wipe) out(`Стёрто строк: ${total}${total > 0 ? ' (' + erased.map(([table, n]) => `${table}: ${n}`).join(', ') + ')' : ''}`);
+    logger?.info(wipe ? `demo data added (wiped ${total} rows)` : 'demo data added');
     out(`Пробные данные залиты; пароль записан в файл ${passwordFile}`);
     out(`Копия базы до заливки: ${copy}`);
     return { code: DEMO_EXIT.ok };

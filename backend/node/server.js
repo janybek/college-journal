@@ -126,7 +126,8 @@ export async function main(argv, { env = process.env, root, out = console.log, n
     return { code: EXIT.config };
   }
   const command = argv[0];
-  if (argv.length > 1 || (command !== undefined && command !== '--init' && command !== '--admin-password' && command !== '--backup' && command !== '--demo')) {
+  const wipe = command === '--demo' && argv.length === 2 && argv[1] === '--wipe';
+  if ((argv.length > 1 && !wipe) || (command !== undefined && command !== '--init' && command !== '--admin-password' && command !== '--backup' && command !== '--demo')) {
     out(`Неизвестный параметр: ${argv.join(' ')}`);
     return { code: EXIT.config };
   }
@@ -148,7 +149,7 @@ export async function main(argv, { env = process.env, root, out = console.log, n
       return { code: EXIT.ok };
     }
 
-    if (command === '--demo') return await runDemo(config, { out, now, logger });
+    if (command === '--demo') return await runDemo(config, { out, now, logger, wipe });
 
     if (command === '--backup') {
       const base = openBase(config, { now });
