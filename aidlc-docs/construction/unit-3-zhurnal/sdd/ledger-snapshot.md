@@ -46,3 +46,6 @@ Owner stops: after task 19 (block 1), 21 (block 2), 25 (block 3), 26 (block 4).
 - Task 17: dispatched journal-screens (opus), BASE 3a9c2a1
 - Task 17: implementer DONE eb040e3 (opus, 678 tests, shots in task-17-shots/, stand and Chrome stopped by own PIDs). NOT YET REVIEWED. Noted: teacher menu «Журнал» vs page heading «Журналы» (dictionary-only); extra keys journal.loading, journal.list.*.
 - PAUSE 22.11 (owner asked about credits): 5-hour limit 94%, weekly 73%, Fable weekly 85%. Next: review task 17 (BASE 3a9c2a1, HEAD eb040e3), then tasks 18–19 → block 1 stop. Owner to choose savings (see aidlc-state step 5).
+- OWNER RULING 22.11 (economy, all 4): new chat for the coordinator; screens 18–26 on sonnet; AI review only for tasks 19, 20, 22, 26 (rights/student data), others accepted by the owner per block; final review of the unit on opus (not fable).
+- Task 17: complete (commits 3a9c2a1..eb040e3, no AI review per owner ruling — owner reviews block 1).
+- RESUME HERE: Task 18 (sonnet, journal-screens), BASE eb040e3. Then 19 (+review) → block 1 stop: raise journal-dev-reset, log in as teacher1, give the owner the list, notes into aidlc-docs/construction/unit-3-zhurnal/замечания.md.
