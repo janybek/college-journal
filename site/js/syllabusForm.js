@@ -56,12 +56,14 @@ const filled = (list) => (Array.isArray(list) ? list.filter((row) => !blankRow(r
 // The section without the rows nobody filled in (the form never sends them: the server would name an empty book
 // `required`, and the places of its errors would not be the places on the screen). Lessons of the plan always stay:
 // a lesson without a name is a mistake the server names at its field. Nothing dropped: the same object back.
+const BLANK_LISTS = {
+  goals: ['knowledge', 'skill', 'attitude', 'prerequisite', 'postrequisite'],
+  selfWork: ['items'], literature: ['main', 'extra'], software: ['items'], policies: ['grading', 'behavior', 'ethics'],
+};
+
 export function withoutBlankRows(section, value) {
   if (!value || typeof value !== 'object') return value;
-  const lists = {
-    goals: ['knowledge', 'skill', 'attitude', 'prerequisite', 'postrequisite'],
-    selfWork: ['items'], literature: ['main', 'extra'], software: ['items'], policies: ['grading', 'behavior', 'ethics'],
-  }[section] || [];
+  const lists = BLANK_LISTS[section] || [];
   let out = value;
   for (const key of lists) {
     if (Array.isArray(value[key]) && value[key].some(blankRow)) out = { ...out, [key]: filled(value[key]) };
@@ -70,6 +72,24 @@ export function withoutBlankRows(section, value) {
     out = { ...out, units: value.units.map((u) => (Array.isArray(u.literature) ? { ...u, literature: filled(u.literature) } : u)) };
   }
   return out;
+}
+
+// The places on the screen of the server's errors: the form sends a section without its empty rows (and keeps them on
+// the screen), so the index of a row in the list the server saw is turned back into the index of that row on the screen.
+// value: the section as it stood on the screen when it was sent.
+export function placeErrors(section, value, errors) {
+  if (!Array.isArray(errors)) return [];
+  if (!value || typeof value !== 'object') return errors;
+  const lists = BLANK_LISTS[section] || [];
+  const places = (list) => (Array.isArray(list) ? list.map((row, i) => (blankRow(row) ? -1 : i)).filter((i) => i >= 0) : []);
+  return errors.map((error) => {
+    if (!error || typeof error !== 'object' || error.list === undefined || typeof error.index !== 'number') return error;
+    let list = null;
+    if (section === 'units' && error.list === 'literature') list = ((value.units || []).find((u) => u.unit === error.unit) || {}).literature;
+    else if (lists.includes(error.list)) list = value[error.list];
+    const at = list ? places(list)[error.index] : undefined;
+    return at === undefined ? error : { ...error, index: at };
+  });
 }
 
 const without = (object, keys) => Object.fromEntries(Object.entries(object).filter(([key]) => !keys.includes(key)));
@@ -88,27 +108,135 @@ export function sectionData(section, doc) {
   return copy(value) ?? {};
 }
 
-// The section on the screen differs from the one last saved.
-export function isDirty(section, doc, saved) {
-  return JSON.stringify(sectionData(section, doc)) !== JSON.stringify(sectionData(section, saved));
+// The same value whatever the order of the keys of its objects (arrays keep their order).
+export function sameValue(a, b) {
+  if (a === b) return true;
+  if (Array.isArray(a) || Array.isArray(b)) {
+    return Array.isArray(a) && Array.isArray(b) && a.length === b.length && a.every((item, i) => sameValue(item, b[i]));
+  }
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object') return false;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => Object.prototype.hasOwnProperty.call(b, key) && sameValue(a[key], b[key]));
 }
 
-// The errors of the server -> Map(key of the field -> code); the first error of a field wins. A key reads like its
-// place: 'credits', 'knowledge' (the list as a whole), 'knowledge.2.text', 'u1.lecture.0.hours' (unit 1), 'units'.
-// An error with no place (e.g. a lesson of no unit) gets the key ''.
+// A description of a unit with nothing in it: typed and erased again it is no change (it is still sent: an emptied
+// description must reach the server).
+const blankUnit = (unit) => ['description', 'questions', 'guidance', 'results'].every((key) => isBlank(unit[key]))
+  && !(Array.isArray(unit.literature) && unit.literature.length > 0);
+
+// The section on the screen differs from the one last saved.
+export function isDirty(section, doc, saved) {
+  const of = (source) => {
+    const data = sectionData(section, source);
+    return section === 'units' ? { units: data.units.filter((unit) => !blankUnit(unit)) } : data;
+  };
+  return !sameValue(of(doc), of(saved));
+}
+
+// The key of an error on the screen. A key reads like its place: 'credits', 'knowledge' (the list as a whole),
+// 'knowledge.2.text', 'u1.lecture.0.hours' (unit 1), 'units'. An error with no place (e.g. a lesson of no unit) gets
+// a key of its own, '!<its place in the list>', so that every one of them is shown.
+export function errorKeyOf(error, index) {
+  const parts = [];
+  if (error.unit !== undefined && error.unit !== null) parts.push('u' + error.unit);
+  if (error.list !== undefined) parts.push(error.list);
+  if (error.index !== undefined) parts.push(error.index);
+  if (error.field !== undefined) parts.push(error.field);
+  return parts.length > 0 ? parts.join('.') : '!' + index;
+}
+
+// The errors of the server -> Map(key of the field -> code); the first error of a field wins.
 export function errorMap(fields) {
   const out = new Map();
-  for (const error of Array.isArray(fields) ? fields : []) {
-    if (!error || typeof error !== 'object') continue;
-    const parts = [];
-    if (error.unit !== undefined && error.unit !== null) parts.push('u' + error.unit);
-    if (error.list !== undefined) parts.push(error.list);
-    if (error.index !== undefined) parts.push(error.index);
-    if (error.field !== undefined) parts.push(error.field);
-    const key = parts.join('.');
+  (Array.isArray(fields) ? fields : []).forEach((error, index) => {
+    if (!error || typeof error !== 'object') return;
+    const key = errorKeyOf(error, index);
     if (!out.has(key)) out.set(key, error.code);
-  }
+  });
   return out;
+}
+
+// What the line beside «Сохранить» says: 'locked' | 'invalid' | 'error' | 'dirty' | 'saved' | 'clean'.
+// status: what the last save of the tab ended with ({ kind }); errors: how many of its marks are still on the screen.
+// «Исправьте отмеченные поля» stays only while a mark is left.
+export function statusKind({ locked = false, status = null, errors = 0, dirty = false }) {
+  if (locked) return 'locked';
+  if (status && status.kind === 'invalid' && errors > 0) return 'invalid';
+  if (status && status.kind === 'error') return 'error';
+  if (dirty) return 'dirty';
+  if (status && status.kind === 'saved') return 'saved';
+  return 'clean';
+}
+
+// The errors of the form after a change of a list of a section: removing or moving rows takes the marks off the
+// section (their keys name the places of rows, which are other rows now); adding a row at the end keeps them.
+export function errorsAfterEdit(errors, section, edit) {
+  if ((edit !== 'remove' && edit !== 'move') || !errors || !(section in errors)) return errors;
+  const rest = { ...errors };
+  delete rest[section];
+  return rest;
+}
+
+// ---- «Порядок пар» ----
+
+const PAIR_HOURS = 2;
+
+// The pairs each lesson takes in the order of the list: [{ id, from, to }]; a lesson of 4 hours takes two (from 3,
+// to 4), a control without hours none (from and to null: it is a mark on the last pair of its unit).
+export function pairNumbers(lessons) {
+  let next = 1;
+  return (lessons || []).map((lesson) => {
+    const count = Math.floor((typeof lesson.hours === 'number' ? lesson.hours : 0) / PAIR_HOURS);
+    if (count <= 0) return { id: lesson.id, from: null, to: null };
+    const from = next;
+    next += count;
+    return { id: lesson.id, from, to: next - 1 };
+  });
+}
+
+const markOnly = (lesson) => lesson.lessonKind === 'control' && !(lesson.hours > 0);
+
+// The lesson at `index` can go a step up (-1) or down (1): the neighbour that way is of the same unit, and the unit
+// does not start with a control without hours afterwards (it is the mark on the last pair: the server refuses it).
+export function canMove(lessons, index, step) {
+  const list = lessons || [];
+  const to = index + step;
+  if (index < 0 || index >= list.length || to < 0 || to >= list.length || list[to].unit !== list[index].unit) return false;
+  const moved = listMove(list, index, step);
+  const first = moved.find((lesson) => lesson.unit === list[index].unit);
+  return !markOnly(first);
+}
+
+// A new list with the lesson moved; where it cannot go, the same order (as a copy).
+export function moveLesson(lessons, index, step) {
+  return canMove(lessons, index, step) ? listMove(lessons, index, step) : [...(lessons || [])];
+}
+
+// ---- The checks before submitting (syllabus.submit with dryRun) ----
+
+// { errors, warnings } -> Map(tab -> { errors, warnings }) with the numbers, in the order of the tabs; the tab of
+// a check is its section.
+export function checkTabs(checks) {
+  const counts = new Map();
+  const count = (list, kind) => {
+    for (const item of Array.isArray(list) ? list : []) {
+      if (!item || typeof item.section !== 'string') continue;
+      if (!counts.has(item.section)) counts.set(item.section, { errors: 0, warnings: 0 });
+      counts.get(item.section)[kind] += 1;
+    }
+  };
+  count(checks && checks.errors, 'errors');
+  count(checks && checks.warnings, 'warnings');
+  const rank = (tab) => (TABS.includes(tab) ? TABS.indexOf(tab) : TABS.length);
+  return new Map([...counts].sort((a, b) => rank(a[0]) - rank(b[0])));
+}
+
+// An error or a warning of the checks -> { key, params } for t(): with a field 'sform.checks.<section>.<field>',
+// otherwise 'sform.checks.<section>.<code>'. params: the topic (name), the date of its held pair (as the server gives
+// it), the hours held, the unit and the number of a row (n, from 1).
+export function checkLine(item) {
+  const key = item.field ? `sform.checks.${item.section}.${item.field}` : `sform.checks.${item.section}.${item.code}`;
+  return { key, params: { name: item.name, date: item.date, held: item.held, unit: item.unit, n: typeof item.index === 'number' ? item.index + 1 : undefined } };
 }
 
 // The numbers of the lessons as the tables of the form stand (before saving): Map('<unit>.<kind>.<place>' -> number),

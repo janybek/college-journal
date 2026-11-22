@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   TABS, tabOf, listAdd, listRemove, listMove, emptyItem, sectionData, isDirty, errorMap, tableNumbers, unitHasContent, withoutBlankRows,
+  pairNumbers, canMove, moveLesson, checkTabs, checkLine, placeErrors, errorsAfterEdit, statusKind,
 } from '../site/js/syllabusForm.js';
 
 const units = [{ unit: 1, title: 'Основы', lecture: [{ id: 'tp_1', name: 'Л', hours: 2, controlForms: '', selfHours: null, description: '', number: 1 }], practice: [], seminar: [], lab: [], control: [] },
@@ -69,4 +70,88 @@ test('tableNumbers: Л1, Л2… by kind, one after another through the units', (
 
 test('a unit with a row asks before it is removed', () => {
   assert.deepEqual([unitHasContent(units[0]), unitHasContent(emptyItem('unit'))], [true, false]);
+});
+
+// ---- Task 42: «Порядок пар», the checks before submitting, the fixes after the review of task 41 ----
+
+const lessons = [{ id: 'a', unit: 1, lessonKind: 'lecture', hours: 4 }, { id: 'b', unit: 1, lessonKind: 'practice', hours: 2 }, { id: 'm', unit: 1, lessonKind: 'control', hours: 0 },
+  { id: 'c', unit: 2, lessonKind: 'lecture', hours: 2 }];
+
+test('pairNumbers: the pairs a lesson takes, one after another; a control without hours takes none', () => {
+  assert.deepEqual(pairNumbers(lessons), [{ id: 'a', from: 1, to: 2 }, { id: 'b', from: 3, to: 3 }, { id: 'm', from: null, to: null }, { id: 'c', from: 4, to: 4 }]);
+  assert.deepEqual(pairNumbers([]), []);
+});
+
+test('canMove and moveLesson: only inside the unit', () => {
+  assert.deepEqual([canMove(lessons, 0, -1), canMove(lessons, 0, 1), canMove(lessons, 2, 1), canMove(lessons, 3, -1)], [false, true, false, false]);     // через границу юнита нельзя
+  assert.deepEqual([moveLesson(lessons, 1, -1).map((l) => l.id), moveLesson(lessons, 2, 1).map((l) => l.id)], [['b', 'a', 'm', 'c'], ['a', 'b', 'm', 'c']]);
+  assert.notEqual(moveLesson(lessons, 2, 1), lessons);
+  // a control without hours is a mark on the last pair of its unit: it never stands first there (the server refuses: control_first)
+  const marks = [{ id: 'x', unit: 1, lessonKind: 'lecture', hours: 2 }, { id: 'y', unit: 1, lessonKind: 'control', hours: 0 }, { id: 'z', unit: 1, lessonKind: 'control', hours: 2 }];
+  assert.deepEqual([canMove(marks, 1, -1), canMove(marks, 0, 1), canMove(marks, 2, -1), canMove(marks, 1, 1)], [false, false, true, true]);
+});
+
+const checks = { errors: [{ section: 'title', field: 'credits', code: 'required' }, { section: 'plan', unit: 2, code: 'unit_empty' }, { section: 'plan', code: 'held_missing', name: 'Введение', date: '2026-09-02' }],
+  warnings: [{ section: 'literature', code: 'empty' }] };
+
+test('checkTabs: the errors and the warnings of each tab', () => {
+  assert.deepEqual([...checkTabs(checks)], [['title', { errors: 1, warnings: 0 }], ['plan', { errors: 2, warnings: 0 }], ['literature', { errors: 0, warnings: 1 }]]);
+  // in the order of the tabs, whatever the order of the list
+  assert.deepEqual([...checkTabs({ errors: [{ section: 'selfWork', index: 0, code: 'bad_unit' }, { section: 'goals', field: 'goal', code: 'required' }], warnings: [] }).keys()], ['goals', 'selfWork']);
+  assert.deepEqual([...checkTabs(undefined)], []);
+});
+
+test('checkLine: the text of a check by its section and field or code', () => {
+  assert.deepEqual(checks.errors.map(checkLine).map((x) => x.key), ['sform.checks.title.credits', 'sform.checks.plan.unit_empty', 'sform.checks.plan.held_missing']);
+  assert.deepEqual([checkLine({ section: 'goals', field: 'goal', code: 'required' }).key, checkLine({ section: 'selfWork', index: 0, code: 'bad_unit' }).key],
+    ['sform.checks.goals.goal', 'sform.checks.selfWork.bad_unit']);
+  assert.deepEqual(checkLine(checks.errors[2]).params, { name: 'Введение', date: '2026-09-02', held: undefined, unit: undefined, n: undefined });
+  assert.deepEqual([checkLine(checks.errors[1]).params.unit, checkLine({ section: 'selfWork', index: 0, code: 'bad_unit' }).params.n], [2, 1]);
+});
+
+test('M1: every error without a place is kept, not only the first', () => {
+  const map = errorMap([{ code: 'bad_unit', id: 'tp_1', name: 'Первая' }, { code: 'bad_unit', id: 'tp_2', name: 'Вторая' }, { field: 'credits', code: 'required' }]);
+  assert.equal(map.size, 3);
+  assert.deepEqual([...map.values()], ['bad_unit', 'bad_unit', 'required']);
+});
+
+test('M2: «исправьте отмеченные поля» stays only while a marked field is left', () => {
+  const invalid = { kind: 'invalid' };
+  assert.deepEqual([statusKind({ status: invalid, errors: 2, dirty: true }), statusKind({ status: invalid, errors: 0, dirty: true }), statusKind({ status: invalid, errors: 0, dirty: false })],
+    ['invalid', 'dirty', 'clean']);
+  assert.deepEqual([statusKind({ locked: true, status: null, errors: 0, dirty: true }), statusKind({ status: { kind: 'saved' }, errors: 0, dirty: false }),
+    statusKind({ status: { kind: 'error' }, errors: 0, dirty: true }), statusKind({ status: null, errors: 0, dirty: true })], ['locked', 'saved', 'error', 'dirty']);
+});
+
+test('M3: removing or moving rows drops the errors of the section; adding a row keeps them', () => {
+  const errors = { goals: { map: new Map([['knowledge.2.text', 'too_long']]), list: [] }, title: { map: new Map([['credits', 'required']]), list: [] } };
+  assert.deepEqual(Object.keys(errorsAfterEdit(errors, 'goals', 'remove')), ['title']);
+  assert.deepEqual(Object.keys(errorsAfterEdit(errors, 'goals', 'move')), ['title']);
+  assert.equal(errorsAfterEdit(errors, 'goals', 'add'), errors);
+  assert.deepEqual(Object.keys(errors), ['goals', 'title']);                     // the object it got stays as it was
+});
+
+test('M4: isDirty does not depend on the order of the keys', () => {
+  assert.equal(isDirty('title', { title: { department: 'К', course: 1 } }, { title: { course: 1, department: 'К' } }), false);
+  assert.equal(isDirty('policies', { policies: { grading: [{ name: 'Текущий', maxPoints: 30 }], behavior: [] } }, { policies: { behavior: [], grading: [{ maxPoints: 30, name: 'Текущий' }] } }), false);
+  // a description of a unit typed and erased again is no change
+  const saved = { units: { units: [{ unit: 1, title: '', description: 'О', questions: '', guidance: '', results: '', literature: [] }] } };
+  const typed = { units: { units: [...saved.units.units, { unit: 2, description: '', questions: '', guidance: '', results: '', literature: [] }] } };
+  assert.equal(isDirty('units', typed, saved), false);
+  assert.equal(isDirty('units', { units: { units: [{ ...saved.units.units[0], description: '' }] } }, saved), true);
+});
+
+test('M5: the form sends without the empty rows but keeps them; the errors of the server land on the rows of the screen', () => {
+  const doc = { goals: { goal: 'Цель', knowledge: ['a', '', 'b'], skill: [], attitude: [], prerequisite: [], postrequisite: [] } };
+  const before = JSON.stringify(doc);
+  assert.deepEqual(sectionData('goals', doc).knowledge, ['a', 'b']);
+  assert.equal(JSON.stringify(doc), before);
+  assert.deepEqual(placeErrors('goals', doc.goals, [{ list: 'knowledge', index: 1, field: 'text', code: 'too_long' }, { field: 'goal', code: 'too_long' }]),
+    [{ list: 'knowledge', index: 2, field: 'text', code: 'too_long' }, { field: 'goal', code: 'too_long' }]);
+  const book = { authors: '', title: '', year: '', publisher: '', availability: '' };
+  const units = { units: [{ unit: 2, description: '', questions: '', guidance: '', results: '', literature: [book, { ...book, authors: 'Иванов' }] }] };
+  assert.deepEqual(placeErrors('units', units, [{ unit: 2, list: 'literature', index: 0, field: 'title', code: 'required' }]),
+    [{ unit: 2, list: 'literature', index: 1, field: 'title', code: 'required' }]);
+  const lit = { main: [book, { ...book, year: '1999' }], extra: [] };
+  assert.deepEqual(placeErrors('literature', lit, [{ list: 'main', index: 0, field: 'title', code: 'required' }]), [{ list: 'main', index: 1, field: 'title', code: 'required' }]);
 });

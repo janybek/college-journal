@@ -210,3 +210,19 @@ test('the syllabus form has its texts: the tabs, the statuses, the errors of a s
   assert.deepEqual([ru['lessonType.short.seminar'], ru['lessonType.short.lab'], ru['sform.error.bad_hours'].includes('1 пара = 2 часа')], ['С', 'ЛР', true]);
   assert.deepEqual([ru['syllabus.status.review'], ru['syllabus.status.returned']], ['На утверждении', 'Возвращён']);
 });
+
+test('the syllabus form of task 42: the checks before submitting, the file into the draft, no «soon» any more', () => {
+  const CHECK_KEYS = ['title.department', 'title.academicYear', 'title.course', 'title.planSemester', 'title.credits', 'goals.goal', 'plan.empty', 'plan.unit_empty',
+    'plan.bad_hours', 'plan.held_missing', 'plan.held_hours', 'plan.held_kind', 'selfWork.bad_unit', 'literature.empty', 'software.empty', 'policies.empty', 'units.empty'];
+  for (const dict of [ru, ky, en]) {
+    for (const key of CHECK_KEYS) assert.ok(dict['sform.checks.' + key], key);
+    assert.equal('sform.soon' in dict, false);
+  }
+  assert.ok(ru['syllabus.check.intoDraft']);
+  assert.ok(ru['sform.checks.plan.held_missing'].includes('тем же названием'));                    // подсказка: верните тему под тем же названием
+  assert.ok(ru['syllabus.error.in_review'].includes('{semester}'));
+  // the words a lesson of the draft is written with in the file are read back as its kind
+  for (const dict of [ru, ky, en]) {
+    for (const kind of ['lecture', 'practice']) assert.equal(KIND_WORDS[dict['syllabus.file.kind.' + kind].toLowerCase()], '', kind);
+  }
+});

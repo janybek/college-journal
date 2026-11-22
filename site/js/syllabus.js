@@ -66,18 +66,46 @@ export function renamedHint(semesters) {
 // The names core/syllabusFile.js reads: tests/i18n.test.js checks that the dictionaries repeat them in every language.
 const FILE_INFO = ['discipline', 'teacher', 'course', 'semester', 'audience', 'credits', 'totalHours', 'classHours', 'selfHours'];
 const FILE_PLAN = ['semester', 'unit', 'unitTitle', 'label', 'name', 'lectureHours', 'practiceHours', 'practiceKind', 'selfHours', 'description'];
-const FILE_KINDS = ['seminar', 'lab', 'control'];
+const FILE_KINDS = ['lecture', 'practice', 'seminar', 'lab', 'control'];
 
 const textsOf = (text, prefix, keys) => Object.fromEntries(keys.map((key) => [key, text(prefix + key)]));
 
-// text(key) -> the text of the dictionary. The labels of the file in the language of the screen.
+// text(key) -> the text of the dictionary. The labels of the file in the language of the screen: the sheets, the
+// lines of «Сведения», the columns of the plan, the words of the kinds and the letters of «№» (Л1, П2…).
 export function fileLabels(text) {
   return {
     sheets: { info: text('syllabus.file.sheet.info'), plan: text('syllabus.file.sheet.plan') },
     info: textsOf(text, 'syllabus.file.info.', FILE_INFO),
     plan: textsOf(text, 'syllabus.file.plan.', FILE_PLAN),
     kinds: textsOf(text, 'syllabus.file.kind.', FILE_KINDS),
+    letters: textsOf(text, 'lessonType.short.', FILE_KINDS),
   };
+}
+
+// The answer of syllabus.form (its document as last saved) -> what «Скачать (Excel)» of the form writes: «Сведения»
+// from the title, the plan as one row per lesson in the order of the pairs, each with its unit, the title of the
+// unit, the number of the journal, the СРС hours and the description of its row of the plan.
+export function draftFileData(form) {
+  const { subject, syllabus, doc } = form;
+  const title = doc.title || {};
+  const units = (doc.plan && doc.plan.units) || [];
+  const rowOf = new Map();
+  for (const unit of units) {
+    for (const kind of ['lecture', 'practice', 'seminar', 'lab', 'control']) for (const row of unit[kind] || []) rowOf.set(row.id, row);
+  }
+  const info = {
+    discipline: subject.name, teacher: subject.teacherName, course: title.course, semester: title.planSemester ?? syllabus.planSemester,
+    audience: title.audience, credits: title.credits, totalHours: title.totalHours, classHours: title.classHours, selfHours: title.selfHours,
+  };
+  const rows = (doc.lessons || []).map((lesson) => {
+    const row = rowOf.get(lesson.id) || {};
+    const unit = units[lesson.unit - 1] || {};
+    return {
+      unit: lesson.unit, unitTitle: unit.title ?? '', lessonKind: lesson.lessonKind, number: lesson.number, name: lesson.name, hours: lesson.hours,
+      selfHours: row.selfHours ?? null, description: row.description ?? '',
+    };
+  });
+  return { info, rows };
 }
 
 // The answer of syllabus.get -> what the file holds. No syllabus: the template with the discipline, the teacher and

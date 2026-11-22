@@ -208,6 +208,17 @@ body {
 h1, h2, h3, p, ul, ol, dl, dd { margin: 0; }
 ul, ol { padding: 0; list-style: none; }
 button, input, select { font: inherit; color: inherit; letter-spacing: inherit; }
+
+/* The open list of a <select>. Chrome on Windows paints it with the colours of the options; left alone they took the
+   light text of the dark theme on the white of the list, and only the item under the pointer could be read. Every
+   option gets the surface and the text of the theme. */
+select option,
+select optgroup {
+  background-color: var(--surface-raised);
+  color: var(--text);
+}
+
+select option:disabled { color: var(--text-muted); }
 button { cursor: pointer; }
 a { color: inherit; }
 ::placeholder { color: var(--text-muted); opacity: 1; }

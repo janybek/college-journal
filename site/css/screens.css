@@ -3997,6 +3997,532 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
   .lrow__chevron { transition: none; }
 }
 
+/* The syllabus form, task 42: the buttons of the version in the head, what to fix before sending, the lists of
+   entries (works, books, resources, the grading), the grading as a scale of four grades and «Порядок пар» — the
+   lessons as the timetable will give them: the number of the pair first, in the colour of the kind. */
+
+.sform-head {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--space-3) var(--space-6);
+}
+
+.sform-head__main {
+  display: grid;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.sform-actions {
+  display: grid;
+  justify-items: end;
+  gap: var(--space-2);
+  max-width: 36rem;
+}
+
+.sform-actions__buttons {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+
+.sform-actions__hint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  text-align: right;
+}
+
+.sform-actions__hint .icon {
+  flex: none;
+  width: 1rem;
+  height: 1rem;
+  margin-top: 0.125rem;
+}
+
+.sform-actions__error { justify-self: stretch; }
+
+@media (max-width: 64rem) {
+  .sform-head { grid-template-columns: minmax(0, 1fr); }
+
+  .sform-actions { justify-items: start; max-width: none; }
+
+  .sform-actions__buttons { justify-content: flex-start; }
+
+  .sform-actions__hint { text-align: left; }
+}
+
+/* A tab after the check before sending: the number of its errors (red) or of what is left empty (amber). */
+.sform-tab__count {
+  display: grid;
+  place-items: center;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 0.3rem;
+  border-radius: 999px;
+  font-size: 0.6875rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.sform-tab__count.is-error { background: var(--danger-fill); color: var(--on-primary); }
+
+.sform-tab__count.is-warning { background: var(--warning-wash); color: var(--warning); box-shadow: inset 0 0 0 1px var(--warning-line); }
+
+/* What to fix before sending: a sheet pinned above the tabs with a red bar; every line is a way to its tab. */
+.sform-checks {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-5);
+  border: 1px solid var(--danger-line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: inset 4px 0 0 var(--danger), var(--shadow-card);
+}
+
+.sform-checks__head {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.sform-checks__title {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.sform-checks__title:focus { outline: none; }
+
+.sform-checks__title:focus-visible { outline: 2px solid var(--primary); outline-offset: 4px; border-radius: 4px; }
+
+.sform-checks__icon {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: var(--danger);
+}
+
+.sform-checks__count {
+  display: grid;
+  place-items: center;
+  min-width: 1.5rem;
+  height: 1.5rem;
+  padding: 0 0.4rem;
+  border-radius: 999px;
+  background: var(--danger-wash);
+  color: var(--danger);
+  font-size: 0.8125rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.sform-checks__lead {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+}
+
+.sform-checks__sub {
+  margin-top: var(--space-2);
+  color: var(--warning);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sform-checks__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.sform-check { border-bottom: 1px solid var(--border); }
+
+.sform-check__link {
+  display: grid;
+  grid-template-columns: minmax(7rem, 12rem) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-2);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.sform-check__link:hover { background: var(--row-hover); }
+
+.sform-check__link:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--radius-inner); }
+
+.sform-check__tab {
+  justify-self: start;
+  padding: 0.125rem var(--space-2);
+  border-radius: 6px;
+  background: var(--danger-wash);
+  color: var(--danger);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sform-check.is-warning .sform-check__tab { background: var(--warning-wash); color: var(--warning); }
+
+.sform-check__text { font-size: var(--control-fs); }
+
+.sform-check__go {
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-muted);
+}
+
+.sform-checks-cleared { max-width: 60rem; }
+
+@media (max-width: 48rem) {
+  .sform-checks { padding: var(--space-3) var(--space-4) var(--space-4); }
+
+  .sform-check__link {
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas: "tab go" "text go";
+    row-gap: var(--space-1);
+  }
+
+  .sform-check__tab { grid-area: tab; }
+
+  .sform-check__text { grid-area: text; }
+
+  .sform-check__go { grid-area: go; }
+}
+
+/* The question before sending: what is left empty, in amber. */
+.sform-submit__empty {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-inner);
+  background: var(--warning-wash);
+  color: var(--warning);
+  font-weight: 500;
+}
+
+.sform-submit__empty .icon {
+  flex: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: 0.125rem;
+}
+
+/* The tabs of task 42: a line on what the tab is for, notes, a stack of lists. */
+.sform-lead {
+  max-width: 60rem;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+}
+
+.sform-lead-note { max-width: 60rem; }
+
+.sform-panel__body > .sform-lead + .sform-lead-note { margin-top: calc(-1 * var(--space-3)); }
+
+.sform-stack {
+  display: grid;
+  gap: var(--space-5);
+}
+
+/* A list of entries: numbered cards, the name and arrows on top, the fields on a grid of six columns under them. */
+.entries {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+}
+
+.entries h4 { margin: 0; }
+
+/* A resource: its link carries a hint, its name none — the two boxes stand on one line. */
+.entries--software .entry__body { align-items: end; }
+
+.entries__list {
+  display: grid;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: entry;
+}
+
+.entry {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface-raised);
+}
+
+.entry__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 2rem;
+}
+
+.entry__name {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.entry__body {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: var(--space-3) var(--space-4);
+  align-items: start;
+}
+
+.entry__c1 { grid-column: span 1; }
+
+.entry__c2 { grid-column: span 2; }
+
+.entry__c3 { grid-column: span 3; }
+
+.entry__c5 { grid-column: span 5; }
+
+.entry__full { grid-column: 1 / -1; }
+
+/* The grading: four grades side by side, each under a bar of its colour — from red to green. */
+.grade-scale {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.grade-scale__step {
+  --grade: var(--danger);
+  --grade-wash: var(--danger-wash);
+  display: grid;
+  align-content: start;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-top: 3px solid var(--grade);
+  border-radius: var(--radius-inner);
+  background: var(--grade-wash);
+}
+
+.grade-scale__step[data-grade="fair"] { --grade: var(--warning); --grade-wash: var(--warning-wash); }
+
+.grade-scale__step[data-grade="good"] { --grade: var(--primary); --grade-wash: var(--primary-wash); }
+
+.grade-scale__step[data-grade="excellent"] { --grade: var(--success); --grade-wash: var(--success-wash); }
+
+.grade-scale__name {
+  color: var(--grade);
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.grade-scale__step .field__input { background: var(--surface); }
+
+.grade-scale__criteria .field__textarea { min-height: 5rem; }
+
+/* The rules of behaviour and of ethics: a list of points, the sanction under it. */
+.rules {
+  display: grid;
+  align-content: start;
+  gap: var(--space-3);
+}
+
+/* «Описание юнитов»: the texts of a unit two by two, its books under them. */
+.unit-card__caption {
+  flex: 1 1 16rem;
+  font-weight: 600;
+}
+
+.unit-about {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-4);
+}
+
+.unit-card--about .entries { background: var(--surface); }
+
+/* «Порядок пар» */
+.order-mode {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  max-width: 60rem;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-control);
+  background: var(--muted);
+}
+
+.order-mode__icon {
+  flex: none;
+  width: 1.25rem;
+  height: 1.25rem;
+  margin-top: 0.125rem;
+  color: var(--primary-ink);
+}
+
+.order-mode.is-manual .order-mode__icon { color: var(--warning); }
+
+.order {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.order-unit {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.order-unit__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-3);
+  font-size: 1rem;
+}
+
+.order-unit__name {
+  color: var(--primary-ink);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.order-unit__title { font-weight: 600; }
+
+.order-unit__list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--border);
+  list-style: none;
+}
+
+.order-row {
+  --kind: var(--primary);
+  --kind-wash: var(--primary-wash);
+  --kind-ink: var(--primary-ink);
+  display: grid;
+  grid-template-columns: 4rem 7.5rem minmax(0, 1fr) 4rem auto;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 3rem;
+  padding: var(--space-1) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.order-row[data-kind="practice"],
+.order-row[data-kind="seminar"],
+.order-row[data-kind="lab"] {
+  --kind: var(--success);
+  --kind-wash: var(--success-wash);
+  --kind-ink: var(--success);
+}
+
+.order-row[data-kind="control"] {
+  --kind: var(--warning);
+  --kind-wash: var(--warning-wash);
+  --kind-ink: var(--warning);
+}
+
+/* The number of the pair: a ticket of the timetable in the colour of the kind; a mark without a pair is a dot. */
+.order-row__pair {
+  display: grid;
+  place-items: center;
+  height: 2.25rem;
+  border-left: 3px solid var(--kind);
+  border-radius: var(--radius-inner);
+  background: var(--kind-wash);
+  color: var(--text);
+  font-size: 1rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-row__pair.is-mark {
+  border: 1px dashed var(--kind);
+  background: transparent;
+  color: var(--kind-ink);
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.order-row__kind {
+  color: var(--kind-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.order-row__text { min-width: 0; }
+
+.order-row__label {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.order-row__hours {
+  color: var(--text-muted);
+  font-size: var(--hint-fs);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+@media (max-width: 64rem) {
+  .unit-about { grid-template-columns: minmax(0, 1fr); }
+
+  .grade-scale { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 48rem) {
+  .entries { padding: var(--space-3); }
+
+  .entry { padding: var(--space-3); }
+
+  .entry__body { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+  .entry__c2,
+  .entry__c3,
+  .entry__c5 { grid-column: 1 / -1; }
+
+  .entry__c1 { grid-column: span 1; }
+
+  .grade-scale { grid-template-columns: minmax(0, 1fr); }
+
+  .order-row {
+    grid-template-columns: 3.5rem minmax(0, 1fr) auto;
+    grid-template-areas:
+      "pair text tools"
+      "pair kind tools";
+    row-gap: 0;
+    padding: var(--space-2) 0;
+  }
+
+  .order-row__pair { grid-area: pair; height: 2.75rem; }
+
+  .order-row__text { grid-area: text; }
+
+  .order-row__kind { grid-area: kind; }
+
+  .order-row__hours { display: none; }
+
+  .order-row > .row-tools { grid-area: tools; }
+
+  .order-row .row-tools .icon-button { width: 2.75rem; height: 2.75rem; }
+}
+
 /* Print: black on white in either theme. The passwords of an import print alone, as strips to cut apart
    along the dashed lines; any other screen prints without the sidebar and the bars. */
 

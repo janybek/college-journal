@@ -12,7 +12,8 @@ import { listAdd, listMove, listRemove } from '../syllabusForm.js';
 //   ctx.peek(key)                the same, without marking the field as shown
 //   ctx.errorText(key, code)     the text of that error
 //   ctx.typed(key, errorId, el)  after typing: the error mark of the field goes, the marks of unsaved tabs are updated
-//   ctx.change(fn, focusId)      a change of the structure: fn() changes the state, the screen is redrawn, focus goes to focusId
+//   ctx.change(fn, focusId, edit) a change of the structure: fn() changes the state, the screen is redrawn, focus goes to focusId;
+//                                edit 'remove' or 'move' takes the error marks off the tab (their places are other rows now)
 //   ctx.isOpen(row, fallback), ctx.toggle(row, open)   «СРС и описание» of a lesson, opened or closed by hand
 //   ctx.confirmRemoveUnit(n)     asks before the last unit, which has lessons, is removed
 // A typed value goes into the state at once and the screen is not redrawn: the caret stays where it is.
@@ -97,8 +98,8 @@ export function pointList(ctx, { id, key, title, hint, max, multiline, get, put 
         }),
         ctx.readOnly ? null : rowActions(base, i, count, {
           up: t('sform.item.up', { n: i + 1 }), down: t('sform.item.down', { n: i + 1 }), remove: t('sform.item.remove', { n: i + 1 }),
-        }, (step) => ctx.change(() => put(listMove(get(), i, step)), movedFocus(id, i + step, count, step)),
-        () => ctx.change(() => put(listRemove(get(), i)), count > 1 ? `${id}-${Math.min(i, count - 2)}-remove` : id + '-add')));
+        }, (step) => ctx.change(() => put(listMove(get(), i, step)), movedFocus(id, i + step, count, step), 'move'),
+        () => ctx.change(() => put(listRemove(get(), i)), count > 1 ? `${id}-${Math.min(i, count - 2)}-remove` : id + '-add', 'remove')));
     })),
     ctx.readOnly ? null : el('button', {
       type: 'button', id: id + '-add', class: 'button button--secondary points__add', disabled: full,
@@ -189,8 +190,8 @@ function lessonRow(ctx, { unit, kind, i, count, id, row, get, put, number, forms
     }) : null,
     ctx.readOnly ? null : rowActions(base, i, count, {
       up: t('sform.lesson.up', { label }), down: t('sform.lesson.down', { label }), remove: t('sform.lesson.remove', { label }),
-    }, (step) => ctx.change(() => put(listMove(get(), i, step)), movedFocus(id, i + step, count, step)),
-    () => ctx.change(() => put(listRemove(get(), i)), count > 1 ? `${id}-${Math.min(i, count - 2)}-remove` : id + '-add')),
+    }, (step) => ctx.change(() => put(listMove(get(), i, step)), movedFocus(id, i + step, count, step), 'move'),
+    () => ctx.change(() => put(listRemove(get(), i)), count > 1 ? `${id}-${Math.min(i, count - 2)}-remove` : id + '-add', 'remove')),
     // a version that is not edited shows the disclosure only where there is something in it
     ctx.readOnly && summary.length === 0 ? null : el('button', {
       type: 'button', id: base + '-more', class: 'lrow__more', 'aria-expanded': String(open), 'aria-controls': detailsId,
@@ -206,4 +207,49 @@ function lessonRow(ctx, { unit, kind, i, count, id, row, get, put, number, forms
         id: base + '-desc', key: key + '.description', kind: 'textarea', rows: 2, label: field('description'), className: 'lrow__desc', maxLength: 1000,
         value: () => row$().description, set: (v) => { row$().description = v; },
       })));
+}
+
+// ---- A list of entries of several fields (a work of СРС, a book, a program, a row of the grading) ----
+
+// The entries as numbered cards: the name of the entry and its arrows on top, its fields under them; «Добавить …»
+// under the list, «N из 100» beside the title. get() and put(list) read and write the list in the state; empty() is a
+// new entry; first: the field focus goes to in a new entry; itemName(n) names the entry «Работа 1», «Книга 2»;
+// body(i, base, key, row$) gives the fields of entry i (base: the start of its ids, key: of its error keys,
+// row$(): the entry in the state).
+export function entryList(ctx, { id, key, title = null, hint = null, max, get, put, empty, first, addLabel, itemName, body, className = '', titleLevel = 'h3' }) {
+  const items = get();
+  const titleId = id + '-title';
+  const count = items.length;
+  const full = count >= max;
+  return el('section', { class: ('entries ' + className).trim(), 'aria-labelledby': title ? titleId : null, 'aria-label': title ? null : addLabel },
+    title ? el('div', { class: 'points__head' },
+      el(titleLevel, { class: 'points__title', id: titleId }, title),
+      el('span', { class: 'points__count' + (full ? ' is-full' : ''), id: id + '-count' }, t('sform.list.count', { n: count, max }))) : null,
+    hint ? el('p', { class: 'points__hint' }, hint) : null,
+    listError(ctx, key, id + '-list-error'),
+    count === 0 ? el('p', { class: 'points__empty' }, t('sform.list.empty')) : el('ol', { class: 'entries__list' }, items.map((_, i) => {
+      const base = `${id}-${i}`;
+      const name = itemName(i + 1);
+      return el('li', { class: 'entry' },
+        el('div', { class: 'entry__head' },
+          el('span', { class: 'entry__name', id: base + '-name-label' }, name),
+          ctx.readOnly ? null : rowActions(base, i, count, {
+            up: t('sform.entry.up', { name }), down: t('sform.entry.down', { name }), remove: t('sform.entry.remove', { name }),
+          }, (step) => ctx.change(() => put(listMove(get(), i, step)), movedFocus(id, i + step, count, step), 'move'),
+          () => ctx.change(() => put(listRemove(get(), i)), count > 1 ? `${id}-${Math.min(i, count - 2)}-remove` : id + '-add', 'remove'))),
+        el('div', { class: 'entry__body', role: 'group', 'aria-labelledby': base + '-name-label' }, body(i, base, `${key}.${i}`, () => get()[i])));
+    })),
+    ctx.readOnly ? null : el('button', {
+      type: 'button', id: id + '-add', class: 'button button--secondary points__add', disabled: full,
+      onclick: () => ctx.change(() => put(listAdd(get(), empty())), `${id}-${count}-${first}`, 'add'),
+    }, icon('plus'), addLabel));
+}
+
+// A field of an entry: id `<base>-<name>`, error key `<key>.<name>`; number: the value is kept as a number.
+export function entryField(ctx, { base, key, name, row$, label, kind = 'input', hint = null, rows = 2, number = false, className = '', maxLength = 200, options = null,
+  inputMode = null, hideLabel = false, placeholder = null }) {
+  return boundField(ctx, {
+    id: `${base}-${name}`, key: `${key}.${name}`, kind, label, hint, rows, options, className, maxLength, inputMode: inputMode ?? (number ? 'numeric' : null), hideLabel, placeholder,
+    value: () => row$()[name], set: (v) => { row$()[name] = number ? numberOf(v) : v; },
+  });
 }

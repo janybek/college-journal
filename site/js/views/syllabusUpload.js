@@ -105,17 +105,18 @@ async function download(view) {
   }
 }
 
-// Choose a file and check it. subject: { subjectId, disciplineName, teacherName, groupNames }; onDone(): after the upload.
-// returnId: the button (or ids to try in turn) focus goes back to when the window closes; a screen with several
-// upload buttons names its own.
-export function startUpload(subject, onDone, returnId = 'syllabus-upload') {
+// Choose a file and check it. subject: { subjectId, disciplineName, teacherName, groupNames }; onDone(answer): after
+// the upload, with the answer of syllabus.apply. returnId: the button (or ids to try in turn) focus goes back to when
+// the window closes; a screen with several upload buttons names its own. intoDraft: the syllabus form calls it — the
+// window says the file fills the draft and its button says «Заполнить черновик».
+export function startUpload(subject, onDone, returnId = 'syllabus-upload', { intoDraft = false } = {}) {
   if (state.check) return;
   if (!picker) {
     picker = el('input', { type: 'file', accept: '.xlsx,.xls', class: 'visually-hidden', tabindex: '-1', 'aria-hidden': 'true' });
     document.body.append(picker);
   }
   picker.value = '';
-  picker.onchange = () => { if (picker.files[0]) readFile(subject, onDone, returnId, picker.files[0]); };
+  picker.onchange = () => { if (picker.files[0]) readFile(subject, onDone, returnId, picker.files[0], intoDraft); };
   picker.click();
 }
 
@@ -125,9 +126,9 @@ export function renderUpload(root) {
 
 // Reading the file
 
-async function readFile(subject, onDone, returnId, file) {
+async function readFile(subject, onDone, returnId, file, intoDraft) {
   const check = {
-    subject, onDone, returnId, file: { name: file.name, size: file.size },
+    subject, onDone, returnId, intoDraft, file: { name: file.name, size: file.size },
     phase: 'reading',      // reading | checking | shown | failed (the file was not read or not checked)
     sheets: null,          // [{ name, cells, firstRow }] as sent
     fileError: null,       // { key, params }: the site did not send the file
@@ -201,8 +202,8 @@ async function apply(check) {
     if (state.check !== check) return;
     if (answer.applied === true) {
       state.check = null;
-      state.done = check.subject.subjectId;
-      check.onDone();
+      if (!check.intoDraft) state.done = check.subject.subjectId;
+      check.onDone(answer);
       refresh();
       focusById(...[check.returnId].flat());
       return;
@@ -240,6 +241,7 @@ function checkDialog(check) {
     check.phase === 'reading' ? el('p', { class: 'loading', role: 'status' }, t('import.file.reading')) : null,
     check.phase === 'checking' ? el('p', { class: 'loading', role: 'status' }, t('import.check.busy')) : null,
     check.fileError ? note('error', t(check.fileError.key, check.fileError.params), { role: 'alert' }) : null,
+    answer && ready && check.intoDraft ? note('info', t('syllabus.check.intoDraft'), { class: 'check-into-draft' }) : null,
     answer && ready ? summaries(answer.summaries) : null,
     answer ? warnings(answer, check.sheets) : null,
     answer ? errors(answer, check.sheets) : null,
@@ -260,8 +262,8 @@ function actions(check, ready, closeDialog) {
       ? el('button', { type: 'button', id: 'syllabus-check-retry', class: 'button button--primary', onclick: () => preview(check) }, t('common.retry')) : null];
   }
   const upload = el('button', { type: 'button', id: 'syllabus-check-apply', class: 'button button--primary', onclick: () => apply(check) },
-    icon('upload'), t(check.retry === 'apply' ? 'common.retry' : 'syllabus.check.apply'));
-  if (check.applying) markBusy(upload, 'syllabus.check.applying');
+    icon('upload'), t(check.retry === 'apply' ? 'common.retry' : check.intoDraft ? 'syllabus.check.fill' : 'syllabus.check.apply'));
+  if (check.applying) markBusy(upload, check.intoDraft ? 'syllabus.check.filling' : 'syllabus.check.applying');
   return [closing, upload];
 }
 
@@ -339,7 +341,7 @@ function errorText(error) {
   const key = [`syllabus.error.${error.sheet}.${error.field}.${error.code}`, `syllabus.error.${error.field}.${error.code}`, 'syllabus.error.' + error.code]
     .find((candidate) => !candidate.includes('..') && hasText(candidate));
   if (!key) return t(errorKey(error.code));
-  return t(key, { name: error.name, date: error.date ? dayMonth(error.date) : '', held: error.held });
+  return t(key, { name: error.name, date: error.date ? dayMonth(error.date) : '', held: error.held, semester: error.semester });
 }
 
 const joined = (list) => (Array.isArray(list) ? list.join(', ') : '');

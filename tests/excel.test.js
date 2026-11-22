@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import XLSX from 'xlsx';
 import { TEMPLATE_ROWS, MAX_BOOK_SHEETS, templateSheet, findDateCell, bookSheets, syllabusBook, READ_OPTIONS } from '../site/js/excel.js';
-import { fileLabels, fileData } from '../site/js/syllabus.js';
+import { fileLabels, fileData, draftFileData } from '../site/js/syllabus.js';
+import { docLessons } from '../core/syllabusPlan.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { setup } from './syllabusSetup.js';
 import ru from '../site/js/i18n/ru.js';
@@ -271,4 +272,48 @@ test('bookSheets: a parser error row plus firstRow is the row Excel shows when e
   const planSheet = read.sheets.find((s) => s.name === 'Тематический план');
   const [error] = parseSyllabus(read.sheets).errors;
   assert.deepEqual([error.code, error.row + planSheet.firstRow], ['bad_hours', 6]);    // titles in row 4, the first topic in 5, the broken one in 6
+});
+
+// ---- Task 42: «Скачать (Excel)» of the form: the draft as one lesson per row ----
+
+test('draftFileData: the draft read back by the same parser gives the same lessons; «№» is the number of the journal', () => {
+  const { call, draft, save, dean, sb1 } = setup();
+  const id = draft(sb1, 1);
+  save(id, 'title', { department: 'Кафедра', academicYear: '2026–2027', course: 1, planSemester: 1, credits: 2, audience: 'Сестринское дело', totalHours: 20, classHours: 14, selfHours: 6 });
+  const plan = { units: [
+    { title: 'Основы', lecture: [{ name: 'Введение', hours: 4, selfHours: 2, description: 'О курсе' }, { name: 'Сети', hours: 2 }], practice: [{ name: 'Введение', hours: 2, controlForms: 'опрос' }],
+      seminar: [{ name: 'Обсуждение', hours: 2 }], control: [{ name: '', hours: 0 }] },
+    { title: '', lab: [{ name: 'Таблицы', hours: 2, selfHours: 4 }], control: [{ name: 'Экзамен', hours: 2 }] }] };
+  assert.equal(save(id, 'plan', plan).ok, true);
+  const form = call('syllabus.form', { syllabusId: id }, dean).data;
+  const data = draftFileData(form);
+  assert.deepEqual(data.info, { discipline: 'Информатика', teacher: 'teacher1', course: 1, semester: 1, audience: 'Сестринское дело', credits: 2, totalHours: 20, classHours: 14, selfHours: 6 });
+  const sheets = reread(syllabusBook(XLSX, labels, data)).sheets;
+  // «№» — the letter of the kind and the number of the journal; one lesson is one row, its hours in «Лекция» or «Практика», its kind in words
+  assert.deepEqual(sheets[1].cells.slice(1).map((r) => [r[2], r[3], r[4], r[5], r[6]]), [
+    ['Л1', 'Введение', 4, '', 'лекция'], ['П1', 'Введение', '', 2, 'практика'], ['С1', 'Обсуждение', '', 2, 'семинар'], ['Л2', 'Сети', 2, '', 'лекция'],
+    ['М1', '', '', '', 'модуль'], ['ЛР1', 'Таблицы', '', 2, 'лабораторная'], ['М2', 'Экзамен', '', 2, 'модуль']]);
+  const parsed = parseSyllabus(sheets);
+  assert.deepEqual(parsed.errors, []);
+  const [half] = docLessons(parsed.doc);
+  assert.deepEqual(half.rows.map((r) => [r.unit, r.unitTitle, r.lessonKind, r.name, r.hours, r.selfHours, r.description]),
+    form.doc.lessons.map((l) => {
+      const row = form.doc.plan.units[l.unit - 1][l.lessonKind].find((x) => x.id === l.id);
+      return [l.unit, form.doc.plan.units[l.unit - 1].title, l.lessonKind, l.name, l.hours, row.selfHours, row.description];
+    }));
+  // in every language the words of the kinds are read back
+  for (const dict of [ky, en]) {
+    const back = parseSyllabus(reread(syllabusBook(XLSX, fileLabels((key) => dict[key]), data)).sheets);
+    assert.deepEqual(docLessons(back.doc)[0].rows.map((r) => r.lessonKind), half.rows.map((r) => r.lessonKind));
+  }
+});
+
+test('draftFileData: the downloaded draft, uploaded back, changes nothing', () => {
+  const { call, send, draft, save, dean, sb1 } = setup();
+  const id = draft(sb1, 1);
+  save(id, 'title', { department: 'Кафедра', academicYear: '2026–2027', course: 1, planSemester: 1, credits: 2 });
+  save(id, 'plan', { units: [{ title: 'Основы', lecture: [{ name: 'Введение', hours: 2, description: 'О курсе' }], practice: [{ name: 'Практикум', hours: 4, selfHours: 2 }], control: [{ name: '', hours: 0 }] }] });
+  const sheets = reread(syllabusBook(XLSX, labels, draftFileData(call('syllabus.form', { syllabusId: id }, dean).data))).sheets.map(({ name, cells }) => ({ name, cells }));
+  const back = send('syllabus.preview', sb1, sheets, dean).data;
+  assert.deepEqual([back.ok, back.errors, back.summaries.map((s) => [s.semester, s.replaces, s.added, s.changed, s.removed])], [true, [], [[1, true, 0, 0, 0]]]);
 });

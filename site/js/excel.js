@@ -98,8 +98,19 @@ const valueCell = (value) => (typeof value === 'number' ? { t: 'n', v: value } :
 // The value of one cell of a plan row; null leaves the cell empty. Hours of zero are an empty cell (the parser reads
 // both alike); a zero of СРС stays a zero, because the page tells «0» from «not given». The title of a unit stands
 // only on its first row (firstOfUnit): the parser gives it to every row of the unit.
-function planValue(row, key, kinds, firstOfUnit) {
+// A lesson (a row with lessonKind) is one row: its hours in «Лекция» for a lecture and in «Практика» for any other
+// kind, the kind in words in «Вид занятия», and in «№» the letter of the kind with the number of the journal (Л1, П2).
+// labels: { kinds, letters } of fileLabels.
+function planValue(row, key, labels, firstOfUnit) {
+  const { kinds } = labels;
   if (key === 'unitTitle') return firstOfUnit && !absent(row.unitTitle) ? String(row.unitTitle) : '';
+  if (row.lessonKind) {
+    const hours = Number(row.hours) > 0 ? Number(row.hours) : null;
+    if (key === 'label') return absent(row.number) ? '' : (labels.letters[row.lessonKind] ?? '') + row.number;
+    if (key === 'lectureHours') return row.lessonKind === 'lecture' ? hours : null;
+    if (key === 'practiceHours') return row.lessonKind === 'lecture' ? null : hours;
+    if (key === 'practiceKind') return kinds[row.lessonKind] ?? '';
+  }
   if (key === 'practiceKind') return row.kind === 'control' ? kinds.control : kinds[row.practiceKind] ?? '';
   if (key === 'lectureHours' || key === 'practiceHours') return Number(row[key]) > 0 ? Number(row[key]) : null;
   if (PLAN_TEXT.includes(key)) return absent(row[key]) ? '' : String(row[key]);
@@ -131,7 +142,7 @@ export function syllabusBook(XLSX, labels, data = null) {
     const firstOfUnit = !before || before.unit !== row.unit || before.semester !== row.semester;
     PLAN_KEYS.forEach((key, c) => {
       const ref = XLSX.utils.encode_cell({ r: i + 1, c });
-      const value = planValue(row, key, labels.kinds, firstOfUnit);
+      const value = planValue(row, key, labels, firstOfUnit);
       if (PLAN_TEXT.includes(key)) plan[ref] = textCell(value);
       else if (value === null) delete plan[ref];
       else plan[ref] = valueCell(value);
