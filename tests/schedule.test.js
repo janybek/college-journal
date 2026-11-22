@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { workingDays, planGeneration, pairLock, checkPairChange } from '../core/schedule.js';
+import { workingDays, planGeneration, pairLock, checkPairChange, isSubstitution, teacherHandover } from '../core/schedule.js';
 import { DEFAULT_BELLS } from '../core/settings.js';
 import { AppError } from '../core/errors.js';
 
@@ -88,9 +88,9 @@ const errors = (patch, c = ctx) => checkPairChange(p3, patch, c).errors;
 
 test('checkPairChange', () => {
   assert.deepEqual(checkPairChange(p3, {}, ctx), { errors: [],
-    next: { date: '2026-09-08', slot: 1, startTime: '08:00', teacherId: 'sf_1', roomId: 'r_1', note: '', changed: false } });
+    next: { date: '2026-09-08', slot: 1, startTime: '08:00', teacherId: 'sf_1', roomId: 'r_1', note: '', changed: false, substitute: false } });
   assert.deepEqual(checkPairChange(p3, { date: '2026-09-09', slot: 3, roomId: '', note: ' Конференция ' }, ctx).next,
-    { date: '2026-09-09', slot: 3, startTime: '11:20', teacherId: 'sf_1', roomId: '', note: 'Конференция', changed: true });
+    { date: '2026-09-09', slot: 3, startTime: '11:20', teacherId: 'sf_1', roomId: '', note: 'Конференция', changed: true, substitute: false });
   assert.deepEqual(errors({ date: '2026-09-09', slot: 2 }), [{ field: 'slot', code: 'group_busy' }]);
   assert.deepEqual(errors({ date: '2026-09-09', slot: 3 }), [{ field: 'roomId', code: 'room_busy' }]);
   assert.deepEqual(errors({ date: '2026-09-09', slot: 3, roomId: 'r_2', teacherId: 'sf_2' }), [{ field: 'teacherId', code: 'teacher_busy' }]);
@@ -187,4 +187,43 @@ test('checkPairChange: only a real change freezes the pair', () => {
   assert.equal(next({ slot: 4 }).changed, true);
   assert.equal(next({ teacherId: 'sf_2' }).changed, true);
   assert.equal(checkPairChange({ ...free, changed: true }, { note: 'x' }, ctx).next.changed, true);
+});
+
+test('isSubstitution: a stored fact; before unit 3 a moved pair of a foreign teacher is one', () => {
+  assert.equal(isSubstitution({ substitute: true, changed: false, status: 'closed', teacherId: 'x' }, { teacherId: 'x' }), true);
+  assert.equal(isSubstitution({ substitute: false, changed: false, status: 'planned', teacherId: 'old' }, { teacherId: 'new' }), false);
+  assert.equal(isSubstitution({ substitute: false, changed: true, status: 'planned', teacherId: 'sub' }, { teacherId: 'own' }), true);
+  assert.equal(isSubstitution({ substitute: false, changed: true, status: 'closed', teacherId: 'old' }, { teacherId: 'new' }), false);
+  assert.equal(isSubstitution({ substitute: false, changed: true, status: 'planned', teacherId: 'sub' }, undefined), false);
+});
+
+test('checkPairChange: next.substitute follows the teacher of the subject', () => {
+  const subject = { id: 'sb_1', teacherId: 'sf_1' };
+  const sub = (patch, pair = p3, extra = {}) => checkPairChange(pair, patch, { ...ctx, subject, ...extra }).next.substitute;
+  assert.equal(sub({ teacherId: 'sf_2' }), true);
+  assert.equal(sub({ teacherId: 'sf_1' }, { ...p3, teacherId: 'sf_2', substitute: true }), false);
+  assert.equal(sub({ date: '2026-09-09', slot: 3 }), false);
+  assert.equal(checkPairChange({ ...p3, substitute: true }, { note: 'x' }, ctx).next.substitute, true);
+  assert.equal(checkPairChange(p3, { note: 'x' }, ctx).next.substitute, false);
+});
+
+test('teacherHandover: three kinds of patches', () => {
+  const subject = { id: 'sb_1', teacherId: 'new' };
+  const mk = (id, over) => ({ id, subjectId: 'sb_1', groupId: 'g_1', date: '2026-09-10', slot: 1, teacherId: 'old', roomId: '', status: 'planned', ...over });
+  const pairs = [
+    mk('go', {}),
+    mk('busy', { date: '2026-09-11' }),
+    mk('newBusy', { id: 'nb', subjectId: 'sb_9', groupId: 'g_2', date: '2026-09-11', teacherId: 'new' }),
+    mk('back', { date: '2026-09-12', teacherId: 'new', substitute: true }),
+    mk('past', { date: '2026-08-20', teacherId: 'new', substitute: true, status: 'closed' }),
+    mk('own', { date: '2026-09-13', teacherId: 'new', substitute: false }),
+    mk('other', { date: '2026-09-14', teacherId: 'sub', substitute: true }),
+    mk('closedOld', { date: '2026-08-21', status: 'closed' }),
+  ];
+  assert.deepEqual(teacherHandover(pairs, subject, '2026-09-01', 'old'), { patches: [
+    { id: 'go', patch: { teacherId: 'new', substitute: false } },
+    { id: 'busy', patch: { substitute: true } },
+    { id: 'back', patch: { substitute: false } },
+    { id: 'past', patch: { substitute: false } },
+  ], skippedBusy: 1 });
 });

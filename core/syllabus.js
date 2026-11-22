@@ -43,7 +43,7 @@ export function subjectScope(subject, pairs, index, settings) {
     const other = index.syllabusOf.get(p.topicId);
     return other !== undefined && (!syllabus || other.id !== syllabus.id) && other.semester === settings.semester;
   }).length;
-  return { syllabus, topics, pairs: all.filter((p) => fixed(p) || inSemester(p.date, settings)), clear, skip };
+  return { syllabus, topics, pairs: all.filter((p) => inSemester(p.date, settings) || (fixed(p) && lessonKey(p) !== '')), clear, skip };
 }
 
 const sum = (rows, field) => rows.reduce((total, r) => total + (Number(r[field]) || 0), 0);

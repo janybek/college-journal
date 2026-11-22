@@ -3,6 +3,7 @@ import { addDays, daysBetween, isDate, weekday } from './dates.js';
 import { pairSlots, busyCodes } from './busy.js';
 import { AppError } from './errors.js';
 import { NO_LESSON } from './topics.js';
+import { FIXED_STATUSES } from './schema.js';
 
 const NOTE_MAX = 200;
 const BUSY_FIELD = { group_busy: 'slot', teacher_busy: 'teacherId', room_busy: 'roomId' };
@@ -106,17 +107,34 @@ export function planGeneration({ template, subjects, settings, pairs, from, rest
 // that the old teacher teaches go to the new one, those moved by hand too. A pair given to someone else (a one-off
 // substitution) keeps its teacher; so do held, past and cancelled pairs. A pair whose time the new teacher already
 // teaches stays as it is and is counted.
-// -> { patches: [{ id, patch: { teacherId } }], skippedBusy }
+// Patches: a pair that goes to the new teacher -> { teacherId, substitute: false }; one that stays with the old teacher
+// because the new one is busy -> { substitute: true }; any pair of the subject that the new teacher already teaches and
+// that is marked as a substitution (the old teacher came back) -> { substitute: false }.
+// -> { patches: [{ id, patch }], skippedBusy }
 export function teacherHandover(pairs, subject, today, oldTeacherId) {
   const slots = pairSlots(pairs);
   const patches = [];
   let skippedBusy = 0;
   for (const pair of pairs || []) {
-    if (pair.subjectId !== subject.id || pair.status !== 'planned' || pair.date < today || pair.teacherId !== oldTeacherId || oldTeacherId === subject.teacherId) continue;
-    if (busyCodes(slots, { id: pair.id, day: pair.date, slot: pair.slot, teacherId: subject.teacherId }).length > 0) skippedBusy++;
-    else patches.push({ id: pair.id, patch: { teacherId: subject.teacherId } });
+    if (pair.subjectId !== subject.id) continue;
+    if (pair.teacherId === subject.teacherId) {
+      if (pair.substitute === true) patches.push({ id: pair.id, patch: { substitute: false } });
+      continue;
+    }
+    if (pair.status !== 'planned' || pair.date < today || pair.teacherId !== oldTeacherId || oldTeacherId === subject.teacherId) continue;
+    if (busyCodes(slots, { id: pair.id, day: pair.date, slot: pair.slot, teacherId: subject.teacherId }).length > 0) {
+      skippedBusy++;
+      patches.push({ id: pair.id, patch: { substitute: true } });
+    } else patches.push({ id: pair.id, patch: { teacherId: subject.teacherId, substitute: false } });
   }
   return { patches, skippedBusy };
+}
+
+// A pair is a substitution when it is stored so; a pair moved by hand before unit 3 (no stored fact) is one while it is
+// still planned and its teacher is not the teacher of the subject.
+export function isSubstitution(pair, subject) {
+  return pair.substitute === true
+    || (pair.changed === true && !FIXED_STATUSES.includes(pair.status) && !!subject && subject.teacherId !== pair.teacherId);
 }
 
 export function pairLock(pair, today) {
@@ -166,7 +184,10 @@ export function checkPairChange(pair, patch, ctx) {
   const moved = next.date !== pair.date || next.slot !== pair.slot
     || next.teacherId !== pair.teacherId || next.roomId !== (pair.roomId || '');
   return {
-    next: { ...next, startTime: slotOk ? settings.bells[next.slot - 1] : pair.startTime, changed: pair.changed === true || moved },
+    next: {
+      ...next, startTime: slotOk ? settings.bells[next.slot - 1] : pair.startTime, changed: pair.changed === true || moved,
+      substitute: ctx.subject ? next.teacherId !== ctx.subject.teacherId : pair.substitute === true,
+    },
     errors,
   };
 }

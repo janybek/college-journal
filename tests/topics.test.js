@@ -58,3 +58,12 @@ test('lessons of plan rows and their layout over pairs', () => {
   // skip: два первых свободных занятия считаются пройденными
   assert.deepEqual(layoutLessons(two, [pair('p1', '2026-09-01')], 2), { assign: [{ id: 'p1', patch: L('t2', 'lecture') }], unplaced: [], withoutTopic: 0 });
 });
+
+test('layoutLessons: a held pair without a lesson takes the next free one', () => {
+  const rows = [{ id: 't1', order: 1, lessonKind: 'lecture', hours: 2 }, { id: 't2', order: 2, lessonKind: 'lecture', hours: 2 }, { id: 't3', order: 3, lessonKind: 'lecture', hours: 2 }];
+  const P = (id, date, status, topicId = '') => ({ id, date, slot: 1, status, topicId, lessonType: topicId ? 'lecture' : '', part: topicId ? 1 : null });
+  const ids = (pairs, r = rows) => layoutLessons(r, pairs).assign.map((x) => [x.id, x.patch.topicId]);
+  assert.deepEqual(ids([P('a', '2026-09-01', 'closed'), P('b', '2026-09-08', 'closed'), P('c', '2026-09-15', 'planned')]), [['a', 't1'], ['b', 't2'], ['c', 't3']]);
+  assert.deepEqual(ids([P('a', '2026-09-01', 'closed', 't2'), P('b', '2026-09-08', 'closed'), P('c', '2026-09-15', 'planned')]), [['b', 't1'], ['c', 't3']]);
+  assert.deepEqual(layoutLessons([], [P('a', '2026-09-01', 'closed')]).assign, []);
+});

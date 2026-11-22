@@ -200,3 +200,13 @@ test('planSyllabusUpload: the unit title is a field of the row; a new title is a
   assert.deepEqual([titled.summary.added, titled.summary.changed, titled.summary.removed, titled.units], [0, 3, 0, [{ unit: 1, title: 'Основы' }]]);
   assert.equal(first.parts[0].toInsert[0].unitTitle, '');
 });
+
+test('subjectScope: a held pair without a lesson counts only inside the semester dates', () => {
+  const held = pair('h', '2026-06-01', 'closed');
+  const first = pair('n', '2026-09-01', 'planned');
+  const sc = subjectScope(subject, [held, first], index, S1);
+  assert.deepEqual(sc.pairs.map((p) => p.id), ['n']);
+  assert.deepEqual(layoutLessons(sc.topics, sc.pairs, sc.skip).assign.map((x) => [x.id, x.patch.topicId]), [['n', 'a1']]);
+  assert.deepEqual(subjectScope(subject, [pair('h2', '2026-06-01', 'closed', L('a1', 'lecture'))], index, S1).pairs.map((p) => p.id), ['h2']);
+  assert.deepEqual(subjectScope(subject, [pair('h3', '2026-09-02', 'closed')], index, S1).pairs.map((p) => p.id), ['h3']);
+});

@@ -56,7 +56,7 @@ export function controlMarks(rows) {
 }
 
 // Lays the lessons of ONE syllabus over the pairs of ONE subject. Returns only the pairs whose lesson changes.
-// The lessons of held pairs are taken; of the free ones the first `skip` count as already passed and are not handed out.
+// The lessons of held pairs are taken (a held pair without a lesson takes the next free one like a planned pair); of the free ones the first `skip` count as already passed and are not handed out.
 export function layoutLessons(rows, pairs, skip = 0) {
   const ordered = [...(pairs || [])].sort((a, b) =>
     (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || a.slot - b.slot || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
@@ -67,7 +67,7 @@ export function layoutLessons(rows, pairs, skip = 0) {
   let withoutTopic = 0;
   for (const pair of ordered) {
     let lesson;
-    if (pair.status === 'planned') {
+    if (pair.status === 'planned' || (FIXED_STATUSES.includes(pair.status) && lessonKey(pair) === '')) {
       lesson = free.shift();
       if (!lesson) withoutTopic++;
     } else if (pair.status === 'cancelled' || pair.status === 'missed') lesson = undefined;
