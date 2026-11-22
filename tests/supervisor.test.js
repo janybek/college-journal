@@ -6,7 +6,7 @@ import path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { createLogger } from '../backend/node/log.js';
 import { main, EXIT } from '../backend/node/server.js';
-import { nextDelay, isAlive, runSupervised, requestStop, readStatus } from '../backend/node/supervisor.js';
+import { nextDelay, isAlive, runSupervised, requestStop, readStatus, cli } from '../backend/node/supervisor.js';
 import { PERSON, envOf, keep, quiet, sleep, tempBase, tempConfig, tempDir, until } from './serverSetup.js';
 
 const LIMITS = { firstMs: 10, maxMs: 40, stableMs: 60000 };
@@ -135,4 +135,19 @@ test('a second supervisor beside a living one does not start a server and leaves
   fs.writeFileSync(config.supervisorFile, note);
   const second = runSupervised({ config, logger: quiet(), command: process.execPath, args: [exitWith(dir, 8)], limits: LIMITS });
   assert.deepEqual([await second.done, runsOf(dir, 8), fs.readFileSync(config.supervisorFile, 'utf8')], [EXIT.portBusy, 0, note]);
+});
+
+test('a stop request that nobody carried out is taken back after the timeout: the next supervisor starts; --status tells a foreign process from ours', async (t) => {
+  const { config } = tempBase(t);
+  const dir = tempDir(t);
+  const other = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore', windowsHide: true });
+  t.after(() => other.kill());
+  fs.writeFileSync(config.supervisorFile, JSON.stringify({ pid: other.pid, startedAt: 0 }));                              // a number that went to a foreign process
+  assert.deepEqual([await requestStop(config, { waitMs: 200 }), fs.existsSync(config.stopFile)], [{ stopped: false, reason: 'timeout' }, false]);
+  const next = runSupervised({ config, logger: quiet(), command: process.execPath, args: [exitWith(dir, 0)], limits: LIMITS });
+  assert.deepEqual([await next.done, runsOf(dir, 0)], [EXIT.ok, 1]);
+  fs.writeFileSync(config.stateFile, JSON.stringify({ pid: other.pid, port: 1, startedAt: 0 }));
+  const lines = [];
+  await cli(['--status'], { env: envOf(config), root: config.root, out: (l) => lines.push(l) });
+  assert.equal(lines.some((l) => l.includes('не наш процесс')), true);
 });

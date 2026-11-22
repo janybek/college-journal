@@ -146,7 +146,10 @@ export async function requestStop(config, { waitMs = 15000 } = {}) {
   for (;;) {
     const gone = supervisor ? !fs.existsSync(config.supervisorFile) : !fs.existsSync(config.stateFile);
     if (gone && !(await answers(port))) return { stopped: true };
-    if (clock() > give) return { stopped: false, reason: 'timeout' };
+    if (clock() > give) {
+      fs.rmSync(config.stopFile, { force: true });                       // a request nobody carried out must not stop the next start
+      return { stopped: false, reason: 'timeout' };
+    }
     await sleep(50);
   }
 }
@@ -204,7 +207,8 @@ export async function cli(argv, { env = process.env, root, out = console.log } =
     const s = await readStatus(config);
     out(s.running ? `Сервер работает на порту ${s.port}` : 'Сервер не отвечает');
     const state = readJson(config.stateFile);
-    out(`Процесс сервера: ${state?.pid ?? 'нет'}`);
+    const foreign = !s.running && isAlive(state?.pid);
+    out(`Процесс сервера: ${state?.pid ?? 'нет'}${foreign ? ' (процесс с этим номером жив, но порт не отвечает: это не наш процесс)' : ''}`);
     out(`Процесс присмотра: ${s.supervisor.pid ?? 'нет'}${s.supervisor.running ? '' : ' (не работает)'}`);
     out(`Последняя копия: ${s.lastCopy ?? 'нет'}; всего копий: ${s.copies}`);
     out(`Ошибок в журнале за сегодня: ${s.errorsToday}; неверных входов за сегодня: ${s.failedLoginsToday}`);
