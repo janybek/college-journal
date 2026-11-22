@@ -4,13 +4,14 @@ import { isDate, localDate, localDateTime, localTime } from '../core/dates.js';
 import { FIXED_STATUSES, RESULT_FIELDS } from '../core/schema.js';
 import { readSettings } from '../core/settings.js';
 import { readScheme } from '../core/scoring.js';
-import { inSemester } from '../core/topics.js';
+import { NO_LESSON, inSemester } from '../core/topics.js';
 import { syllabusFor } from '../core/syllabus.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
 import { compareNames } from '../core/names.js';
 import { isSubstitution } from '../core/schedule.js';
 import { firstPairId, studentResults } from '../core/grades.js';
 import { checkMark, checkReason, checkResultValue, markChanges, markMode, markState, normalizeMark } from '../core/journal.js';
+import { relayout } from './scheduleData.js';
 
 export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'units', 'settings', 'attendance', 'unitResults'];
 
@@ -473,3 +474,54 @@ export function changeLogView(store, platform, data, user) {
   });
   return { today: localDate(platform.now()), rows: out, more: picked.length > limit };
 }
+
+// The marks of a pair that has none left, as lines of the change log: the last row of each student, one line per filled field.
+function clearedMarkLog(rows, entry) {
+  const byStudent = new Map();
+  for (const row of rows) byStudent.set(row.studentId, [...(byStudent.get(row.studentId) || []), row]);
+  const log = [];
+  for (const [studentId, list] of byStudent) {
+    const old = markOf(lastOf(list, 'markedAt'));
+    for (const c of markChanges(old, { status: '', noCoat: false, activity: null })) log.push({ ...entry, entity: 'mark', studentId, field: c.field, before: c.before, after: '' });
+  }
+  return log;
+}
+
+// 'journal.missPair' and 'journal.reopenPair': the deanery moves a pair to or from "missed", or clears the marks of a held pair.
+// The pair is written together with the lessons of its subject laid out again; the answer is the journal after the write.
+function changePairStatus(store, platform, data, user, reopen) {
+  if (!viewerOf(user).manager) throw new AppError('forbidden');
+  const rows = readJournalRows(store);
+  const pair = typeof data.pairId === 'string' ? rows.pairs.find((p) => p.id === data.pairId) : undefined;
+  const subject = pair && rows.subjects.find((s) => s.id === pair.subjectId);
+  if (!pair || !subject) throw new AppError('not_found');
+  const code = checkReason(data.reason);
+  if (code) throw new AppError('invalid', { fields: [{ field: 'reason', code }] });
+  const reason = data.reason.trim();
+
+  const nowMs = platform.now();
+  const state = markState({ ...pair, status: 'planned' }, { date: localDate(nowMs), time: localTime(nowMs) }, readScheme(rows.settings));
+  const marks = rows.attendance.filter((r) => r.pairId === pair.id);
+  let patch;
+  if (!reopen) {
+    if (pair.status !== 'planned') throw new AppError('pair_locked');
+    if (state === 'future') throw new AppError('too_early');
+    if (marks.length > 0) throw new AppError('has_marks');
+    patch = { status: 'missed', ...NO_LESSON };
+  } else if (pair.status === 'missed' || pair.status === 'closed') patch = { status: 'planned' };
+  else throw new AppError('pair_locked');
+
+  const at = localDateTime(nowMs);
+  const entry = { at, actorId: user.id, subjectId: subject.id, pairId: pair.id, reason, late: state === 'late' };
+  const log = [...(reopen && pair.status === 'closed' ? clearedMarkLog(marks, entry) : []),
+    { ...entry, entity: 'pair', field: 'status', before: pair.status, after: patch.status }];
+  if (reopen && marks.length > 0) store.removeMany('attendance', marks.map((r) => r.id));
+  store.insertMany('changeLog', log);
+  const pairs = rows.pairs.map((p) => (p.id === pair.id ? { ...p, ...patch } : p));
+  const laid = relayout(store, [subject.id], { ...rows, settings: readSettings(rows.settings), pairs }, [{ id: pair.id, patch }]);
+  const after = { ...rows, pairs: laid.pairs, attendance: reopen ? rows.attendance.filter((r) => r.pairId !== pair.id) : rows.attendance };
+  return { journal: journalView(after, platform, subject.id, user) };
+}
+
+export const missPair = (store, platform, data, user) => changePairStatus(store, platform, data, user, false);
+export const reopenPair = (store, platform, data, user) => changePairStatus(store, platform, data, user, true);

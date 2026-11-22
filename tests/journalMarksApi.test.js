@@ -167,3 +167,16 @@ test('journal.savePair: a held pair keeps its topic: it cannot be cancelled', ()
   at('2026-09-08', '09:00');
   assert.equal(call('schedule.cancelPair', { id: p0908 }, t.dean).error.code, 'pair_locked');
 });
+
+test('journal.savePair: a held pair keeps its topic: a syllabus version without it is not submitted (held_missing)', () => {
+  const s = setup();
+  const { call, t, at, store, sb1 } = s;
+  at('2026-09-09', '09:00');
+  call('syllabus.startDraft', { subjectId: sb1, semester: 1 }, t.teacher1);
+  const draft = store.list('syllabi').find((x) => x.status === 'draft');
+  store.removeMany('topics', [store.list('topics').find((x) => x.syllabusId === draft.id && x.name === 'Тема 1').id]);
+  const sent = call('syllabus.submit', { syllabusId: draft.id }, t.teacher1).data;
+  assert.equal(sent.submitted, false);
+  assert.deepEqual(sent.checks.errors.filter((e) => e.code === 'held_missing'), [{ section: 'plan', code: 'held_missing', name: 'Тема 1', date: '2026-09-01' }]);
+  assert.equal(store.get('syllabi', draft.id).status, 'draft');
+});
