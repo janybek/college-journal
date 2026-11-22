@@ -1,4 +1,5 @@
 import { changeLogView, journalList, journalView, missPair, readJournalRows, reopenPair, saveUnitResults, savePairMarks } from '../journalData.js';
+import { studentGrades } from '../studentGrades.js';
 
 export const journalHandlers = {
   'journal.get': (data, ctx, user) => ({ journal: journalView(readJournalRows(ctx.store), ctx.platform, data.subjectId, user) }),
@@ -7,5 +8,6 @@ export const journalHandlers = {
   'journal.saveResults': (data, ctx, user) => saveUnitResults(ctx.store, ctx.platform, data, user),
   'journal.missPair': (data, ctx, user) => missPair(ctx.store, ctx.platform, data, user),
   'journal.reopenPair': (data, ctx, user) => reopenPair(ctx.store, ctx.platform, data, user),
+  'student.grades': (data, ctx, user) => studentGrades(readJournalRows(ctx.store), ctx.platform, user),
   'journal.log': (data, ctx, user) => changeLogView(ctx.store, ctx.platform, data, user),
 };
