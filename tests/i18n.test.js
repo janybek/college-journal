@@ -391,3 +391,13 @@ test('task 24: the scoring card of the settings has its texts in every language'
   }
   assert.equal(ru['scoring.title'], 'Баллы и журнал');
 });
+
+test('task 25: the course and semester check has its texts in every language', () => {
+  const keys = ['sform.checks.title.planSemester.course_semester', 'sform.checks.title.group_course', 'syllabus.error.course_semester', 'syllabus.warning.semester_by_course'];
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) {
+    for (const p of ['{course}', '{a}', '{b}']) assert.ok(dict[keys[0]].includes(p), p);
+    assert.ok(dict[keys[1]].includes('{groups}'));
+    for (const p of ['{course}', '{semester}', '{plan}']) assert.ok(dict[keys[3]].includes(p), p);
+  }
+});

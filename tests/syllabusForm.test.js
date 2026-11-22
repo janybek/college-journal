@@ -114,7 +114,14 @@ test('checkLine: the text of a check by its section and field or code', () => {
   assert.deepEqual(checks.errors.map(checkLine).map((x) => x.key), ['sform.checks.title.credits', 'sform.checks.plan.unit_empty', 'sform.checks.plan.held_missing']);
   assert.deepEqual([checkLine({ section: 'goals', field: 'goal', code: 'required' }).key, checkLine({ section: 'selfWork', index: 0, code: 'bad_unit' }).key],
     ['sform.checks.goals.goal', 'sform.checks.selfWork.bad_unit']);
-  assert.deepEqual(checkLine(checks.errors[2]).params, { name: 'Введение', date: '2026-09-02', held: undefined, unit: undefined, n: undefined });
+  assert.deepEqual(checkLine(checks.errors[2]).params, { name: 'Введение', date: '2026-09-02', held: undefined, unit: undefined, n: undefined, course: undefined, a: undefined, b: undefined, groups: undefined });
+  const err = { section: 'title', field: 'planSemester', code: 'course_semester', course: 2 };
+  assert.deepEqual(checkLine(err, (key) => key === 'sform.checks.title.planSemester.course_semester'),
+    { key: 'sform.checks.title.planSemester.course_semester', params: { name: undefined, date: undefined, held: undefined, unit: undefined, n: undefined, course: 2, a: 3, b: 4, groups: undefined } });
+  assert.equal(checkLine(err).key, 'sform.checks.title.planSemester');
+  assert.equal(checkLine({ section: 'title', field: 'planSemester', code: 'required' }, () => false).key, 'sform.checks.title.planSemester');
+  assert.deepEqual([checkLine({ section: 'title', code: 'group_course', groups: ['01-1', '03-1'] }).key, checkLine({ section: 'title', code: 'group_course', groups: ['01-1', '03-1'] }).params.groups],
+    ['sform.checks.title.group_course', '01-1, 03-1']);
   assert.deepEqual([checkLine(checks.errors[1]).params.unit, checkLine({ section: 'selfWork', index: 0, code: 'bad_unit' }).params.n], [2, 1]);
 });
 

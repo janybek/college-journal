@@ -260,12 +260,26 @@ export function checkTabs(checks) {
   return new Map([...counts].sort((a, b) => rank(a[0]) - rank(b[0])));
 }
 
-// An error or a warning of the checks -> { key, params } for t(): with a field 'sform.checks.<section>.<field>',
-// otherwise 'sform.checks.<section>.<code>'. params: the topic (name), the date of its held pair (as the server gives
-// it), the hours held, the unit and the number of a row (n, from 1).
-export function checkLine(item) {
-  const key = item.field ? `sform.checks.${item.section}.${item.field}` : `sform.checks.${item.section}.${item.code}`;
-  return { key, params: { name: item.name, date: item.date, held: item.held, unit: item.unit, n: typeof item.index === 'number' ? item.index + 1 : undefined } };
+// An error or a warning of the checks -> { key, params } for t(): with a field 'sform.checks.<section>.<field>.<code>'
+// when has(key) says the dictionary holds it, else 'sform.checks.<section>.<field>'; without a field
+// 'sform.checks.<section>.<code>'. params: the topic (name), the date of its held pair (as the server gives it), the
+// hours held, the unit and the number of a row (n, from 1), the course and its two semesters (a, b), the groups.
+export function checkLine(item, has = () => false) {
+  const known = typeof has === 'function' ? has : () => false;
+  let key = `sform.checks.${item.section}.${item.code}`;
+  if (item.field) {
+    const withCode = `sform.checks.${item.section}.${item.field}.${item.code}`;
+    key = known(withCode) ? withCode : `sform.checks.${item.section}.${item.field}`;
+  }
+  const course = Number.isInteger(item.course) ? item.course : undefined;
+  return {
+    key,
+    params: {
+      name: item.name, date: item.date, held: item.held, unit: item.unit, n: typeof item.index === 'number' ? item.index + 1 : undefined,
+      course, a: course === undefined ? undefined : course * 2 - 1, b: course === undefined ? undefined : course * 2,
+      groups: Array.isArray(item.groups) ? item.groups.join(', ') : undefined,
+    },
+  };
 }
 
 // The numbers of the lessons as the tables of the form stand (before saving): Map('<unit>.<kind>.<place>' -> number),

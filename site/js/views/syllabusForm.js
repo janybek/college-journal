@@ -267,7 +267,7 @@ function tabs() {
 // ---- What to fix before submitting ----
 
 function checkText(item) {
-  const { key, params } = checkLine(item);
+  const { key, params } = checkLine(item, hasText);
   return t(hasText(key) ? key : 'sform.checks.other', { ...params, date: dayText(params.date) });
 }
 
@@ -627,7 +627,8 @@ async function send() {
 }
 
 function submitDialog({ warnings }) {
-  const empty = [...new Set(warnings.map((item) => item.section))].filter((tab) => TABS.includes(tab)).map((tab) => t('sform.tab.' + tab));
+  const empty = [...new Set(warnings.filter((item) => item.code === 'empty').map((item) => item.section))].filter((tab) => TABS.includes(tab)).map((tab) => t('sform.tab.' + tab));
+  const others = warnings.filter((item) => item.code !== 'empty');
   const close = () => {
     if (state.submitting) return;
     state.submitAsk = null;
@@ -635,11 +636,12 @@ function submitDialog({ warnings }) {
     focusById('sf-submit');
   };
   const go = el('button', { type: 'button', id: 'sf-send', class: 'button button--primary', onclick: send },
-    icon('checkCircle'), t(empty.length > 0 ? 'sform.submit.anyway' : 'sform.submit.go'));
+    icon('checkCircle'), t(empty.length > 0 || others.length > 0 ? 'sform.submit.anyway' : 'sform.submit.go'));
   if (state.submitting === 'send') markBusy(go, 'sform.submit.sending');
   const dialog = modal({ id: 'sf-submit-ask', labelledBy: 'sf-submit-title', className: 'dialog--confirm', onClose: close, canCancel: () => !state.submitting },
     el('h2', { class: 'dialog__title', id: 'sf-submit-title' }, t('sform.submit.title')),
     empty.length > 0 ? el('p', { class: 'sform-submit__empty' }, icon('alert'), el('span', {}, t('sform.submit.empty', { tabs: empty.join(', ') }))) : null,
+    ...others.map((item) => el('p', { class: 'sform-submit__empty' }, icon('alert'), el('span', {}, checkText(item)))),
     el('p', {}, t('sform.submit.text')),
     el('div', { class: 'dialog__actions' },
       el('button', { type: 'button', class: 'button button--secondary', autofocus: true, onclick: () => dialog.close() }, t('common.cancel')),
