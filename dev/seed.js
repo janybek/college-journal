@@ -1,10 +1,11 @@
 import { hashPassword } from '../core/auth.js';
-import { addDays, mondayOf } from '../core/dates.js';
+import { addDays, addMinutes, localDate, mondayOf } from '../core/dates.js';
 import { DEFAULT_BELLS, settingsToRows } from '../core/settings.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { generateSchedule, relayout, todayOf } from '../backend/scheduleData.js';
 import { publishSyllabusDoc, uploadSyllabus } from '../backend/syllabusUpload.js';
 import { draftForm, saveSection, startDraft } from '../backend/syllabusDraft.js';
+import { journalView, readJournalRows, savePairMarks, saveUnitResults, writeMarks } from '../backend/journalData.js';
 import { approveSyllabus, returnSyllabus, submitSyllabus } from '../backend/syllabusFlow.js';
 
 // One password for every fictional person of the dev stand.
@@ -226,6 +227,7 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin 
 
   seedSyllabi(store, platform, subjects, teacher1.fullName, admin);
   seedPairs(store, platform);
+  seedMarks(store, platform);
 }
 
 // Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
@@ -258,12 +260,12 @@ export function seedAdmin(store, platform) {
   store.insert('staff', { ...person, passwordHash: hashPassword(platform, DEV_PASSWORD), mustChangePassword: false, active: true, lang: 'ru' });
 }
 
-// Semester from four weeks before this week to the Friday of week 18; one day off on the Wednesday after next Monday.
+// Semester from nine weeks before this week to the Friday of week 18; one day off on the Wednesday after next Monday.
 function seedPairs(store, platform) {
   const thisMonday = mondayOf(todayOf(platform));
-  const start = addDays(thisMonday, -28);
+  const start = addDays(thisMonday, -63);
   store.insertMany('settings', settingsToRows({
-    semesterStart: start, semesterEnd: addDays(start, 123), holidays: [addDays(start, 37)], bells: DEFAULT_BELLS, semester: 1,
+    semesterStart: start, semesterEnd: addDays(start, 123), holidays: [addDays(thisMonday, 9)], bells: DEFAULT_BELLS, semester: 1,
   }));
   generateSchedule(store, platform);
 
@@ -281,4 +283,71 @@ function seedPairs(store, platform) {
   store.update('pairs', substitute.id, { teacherId: teacher3.id, changed: true, substitute: true, note: 'Замена' });
   store.update('pairs', cancelled.id, { status: 'cancelled', changed: true });
   relayout(store);
+}
+
+// The mark of student i on the k-th pair of a subject (no chance in it): [status, noCoat, activity].
+function markOfStudent(i, k, pair, first) {
+  let status = 'present';
+  if ((i + k) % 17 === 0) status = 'excused';
+  else if ((i * 7 + k * 3) % 11 === 0) status = 'absent';
+  else if ((i * 7 + k * 3) % 11 === 1) status = 'late';
+  const attended = status === 'present' || status === 'late';
+  const noCoat = pair.lessonType === 'practice' && status !== 'absent' && status !== 'excused' && (i + 2 * k) % 13 === 0;
+  const activity = attended && !first && pair.lessonType !== 'control' ? 4 + ((i * 3 + k * 5) % 7) : null;
+  return { status, noCoat, activity };
+}
+
+// The marks of the stand: every past pair is held except the last past pair of «Анатомия» in 02-1; the control and the self-work of unit 1
+// of «Информатика»; three corrections for the change log. Written through the functions of the journal, by the people of the stand.
+function seedMarks(store, platform) {
+  const today = localDate(platform.now());
+  const staff = new Map(store.list('staff').map((p) => [p.id, p]));
+  const groups = new Map(store.list('groups').map((g) => [g.id, g]));
+  const students = store.list('students');
+  const subjects = store.list('subjects');
+  const userOf = (row) => ({ id: row.id, roles: String(row.roles).split(','), kind: 'staff' });
+  const order = (a, b) => a.date.localeCompare(b.date) || a.slot - b.slot;
+
+  const past = (subject) => store.list('pairs').filter((p) => p.subjectId === subject.id).sort(order);
+  const skipped = past(subjects.find((s) => s.name === 'Анатомия' && groups.get(s.groupId).name === '02-1')).filter((p) => p.date < today && p.status === 'planned').at(-1);
+  for (const subject of subjects) {
+    const group = students.filter((s) => s.groupId === subject.groupId);
+    const pairs = past(subject);
+    const first = pairs.find((p) => ['planned', 'running', 'closed'].includes(p.status));
+    pairs.forEach((pair, k) => {
+      if (pair.date >= today || pair.status !== 'planned' || pair.id === skipped.id) return;
+      const items = group.map((s, i) => ({ studentId: s.id, ...markOfStudent(i, k, pair, pair === first) }));
+      const at = `${pair.date} ${addMinutes(pair.startTime, 85)}:00`;
+      writeMarks(store, { pair, subject, items, existing: new Map(), actorId: pair.teacherId, at });
+    });
+  }
+
+  const informatics = subjects.filter((s) => s.name === 'Информатика' && groups.get(s.groupId).name !== '03-1');
+  for (const subject of informatics) {
+    const group = students.filter((s) => s.groupId === subject.groupId);
+    const teacher = userOf(staff.get(subject.teacherId));
+    const rated = group.slice(0, -2);
+    saveUnitResults(store, platform, { subjectId: subject.id, unit: 1, field: 'control', items: rated.map((s, i) => ({ studentId: s.id, value: 22 + ((i * 5) % 19) })) }, teacher);
+    saveUnitResults(store, platform, { subjectId: subject.id, unit: 1, field: 'self', items: rated.map((s, i) => ({ studentId: s.id, value: 10 + ((i * 3) % 11) })) }, teacher);
+  }
+
+  // 1. the teacher turns «не был» into «отработано» with an activity on an old pair (a status row and an activity row)
+  const first = informatics.find((s) => groups.get(s.groupId).name === '01-1');
+  const teacher1 = userOf(staff.get(first.teacherId));
+  const group1 = students.filter((s) => s.groupId === first.groupId);
+  const old = past(first)[5];
+  savePairMarks(store, platform, { pairId: old.id, marks: [{ studentId: group1[1].id, status: 'madeup', noCoat: false, activity: 8 }], reason: 'Отработал тему на консультации' }, teacher1);
+
+  // 2. the deanery changes one mark
+  const second = informatics.find((s) => groups.get(s.groupId).name === '02-1');
+  const dean = userOf(store.list('staff').find((p) => p.login === 'dean'));
+  const group2 = students.filter((s) => s.groupId === second.groupId);
+  const pair = past(second)[3];
+  const was = markOfStudent(4, 3, pair, false);
+  savePairMarks(store, platform, { pairId: pair.id, marks: [{ studentId: group2[4].id, ...was, status: was.status === 'present' ? 'late' : 'present' }], reason: 'Ошибка при заполнении' }, dean);
+
+  // 3. the manual current points of one student: two more than the calculated ones, not above the scheme
+  const view = journalView(readJournalRows(store), platform, first.id, teacher1);
+  const calculated = view.results[group1[3].id].units[0].current;
+  saveUnitResults(store, platform, { subjectId: first.id, unit: 1, field: 'current', items: [{ studentId: group1[3].id, value: Math.min(40, calculated + 2) }], reason: 'Участие в олимпиаде' }, teacher1);
 }
