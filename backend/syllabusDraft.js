@@ -23,6 +23,12 @@ export function viewerOf(user, version, subjects) {
   return { id: user.id, roles: user.roles, teaches };
 }
 
+// [{ name, course }]: the groups where the teacher of the version leads its discipline, from sheets the request has already read.
+export function groupsOfTeacher(version, subjects, groups) {
+  const ids = new Set(subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId).map((s) => s.groupId));
+  return groups.filter((g) => ids.has(g.id)).map((g) => ({ name: g.name, course: g.course }));
+}
+
 const keyOfVersion = (v) => ({ disciplineId: v.disciplineId, teacherId: v.teacherId, semester: v.semester });
 
 // Writes the row of a new version of a key and, when the key has an approved version, a copy of its sections (one insertMany per non-empty sheet).
@@ -114,7 +120,7 @@ export function draftForm(store, platform, data, user) {
     },
     can: { edit: rights.edit, submit: rights.submit, approve: rights.approve, giveBack: rights.giveBack },
     doc,
-    checks: checkSubmit(doc, held),
+    checks: checkSubmit(doc, held, groupsOfTeacher(version, subjects, groups)),
   };
 }
 

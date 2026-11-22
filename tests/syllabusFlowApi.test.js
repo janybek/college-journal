@@ -64,7 +64,7 @@ test('draft → review → returned → review → approved: the lessons reach t
   assert.equal(store.get('syllabi', syllabusId).status, 'draft');
   reset();
   assert.equal(call('syllabus.submit', { syllabusId }, teacher1).data.submitted, true);
-  assert.deepEqual([lists, writes], [{ subjects: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1 },
+  assert.deepEqual([lists, writes], [{ subjects: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, groups: 1 },
     { 'updateMany:syllabi': 1 }]);
   assert.deepEqual(pick(syllabusId, 'status', 'submittedBy', 'submittedAt'), ['review', staff.teacher1, '2026-08-31']);
   assert.deepEqual(lessons(sb1).map((x) => x[1]), ['', '']);
@@ -80,7 +80,7 @@ test('draft → review → returned → review → approved: the lessons reach t
   assert.deepEqual(pick(syllabusId, 'status', 'remark', 'decidedBy', 'decidedAt'), ['approved', '', staff.dean, '2026-08-31']);
   assert.deepEqual([lessons(sb1), lessons(sb3)], [[['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]], [['2026-09-02', ...FIRST[0]], ['2026-09-09', ...FIRST[1]]]]);
   assert.deepEqual(writes, { 'updateMany:syllabi': 1, 'updateMany:pairs': 1 });
-  assert.deepEqual(lists, { subjects: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, settings: 1 });
+  assert.deepEqual(lists, { subjects: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, settings: 1, groups: 1 });
   assert.deepEqual([calls.get, calls.update || 0, calls.insert || 0], [1, 0, 0]);
 });
 
@@ -259,5 +259,44 @@ test('a row of an unknown kind (typed by hand in the sheet) is named and stops b
   const expected = [{ section: 'plan', code: 'bad_kind', id: row.id, name: 'Практикум' }];
   assert.deepEqual([call('syllabus.submit', { syllabusId }, teacher1).data.checks.errors, call('syllabus.approve', { syllabusId }, dean).data], [expected,
     { approved: false, checks: { errors: expected, warnings: FOUR_EMPTY }, changedPairs: 0 }]);
+  assert.equal(snapshotAll(), before);
+});
+
+const groupWarnings = (checks) => checks.warnings.filter((w) => w.code === 'group_course');
+
+test('a group of another course than the title warns at the form, submitting and approving; the same course does not', () => {
+  const { store, call, syllabusId, g2, teacher1, dean } = ready();
+  assert.deepEqual(groupWarnings(call('syllabus.submit', { syllabusId, dryRun: true }, teacher1).data.checks), []);
+  assert.deepEqual(groupWarnings(call('syllabus.form', { syllabusId }, teacher1).data.checks), []);
+  // 02-1 is on the 2nd course, the title says the 1st: only that group is named
+  store.update('groups', g2, { course: 2 });
+  const expected = [{ section: 'title', code: 'group_course', groups: ['02-1'] }];
+  assert.deepEqual(groupWarnings(call('syllabus.form', { syllabusId }, teacher1).data.checks), expected);
+  assert.deepEqual(groupWarnings(call('syllabus.submit', { syllabusId, dryRun: true }, teacher1).data.checks), expected);
+  const sent = call('syllabus.submit', { syllabusId }, teacher1).data;
+  assert.deepEqual([sent.submitted, groupWarnings(sent.checks)], [true, expected]);
+  const done = call('syllabus.approve', { syllabusId }, dean).data;
+  assert.deepEqual([done.approved, groupWarnings(done.checks)], [true, expected]);
+});
+
+test('the groups of another teacher of the same discipline are not named in the warning', () => {
+  const { store, call, syllabusId, ds1, teacher1, staff } = ready();
+  const g3 = store.insert('groups', { name: '03-1', course: 3 }).id;
+  store.insert('subjects', { name: 'Информатика', disciplineId: ds1, groupId: g3, teacherId: staff.teacher2, scheme: 'A' });
+  assert.deepEqual(groupWarnings(call('syllabus.form', { syllabusId }, teacher1).data.checks), []);
+  assert.deepEqual(groupWarnings(call('syllabus.submit', { syllabusId, dryRun: true }, teacher1).data.checks), []);
+});
+
+test('a title of the 2nd course with the plan semester of the 1st is refused at submitting and approving, nothing is written', () => {
+  const { store, call, snapshotAll, syllabusId, teacher1, dean } = ready();
+  store.update('syllabi', syllabusId, { course: 2, planSemester: 1 });
+  const before = snapshotAll();
+  const expected = { section: 'title', field: 'planSemester', code: 'course_semester', course: 2 };
+  assert.deepEqual(call('syllabus.form', { syllabusId }, teacher1).data.checks.errors, [expected]);
+  const sent = call('syllabus.submit', { syllabusId }, teacher1).data;
+  assert.deepEqual([sent.submitted, sent.checks.errors], [false, [expected]]);
+  assert.equal(store.get('syllabi', syllabusId).status, 'draft');
+  const direct = call('syllabus.approve', { syllabusId }, dean).data;
+  assert.deepEqual([direct.approved, direct.changedPairs, direct.checks.errors], [false, 0, [expected]]);
   assert.equal(snapshotAll(), before);
 });

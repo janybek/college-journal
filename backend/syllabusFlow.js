@@ -5,7 +5,7 @@ import { LIMITS, plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
 import { approvalPlan, checkHeld, checkSubmit, rightsOn, versionsOf } from '../core/syllabusFlow.js';
 import { loadSettings, relayout, todayOf } from './scheduleData.js';
-import { readTables, versionOf, viewerOf } from './syllabusDraft.js';
+import { groupsOfTeacher, readTables, versionOf, viewerOf } from './syllabusDraft.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const isManager = (user) => user.roles.includes('admin') || user.roles.includes('dean');
@@ -23,14 +23,14 @@ function allow(version, user, subjects, action) {
 }
 
 // The checks before submitting and approving: the version against the approved one of its key and the held pairs.
-function examine(store, version, syllabi) {
+function examine(store, version, syllabi, subjects) {
   const tables = readTables(store, DOC_TABLES);
   const pairs = store.list('pairs');
   const { approved } = versionsOf(syllabi, { disciplineId: version.disciplineId, teacherId: version.teacherId, semester: version.semester });
   const rows = rowsOfVersion(tables, version.id);
   const previous = approved && approved.id !== version.id ? rowsOfVersion(tables, approved.id) : null;
   const held = previous ? checkHeld(rows.topics, previous.topics, pairs) : [];
-  return { tables, pairs, approved: previous ? approved : null, rows, previous, checks: checkSubmit(buildDoc(version, rows), held) };
+  return { tables, pairs, approved: previous ? approved : null, rows, previous, checks: checkSubmit(buildDoc(version, rows), held, groupsOfTeacher(version, subjects, store.list('groups'))) };
 }
 
 // 'syllabus.submit' { syllabusId, dryRun? } -> { submitted, checks }
@@ -41,7 +41,7 @@ export function submitSyllabus(store, platform, data, user) {
   const version = versionOf(syllabi, syllabusId);
   const subjects = store.list('subjects');
   allow(version, user, subjects, 'submit');
-  const { checks } = examine(store, version, syllabi);
+  const { checks } = examine(store, version, syllabi, subjects);
   if (checks.errors.length > 0 || data.dryRun === true) return { submitted: false, checks };
   store.updateMany('syllabi', [{ id: version.id, patch: { status: 'review', submittedBy: user.id, submittedAt: todayOf(platform) } }]);
   return { submitted: true, checks };
@@ -55,7 +55,7 @@ export function approveSyllabus(store, platform, data, user) {
   const version = versionOf(syllabi, syllabusId);
   const subjects = store.list('subjects');
   allow(version, user, subjects, 'approve');
-  const { tables, pairs, approved, rows, previous, checks } = examine(store, version, syllabi);
+  const { tables, pairs, approved, rows, previous, checks } = examine(store, version, syllabi, subjects);
   if (checks.errors.length > 0) return { approved: false, checks, changedPairs: 0 };
   const settings = loadSettings(store);                     // every read goes before the first write
 
