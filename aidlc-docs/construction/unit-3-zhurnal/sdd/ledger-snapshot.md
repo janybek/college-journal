@@ -64,3 +64,5 @@ Owner stops: after task 19 (block 1), 21 (block 2), 25 (block 3), 26 (block 4).
 - Task 20: complete (commits 79388fd..1c7e56d, review clean; probe scratchpad/fuzz.mjs — pairScore = server rule on 1400 combos). minor → task 21: journalCell.js:834 onSaved skipped when the dialog closed mid-save (grid stale until reload) — call onSaved before the isConnected check; reason field not disabled while busy.
 - Task 21: dispatched journal-screens (sonnet), BASE 1c7e56d. No AI review per owner ruling (only 19, 20, 22, 26).
 - Task 21: complete (commits 1c7e56d..873a3be, no AI review per owner ruling; 695 tests). Note: no RED run (tests written after the functions) — process deviation, tests themselves follow the brief. Task-20 minor (onSaved before isConnected, reason disabled while busy) fixed here. BLOCK 2 STOP.
+- BLOCK 2 ACCEPTED by the owner 23.11 («Принимаю, дальше», no notes). Next: block 3 (task 22 +review, 23, 24, 25).
+- Task 22: dispatched journal-screens (sonnet), BASE 259191a+docs
