@@ -1,6 +1,6 @@
 // Address of the journal server on the owner's computer (Tailscale Funnel): 'https://<name>.ts.net/api'.
 // While it is empty the site says «not connected». It is written at the deployment (task 13).
-export const PRODUCTION_API_URL = '';
+export const PRODUCTION_API_URL = 'https://journal.tail750a0e.ts.net/api';
 
 export const LOCAL_HOSTS = ['localhost', '127.0.0.1'];
 
