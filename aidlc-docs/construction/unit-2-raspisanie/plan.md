@@ -96,6 +96,7 @@
 39. **Секреты в журнале работы и в файлах.** Временный пароль есть только в выводе команд первого запуска и смены пароля; в `server.log` нет паролей, токенов, логинов, ФИО и тел запросов — и при падении обработчика тоже; строку журнала нельзя подделать именем действия с переводом строки. Тесты — задачи 48 и 49.
 40. **Падение, второй запуск, остановка.** Упавший сервер поднимается сам с растущей паузой; ошибка настроек и занятый порт не дают бесконечного перезапуска; второй запуск рядом с работающим первому не мешает; остановка — по просьбе, без завершения процессов по номеру; токен, выданный до перезапуска, действует после него. Тесты — задачи 48 и 51.
 41. **Сайт и адрес сервера.** Адрес нельзя подменить ссылкой или хранилищем браузера; адрес не вида `https://…/api` — сайт говорит «не подключён», а не шлёт пароль куда попало; сервер выключен — «Сервер журнала сейчас недоступен», телефон без интернета — «Нет связи»; кнопки «Повторить» на шести экранах остаются. Тесты — задача 52.
+42. **Excel силлабуса — только первое заполнение.** Кнопка «Заполнить из файла» видна только у силлабуса без утверждённой версии и с черновиком без строк «Тем»; «Скачать (Excel)» заполненного силлабуса нет, «Скачать шаблон» есть; прежних ключей `syllabus.upload` и `sform.file.upload` в словарях и на экранах нет. Сервер файл принимает как прежде — это записано в «Чего в дополнении 4 нет». Тесты — задача 52.
 
 Проверяющий задач 47–51 отдельно убеждается: каждая проверка обхода сделана настоящим запросом к серверу, поднятому на порту 0 во временной папке, а «ничего не записано» — сравнением данных до и после, а не кодом ответа; тесты не читают и не пишут ничего вне временных папок; порт 5373, `serve.local.json` и «Автозагрузку» Windows не трогает ни один тест.
 
@@ -5960,9 +5961,9 @@ assert.equal('uploaded' in call('subjects.overview', {}, dean).data.rows[0], fal
 
 **Architecture:** `backend/store/sqliteStore.js` — четвёртое хранилище: таблица на каждый лист `core/schema.js`, колонки по схеме, форма строк через общий `shapeRow`. `handleRequest` выполняет запрос внутри `store.transaction`, если хранилище её умеет (умеет только SQLite; Apps Script и стенды работают как раньше). Всё, что есть только в Node, лежит в новой папке `backend/node/` — пара к `backend/gas/`: настройки, открытие базы и первый запуск, HTTP-сервер, журнал работы, копия, присмотр за процессом. Правило ограничения попыток — чистая функция в `core/`; счёт хранится в памяти сервера. Сайт получает адрес сервера одной константой и два новых сообщения.
 
-**Tech Stack:** Node 24 (на этом компьютере 24.18), встроенные `node:sqlite` (`DatabaseSync`, `backup`), `node:http`, `node:fs`, `node:child_process`. Новых зависимостей нет, ничего не устанавливается.
+**Tech Stack:** Node 24 (на этом компьютере 24.18), встроенные `node:sqlite` (`DatabaseSync`; копия базы — `VACUUM INTO`, не `backup()`: `backup()` с соединения, которое обслуживает запросы, падает при совпадении с запросом), `node:http`, `node:fs`, `node:child_process`. Новых зависимостей нет, ничего не устанавливается.
 
-**Порядок.** Перед задачей 46 — сверка плана проверяющим (задачи между собой и с готовым кодом), находки правятся в этом файле. Затем 46 → 47 → 48 → 49 → 50 → 51 → 52, затем задача 13. Задачи идут строго по одной; после каждой `npm test` зелёное и `npm run build:gas` собирается (код Apps Script остаётся запасным и не должен сломаться). Способ исполнения выбран: агенты по одной задаче, проверяющий после каждой.
+**Порядок.** Перед задачей 46 — сверка плана проверяющим (задачи между собой и с готовым кодом), находки правятся в этом файле. Сверка сделана (`.superpowers/sdd/plan-unit-2-raspisanie/preflight-addendum4.md`), её находки внесены в этот план. Затем 46 → 47 → 48 → 49 → 50 → 51 → 52, затем задача 13. Между задачами 49 и 52 стенд уже отвечает `too_many_attempts`, а текста для него в словаре нет: в этом промежутке ограничение попыток владельцу не показывать. Задачи идут строго по одной; после каждой `npm test` зелёное и `npm run build:gas` собирается (код Apps Script остаётся запасным и не должен сломаться). Способ исполнения выбран: агенты по одной задаче, проверяющий после каждой.
 
 **Что из прежнего текста больше не действует** (текст задач 1–45 не переписывается):
 
@@ -5977,7 +5978,8 @@ assert.equal('uploaded' in call('subjects.overview', {}, dean).data.rows[0], fal
 
 - **Без зависимостей.** Только встроенные модули Node. `package.json` получает `"engines": { "node": ">=24" }` и команды `serve*`; `devDependencies` не меняются.
 - **Что попадает в сборку Apps Script, остаётся чистым.** `backend/api.js`, `backend/handlers/*`, `core/*` не импортируют ничего из `backend/node/` и `backend/store/sqliteStore.js`; в них нет `node:`, `require(` и слова `process` даже в комментариях (их ищет `tests/gasBundle.test.js`).
-- **Настоящие данные вне репозитория.** База, секрет, журнал работы и копии лежат в папках из настроек. Сервер не стартует, если любая из этих папок внутри папки репозитория. Настройки — файл `serve.local.json` в корне (в `.gitignore`) или переменные окружения; в коде и тестах настоящих путей нет. Тесты работают только во временных папках `os.tmpdir()` и на порту 0; данные вымышленные.
+- **Настоящие данные вне репозитория.** База, секрет, журнал работы и копии лежат в папках из настроек. Сервер не стартует, если любая из этих папок внутри папки репозитория. Настройки — файл `serve.local.json` в корне (в `.gitignore`) **или** переменные окружения, не вперемешку: если задана `JOURNAL_DATA_DIR`, файл не читается вовсе; в коде и тестах настоящих путей нет. Тесты работают только во временных папках `os.tmpdir()` и на порту 0; данные вымышленные.
+- **Рабочий сервер запускается из своей папки с кодом выложенного коммита** (`D:\Журнал колледжа — сервер`, см. «Откуда работает сервер» ниже), а не из папки разработки; обновляется только при выкладке (задача 13, шаг 3и). Агенты эту папку не открывают и не правят.
 - **Рабочий порт — 5373**, слушает только `127.0.0.1` (наружу его выводит Tailscale Funnel). 5173 и 5273 сервер не занимает никогда.
 - **Рабочий сервер** не знает о `dev/seed.js`, не имеет сброса, не читает файлы для раздачи. Базу сам не создаёт: только команда первого запуска.
 - **Чужой сайт.** Запрос к `/api` выполняется, только если заголовок `Origin` есть и посимвольно равен одному из `origins` настроек (по умолчанию ровно `https://janybek.github.io`). `*` в ответе не бывает. Отказ — до разбора тела: ничего не прочитано, не записано, попытка входа не засчитана.
@@ -5985,7 +5987,7 @@ assert.equal('uploaded' in call('subjects.overview', {}, dean).data.rows[0], fal
 - **Журнал работы** (`server.log`) — рядом с базой. В нём нет тел запросов, паролей, токенов, логинов и ФИО; имя действия пишется, только если оно известно журналу.
 - **Время** — `platform.now()`; даты копий и строк журнала работы — по Бишкеку (`localDate`, `TZ_OFFSET_MS` из `core/dates.js`).
 - **Ничего не удаляется из базы.** `ensureTables` только дописывает таблицы и колонки. Копия при запуске делается до того, как новый код их допишет.
-- **Агенты рабочую базу не трогают.** Файл `serve.local.json`, папку данных и папку копий они не открывают; сервер на 5373 не запускают и не останавливают; в «Автозагрузку» Windows ничего не кладут; `tailscale` не вызывают. Стенд владельца на 5273 не трогают. Процессы, которые агент поднял для проверки, он останавливает сам, по своим PID.
+- **Агенты рабочую базу не трогают.** Файл `serve.local.json`, папку данных, папку копий и папку сервера они не открывают; сервер на 5373 не запускают и не останавливают; в «Автозагрузку» Windows ничего не кладут; `tailscale` не вызывают. Стенд владельца на 5273 не трогают. Процессы, которые агент поднял для проверки, он останавливает сам, по своим PID.
 - **Проверка обхода** — настоящим запросом к поднятому серверу (порт 0, временная папка), а не вызовом внутренней функции.
 - Сообщения коммитов на английском; последняя строка — `Co-Authored-By` с той моделью, которая писала коммит.
 
@@ -6009,10 +6011,12 @@ assert.equal('uploaded' in call('subjects.overview', {}, dean).data.rows[0], fal
 | Администратор забыл пароль | `scripts\journal-admin-password.cmd`: новый временный пароль `admin` в окне | в Google это делалось правкой таблицы |
 | Чужой сайт | `Origin` обязателен и равен сайту; иначе 403, запрос не выполняется. Стенд ходит на свой сервер стенда, в `origins` рабочего сервера его нет | поручение координатора: «только `https://janybek.github.io`» |
 | Попытки входа | 10 неверных попыток одного логина за 15 минут — вход с этим логином закрыт на 15 минут, даже с верным паролем. Счёт ведётся по логину (регистр и пробелы не важны), в памяти сервера | вопрос владельцу; через туннель все запросы приходят с одного адреса, считать по адресу нельзя |
+| Таблица попыток входа полна (5000 разных логинов) | Сначала убираются записи с прошедшим окном и истёкшим блоком; если места нет — вытесняется незакрытая запись с наименьшим счётом (при равном — самая старая). Счёт жертвы (несколько ошибок) выше, чем у мусорных логинов (по одной), и остаётся. Если закрыты все 5000 логинов — новые не считаются и не закрываются. Решение вместо «таблица полна — вход закрыт всем» (иначе 5000 запросов закрыли бы вход всему колледжу) | замечание I6 сверки |
+| Откуда работает сервер | Из отдельной папки с кодом выложенного коммита: `D:\Журнал колледжа — сервер` (`git worktree add --detach "<папка>" <коммит>`; зависимостей из npm серверу не нужно). В ней лежат `serve.local.json`, и туда ведёт ярлык автозапуска; пути скриптов считаются от места самого файла. Обновляется только при выкладке: `serve:stop` → `git checkout --detach <коммит>` → `serve:start` | иначе после любого перезапуска сервер с настоящей базой возьмёт недописанный код из рабочей папки и допишет в настоящую базу таблицы недоделанной схемы; замечание C1 сверки |
 | Попытки входа на стенде | То же правило (счёт сбрасывается перезапуском стенда) | владелец видит сообщение на приёмке; один код на стенде и на сервере |
 | Журнал работы | `server.log`: строки `ГГГГ-ММ-ДД ЧЧ:ММ:СС INFO текст` и `… ERROR текст`; на запрос — действие, итог, миллисекунды. Больше 5 МБ — переименовывается в `server.log.1` | дизайн |
 | Автозапуск | Ярлык в «Автозагрузке» Windows запускает сервер без окна (как «Мои чаты»); за сервером следит свой процесс и поднимает его после падения с растущей паузой 1 с … 60 с | вопрос владельцу: после перезагрузки сервер заработает, когда владелец войдёт в Windows |
-| Остановка | `npm run serve:stop` кладёт в папку данных файл-просьбу; сервер закрывает базу и выходит. Процессы по номеру не убиваются | нельзя убить чужой процесс; у сервера, видного из интернета, нет адреса «выключись» |
+| Остановка | `npm run serve:stop` кладёт в папку данных файл-просьбу; сервер закрывает базу и выходит, присмотр тоже (просьба действует и во время паузы перед перезапуском: у присмотра свой файл `supervisor.state.json` с номером процесса). Процессы по номеру не убиваются | нельзя убить чужой процесс; у сервера, видного из интернета, нет адреса «выключись» |
 | Адрес сервера на сайте | Константа `PRODUCTION_API_URL` в `site/config.js`. Страница на `localhost` и `127.0.0.1` ходит на свой `/api` (стенд), любая другая — на эту константу. До задачи 13 константа пуста (сайт пишет «не подключён»); адрес Tailscale вписывается в задаче 13 | адрес известен только после установки Tailscale |
 | Сообщения сайта | Сервер не отвечает — «Сервер журнала сейчас недоступен…»; телефон без интернета — прежнее «Нет связи…»; попытки исчерпаны — «Слишком много неверных попыток входа…» | поручение координатора |
 | Настоящие списки студентов | По умолчанию: вносятся сразу в рабочую базу после выкладки — ограничение попыток теперь есть; решение от 20.11.2026 «только после юнита 3» тогда отменяется. Решает владелец | вопрос владельцу |
@@ -6022,7 +6026,11 @@ assert.equal('uploaded' in call('subjects.overview', {}, dean).data.rows[0], fal
 
 - Переноса данных из Google (там только пробные), своего домена, Cloudflare, нескольких серверов, облачных копий («Чего не делаем» дизайна).
 - Службы Windows: сервер работает, пока владелец вошёл в систему. Работа без входа — версия 2.
-- Ограничения попыток по адресу: через туннель адрес у всех один. Шутник может закрыть чужой логин на 15 минут — владельцу об этом сказано в `owner-summary-5.md`.
+- Ограничения попыток по адресу: через туннель адрес у всех один. Шутник может закрыть чужой логин на 15 минут — владельцу об этом сказано в `owner-summary-5.md`. Один пароль можно пробовать по всем номерам билетов подряд: счёт у каждого логина свой (число таких ошибок за день видно в `serve:status`, `failedLoginsToday`). После перезапуска сервера счёт попыток пуст.
+- Защита `Origin` — от чужих сайтов в браузере, не от программ: `curl` ставит любой. `https://janybek.github.io` — общий адрес всех сайтов Pages этой учётной записи; до своего домена страница любого другого репозитория владельца пройдёт проверку.
+- Автозапуск зависит от VBScript: он идёт через `wscript` и `serve-hidden.vbs`; если Windows когда-нибудь отключит VBScript, запасной способ — ярлык на `conhost.exe --headless node backend\node\supervisor.js`.
+- `owner-summary-5.md` обязана сказать владельцу две вещи: после десяти ошибок и нового пароля из `journal-admin-password.cmd` вход ещё до 15 минут закрыт счётчиком работающего сервера; рабочую базу нельзя открывать программами-редакторами (запросы журнала ждут до 5 секунд) — смотреть только копии.
+- Правило «Excel силлабуса — только первое заполнение» выполняют только экраны (задача 52). Сервер файл по-прежнему принимает, в том числе в заполненный черновик: прямой запрос `syllabus.apply` правило обходит. Проверка на сервере — позже.
 - Ограничения времени ожидания ответа на сайте (компьютер спит — запрос висит, пока браузер не сдастся) и кеша: это юнит 3.
 - Экрана «состояние копий» на сайте: это юнит 6 («копии»).
 - Шифрования файла базы и копий; HTTPS на самом сервере (его даёт Funnel).
@@ -6044,23 +6052,26 @@ backend/node/supervisor.js      запуск, перезапуск, остано
 scripts/serve-hidden.vbs  autostart.ps1  journal-init.cmd  journal-admin-password.cmd             новые
 dev/server.js                   общие помощники из backend/node/http.js; ограничение попыток
 site/config.js  site/js/api.js  site/js/i18n/*.js  views/login.js  + шесть списков «можно повторить»
+site/js/views/syllabusForm.js  subjects.js  syllabusUpload.js   кнопка «Заполнить из файла» (правило «Excel — только первое заполнение»)
 serve.example.json              образец настроек с выдуманными путями                             новый
 package.json  .gitignore  .gitattributes
 tests/loginGuard.test.js  sqliteStore.test.js  serverBase.test.js  server.test.js  backup.test.js
-tests/supervisor.test.js  siteConfig.test.js  siteApi.test.js  serverSetup.js                     новые
+tests/supervisor.test.js  siteConfig.test.js  siteApi.test.js  siteFillFromFile.test.js  serverSetup.js   новые
 tests/store.test.js  api.test.js  devServer.test.js  syllabusSetup.js  i18n.test.js
 ```
 
 ### Общие помощники тестов сервера (`tests/serverSetup.js`, задачи 48–51)
 
-Создаётся в задаче 48, дополняется в 49. Всё — во временной папке, которую тест удаляет после себя (базу закрыть до удаления: Windows не удаляет открытый файл).
+Создаётся в задаче 48, дополняется в 49. Всё — во временной папке, которую тест удаляет после себя.
 
-- `tempConfig(t, extra = {})` → объект настроек, как его отдаёт `readConfig`: `dataDir`, `backupDir`, `alertDir` — три подпапки новой папки `os.tmpdir()`, `port: 0`, `origins: [ORIGIN]`, пути `dbFile`, `secretFile`, `logFile`, `stateFile`, `stopFile`; сверх того `root` — ещё одна подпапка, изображающая репозиторий (в ней нет `serve.local.json`): её получает `main`, чтобы не прочитать настоящие настройки владельца. `envOf(config)` → те же папки и порт 0 переменными `JOURNAL_*`.
+**Закрытие и удаление.** Обработчики `t.after` выполняются в порядке регистрации, а Windows не удаляет папку с открытой базой (`EPERM`). Поэтому помощники ведут список открытого сами: на тест один `t.after`, зарегистрированный при первом обращении; он закрывает всё из списка в обратном порядке (базы, серверы, копии, присмотр), и только потом удаляет папки. Тесты не пишут «закрыть в `t.after`», а берут помощники: `keep(t, x)` — внести в список любой объект с `close()` или `stop()` (база `DatabaseSync`, сервер, `run` от `main`, `backups`, присмотр), возвращает `x` (`close()` и `stop()` у внесённого можно вызвать в самом тесте: повторный вызов у остановленного не бросает); `open(t, config, options)` = `keep(t, openBase(config, options))`. Прямой `openBase(config)` в аргументе без `keep` и `open` в тестах не пишется.
+
+- `tempConfig(t, extra = {})` → объект настроек, как его отдаёт `readConfig`: `dataDir`, `backupDir`, `alertDir` — три подпапки новой папки `os.tmpdir()`, `port: 0`, `origins: [ORIGIN]`, пути `dbFile`, `secretFile`, `logFile`, `stateFile`, `stopFile`, `supervisorFile`; создаёт только `root` и `alertDir` (`dataDir` и `backupDir` не создаёт: тест ждёт, что их нет); сверх того `root` — ещё одна подпапка, изображающая репозиторий (в ней нет `serve.local.json`): её получает `main`, чтобы не прочитать настоящие настройки владельца. `envOf(config)` → те же папки и порт 0 переменными `JOURNAL_*`.
 - `ORIGIN = 'https://janybek.github.io'`; `PERSON = { login: 'zebra', fullName: 'Zebra Person', password: 'Passw0rd-zebra' }` — вымышленный администратор, чьи слова тесты ищут в журнале работы.
 - `tempBase(t, extra)` → `{ config, tempPassword }`: `initBase(config)`, затем через `openBase` добавлен сотрудник `PERSON` (роль `admin`, свой пароль, `mustChangePassword: false`).
-- (задача 49) `start(t, options = {})` → `{ srv, config, post(request, headers), raw(method, path, headers) }`: `tempBase` → `openBase(config, { now: options.now })` → `upgrade()` → журнал работы в `config.logFile` → `startServer({ config, base, logger, guard: options.guard, maxBodyBytes: options.maxBodyBytes })`. Оба помощника шлют через `http.request`: заголовки и путь уходят как заданы (как `rawGet` в `tests/devServer.test.js`). `post` шлёт `POST /api` с `Content-Type: text/plain;charset=utf-8` и возвращает `{ status, headers: { get(name) }, json() }`; `raw` возвращает `{ status, headers, body }`. `login(password, name = PERSON.login)` → тело запроса `auth.login`.
+- (задача 49) `start(t, options = {})` → `{ srv, config, base, logger, post(request, headers), raw(method, path, headers) }`: `tempBase` → `open(t, config, { now: options.now })` → `upgrade()` → журнал работы в `config.logFile` (`logger`) → `keep(t, await startServer({ config, base, logger, guard: options.guard, maxBodyBytes: options.maxBodyBytes }))`. Оба помощника шлют через `http.request`: заголовки и путь уходят как заданы (как `rawGet` в `tests/devServer.test.js`). `post` шлёт `POST /api` с `Content-Type: text/plain;charset=utf-8` и возвращает `{ status, headers: { get(name) }, json() }`; `raw` возвращает `{ status, headers, body }`. `login(password, name = PERSON.login)` → тело запроса `auth.login`.
 - Мелкие помощники: `tempDir(t)` — новая временная папка, которую тест удалит; `quiet()` — журнал в память: `{ lines, info(text), error(text) }`, строки вида `'INFO …'` и `'ERROR …'`; `sleep(ms)`; `until(fn, ms = 5000)` — ждёт, пока `fn()` вернёт не пустое; `roomsIn(config)`, `dropTable(config, name)`, `snapshotStaff(config, filter)` — открывают базу своим соединением и закрывают его.
-- Каждую базу, которую тест открыл (`openBase`, `openDatabase`, `main([])`), он закрывает в `t.after`. Файлы репозитория тесты читают по пути от самого теста (`new URL('../.gitignore', import.meta.url)`), а не от текущей папки.
+- Каждую базу, сервер и копию, которые тест открыл (`openBase`, `openDatabase`, `startServer`, `startBackups`, `main([])`), он вносит в список через `keep` или `open`. `roomsIn`, `dropTable` и `snapshotStaff` закрывают свои соединения сами. Файлы репозитория тесты читают по пути от самого теста (`new URL('../.gitignore', import.meta.url)`), а не от текущей папки.
 
 ---
 
@@ -6086,7 +6097,7 @@ export function createLoginGuard(limit = LOGIN_LIMIT);
 - `fail(key, now)`: записи нет, либо её окно прошло (`now - first >= windowMs`) и блока нет — новая запись `{ first: now, count: 1 }`; иначе `count + 1`. `count` дошёл до `attempts` — `until = now + blockMs`. Пока ключ закрыт, `fail` ничего не меняет (блок не продлевается).
 - `blockedFor(key, now)`: сколько миллисекунд ключ ещё закрыт; 0 — вход разрешён. Блок истёк — запись удаляется: дальше свежий счёт.
 - `success(key)` удаляет запись.
-- **Таблица полна** (`size() === maxKeys`, новому ключу нужно место): сначала удаляются записи с прошедшим окном и без блока. Места всё равно нет — запись не создаётся и никто не вытесняется; пока таблица полна, `blockedFor` для ключа без записи отвечает временем до ближайшего освобождения места (наименьшее из `until` и `first + windowMs` минус `now`). Так поток чужих логинов не стирает счёт жертвы.
+- **Таблица полна** (`size() === maxKeys`, новому ключу нужно место): сначала удаляются записи с прошедшим окном и без блока и записи с истёкшим блоком (`now >= until`). Места всё равно нет — вытесняется незакрытая запись с наименьшим `count` (при равном — с меньшим `first`) и создаётся новая. Закрытые записи не вытесняются никогда. Если закрыты все `maxKeys` записей — новая не создаётся, `fail` ничего не меняет, а `blockedFor` для ключа без записи отвечает 0 (вход всем остальным не закрывается). Так поток чужих логинов (по одной ошибке на логин) не стирает счёт жертвы с несколькими ошибками и не закрывает вход всем.
 
 - [ ] **Step 1: тесты** (`tests/loginGuard.test.js`).
 
@@ -6120,21 +6131,27 @@ test('failures outside the window do not add up; a success clears the count; key
   g.fail('b', 1004); g.fail('b', 1005); g.fail('b', 1006);
   assert.deepEqual([g.blockedFor('b', 1006) > 0, g.blockedFor('a', 1006)], [true, 0]);
 });
-test('a full table: strangers wait, nobody is pushed out, and room comes back when windows pass', () => {
+test('a full table: a flow of strange logins pushes out only one-error keys, never the victim and never a blocked key; nobody is locked out', () => {
   const g = createLoginGuard(L);
   g.fail('victim', 0); g.fail('victim', 1);
-  g.fail('x1', 2); g.fail('x2', 3); g.fail('x3', 4);                     // места для x3 нет: таблица — victim, x1, x2
-  assert.deepEqual([g.size(), g.blockedFor('x3', 5), g.blockedFor('victim', 5)], [3, 995, 0]);
-  g.fail('victim', 5);
-  assert.equal(g.blockedFor('victim', 6), 4999);                         // счёт жертвы цел: третья ошибка закрыла вход
-  assert.equal(g.blockedFor('x3', 1003), 0);                             // окна x1 и x2 прошли
-  g.fail('x3', 1003);
-  assert.equal(g.size(), 2);
+  g.fail('x1', 2); g.fail('x2', 3);
+  g.fail('x3', 4);                                                       // таблица полна: вытеснен x1 (счёт 1, самый старый)
+  assert.deepEqual([g.size(), g.blockedFor('x3', 5), g.blockedFor('victim', 5)], [3, 0, 0]);
+  for (let i = 0; i < 50; i++) g.fail('junk' + i, 6 + i);                // поток чужих логинов
+  g.fail('victim', 60);
+  assert.deepEqual([g.blockedFor('victim', 61), g.blockedFor('someone-new', 61), g.size()], [4999, 0, 3]);   // счёт жертвы цел: третья ошибка закрыла вход
+  const B = { attempts: 1, windowMs: 1000, blockMs: 5000, maxKeys: 2, keyLength: 10 };
+  const h = createLoginGuard(B);
+  h.fail('a', 0); h.fail('b', 1);                                        // оба закрыты, таблица полна
+  h.fail('c', 2);                                                        // места нет, закрытых не вытесняют: c не записан
+  assert.deepEqual([h.size(), h.blockedFor('c', 3), h.blockedFor('a', 3) > 0, h.blockedFor('b', 3) > 0], [2, 0, true, true]);
+  h.fail('c', 5001);                                                     // блоки a и b истекли: место нашлось
+  assert.deepEqual([h.size(), h.blockedFor('c', 5002)], [1, 5000 - 1]);  // c тоже закрыт (лимит 1): until = 5001 + 5000
 });
 ```
 
 - [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное.
-- [ ] **Step 5:** коммит `feat: login attempt limit - the rule (key, window, block, a full table lets nobody be pushed out)`.
+- [ ] **Step 5:** коммит `feat: login attempt limit - the rule (key, window, block, a full table pushes out the weakest key and locks nobody out)`.
 
 ---
 
@@ -6158,6 +6175,8 @@ export function createSqliteStore(schema, platform, db);
 // Строка приводится общим shapeRow на записи и на чтении (bool хранится 0/1, читается true/false). list — в порядке вставки (ORDER BY rowid).
 // Значения уходят в запрос только параметрами (?), имена таблиц и колонок — только из схемы. id раздаёт generateId из memoryStore.js.
 // Каждый пакетный метод атомарен и вне transaction.
+// Подсказки из пробы: в параметры запроса не идут true, false и undefined — в запрос уходит строка после shapeRow (bool как 0/1); строки из базы — объекты без прототипа,
+// наружу только через shapeRow (иначе строгое сравнение в тестах не сойдётся); PRAGMA journal_mode = WAL для ':memory:' отвечает 'memory' — ответ не проверять.
 // + transaction(fn): BEGIN IMMEDIATE; результат fn; COMMIT. fn бросила — ROLLBACK и та же ошибка дальше. Вызов внутри transaction выполняет fn в той же транзакции.
 
 // backend/api.js — handleRequest
@@ -6166,6 +6185,7 @@ export function createSqliteStore(schema, platform, db);
 
 // tests/syllabusSetup.js
 export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform) } = {});   // прежние вызовы setup() не меняются
+// spyOn оборачивает ключи хранилища, но метод transaction пропускает как есть: в x.order и x.calls записей 'transaction:…' нет
 ```
 
 - [ ] **Step 1: тесты.**
@@ -6174,15 +6194,16 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
 // tests/store.test.js — те же проверки, что у памяти, файла и Google
 storeContract('sqliteStore', () => { const db = openDatabase(':memory:'); ensureTables(SCHEMA, db); return createSqliteStore(SCHEMA, platform, db); });
 
-// tests/sqliteStore.test.js. tmpBase(t) -> { file, db, s }: файл journal.sqlite во временной папке, ensureTables, хранилище; t.after закрывает базу и удаляет папку.
+// tests/sqliteStore.test.js. tmpBase(t) -> { file, db, s, keep(db) }: файл journal.sqlite во временной папке, ensureTables, хранилище. Один t.after на тест:
+// закрывает все ещё открытые базы из списка (db и всё, что тест внёс через keep; уже закрытую тестом не трогает) и только потом удаляет папку (порядок t.after — порядок регистрации, открытая база даёт EPERM).
 test('a file base: WAL, full sync; rows survive reopening in the order of insertion and in the shared shape', (t) => {
-  const { file, db, s } = tmpBase(t);
+  const { file, db, s, keep } = tmpBase(t);
   assert.deepEqual([db.prepare('PRAGMA journal_mode').get().journal_mode, db.prepare('PRAGMA synchronous').get().synchronous], ['wal', 2]);
   const [b, a] = s.insertMany('rooms', [{ name: 'Б' }, { name: 'А' }]);
   const g = s.insert('groups', { name: '01-1', course: '' });
   const st = s.insert('students', { fullName: "О'Нил\"; DROP TABLE students;--", cardNo: 'S1', active: 'да', junk: 1 });
   db.close();
-  const again = createSqliteStore(SCHEMA, platform, openDatabase(file));            // (закрыть в t.after)
+  const again = createSqliteStore(SCHEMA, platform, keep(openDatabase(file)));
   assert.deepEqual(again.list('rooms'), [b, a]);
   assert.deepEqual([again.get('groups', g.id).course, again.get('students', st.id), again.list('students').length], [null, st, 1]);
   assert.deepEqual([st.active, st.mustChangePassword, 'junk' in st], [true, false, false]);
@@ -6263,11 +6284,11 @@ test('a request broken at any of its writes leaves every sheet as before: «Из
 test('a process killed in the middle of a request: the base opens, is whole and has nothing of that request', (t) => {
   // дочерний процесс (spawnSync(process.execPath, [script]), script — файл во временной папке): открывает ту же базу, в store.transaction
   // вставляет аудиторию и группу и вызывает process.exit(1), не дойдя до COMMIT
-  const { file, db, s } = tmpBase(t);
+  const { file, db, s, keep } = tmpBase(t);
   s.insert('rooms', { name: 'до' });
   db.close();
   assert.equal(killedInTheMiddle(file).status, 1);
-  const after = openDatabase(file);
+  const after = keep(openDatabase(file));
   const store = createSqliteStore(SCHEMA, platform, after);
   assert.deepEqual([store.list('rooms').map((r) => r.name), store.list('groups'), after.prepare('PRAGMA integrity_check').get().integrity_check], [['до'], [], 'ok']);
 });
@@ -6282,7 +6303,7 @@ test('a process killed in the middle of a request: the base opens, is whole and 
 
 Только функции и их тесты; команды и HTTP — задача 49.
 
-**Files:** Create `backend/node/config.js`, `backend/node/base.js`, `serve.example.json`, `tests/serverSetup.js`, `tests/serverBase.test.js`. Modify `.gitignore` (строки `serve.local.json`, `*.sqlite`, `*.sqlite-wal`, `*.sqlite-shm`, `server.log*`).
+**Files:** Create `backend/node/config.js`, `backend/node/base.js`, `serve.example.json`, `tests/serverSetup.js`, `tests/serverBase.test.js`. Modify `.gitignore` (строки `serve.local.json`, `secret.key`, `*.sqlite*`, `server.state.json`, `supervisor.state.json`, `stop.request`, `server.log*`).
 
 **Interfaces — Consumes:** `openDatabase`, `ensureTables`, `createSqliteStore` (задача 47); `generateTempPassword`, `hashPassword`, `TEMP_HASH_ROUNDS` (`core/auth.js`); `normalizeRow` (`core/validate.js`); `createNodePlatform`.
 
@@ -6294,14 +6315,16 @@ export const DEFAULTS = { port: 5373, origins: ['https://janybek.github.io'] };
 export const LOCAL_CONFIG = 'serve.local.json';                  // в корне репозитория, в .gitignore
 export class ConfigError extends Error { /* code */ }
 export function readConfig({ env, root, file } = {});
-// env — по умолчанию окружение процесса, root — корень репозитория, file — root/serve.local.json.
-// Значение берётся из первого места, где оно есть: переменные JOURNAL_DATA_DIR, JOURNAL_BACKUP_DIR, JOURNAL_ALERT_DIR, JOURNAL_PORT, JOURNAL_ORIGINS (через запятую);
-// файл { dataDir, backupDir, alertDir, port, origins }; DEFAULTS. alertDir необязателен ('' — тревожный файл не пишется).
-// -> { dataDir, backupDir, alertDir, port, origins, dbFile, secretFile, logFile, stateFile, stopFile } — пути абсолютные:
-//    dbFile = dataDir/journal.sqlite, secretFile = dataDir/secret.key, logFile = dataDir/server.log, stateFile = dataDir/server.state.json, stopFile = dataDir/stop.request
+// env — по умолчанию окружение процесса, root — корень репозитория (у рабочего сервера — его папка), file — root/serve.local.json.
+// Источник один, значения не смешиваются: если в env задана JOURNAL_DATA_DIR — значения только из переменных JOURNAL_DATA_DIR, JOURNAL_BACKUP_DIR, JOURNAL_ALERT_DIR,
+// JOURNAL_PORT, JOURNAL_ORIGINS (через запятую) и DEFAULTS, а файл настроек не читается вовсе (даже битый); иначе — только файл { dataDir, backupDir, alertDir, port, origins } и DEFAULTS,
+// переменные JOURNAL_* не читаются. alertDir необязателен ('' — тревожный файл не пишется). Файл с BOM (Блокнот, PowerShell 5.1) читается: BOM срезается перед разбором.
+// -> { dataDir, backupDir, alertDir, port, origins, dbFile, secretFile, logFile, stateFile, stopFile, supervisorFile } — пути абсолютные:
+//    dbFile = dataDir/journal.sqlite, secretFile = dataDir/secret.key, logFile = dataDir/server.log, stateFile = dataDir/server.state.json, stopFile = dataDir/stop.request,
+//    supervisorFile = dataDir/supervisor.state.json
 // Ошибки (ConfigError.code): 'bad_config' — файл есть, но это не JSON-объект; 'no_data_dir', 'no_backup_dir' — не заданы;
-//   'inside_repo' — dataDir, backupDir или alertDir равен root или лежит внутри него (сравнение после path.resolve и fs.realpathSync существующей части пути,
-//   без учёта регистра букв; относительный путь считается от root, то есть всегда внутри);
+//   'inside_repo' — dataDir, backupDir или alertDir равен root или лежит внутри него: после path.resolve и fs.realpathSync существующей части пути, без учёта регистра букв,
+//   путь внутри, если path.relative(root, папка) пуст, либо не начинается с '..' и не абсолютен (соседняя папка `<root> — данные` — не внутри); относительный путь считается от root, то есть всегда внутри;
 //   'bad_port' — не целое число 0 или 1024–65535, либо 5173 или 5273; 'bad_origin' — список пуст или в нём не `https://<хост>` без пути (в том числе '*').
 
 // backend/node/base.js — только Node
@@ -6319,7 +6342,7 @@ export function resetAdminPassword(config);
 // Остальные строки не трогает. Нет базы -> 'no_base'. -> { adminLogin: 'admin', adminTempPassword }
 ```
 
-`serve.example.json` — образец с выдуманными путями: `{ "dataDir": "X:\\journal-data", "backupDir": "C:\\JournalBackups", "alertDir": "", "port": 5373, "origins": ["https://janybek.github.io"] }`.
+`serve.example.json` — образец с выдуманными путями: `{ "dataDir": "X:\\journal-data", "backupDir": "X:\\journal-copies", "alertDir": "", "port": 5373, "origins": ["https://janybek.github.io"] }`.
 
 - [ ] **Step 1: тесты** (`tests/serverBase.test.js`; `root` — временная папка, изображающая репозиторий).
 
@@ -6327,14 +6350,27 @@ export function resetAdminPassword(config);
 const read = (root, fileData, env = {}) => { if (fileData !== undefined) fs.writeFileSync(path.join(root, 'serve.local.json'), typeof fileData === 'string' ? fileData : JSON.stringify(fileData)); return readConfig({ env, root }); };
 const codeOf = (fn) => { try { fn(); return null; } catch (e) { return e.code; } };
 
-test('readConfig: the file, the environment over the file, the defaults, the derived paths', (t) => {
+test('readConfig: the file with the defaults, the environment alone, the derived paths', (t) => {
   const { root, outside } = tempRoot(t);                                  // outside — соседняя папка вне root
   const c = read(root, { dataDir: path.join(outside, 'data'), backupDir: path.join(outside, 'copies') });
   assert.deepEqual([c.port, c.origins, c.alertDir, path.relative(c.dataDir, c.dbFile), path.relative(c.dataDir, c.secretFile), path.relative(c.dataDir, c.logFile),
-    path.relative(c.dataDir, c.stateFile), path.relative(c.dataDir, c.stopFile)],
-    [5373, ['https://janybek.github.io'], '', 'journal.sqlite', 'secret.key', 'server.log', 'server.state.json', 'stop.request']);
-  const e = readConfig({ root, env: { JOURNAL_DATA_DIR: path.join(outside, 'other'), JOURNAL_PORT: '6001', JOURNAL_ORIGINS: 'https://a.example, https://b.example' } });
-  assert.deepEqual([path.basename(e.dataDir), path.basename(e.backupDir), e.port, e.origins], ['other', 'copies', 6001, ['https://a.example', 'https://b.example']]);
+    path.relative(c.dataDir, c.stateFile), path.relative(c.dataDir, c.stopFile), path.relative(c.dataDir, c.supervisorFile)],
+    [5373, ['https://janybek.github.io'], '', 'journal.sqlite', 'secret.key', 'server.log', 'server.state.json', 'stop.request', 'supervisor.state.json']);
+  const e = readConfig({ root, env: { JOURNAL_DATA_DIR: path.join(outside, 'other'), JOURNAL_BACKUP_DIR: path.join(outside, 'other-copies'), JOURNAL_PORT: '6001',
+    JOURNAL_ORIGINS: 'https://a.example, https://b.example' } });          // файл в root при этом лежит и не читается
+  assert.deepEqual([path.basename(e.dataDir), path.basename(e.backupDir), e.port, e.origins], ['other', 'other-copies', 6001, ['https://a.example', 'https://b.example']]);
+});
+test('readConfig: with JOURNAL_DATA_DIR the settings file is not read at all; without it the JOURNAL_* variables are not read', (t) => {
+  const { root, outside } = tempRoot(t);
+  const files = { dataDir: path.join(outside, 'from-file'), backupDir: path.join(outside, 'file-copies'), alertDir: path.join(outside, 'file-alert'), port: 6002 };
+  fs.writeFileSync(path.join(root, 'serve.local.json'), JSON.stringify(files));
+  assert.equal(codeOf(() => readConfig({ root, env: { JOURNAL_DATA_DIR: path.join(outside, 'x') } })), 'no_backup_dir');     // обратная папка не берётся из файла
+  const only = readConfig({ root, env: { JOURNAL_DATA_DIR: path.join(outside, 'x'), JOURNAL_BACKUP_DIR: path.join(outside, 'y') } });
+  assert.deepEqual([only.alertDir, only.port], ['', 5373]);                                                                 // ни тревога, ни порт не из файла
+  fs.writeFileSync(path.join(root, 'serve.local.json'), 'не json');
+  assert.equal(readConfig({ root, env: { JOURNAL_DATA_DIR: path.join(outside, 'x'), JOURNAL_BACKUP_DIR: path.join(outside, 'y') } }).port, 5373);   // битый файл не мешает
+  fs.writeFileSync(path.join(root, 'serve.local.json'), JSON.stringify(files));
+  assert.deepEqual([readConfig({ root, env: { JOURNAL_PORT: '6003', JOURNAL_BACKUP_DIR: path.join(outside, 'z') } }).port, path.basename(readConfig({ root, env: {} }).dataDir)], [6002, 'from-file']);
 });
 test('readConfig refuses: nothing set, a broken file, folders inside the repository by any spelling, the stand ports, a wildcard origin', (t) => {
   const { root, outside } = tempRoot(t);
@@ -6346,19 +6382,21 @@ test('readConfig refuses: nothing set, a broken file, folders inside the reposit
     assert.equal(codeOf(() => read(root, { ...ok, backupDir: inside })), 'inside_repo', inside);
   }
   assert.equal(codeOf(() => read(root, { ...ok, alertDir: path.join(root, 'site') })), 'inside_repo');
+  assert.equal(codeOf(() => read(root, { ...ok, dataDir: root + ' — данные' })), null);                      // сосед с тем же началом имени (как «Журнал колледжа — данные») — не внутри
+  assert.equal(codeOf(() => read(root, '﻿' + JSON.stringify(ok))), null);                                 // файл с BOM читается
   for (const port of [5173, 5273, 80, 70000, '5373x', 1.5]) assert.equal(codeOf(() => read(root, { ...ok, port })), 'bad_port', String(port));
   for (const origins of [[], ['*'], ['https://janybek.github.io', '*'], ['http://janybek.github.io'], ['https://janybek.github.io/college-journal'], 'https://janybek.github.io'])
     assert.equal(codeOf(() => read(root, { ...ok, origins })), 'bad_origin', JSON.stringify(origins));
 });
 test('the repository ignores the local settings and any base file', () => {
   const lines = fs.readFileSync(new URL('../.gitignore', import.meta.url), 'utf8').split(/\r?\n/);
-  for (const line of ['serve.local.json', '*.sqlite', '*.sqlite-wal', '*.sqlite-shm', 'server.log*']) assert.equal(lines.includes(line), true, line);
+  for (const line of ['serve.local.json', 'secret.key', '*.sqlite*', 'server.state.json', 'supervisor.state.json', 'stop.request', 'server.log*']) assert.equal(lines.includes(line), true, line);
 });
 test('initBase: the base, the secret and one admin who must change the temporary password; the password is in no file', (t) => {
   const config = tempConfig(t);
   const made = initBase(config);
   assert.deepEqual([made.adminLogin, /^[a-z2-9]{8}$/.test(made.adminTempPassword), /^[0-9a-f]{64}$/.test(fs.readFileSync(config.secretFile, 'utf8').trim())], ['admin', true, true]);
-  const base = openBase(config);                                          // (закрыть в t.after)
+  const base = open(t, config);
   const call = (action, data, token) => handleRequest(JSON.stringify({ action, data, token }), { store: base.store, platform: base.platform });
   const session = call('auth.login', { login: 'admin', password: made.adminTempPassword }).data;
   assert.deepEqual([session.user.roles, session.user.mustChangePassword, base.store.list('staff').length, call('dir.list', { table: 'rooms' }, session.token).error.code],
@@ -6383,11 +6421,11 @@ test('openBase never makes a base: a missing folder, a missing file, a missing o
 });
 test('a token lives through a restart; upgrade adds a new sheet and keeps the rows', (t) => {
   const { config } = tempBase(t);
-  let base = openBase(config);
+  let base = open(t, config);
   const token = handleRequest({ action: 'auth.login', data: { login: PERSON.login, password: PERSON.password } }, base).data.token;
   base.db.exec('DROP TABLE "rooms"');
   base.close();
-  base = openBase(config);                                                // (закрыть в t.after)
+  base = open(t, config);
   assert.deepEqual(base.upgrade(), { created: ['rooms'], added: [] });
   assert.equal(handleRequest({ action: 'auth.me', token }, base).data.user.fullName, PERSON.fullName);
 });
@@ -6395,7 +6433,7 @@ test('resetAdminPassword: the old password dies, the new one works and must be c
   const { config, tempPassword } = tempBase(t);
   const before = snapshotStaff(config, (row) => row.login !== 'admin');   // строки остальных сотрудников целиком
   const made = resetAdminPassword(config);
-  const base = openBase(config);                                          // (закрыть в t.after)
+  const base = open(t, config);
   const call = (action, data, token) => handleRequest({ action, data, token }, base);
   assert.deepEqual([made.adminTempPassword !== tempPassword, call('auth.login', { login: 'admin', password: tempPassword }).error.code,
     call('auth.login', { login: 'admin', password: made.adminTempPassword }).data.user.mustChangePassword], [true, 'bad_credentials', true]);
@@ -6447,16 +6485,22 @@ export async function startServer({ config, base, logger, guard = createLoginGua
 // POST /api, Origin другой или его нет -> 403 { ok: false, error: { code: 'forbidden_origin' } }, без Access-Control-Allow-Origin; тело не читается, запрос не выполняется
 // /api, любой другой метод   -> 405, Allow: POST (как у стенда); тело больше maxBodyBytes -> 413 (как у стенда)
 // любой другой путь          -> 404 'Not found'; модуль не читает файлы с диска для ответа вовсе
+// Ошибка при разборе адреса запроса (`//`, `///`, `/\`, `//[`, `//@/api`: `new URL` на них бросает) — тоже 404; исключение наружу не выходит, процесс из-за запроса не падает
+//   (иначе падение обнулило бы счёт попыток в памяти: присмотр поднимет сервер заново). Клиент, оборвавший соединение посреди запроса, сервер не останавливает.
 // Каждый запрос к /api — строка журнала: 'api <действие> <ok | код ошибки> <мс>ms'; действие пишется, только если actionKind(action) !== null, иначе '?'.
-export async function main(argv, { env, root, out = console.log, now } = {});
-// []                  -> readConfig, журнал работы, openBase, upgrade() (если что-то дописано — строка в журнал), startServer, stateFile { pid, port, startedAt };
-//                        out('Сервер журнала: http://127.0.0.1:<порт>  база: <dbFile>') -> { code: 0, server, base, stop() }; stop() закрывает сервер и базу, удаляет stateFile
+export async function main(argv, { env, root, out = console.log, now, nodeVersion = process.versions.node } = {});
+// main процесс не завершает: выход делает только обёртка прямого запуска (в тестах main вызывается в том же процессе).
+// Версия Node ниже 24 (nodeVersion) -> out('Нужен Node 24 или новее (сейчас <версия>)') -> { code: EXIT.config }, ничего не создано.
+// []                  -> readConfig, журнал работы (папку данных он не создаёт: пропала папка — строка не пишется, база не создаётся), openBase, upgrade() (если что-то дописано — строка в журнал), startServer, stateFile { pid, port, startedAt };
+//                        out('Сервер журнала: http://127.0.0.1:<порт>  база: <dbFile>') -> { code: 0, server, base, stop(), done }; stop() закрывает сервер и базу, удаляет stateFile;
+//                        done — обещание, которое выполняется кодом EXIT.ok после остановки по просьбе (задача 51) и при stop()
 // ['--init']          -> initBase; out: 'База создана: <dbFile>', 'Администратор: admin', 'Временный пароль: <пароль>',
 //                        'Запишите пароль: он показан один раз и нигде не сохранён. При первом входе журнал попросит его сменить.' -> { code: 0 }; сервер не поднимается
 // ['--admin-password'] -> resetAdminPassword; те же три последние строки -> { code: 0 }
 // ConfigError, BaseError -> out(понятная фраза по-русски с кодом ошибки), ничего не создано -> { code: EXIT.config }; порт занят (EADDRINUSE) -> { code: EXIT.portBusy }
 // неизвестный параметр (в том числе '--reset', '--real', '--seed') -> out('Неизвестный параметр: …') -> { code: EXIT.config }; база не открывается
-// Прямой запуск файла: main(process.argv.slice(2)), код возврата — код процесса; необработанная ошибка — в журнал работы и выход с EXIT.crash.
+// Прямой запуск файла (обёртка): r = await main(process.argv.slice(2)); команды (--init, --admin-password, ошибки) — выход с r.code; работающий сервер — ждёт r.done и выходит с его кодом;
+// необработанная ошибка — в журнал работы и выход с EXIT.crash.
 // Временный пароль передаётся только в out; в logger он не попадает.
 ```
 
@@ -6507,7 +6551,7 @@ test('the site gets its answer with its own origin in the header and never a wil
   assert.deepEqual([health.status, JSON.parse(health.body), health.headers['access-control-allow-origin']], [200, { ok: true, data: 'journal' }, undefined]);
 });
 test('a foreign, look-alike, null or missing Origin: 403, nothing is run, nothing is written and a login attempt is not counted', async (t) => {
-  const { post, config } = await start(t, { guard: createLoginGuard({ ...LOGIN_LIMIT, attempts: 2 }) });
+  const { post, raw, config } = await start(t, { guard: createLoginGuard({ ...LOGIN_LIMIT, attempts: 2 }) });
   const token = (await (await post(login(PERSON.password), { Origin: ORIGIN })).json()).data.token;
   const strangers = ['https://evil.example', 'https://janybek.github.io.evil.example', 'https://evil.example/https://janybek.github.io', 'http://janybek.github.io',
     'https://JANYBEK.github.io', 'https://janybek.github.io/', 'https://janybek.github.io:444', 'https://janybek.github.io, https://evil.example', 'null', '*', undefined];
@@ -6517,6 +6561,7 @@ test('a foreign, look-alike, null or missing Origin: 403, nothing is run, nothin
     assert.deepEqual([res.status, res.headers.get('access-control-allow-origin'), (await res.json()).error.code], [403, null, 'forbidden_origin'], String(origin));
     assert.equal((await post(login('wrong'), headers)).status, 403, String(origin));
   }
+  assert.equal((await raw('GET', '/health')).status, 200);                                         // сервер после всех чужих запросов жив
   assert.equal(roomsIn(config).length, 0);                                                         // читает базу отдельным соединением
   assert.equal((await (await post(login(PERSON.password), { Origin: ORIGIN })).json()).ok, true);  // чужие «ошибки» вход не закрыли
 });
@@ -6531,12 +6576,25 @@ test('nothing is served from the disk, by any path', async (t) => {
   const { raw, config } = await start(t);
   fs.writeFileSync(path.join(config.dataDir, 'note.txt'), 'TOP-SECRET');
   const paths = ['/', '/index.html', '/journal.sqlite', '/secret.key', '/server.log', '/note.txt', '/../note.txt', '/api/../note.txt', '/api/', '/api/note.txt', '/%2e%2e/note.txt',
-    '/..%2fnote.txt', '/api%2f..%2fsecret.key', '/..\\secret.key', '//note.txt', '/health/../secret.key', '/' + encodeURIComponent(config.secretFile)];
+    '/..%2fnote.txt', '/api%2f..%2fsecret.key', '/..\\secret.key', '//note.txt', '/health/../secret.key', '/' + encodeURIComponent(config.secretFile),
+    '//', '///', '/\\', '//[', '//@/api', '//:80/api', '//%00/api'];                                  // на этих адресах разбор пути бросает исключение: ответ 404, не падение
   const secret = fs.readFileSync(config.secretFile, 'utf8').trim();
   for (const p of paths) for (const method of ['GET', 'HEAD', 'POST']) {
     const res = await raw(method, p, { Origin: ORIGIN });
     assert.deepEqual([res.status, res.body.includes('TOP-SECRET'), res.body.includes(secret), res.body.includes('SQLite format')], [404, false, false, false], `${method} ${p}`);
   }
+  assert.equal((await raw('GET', '/health')).status, 200);                                            // после всех этих запросов сервер жив
+});
+test('a client that hangs up in the middle of a request does not stop the server', async (t) => {
+  const { srv, post, raw } = await start(t);
+  for (const head of ['POST /api HTTP/1.1\r\nHost: x\r\nOrigin: ' + ORIGIN + '\r\nContent-Length: 1000\r\n\r\n{"action":"auth', 'POST /api HTTP/1.1\r\nHost: x\r\nOrigin: ' + ORIGIN + '\r\nContent-Le']) {
+    const socket = net.connect(srv.port, '127.0.0.1');
+    await new Promise((resolve) => socket.once('connect', resolve));
+    socket.write(head);
+    socket.destroy();                                                                                 // клиент ушёл, тело не дослал
+  }
+  await sleep(100);
+  assert.deepEqual([(await raw('GET', '/health')).status, (await (await post(login(PERSON.password), { Origin: ORIGIN })).json()).ok], [200, true]);
 });
 test('/api answers 405 to other methods and 413 to an oversized body, as the stand does', async (t) => {
   const { raw, post } = await start(t, { maxBodyBytes: 1000 });
@@ -6579,8 +6637,11 @@ test('main: a plain start never makes a base; the stand words --reset, --real an
   const env = { JOURNAL_DATA_DIR: config.dataDir, JOURNAL_BACKUP_DIR: config.backupDir, JOURNAL_PORT: '0' };
   const said = [];
   for (const argv of [[], ['--reset'], ['--real'], ['--seed'], ['--init', '--reset']])
-    assert.deepEqual([(await main(argv, { env, root: config.root, out: (line) => said.push(line) })).code, fs.existsSync(config.dbFile)], [EXIT.config, false], argv.join(' '));
+    assert.deepEqual([(await main(argv, { env, root: config.root, out: (line) => said.push(line) })).code, fs.existsSync(config.dbFile), fs.existsSync(config.dataDir)], [EXIT.config, false, false], argv.join(' '));
   assert.equal((await main([], { env: {}, root: config.root, out: () => {} })).code, EXIT.config);
+  said.length = 0;
+  assert.deepEqual([(await main(['--init'], { env, root: config.root, out: (line) => said.push(line), nodeVersion: '22.1.0' })).code, fs.existsSync(config.dataDir), said.some((l) => /Node 24/.test(l))],
+    [EXIT.config, false, true]);                                                                      // старый Node — понятная фраза, ничего не создано
 });
 test('main --init shows the temporary password in the window only; then the server starts, answers and writes its state file; --admin-password gives a new one', async (t) => {
   const config = tempConfig(t);
@@ -6590,7 +6651,7 @@ test('main --init shows the temporary password in the window only; then the serv
   assert.equal((await main(['--init'], { env, root: config.root, out })).code, 0);
   const password = said.find((l) => l.startsWith('Временный пароль: ')).slice('Временный пароль: '.length);
   assert.equal(/^[a-z2-9]{8}$/.test(password), true);
-  const run = await main([], { env, root: config.root, out });                                       // (run.stop() в t.after)
+  const run = keep(t, await main([], { env, root: config.root, out }));
   assert.deepEqual([run.code, JSON.parse(fs.readFileSync(config.stateFile, 'utf8')).port, fs.readFileSync(config.logFile, 'utf8').includes(password)], [0, run.server.port, false]);
   const res = await fetch(run.server.url + '/api', { method: 'POST', headers: { Origin: ORIGIN, 'Content-Type': 'text/plain;charset=utf-8' },
     body: JSON.stringify({ action: 'auth.login', data: { login: 'admin', password } }) });
@@ -6621,7 +6682,7 @@ test('the stand limits login attempts by the same rule; a restart clears the cou
 
 `config.root` в `tempConfig` — временная папка, изображающая репозиторий (в ней нет `serve.local.json`), чтобы `main` не читал настоящие настройки владельца.
 
-- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное; `npm run build:gas` собирается и `tests/gasBundle.test.js` зелёный (в `backend/handlers/auth.js` нет слова `process`). Проверка руками во временной папке, не на настоящей базе: переменные `JOURNAL_DATA_DIR`, `JOURNAL_BACKUP_DIR` — временные папки, `JOURNAL_PORT=5399`; `npm run serve:init`, затем `npm run serve`; `curl` без `Origin` — 403, с `Origin: https://janybek.github.io` — ответ; `curl http://127.0.0.1:5399/../secret.key --path-as-is` — 404. Процесс остановить по своему PID, временные папки удалить. Вывод `serve:init` с паролем в отчёт не копировать.
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное; `npm run build:gas` собирается и `tests/gasBundle.test.js` зелёный (в `backend/handlers/auth.js` нет слова `process`). Проверка руками во временной папке, не на настоящей базе: переменные `JOURNAL_DATA_DIR`, `JOURNAL_BACKUP_DIR`, `JOURNAL_ALERT_DIR` — три временные папки (при заданной `JOURNAL_DATA_DIR` файл настроек не читается), `JOURNAL_PORT=5399`; `npm run serve:init`, затем `npm run serve`; `curl` без `Origin` — 403, с `Origin: https://janybek.github.io` — ответ; `curl http://127.0.0.1:5399/../secret.key --path-as-is` — 404. Процесс остановить по своему PID, временные папки удалить. Вывод `serve:init` с паролем в отчёт не копировать.
 - [ ] **Step 5:** коммит `feat: the working server - its own site only, no files, a login limit and a work log`.
 
 ---
@@ -6630,7 +6691,7 @@ test('the stand limits login attempts by the same rule; a restart clears the cou
 
 **Files:** Create `backend/node/backup.js`, `tests/backup.test.js`. Modify `backend/node/server.js` (копия в `main` и команда `--backup`), `package.json` (`"serve:backup": "node backend/node/server.js --backup"`).
 
-**Interfaces — Consumes:** `backup` из `node:sqlite`; `openDatabase` (задача 47); `openBase`, настройки и журнал работы (задачи 48, 49); `localDate` (`core/dates.js`).
+**Interfaces — Consumes:** SQL `VACUUM INTO` (не `backup()` из `node:sqlite`: он падает, когда копия совпала с запросом; `VACUUM INTO` синхронный и между запросами совпасть с ними не может); `openDatabase` (задача 47); `openBase`, настройки и журнал работы (задачи 48, 49); `localDate` (`core/dates.js`).
 
 **Produces:**
 
@@ -6642,11 +6703,13 @@ export const ALERT_FILE = 'Журнал — копия не сделана.txt';
 export const copyName = (date) => `journal-${date}.sqlite`;                 // date — 'ГГГГ-ММ-ДД' по Бишкеку
 export function verifyCopy(file, tables);
 // Открывает копию только для чтения: PRAGMA integrity_check = 'ok'; в ней есть каждая таблица из tables; в "staff" есть хотя бы одна строка.
-// Иначе бросает Error с причиной. Базу закрывает всегда; файлов '-wal' и '-shm' рядом с копией после проверки нет.
-export function pruneCopies(backupDir, keep = KEEP_DAYS);
-// Оставляет keep последних по имени файлов вида journal-ГГГГ-ММ-ДД.sqlite, остальные такие удаляет; любые другие файлы папки не трогает. -> имена удалённых
+// Иначе бросает Error с причиной. Базу закрывает всегда; файлов '-wal' и '-shm' рядом с копией после проверки нет (копия от VACUUM INTO — один файл в режиме delete).
+export function pruneCopies(backupDir, keep = KEEP_DAYS, now = Date.now);   // now — как у backupNow: возраст временного файла считается от неё
+// Оставляет keep последних по имени файлов вида journal-ГГГГ-ММ-ДД.sqlite, остальные такие удаляет; любые другие файлы папки не трогает. -> имена удалённых копий.
+// Временные файлы journal-ГГГГ-ММ-ДД.sqlite.<номер процесса>.tmp старше суток тоже удаляет (в возвращаемый список они не входят).
 export async function backupNow({ db, config, now, logger });
-// 1) создаёт backupDir; 2) backup(db, '<backupDir>/journal-<сегодня>.sqlite.tmp'); 3) verifyCopy(tmp, таблицы базы db из sqlite_master);
+// 1) создаёт backupDir (папку alertDir не создаёт: нет её — значит строка в журнале и всё); 2) удаляет временный файл с этим же именем, если он остался;
+//    VACUUM INTO '<backupDir>/journal-<сегодня>.sqlite.<process.pid>.tmp' (параметром, не склейкой строки); 3) verifyCopy(tmp, таблицы базы db из sqlite_master);
 // 4) переименовывает tmp в journal-<сегодня>.sqlite (копия того же дня заменяется); 5) pruneCopies; 6) logger.info('backup ok <имя> <байт>'), убирает тревожный файл.
 // -> { ok: true, file, removed }
 // Ошибка на шагах 1–4: tmp удаляется, прежние копии (и копия этого дня) целы, logger.error('BACKUP FAILED: <причина>'); если config.alertDir задан —
@@ -6666,7 +6729,7 @@ export function startBackups({ db, config, now, logger, everyMs = CHECK_EVERY_MS
 const at = (day, hour = 6) => () => Date.UTC(2026, 10, day, hour);                // 12:00 по Бишкеку того же дня
 test('a copy is a whole base in one file: it opens, is intact and holds the same rows; it can stand in for the base', async (t) => {
   const { config } = tempBase(t);
-  const base = openBase(config);                                                  // (закрыть в t.after)
+  const base = open(t, config);
   base.store.insertMany('rooms', [{ name: 'Ауд. 1' }, { name: 'Ауд. 2' }]);
   const res = await backupNow({ db: base.db, config, now: at(22), logger: quiet() });
   assert.deepEqual([res.ok, path.basename(res.file), fs.readdirSync(config.backupDir)], [true, 'journal-2026-11-22.sqlite', ['journal-2026-11-22.sqlite']]);
@@ -6675,13 +6738,13 @@ test('a copy is a whole base in one file: it opens, is intact and holds the same
   fs.mkdirSync(restored.dataDir, { recursive: true });
   fs.copyFileSync(res.file, restored.dbFile);
   fs.copyFileSync(config.secretFile, restored.secretFile);
-  const again = openBase(restored);                                               // (закрыть в t.after)
+  const again = open(t, restored);
   assert.deepEqual([again.store.list('rooms').map((r) => r.name), handleRequest({ action: 'auth.login', data: { login: PERSON.login, password: PERSON.password } }, again).ok],
     [['Ауд. 1', 'Ауд. 2'], true]);
 });
 test('one copy a day: the same day replaces its file, restarts in a loop push nothing out, 31 days keep the last 30, foreign files stay', async (t) => {
   const { config } = tempBase(t);
-  const base = openBase(config);
+  const base = open(t, config);
   fs.mkdirSync(config.backupDir, { recursive: true });
   for (const name of ['notes.txt', 'journal.sqlite', 'journal-old.sqlite', 'journal-2026-11-01.sqlite.bak']) fs.writeFileSync(path.join(config.backupDir, name), 'чужое');
   for (let i = 0; i < 40; i++) await backupNow({ db: base.db, config, now: at(1, 6), logger: quiet() });        // сорок перезапусков за день
@@ -6694,12 +6757,12 @@ test('one copy a day: the same day replaces its file, restarts in a loop push no
 });
 test('the date of a copy is the Bishkek date: 18:30 UTC is already tomorrow', async (t) => {
   const { config } = tempBase(t);
-  const res = await backupNow({ db: openBase(config).db, config, now: () => Date.UTC(2026, 10, 22, 18, 30), logger: quiet() });
+  const res = await backupNow({ db: open(t, config).db, config, now: () => Date.UTC(2026, 10, 22, 18, 30), logger: quiet() });
   assert.equal(path.basename(res.file), 'journal-2026-11-23.sqlite');
 });
 test('a failed copy is loud and harmless: BACKUP FAILED in the log, the alert file, no .tmp, earlier copies whole; the next good copy removes the alert', async (t) => {
   const { config } = tempBase(t);
-  const base = openBase(config);
+  const base = open(t, config);
   const good = await backupNow({ db: base.db, config, now: at(21), logger: quiet() });
   const bytes = fs.readFileSync(good.file);
   const log = quiet();
@@ -6714,7 +6777,7 @@ test('a failed copy is loud and harmless: BACKUP FAILED in the log, the alert fi
 });
 test('a copy that does not pass the check is not kept and replaces nothing', async (t) => {
   const { config } = tempBase(t);
-  const base = openBase(config);
+  const base = open(t, config);
   const good = await backupNow({ db: base.db, config, now: at(22, 1), logger: quiet() });
   const bytes = fs.readFileSync(good.file);
   base.store.removeMany('staff', base.store.list('staff').map((r) => r.id));                                   // база без единого сотрудника — не копия
@@ -6734,7 +6797,7 @@ test('startBackups: a copy at once, the next one when the day changes, none in b
   const { config } = tempBase(t);
   const clock = { t: Date.UTC(2026, 10, 22, 6) };
   const log = quiet();
-  const backups = startBackups({ db: openBase(config).db, config, now: () => clock.t, logger: log, everyMs: 20 });       // (stop в t.after)
+  const backups = keep(t, startBackups({ db: open(t, config).db, config, now: () => clock.t, logger: log, everyMs: 20 }));
   assert.equal((await backups.first).ok, true);
   await sleep(100);
   assert.equal(log.lines.filter((l) => /backup ok/.test(l)).length, 1);
@@ -6742,17 +6805,47 @@ test('startBackups: a copy at once, the next one when the day changes, none in b
   await until(() => fs.existsSync(path.join(config.backupDir, 'journal-2026-11-23.sqlite')));
   backups.stop();
 });
+test('a copy made while requests are being served never fails: no BACKUP FAILED, and the new day gets its copy', async (t) => {
+  const clock = { t: Date.UTC(2026, 10, 22, 6) };
+  const { config, base, logger, post } = await start(t, { now: () => clock.t });                    // сервер на порту 0; logger пишет в config.logFile
+  const backups = keep(t, startBackups({ db: base.db, config, now: () => clock.t, logger, everyMs: 5 }));
+  assert.equal((await backups.first).ok, true);
+  const token = (await (await post(login(PERSON.password), { Origin: ORIGIN })).json()).data.token;
+  for (let i = 0; i < 60; i++) {
+    if (i === 20) clock.t += 86400000;                                                              // посреди серии запросов наступил новый день
+    assert.equal((await (await post({ action: 'dir.list', token, data: { table: 'rooms' } }, { Origin: ORIGIN })).json()).ok, true);
+  }
+  await until(() => fs.existsSync(path.join(config.backupDir, 'journal-2026-11-23.sqlite')));
+  backups.stop();
+  const text = fs.readFileSync(config.logFile, 'utf8');
+  assert.deepEqual([/BACKUP FAILED/.test(text), fs.existsSync(path.join(config.alertDir, ALERT_FILE)), (text.match(/backup ok/g) ?? []).length], [false, false, 2]);
+});
+test('a leftover temporary file neither breaks the next copy nor lives for ever', async (t) => {
+  const { config } = tempBase(t);
+  const base = open(t, config);
+  fs.mkdirSync(config.backupDir, { recursive: true });
+  const own = path.join(config.backupDir, `journal-2026-11-22.sqlite.${process.pid}.tmp`);                  // остался от упавшей копии того же процесса
+  const oldOther = path.join(config.backupDir, 'journal-2026-11-01.sqlite.99999.tmp');
+  const freshOther = path.join(config.backupDir, 'journal-2026-11-22.sqlite.88888.tmp');
+  for (const file of [own, oldOther, freshOther]) fs.writeFileSync(file, 'мусор');
+  const twoDaysAgo = new Date(Date.UTC(2026, 10, 20, 6));
+  const anHourAgo = new Date(Date.UTC(2026, 10, 22, 5));                                                // «сейчас» теста — at(22): 22.11 06:00 UTC
+  fs.utimesSync(oldOther, twoDaysAgo, twoDaysAgo);
+  fs.utimesSync(freshOther, anHourAgo, anHourAgo);
+  const res = await backupNow({ db: base.db, config, now: at(22), logger: quiet() });
+  assert.deepEqual([res.ok, fs.existsSync(own), fs.existsSync(oldOther), fs.existsSync(freshOther)], [true, false, false, true]);
+});
 test('the start of the server copies the base before new sheets are added to it', async (t) => {
   const { config } = tempBase(t);
-  const base = openBase(config); base.db.exec('DROP TABLE "rooms"'); base.close();
-  const run = await main([], { env: envOf(config), root: config.root, out: () => {}, now: at(22) });                    // (run.stop() в t.after)
-  const copy = openDatabase(path.join(config.backupDir, 'journal-2026-11-22.sqlite'), { readOnly: true });
+  const base = open(t, config); base.db.exec('DROP TABLE "rooms"'); base.close();
+  const run = keep(t, await main([], { env: envOf(config), root: config.root, out: () => {}, now: at(22) }));
+  const copy = keep(t, openDatabase(path.join(config.backupDir, 'journal-2026-11-22.sqlite'), { readOnly: true }));
   const has = (db) => db.prepare(`SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = 'rooms'`).get().n;
   assert.deepEqual([has(copy), has(run.base.db)], [0, 1]);
 });
 test('main --backup makes a copy while the server is running', async (t) => {
   const { config } = tempBase(t);
-  const run = await main([], { env: envOf(config), root: config.root, out: () => {}, now: at(22) });                    // (run.stop() в t.after)
+  const run = keep(t, await main([], { env: envOf(config), root: config.root, out: () => {}, now: at(22) }));
   run.base.store.insert('rooms', { name: 'Новая' });                                                                    // после копии запуска
   const said = [];
   assert.equal((await main(['--backup'], { env: envOf(config), root: config.root, out: (line) => said.push(line), now: at(22) })).code, 0);
@@ -6761,7 +6854,7 @@ test('main --backup makes a copy while the server is running', async (t) => {
 });
 ```
 
-- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное; после тестов во временной папке системы не осталось папок `journal-*` этого прогона.
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное; после тестов во временной папке системы не осталось папок `journal-*` этого прогона; рядом с копиями нет файлов `-wal`, `-shm` и `.tmp`.
 - [ ] **Step 5:** коммит `feat: a checked daily copy of the base, kept for 30 days; a failed copy is loud`.
 
 ---
@@ -6777,32 +6870,40 @@ test('main --backup makes a copy while the server is running', async (t) => {
 **Produces:**
 
 ```js
-// backend/node/server.js — main(argv, { …, stopCheckMs = 2000 }): main([]) раз в stopCheckMs (таймер unref) проверяет config.stopFile; файл есть -> logger.info('stop requested'), stop(), выход с EXIT.ok.
-// Файл-просьбу удаляет тот, кто её выполнил. Файл, оставшийся от прошлого раза, при запуске удаляется.
+// backend/node/server.js — main(argv, { …, stopCheckMs = 2000 }): main([]) раз в stopCheckMs (таймер unref) проверяет config.stopFile; файл есть -> logger.info('stop requested'), удаляет файл, stop(), done выполняется EXIT.ok
+// (выход из процесса делает обёртка прямого запуска по done, не сам main).
+// Файл-просьбу удаляет тот, кто её выполнил. Файл, оставшийся от прошлого раза, при запуске удаляется — но только после того, как порт занят этим процессом (listen удался);
+// второй запуск, не сумевший занять порт (EXIT.portBusy), чужие stateFile и stopFile не трогает.
 
 // backend/node/supervisor.js — только Node
-export const RESTART = { firstMs: 1000, maxMs: 60000, stableMs: 60000 };
+export const RESTART = { firstMs: 1000, maxMs: 60000, stableMs: 60000, pollMs: 200 };   // pollMs — как часто присмотр смотрит stopFile во время паузы; в тестах limits без pollMs берут 200
 export function nextDelay(previousMs, ranMs, limits = RESTART);
 // сервер проработал не меньше stableMs или previousMs === 0 -> firstMs; иначе min(previousMs * 2, maxMs)
+export function isAlive(pid);                                          // process.kill(pid, 0) без завершения процесса: есть ли такой процесс; не число -> false
 export function runSupervised({ config, logger, command, args, env, limits = RESTART, now });
-// Запускает сервер дочерним процессом (по умолчанию тот же node и backend/node/server.js, env — окружение ребёнка; окна нет: windowsHide). Когда ребёнок вышел:
+// Пишет свой файл config.supervisorFile { pid, startedAt } (pid — номер процесса присмотра) и удаляет его при любом выходе. Запускает сервер дочерним процессом
+// (по умолчанию тот же node и backend/node/server.js, env — окружение ребёнка; окна нет: windowsHide). Перед каждым запуском смотрит stopFile. Когда ребёнок вышел:
 //   EXIT.ok (остановлен по просьбе), EXIT.config, EXIT.portBusy -> не перезапускает: logger.info | error('server stopped: <причина>'), обещание done выполняется этим кодом;
 //   любой другой код или сигнал -> logger.error('server exited with <код>, restart in <мс> ms') и новый запуск через nextDelay.
-// Просьба остановиться, пришедшая во время паузы перед перезапуском, тоже завершает присмотр. -> { done, stop() }
+// Во время паузы перед перезапуском stopFile проверяется каждые pollMs: просьба есть -> файл удаляется, logger.info('stop requested'), нового запуска нет, done выполняется EXIT.ok. -> { done, stop() }
 export async function requestStop(config, { waitMs = 15000 } = {});
-// Сервер не запущен (нет stateFile или /health на его порту не отвечает) -> { stopped: false, reason: 'not_running' }.
-// Иначе пишет stopFile и ждёт, пока /health перестанет отвечать и stateFile исчезнет -> { stopped: true }; не дождался -> { stopped: false, reason: 'timeout' }.
+// Файл присмотра config.supervisorFile есть и его pid жив (isAlive) -> пишет stopFile и ждёт, пока файл присмотра исчезнет и /health перестанет отвечать, — даже если /health уже молчит
+//   (сервер упал, присмотр ждёт паузу) -> { stopped: true }; не дождался -> { stopped: false, reason: 'timeout' }.
+// Файл присмотра есть, но его pid мёртв -> файл удаляется как устаревший; дальше как без присмотра.
+// Присмотра нет: нет stateFile или /health на его порту не отвечает (ответ — JSON с data === 'journal', чужая программа на порту не считается) -> { stopped: false, reason: 'not_running' }, файл-просьба не пишется;
+//   иначе сервер запущен напрямую: пишет stopFile и ждёт, пока /health замолчит и stateFile исчезнет -> { stopped: true } или 'timeout'.
 // Процессы по номеру не завершает.
 export async function readStatus(config, { now } = {});
-// -> { running, port, startedAt, lastCopy, copies, errorsToday }: running — отвечает ли /health на порту из stateFile; lastCopy — имя последнего файла копии или null;
-//    copies — их число; errorsToday — число строк ERROR журнала работы за сегодняшнюю дату по Бишкеку. Личных данных в ответе нет.
-// Прямой запуск: без параметров — runSupervised; '--stop' — requestStop и фраза о результате; '--status' — readStatus строками по-русски.
+// -> { running, port, startedAt, supervisor: { running, pid }, lastCopy, copies, errorsToday, failedLoginsToday }: running — отвечает ли /health (тело data === 'journal') на порту из stateFile;
+//    supervisor — по файлу присмотра и isAlive (нет файла — { running: false, pid: null }); lastCopy — имя последнего файла копии или null; copies — их число;
+//    errorsToday — число строк ERROR журнала работы за сегодняшнюю дату по Бишкеку; failedLoginsToday — число строк `api auth.login bad_credentials` за сегодня (перебор паролей виден). Личных данных в ответе нет.
+// Прямой запуск: без параметров — runSupervised; '--stop' — requestStop и фраза о результате; '--status' — readStatus строками по-русски (в том числе номера процессов сервера и присмотра).
 ```
 
 Файлы для Windows (только латиница внутри: кодировка не важна; пути — от места самого файла, без записанного пути к репозиторию):
 
 - `scripts/serve-hidden.vbs` — запускает `node backend\node\supervisor.js` в папке репозитория без окна (`WScript.Shell.Run …, 0, False`).
-- `scripts/autostart.ps1 -Install | -Remove | -Status [-StartupDir <папка>] [-Name <имя ярлыка>]` — кладёт или убирает ярлык на `wscript.exe "<репозиторий>\scripts\serve-hidden.vbs"`; папка по умолчанию — «Автозагрузка» пользователя (`[Environment]::GetFolderPath('Startup')`), имя по умолчанию `Journal server`. Работает в Windows PowerShell 5.1. Больше ничего в системе не меняет.
+- `scripts/autostart.ps1 -Install | -Remove | -Status [-StartupDir <папка>] [-Name <имя ярлыка>]` — кладёт или убирает ярлык на `wscript.exe "<папка, где лежит скрипт>\serve-hidden.vbs"` (при выкладке скрипт запускают из папки сервера, и ярлык ведёт туда); папка по умолчанию — «Автозагрузка» пользователя (`[Environment]::GetFolderPath('Startup')`), имя по умолчанию `Journal server` — **одно имя для `-Install`, `-Status` и `-Remove`, `-Name` в командах плана не пишется**. Работает в Windows PowerShell 5.1. Больше ничего в системе не меняет. Политика запуска скриптов у пользователя не задана, поэтому во всех командах плана: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\autostart.ps1 …`.
 - `scripts/journal-init.cmd`, `scripts/journal-admin-password.cmd` — для двойного щелчка владельца: `chcp 65001`, переход в папку репозитория, `node backend\node\server.js --init` (или `--admin-password`), `pause` — окно не закрывается, пока владелец не запишет пароль.
 
 `package.json`: `"serve:start": "wscript scripts/serve-hidden.vbs"`, `"serve:stop": "node backend/node/supervisor.js --stop"`, `"serve:status": "node backend/node/supervisor.js --status"`.
@@ -6833,53 +6934,73 @@ test('the real server under supervision: killed, it comes back by itself; a stop
   const sup = runSupervised({ config, logger: log, limits: { firstMs: 50, maxMs: 200, stableMs: 60000 }, env: envOf(config) });
   const first = await until(() => stateOf(config));                                    // { pid, port, startedAt }
   assert.equal((await fetch(`http://127.0.0.1:${first.port}/health`)).status, 200);
+  const supervisor = JSON.parse(fs.readFileSync(config.supervisorFile, 'utf8'));       // { pid, startedAt } присмотра: свой процесс теста, не сервер
+  assert.deepEqual([supervisor.pid, isAlive(supervisor.pid), supervisor.pid !== first.pid], [process.pid, true, true]);
   process.kill(first.pid);                                                             // свой дочерний процесс теста
   const second = await until(() => { const s = stateOf(config); return s && s.pid !== first.pid ? s : null; });
   assert.equal((await fetch(`http://127.0.0.1:${second.port}/health`)).status, 200);
+  assert.deepEqual((await readStatus(config)).supervisor, { running: true, pid: process.pid });
   assert.deepEqual(await requestStop(config, { waitMs: 10000 }), { stopped: true });
-  assert.deepEqual([await sup.done, fs.existsSync(config.stateFile), fs.existsSync(config.stopFile)], [EXIT.ok, false, false]);
+  assert.deepEqual([await sup.done, fs.existsSync(config.stateFile), fs.existsSync(config.stopFile), fs.existsSync(config.supervisorFile), isAlive(second.pid)], [EXIT.ok, false, false, false, false]);
   await assert.rejects(fetch(`http://127.0.0.1:${second.port}/health`));
+});
+test('a stop request that comes in the pause before a restart ends the supervision: nothing starts again', async (t) => {
+  const { config } = tempBase(t);
+  const log = quiet();
+  // exitWith(1) — скрипт, который дописывает строку в runs-1.txt и выходит с кодом 1; dir — его папка
+  const sup = runSupervised({ config, logger: log, command: process.execPath, args: [exitWith(1)], limits: { firstMs: 5000, maxMs: 5000, stableMs: 60000, pollMs: 20 } });
+  await until(() => log.lines.some((l) => /ERROR server exited with 1, restart in 5000 ms/.test(l)));        // присмотр в паузе, сервера нет
+  assert.deepEqual(await requestStop(config, { waitMs: 3000 }), { stopped: true });
+  assert.deepEqual([await sup.done, runsOf(dir, 1), fs.existsSync(config.supervisorFile), fs.existsSync(config.stopFile)], [EXIT.ok, 1, false, false]);
 });
 test('a second start beside a running server exits with the port code, leaves the first one answering and does not loop', async (t) => {
   const { config } = tempBase(t);
-  const first = await main([], { env: envOf(config), root: config.root, out: () => {} });                                // (first.stop() в t.after)
+  const first = keep(t, await main([], { env: envOf(config), root: config.root, out: () => {}, stopCheckMs: 60000 }));
   const second = runSupervised({ config, logger: quiet(), env: { ...envOf(config), JOURNAL_PORT: String(first.server.port) }, limits: { firstMs: 10, maxMs: 40, stableMs: 60000 } });
   assert.equal(await second.done, EXIT.portBusy);
   assert.deepEqual([(await fetch(first.server.url + '/health')).status, stateOf(config).port], [200, first.server.port]);
+  fs.writeFileSync(config.stopFile, '');                                                                                 // просьба, адресованная первому серверу
+  const third = await main([], { env: { ...envOf(config), JOURNAL_PORT: String(first.server.port) }, root: config.root, out: () => {} });
+  assert.deepEqual([third.code, fs.existsSync(config.stopFile)], [EXIT.portBusy, true]);                                  // неудачный второй запуск чужую просьбу не стёр
 });
-test('requestStop without a running server says so and leaves no request file; a stale request file does not stop the next start', async (t) => {
+test('requestStop without a running server says so and leaves no request file; a dead supervisor file is cleared; a stale request file does not stop the next start', async (t) => {
   const { config } = tempBase(t);
   assert.deepEqual([await requestStop(config, { waitMs: 200 }), fs.existsSync(config.stopFile)], [{ stopped: false, reason: 'not_running' }, false]);
+  const dead = spawnSync(process.execPath, ['-e', '']).pid;                                                              // процесс, которого уже нет
+  fs.writeFileSync(config.supervisorFile, JSON.stringify({ pid: dead, startedAt: 0 }));
+  assert.deepEqual([await requestStop(config, { waitMs: 200 }), fs.existsSync(config.supervisorFile), fs.existsSync(config.stopFile)], [{ stopped: false, reason: 'not_running' }, false, false]);
   fs.writeFileSync(config.stopFile, '');                                                                                 // просьба, оставшаяся от прошлого раза
-  const run = await main([], { env: envOf(config), root: config.root, out: () => {}, stopCheckMs: 30 });                 // (run.stop() в t.after)
+  const run = keep(t, await main([], { env: envOf(config), root: config.root, out: () => {}, stopCheckMs: 30 }));
   await sleep(200);
   assert.deepEqual([(await fetch(run.server.url + '/health')).status, fs.existsSync(config.stopFile)], [200, false]);
 });
-test('readStatus: running, the port, the last copy, the count of copies and of ERROR lines of today; no names in it', async (t) => {
+test('readStatus: running, the port, the last copy, the count of copies, of ERROR lines and of failed logins of today; no names in it', async (t) => {
   const { config } = tempBase(t);
   const noon = () => Date.UTC(2026, 10, 22, 6);                                                                          // 22.11.2026 12:00 по Бишкеку
-  assert.deepEqual(await readStatus(config, { now: noon }), { running: false, port: null, startedAt: null, lastCopy: null, copies: 0, errorsToday: 0 });
-  const run = await main([], { env: envOf(config), root: config.root, out: () => {}, now: noon });                       // (run.stop() в t.after)
+  assert.deepEqual(await readStatus(config, { now: noon }), { running: false, port: null, startedAt: null, supervisor: { running: false, pid: null }, lastCopy: null, copies: 0, errorsToday: 0, failedLoginsToday: 0 });
+  const run = keep(t, await main([], { env: envOf(config), root: config.root, out: () => {}, now: noon }));
   createLogger(config.logFile, { now: noon }).error('проба');
   createLogger(config.logFile, { now: () => noon() - 86400000 }).error('вчерашняя');
+  for (const [at, text] of [[noon, 'api auth.login bad_credentials 3ms'], [noon, 'api auth.login bad_credentials 4ms'], [noon, 'api auth.login ok 5ms'], [() => noon() - 86400000, 'api auth.login bad_credentials 3ms']])
+    createLogger(config.logFile, { now: at }).info(text);
   const status = await readStatus(config, { now: noon });
-  assert.deepEqual([status.running, status.port, status.lastCopy, status.copies, status.errorsToday], [true, run.server.port, 'journal-2026-11-22.sqlite', 1, 1]);
+  assert.deepEqual([status.running, status.port, status.lastCopy, status.copies, status.errorsToday, status.failedLoginsToday], [true, run.server.port, 'journal-2026-11-22.sqlite', 1, 1, 2]);
   assert.equal(JSON.stringify(status).includes(PERSON.fullName), false);
 });
 ```
 
-`stateFile` принадлежит серверу, который его записал: второй сервер, не сумевший занять порт, чужой `stateFile` не трогает и не удаляет.
+`stateFile` принадлежит серверу, который его записал, `supervisorFile` — присмотру: второй сервер, не сумевший занять порт, чужие `stateFile` и `stopFile` не трогает и не удаляет.
 
-- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное. Проверка файлов Windows руками, **только во временных папках**: `JOURNAL_DATA_DIR`, `JOURNAL_BACKUP_DIR` — временные, `JOURNAL_PORT=5399`; `npm run serve:init`; `npm run serve:start` — окна нет, `npm run serve:status` говорит «работает»; завершить процесс сервера по PID из `server.state.json` — через секунду-две `serve:status` снова «работает», в `server.log` строка `restart`; `npm run serve:stop` — оба процесса вышли. `powershell -File scripts\autostart.ps1 -Install -StartupDir <временная папка>` — ярлык появился, его цель — `wscript.exe`, аргумент — путь к `serve-hidden.vbs`; `-Status` и `-Remove` работают. В настоящую «Автозагрузку» агент ничего не кладёт и порт 5373 не занимает. `git status` чистый; `git diff` не показывает изменений концов строк в прежних файлах.
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` зелёное. Проверка файлов Windows руками, **только во временных папках**: `JOURNAL_DATA_DIR`, `JOURNAL_BACKUP_DIR`, `JOURNAL_ALERT_DIR` — три временные папки (файл настроек при этом не читается), `JOURNAL_PORT=5399`; `npm run serve:init`; `npm run serve:start` — окна нет, `npm run serve:status` говорит «работает» и называет два номера процессов (сервера и присмотра — из `server.state.json` и `supervisor.state.json`); завершить процесс сервера по номеру из `server.state.json` — через секунду-две `serve:status` снова «работает», в `server.log` строка `restart`; `npm run serve:stop` — потом по двум записанным номерам убедиться (`tasklist /FI "PID eq <номер>"`), что обоих процессов нет, а файлов `server.state.json`, `supervisor.state.json` и `stop.request` в папке нет. `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\autostart.ps1 -Install -StartupDir <временная папка>` — ярлык появился, его цель — `wscript.exe`, аргумент — путь к `serve-hidden.vbs`; `-Status` и `-Remove` (с тем же `-StartupDir`) работают. В настоящую «Автозагрузку» агент ничего не кладёт и порт 5373 не занимает. `git status` чистый; `git diff` не показывает изменений концов строк в прежних файлах.
 - [ ] **Step 5:** коммит `feat: the server starts without a window, comes back after a crash and stops on request`.
 
 ---
 
-### Task 52 (Э): сайт ходит на сервер журнала; «сервер недоступен» и «слишком много попыток»
+### Task 52 (Э): сайт ходит на сервер журнала; «сервер недоступен» и «слишком много попыток»; Excel силлабуса — только для первого заполнения
 
-Экранов не прибавляется: меняется адрес сервера и появляются два сообщения.
+Экранов не прибавляется: меняется адрес сервера, появляются два сообщения, а Excel силлабуса остаётся только для первого заполнения. Правило владельца от 22.11.2026: «Excel силлабуса — только для первого заполнения („Заполнить из файла“), правки — на сайте». Выполняют его только экраны; сервер файл по-прежнему принимает (известное ограничение — в «Чего в дополнении 4 нет»).
 
-**Files:** Modify `site/config.js`, `site/js/api.js`, `site/js/views/login.js`, `site/js/i18n/ru.js`, `ky.js`, `en.js`; списки «ошибку можно повторить» — `site/js/views/directory.js` (строка 31), `schedule.js` (28), `subjects.js` (24), `syllabusUpload.js` (21), `weekTemplate.js` (22), `import.js` (419). Create `tests/siteConfig.test.js`, `tests/siteApi.test.js`.
+**Files:** Modify `site/config.js`, `site/js/api.js`, `site/js/views/login.js`, `site/js/i18n/ru.js`, `ky.js`, `en.js`; списки «ошибку можно повторить» — `site/js/views/directory.js` (строка 31), `schedule.js` (28), `subjects.js` (24), `syllabusUpload.js` (21), `weekTemplate.js` (22), `import.js` (419); кнопки файла — `site/js/views/subjects.js` (окно «Добавить предмет» и список, условие `takesFile`), `site/js/views/syllabusForm.js` (строки около 211–216), `site/js/views/syllabusUpload.js` (кнопка «Скачать (Excel)» заполненного силлабуса, около строки 55). Create `site/js/fillFromFile.js`, `tests/siteConfig.test.js`, `tests/siteApi.test.js`, `tests/siteFillFromFile.test.js`. Modify `tests/i18n.test.js` (список кодов ошибок, у которых обязан быть текст, — строка около 164: добавить `server_down` и `too_many_attempts`).
 
 **Interfaces — Consumes:** код ошибки `too_many_attempts` (задача 49); стенд отвечает на `/api` как раньше.
 
@@ -6899,6 +7020,11 @@ export const API_URL = apiUrlFor(location.hostname);
 export const RETRYABLE = ['network', 'server_down', 'internal'];       // шесть экранов берут список отсюда вместо своих
 export function failureCode(online);                                   // online === false -> 'network'; иначе 'server_down'
 // call(): fetch не удался, ответ не JSON или в нём нет логического ok -> new ApiError(failureCode(globalThis.navigator ? globalThis.navigator.onLine : undefined)); остальное как было
+
+// site/js/fillFromFile.js — чистая функция без DOM (импортируется в тестах Node), её вызывают subjects.js и syllabusForm.js
+export function canFillFromFile({ hasApproved, topicRows });
+// true только если у силлабуса (дисциплина + преподаватель + половина года) нет утверждённой версии (hasApproved === false) и в открытом черновике, если он есть, нет ни одной строки «Тем» (topicRows === 0);
+// иначе false. Данные для аргументов экраны берут из ответов, которые у них уже есть (`syllabusStatus`, `open`, план формы), новых запросов нет.
 ```
 
 Новые ключи трёх словарей (кыргызский и английский — по смыслу; кыргызский — в список на вычитку):
@@ -6907,8 +7033,11 @@ export function failureCode(online);                                   // online
 | --- | --- |
 | `error.server_down` | Сервер журнала сейчас недоступен. Попробуйте через несколько минут. Если не заработает — сообщите в деканат. |
 | `error.too_many_attempts` | Слишком много неверных попыток входа. Подождите 15 минут и попробуйте снова. |
+| `syllabus.fillFromFile` | Заполнить из файла (один ключ вместо `syllabus.upload` и `sform.file.upload`; те два из словарей удаляются) |
 
 `error.network` («Нет связи с сервером. Проверьте интернет…») остаётся для телефона без интернета. В `login.js` поле пароля очищается и при `too_many_attempts`.
+
+Кнопка файла: на экранах «Предметы» (окно «Добавить предмет» и список) и в форме силлабуса называется «Заполнить из файла» и видна только при `canFillFromFile(...) === true`, то есть для пустого или нового черновика. После сохранения плана, при утверждённой версии и при непустом черновике её нет. «Скачать (Excel)» заполненного силлабуса (в форме и на странице) убирается вместе с её ключом в трёх словарях; «Скачать шаблон» остаётся. Подсказки, где про файл сказано как про способ правки (`syllabus.emptyHint.staff`, `subjects.add.saved`, «Как заполнить шаблон»), переписать в трёх словарях: файл — только для первого заполнения, дальше правки на сайте.
 
 - [ ] **Step 1: тесты.**
 
@@ -6925,9 +7054,10 @@ test('the stand talks to its own stand, any other page to the journal server; a 
   assert.equal(PRODUCTION_API_URL === '' || apiUrlFor('janybek.github.io') === PRODUCTION_API_URL, true);        // вписанный в задаче 13 адрес обязан пройти проверку
 });
 test('the address of the server cannot come from the page address or the browser storage', () => {
-  for (const file of ['site/config.js', 'site/js/api.js'])
-    assert.doesNotMatch(fs.readFileSync(file, 'utf8'), /location\.(search|hash|href)|URLSearchParams|localStorage|sessionStorage|document\.cookie/, file);
-  assert.doesNotMatch(fs.readFileSync('site/config.js', 'utf8'), /script\.google\.com/);
+  const site = (file) => fs.readFileSync(new URL(`../site/${file}`, import.meta.url), 'utf8');                    // путь от самого теста, а не от текущей папки
+  for (const file of ['config.js', 'js/api.js'])
+    assert.doesNotMatch(site(file), /location\.(search|hash|href)|URLSearchParams|localStorage|sessionStorage|document\.cookie/, file);
+  assert.doesNotMatch(site('config.js'), /script\.google\.com/);
 });
 
 // tests/siteApi.test.js — подставной fetch, как fakeFetch в tests/reviewCount.test.js; api.js импортируется динамически после globalThis.location.
@@ -6947,18 +7077,39 @@ test('an answer of the server keeps its code: too_many_attempts, bad_credentials
 });
 test('the six screens take the list of retryable errors from api.js', () => {
   for (const name of ['directory', 'schedule', 'subjects', 'syllabusUpload', 'weekTemplate', 'import']) {
-    const text = fs.readFileSync(`site/js/views/${name}.js`, 'utf8');
+    const text = fs.readFileSync(new URL(`../site/js/views/${name}.js`, import.meta.url), 'utf8');
     assert.match(text, /\bRETRYABLE\b/, name);
     assert.doesNotMatch(text, /\['network', 'internal'\]|=== 'network' \|\|/, name);
   }
 });
-// tests/i18n.test.js — прежняя проверка «наборы ключей одинаковые» покрывает два новых ключа; добавить: у обоих есть текст во всех трёх словарях и он не равен ключу
+// tests/i18n.test.js — прежняя проверка «наборы ключей одинаковые» покрывает новые ключи; добавить: у `error.server_down`, `error.too_many_attempts` и `syllabus.fillFromFile` есть текст во всех трёх словарях и он не равен ключу;
+// в списке кодов ошибок, у которых обязан быть текст (строка около 164), есть `server_down` и `too_many_attempts`
+
+// tests/siteFillFromFile.test.js — модули сайта без DOM импортируются динамически, файлы экранов читаются как текст по пути от теста
+test('the file button is for the first fill only: no approved version and no topics in the draft', async () => {
+  const { canFillFromFile } = await import('../site/js/fillFromFile.js');
+  assert.deepEqual([canFillFromFile({ hasApproved: false, topicRows: 0 }), canFillFromFile({ hasApproved: false, topicRows: 12 }),
+    canFillFromFile({ hasApproved: true, topicRows: 0 }), canFillFromFile({ hasApproved: true, topicRows: 12 })], [true, false, false, false]);
+});
+test('one button «Заполнить из файла» on the screens; the two old file entries are gone', async () => {
+  const view = (name) => fs.readFileSync(new URL(`../site/js/views/${name}.js`, import.meta.url), 'utf8');
+  for (const name of ['subjects', 'syllabusForm']) {
+    assert.match(view(name), /syllabus\.fillFromFile/, name);
+    assert.match(view(name), /canFillFromFile/, name);
+  }
+  for (const name of ['subjects', 'syllabusForm', 'syllabusUpload']) assert.doesNotMatch(view(name), /['"`](syllabus\.upload|sform\.file\.upload)['"`]/, name);
+  for (const lang of ['ru', 'ky', 'en']) {
+    const dict = fs.readFileSync(new URL(`../site/js/i18n/${lang}.js`, import.meta.url), 'utf8');
+    assert.match(dict, /['"]syllabus\.fillFromFile['"]/, lang);
+    assert.doesNotMatch(dict, /['"](syllabus\.upload|sform\.file\.upload)['"]/, lang);
+  }
+});
 ```
 
 - [ ] **Step 2:** падает. **Step 3:** написать.
-- [ ] **Step 4: проверка на стенде** (свой `npm run dev:reset`, headless Chrome с временным профилем; стенд координатора на 5273 остановлен): экран входа открывается, вход `dean` работает (стенд ходит на `/api`); остановить свой стенд, не закрывая страницу, и нажать «Войти» — «Сервер журнала сейчас недоступен…», введённый логин на месте; поднять стенд, ввести неверный пароль одиннадцать раз — «Слишком много неверных попыток входа…», пароль очищен; перезапустить стенд — вход работает. На экране «Справочники» при остановленном стенде сохранение показывает то же сообщение и кнопку повтора. Ширина 360 px и обе темы. `npm test` зелёное.
-- [ ] **Step 5:** скриншоты в `.superpowers/sdd/plan-unit-2-raspisanie/task-52-shots/`: вход с «Сервер журнала сейчас недоступен» (тёмная, светлая, 360 px), вход с «Слишком много попыток» (тёмная), окно справочника с повтором.
-- [ ] **Step 6:** коммит `feat: the site talks to the journal server; «server unavailable» and «too many attempts» messages`.
+- [ ] **Step 4: проверка на стенде** (свой `npm run dev:reset`, headless Chrome с временным профилем; стенд координатора на 5273 остановлен): экран входа открывается, вход `dean` работает (стенд ходит на `/api`); остановить свой стенд, не закрывая страницу, и нажать «Войти» — «Сервер журнала сейчас недоступен…», введённый логин на месте; поднять стенд, ввести неверный пароль одиннадцать раз — «Слишком много неверных попыток входа…», пароль очищен; перезапустить стенд — вход работает. На экране «Справочники» при остановленном стенде сохранение показывает то же сообщение и кнопку повтора. Кнопка «Заполнить из файла»: новый предмет без силлабуса и пустой черновик — кнопка есть; после сохранения плана в черновике — кнопки нет; утверждённый силлабус — кнопки нет и «Скачать (Excel)» заполненного силлабуса нет, «Скачать шаблон» есть. Ширина 360 px и обе темы. `npm test` зелёное.
+- [ ] **Step 5:** скриншоты в `.superpowers/sdd/plan-unit-2-raspisanie/task-52-shots/`: вход с «Сервер журнала сейчас недоступен» (тёмная, светлая, 360 px), вход с «Слишком много попыток» (тёмная), окно справочника с повтором; форма силлабуса: пустой черновик с кнопкой «Заполнить из файла», тот же черновик после сохранения плана без неё, утверждённый силлабус без кнопки.
+- [ ] **Step 6:** коммит `feat: the site talks to the journal server; «server unavailable» and «too many attempts» messages; Excel only for the first fill`.
 
 ---
 
@@ -6987,21 +7138,22 @@ test('the six screens take the list of retryable errors from api.js', () => {
 - **К шагу 6.** На живом сайте на вымышленных данных: преподаватель заполняет силлабус (титул, цель, два юнита, одна книга) и отправляет; деканат возвращает с замечанием, преподаватель исправляет, деканат утверждает — у группы появились темы; студент с телефона видит силлабус; в цели курса текст, начинающийся с `=`, в таблице остался текстом. Замерить: `syllabus.form` и `syllabus.get` (по 13–14 листов; ожидание — до 10 секунд), `syllabus.saveSection` (до 6 секунд), `syllabus.approve` (до 12 секунд), `syllabus.queue` (до 5 секунд). Что дольше — записать в «Что перенести» для кеша юнита 3; это цена варианта Б, владелец о ней знает.
 - **К шагу 7.** В «Что перенести в следующие юниты» записать. Юнит 3: кеш для страницы силлабуса и формы; число очереди — ещё один фоновый запрос при открытии сайта у деканата (под общий кеш). Юниты 4–6: политика оценивания силлабуса — пока только текст, оценки по ней не считаются; задания СРС будут ссылаться на строки листа «СРС», ведомость — на юниты листа «Юниты»; новая версия должна беречь и эти ссылки (как сейчас `sourceId` у тем). Версия 2: экран архива версий, удаление черновика (и с ним — запрет удалить дисциплину и сотрудника из-за пустого черновика), уведомления о возврате, перенос силлабуса на новый учебный год, печать. Известное ограничение: два одновременных «Заполнить» на Google могут дать две открытые версии одного ключа; журнал показывает одну (`versionsOf`: больший номер, затем больший id), лишнюю без удаления черновика не убрать.
 
-Дополнение 4 от 22.11.2026: задача идёт после задач 46–52. **Выкладка юнита 2 теперь значит: рабочий сервер на компьютере владельца + Tailscale Funnel + `git push` сайта с новым адресом сервера. `clasp` не запускается.** Шаги 3 и 4 ниже и пункты «К шагам 3 и 4», «К шагу 4» прежних дополнений отменены; замеры «до 6–15 секунд» из пунктов «К шагу 6» заменяются одним ожиданием: любое действие на живом сайте — до 1 секунды, что дольше — находка. Код Apps Script остаётся запасным, живая публикация Google не удаляется, сайт к ней больше не обращается. Перед показом владельцу — общая проверка диапазона дополнения 4 (от коммита плана `docs: plan of addendum 4 - the database and the server on the owner's computer` до `HEAD`) самой сильной моделью по Review Focus 33–41, с пробными скриптами против настоящего кода и попытками обхода (чужой `Origin`, перебор паролей, `../`, пропавшая папка базы, сбой копии); одна волна исправлений одним агентом и повторная проверка тем же проверяющим. Вопросы к владельцу и то, что он делает сам, — в `owner-summary-5.md`. К шагам ниже добавляется:
+Дополнение 4 от 22.11.2026: задача идёт после задач 46–52. **Выкладка юнита 2 теперь значит: рабочий сервер на компьютере владельца + Tailscale Funnel + `git push` сайта с новым адресом сервера. `clasp` не запускается.** Шаги 3 и 4 ниже и пункты «К шагам 3 и 4», «К шагу 4» прежних дополнений отменены; замеры «до 6–15 секунд» из пунктов «К шагу 6» заменяются одним ожиданием: любое действие на живом сайте — до 1 секунды, что дольше — находка. Код Apps Script остаётся запасным, живая публикация Google не удаляется, сайт к ней больше не обращается. Перед показом владельцу — общая проверка диапазона дополнения 4 (от коммита плана `docs: plan of addendum 4 - the database and the server on the owner's computer` до `HEAD`) самой сильной моделью по Review Focus 33–42, с пробными скриптами против настоящего кода и попытками обхода (чужой `Origin`, перебор паролей, `../`, пропавшая папка базы, сбой копии); одна волна исправлений одним агентом и повторная проверка тем же проверяющим. Вопросы к владельцу и то, что он делает сам, — в `owner-summary-5.md`. К шагам ниже добавляется:
 
-- **К шагу 1.** На стенде (`journal-dev-reset`) сверх списка `owner-summary-4.md`: остановить стенд при открытой странице и нажать «Войти» — «Сервер журнала сейчас недоступен…»; одиннадцать неверных паролей — «Слишком много неверных попыток входа…». Два новых кыргызских ключа (`error.server_down`, `error.too_many_attempts`) — в список на вычитку.
-- **К шагу 2.** В таблицу решений `aidlc-state.md` — строки «Решения плана дополнения 4» и ответы владельца на вопросы `owner-summary-5.md` (если владелец согласен вносить настоящие списки сразу — решение от 20.11.2026 «только после юнита 3» зачеркнуть с пометкой «отменено»). В `CLAUDE.md`: первая строка (база — файл SQLite на компьютере владельца, сервер — Node на нём же, сайт на GitHub Pages; Apps Script — запасной); «Команды» — `npm run serve`, `serve:start`, `serve:stop`, `serve:status`, `serve:backup` и два файла для владельца в `scripts\`; раздел «Выкладка» — порядок из шагов 3а–3з; «Жёсткие правила» — вместо адреса Apps Script не меняется адрес Tailscale, рабочий сервер — только порт 5373, папка данных и `serve.local.json` в репозиторий не попадают, команды с паролем администратора запускает только владелец; «Настоящие данные» — где теперь лежит база. Так же поправить первую строку памяток `.claude/agents/journal-*.md`. В `aidlc-docs/inception/design-v1.md` — разделы 3 «Ограничения», 5 «Как устроено» и 11 «Запуск»: сервер и база на компьютере владельца, ограничение попыток входа, копии.
-- **Шаги 3а–3з заменяют шаги 3 и 4** (всё — только по прямой просьбе владельца; порядок важен):
-  - **3а. Владелец** ставит Tailscale и входит сам; выключает сон компьютера по инструкции из `owner-summary-5.md`; отвечает на вопросы этой страницы (папки, автозапуск).
-  - **3б. Координатор** создаёт `serve.local.json` в корне проекта инструментом правки (пути с обратной чертой): `dataDir` — `D:\Журнал колледжа — данные`, `backupDir` — `C:\JournalBackups`, `alertDir` — Рабочий стол владельца. Файл в `.gitignore`: `git status` после этого чистый.
-  - **3в. Владелец** дважды щёлкает `scripts\journal-init.cmd`: окно показывает «Временный пароль: …» — он записывает его на бумагу и закрывает окно. Координатор это окно не читает ни снимком экрана, ни из терминала и команду сам не запускает. Если пароль потерян до входа — `scripts\journal-admin-password.cmd`, тоже владельцем.
-  - **3г. Координатор**, после согласия владельца на автозапуск: `powershell -File scripts\autostart.ps1 -Install -Name "Журнал колледжа (сервер)"`, затем `npm run serve:start`; `npm run serve:status` — «работает», порт 5373, копия за сегодня есть в `C:\JournalBackups`.
+- **К шагу 1.** На стенде (`journal-dev-reset`) сверх списка `owner-summary-4.md`: остановить стенд при открытой странице и нажать «Войти» — «Сервер журнала сейчас недоступен…»; одиннадцать неверных паролей — «Слишком много неверных попыток входа…». Три новых кыргызских ключа (`error.server_down`, `error.too_many_attempts`, `syllabus.fillFromFile`) — в список на вычитку. Показать правило Excel: у пустого черновика кнопка «Заполнить из файла» есть, после сохранения плана и у утверждённого силлабуса — нет.
+- **К шагу 2.** В таблицу решений `aidlc-state.md` — строки «Решения плана дополнения 4» и ответы владельца на вопросы `owner-summary-5.md` (если владелец согласен вносить настоящие списки сразу — решение от 20.11.2026 «только после юнита 3» зачеркнуть с пометкой «отменено»). В `CLAUDE.md`: первая строка (база — файл SQLite на компьютере владельца, сервер — Node на нём же, сайт на GitHub Pages; Apps Script — запасной); «Команды» — `npm run serve`, `serve:start`, `serve:stop`, `serve:status`, `serve:backup` и два файла для владельца в `scripts\`; раздел «Выкладка» — порядок из шагов 3а–3и, в том числе: рабочий сервер работает из отдельной папки `D:\Журнал колледжа — сервер` с выложенным коммитом, обновляется только при выкладке (шаг 3и), агенты эту папку не открывают и не правят; «Жёсткие правила» — вместо адреса Apps Script не меняется адрес Tailscale, рабочий сервер — только порт 5373, папка данных и `serve.local.json` в репозиторий не попадают, команды с паролем администратора запускает только владелец; в «Главных правилах предметной области» пункт «Силлабус…»: «Excel — только первое заполнение („Заполнить из файла“), дальше правки на сайте», а фраза «Исправления — только через файл: скачать, поправить, загрузить» уходит; «Настоящие данные» — где теперь лежит база. Так же поправить первую строку памяток `.claude/agents/journal-*.md`. В `aidlc-docs/inception/design-v1.md` — разделы 3 «Ограничения», 5 «Как устроено» и 11 «Запуск»: сервер и база на компьютере владельца, ограничение попыток входа, копии.
+- **Шаги 3а–3з заменяют шаги 3 и 4; 3и — обновление при следующих выкладках** (всё — только по прямой просьбе владельца; порядок важен). Рабочий сервер работает не из папки разработки, а из своей папки с выложенным коммитом:
+  - **3а. Владелец:** Tailscale уже поставлен, HTTPS включён, адрес известен (таблица решений, строка от 22.11.2026) — остаётся выключить сон компьютера по инструкции из `owner-summary-5.md` и ответить на вопросы этой страницы (папки, автозапуск). Адрес в шаге 3д сверить с записанным.
+  - **3б. Координатор** создаёт папку сервера: `git worktree add --detach "D:\Журнал колледжа — сервер" <коммит>` (коммит — тот, что принят владельцем; `npm install` не нужен). В её корне инструментом правки (пути с обратной чертой) создаёт `serve.local.json`: `dataDir` — `D:\Журнал колледжа — данные`, `backupDir` — `C:\JournalBackups`, `alertDir` — Рабочий стол владельца. Файл в `.gitignore`: `git status` в обеих папках после этого чистый. Дальше шаги 3в–3г выполняются **в папке сервера**, не в папке разработки.
+  - **3в. Владелец** дважды щёлкает `D:\Журнал колледжа — сервер\scripts\journal-init.cmd`: окно показывает «Временный пароль: …» — он записывает его на бумагу и закрывает окно. Координатор это окно не читает ни снимком экрана, ни из терминала и команду сам не запускает. Если пароль потерян до входа — `scripts\journal-admin-password.cmd`, тоже владельцем.
+  - **3г. Координатор**, после согласия владельца на автозапуск, в папке сервера: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\autostart.ps1 -Install` (ярлык с именем по умолчанию, оно же для `-Status` и `-Remove`; он ведёт на `serve-hidden.vbs` папки сервера), затем `npm run serve:start`; `npm run serve:status` — «работает», порт 5373, копия за сегодня есть в `C:\JournalBackups`.
   - **3д. Координатор** включает Funnel: `tailscale funnel --bg 5373`; `tailscale funnel status` показывает постоянный адрес `https://<имя>.<сеть>.ts.net` — записать его в `aidlc-state.md`, раздел «Выкладка» (рядом — порт, папка данных, папка копий; ID публикации Google оставить с пометкой «запасной»). Если Funnel просит включить его в настройках сети Tailscale — ссылку открывает и подтверждает владелец.
   - **3е. Проверка обхода с настоящего адреса** (`curl` с этого компьютера и по возможности с другого): `GET /health` — `{"ok":true,"data":"journal"}`; `POST /api` без `Origin` и с `Origin: https://evil.example` — 403; с `Origin: https://janybek.github.io` и телом `{"action":"i18n.overrides"}` — ответ журнала и заголовок `Access-Control-Allow-Origin: https://janybek.github.io`; `/journal.sqlite`, `/secret.key`, `/server.log`, `/..%2fsecret.key` (`--path-as-is`) — 404; ни в одном ответе нет `Access-Control-Allow-Origin: *`. Замер: пустой запрос — до 0,3 с, вход — до 0,5 с.
   - **3ж. Адрес на сайте.** Агент «Экраны» коротким поручением вписывает `https://<имя>.<сеть>.ts.net/api` в `PRODUCTION_API_URL` (`site/config.js`); `npm test` зелёное (тест `tests/siteConfig.test.js` проверяет вид адреса); коммит `chore: the site talks to the journal server on the owner's computer`.
   - **3з. `git push`** (шаг 5) — сайт на GitHub Pages обновится и начнёт ходить на компьютер владельца.
-- **К шагу 6 (проверка на живом сайте, вместо проверок таблицы Google).** Владелец входит `admin` с временным паролем и меняет его; заводит пробную группу и сотрудника. С телефона через мобильный интернет (не домашний Wi-Fi): вход, расписание студента — туннель работает снаружи. Десять неверных паролей на пробном логине — пауза 15 минут, другие логины входят. Перезагрузить компьютер: после входа владельца в Windows `npm run serve:status` — «работает», сайт отвечает, Funnel поднялся сам. Завершить процесс сервера по номеру из `server.state.json` — через несколько секунд сайт снова отвечает, в журнале работы строка о перезапуске. Учение восстановления: последнюю копию из `C:\JournalBackups` открыть во временной папке (`JOURNAL_DATA_DIR` — временная папка с копией под именем `journal.sqlite` и копией `secret.key`, `JOURNAL_PORT=5399`) — вход работает; рабочую базу при этом не трогать. Настоящие списки — после этих проверок и только если владелец так решил (вопрос 4 `owner-summary-5.md`).
-- **К шагу 7.** В «Что перенести в следующие юниты» записать. Юнит 3: ограничение попыток входа уже есть (убрать из списка); ограничение времени ожидания ответа на сайте — компьютер спит, запрос висит; кеш главной студента замерить заново — на своём сервере он может не понадобиться; N1 и M6 доработки 3 закрыты транзакцией. Юнит 6 («копии»): показать администратору на сайте дату последней копии и тревогу; выгрузка копии с сайта. Версия 2: сервер как служба Windows (работает без входа владельца); переезд на сервер колледжа — остановить сервер (`npm run serve:stop`), взять последнюю копию и `secret.key`, на новом месте положить их в папку данных. Известные ограничения: счёт попыток входа живёт в памяти и сбрасывается перезапуском; чужой логин можно закрыть на 15 минут десятью неверными паролями; пока владелец не вошёл в Windows после перезагрузки, журнал не работает.
+  - **3и. Обновление сервера при следующих выкладках** (только по просьбе владельца): в папке сервера `npm run serve:stop` → `git -C "D:\Журнал колледжа — сервер" checkout --detach <коммит>` → `npm run serve:start` → `npm run serve:status` («работает») → только потом `git push` сайта. Если менялась схема листов (`core/schema.js`), сервер сам допишет таблицы и колонки при запуске, предварительно сделав копию.
+- **К шагу 6 (проверка на живом сайте, вместо проверок таблицы Google).** Владелец входит `admin` с временным паролем и меняет его; заводит пробную группу и сотрудника. С телефона через мобильный интернет (не домашний Wi-Fi), **на котором Tailscale нет или он выключен** (устройства с включённым Tailscale ходят на адрес по внутренней сети, а не через Funnel, и такая проверка не показывает того, что увидит студент): вход, расписание студента — туннель работает снаружи. Десять неверных паролей на пробном логине — пауза 15 минут, другие логины входят. Перезагрузить компьютер: после входа владельца в Windows `npm run serve:status` — «работает», сайт отвечает, Funnel поднялся сам. Завершить процесс сервера по номеру из `server.state.json` — через несколько секунд сайт снова отвечает, в журнале работы строка о перезапуске. Автозапуск зависит от VBScript Windows; если после обновления Windows сервер после перезагрузки не поднялся — запасной способ записан в известных ограничениях. Учение восстановления: последнюю копию из `C:\JournalBackups` открыть во временной папке: три переменные — `JOURNAL_DATA_DIR` (временная папка с копией под именем `journal.sqlite` и копией `secret.key`), `JOURNAL_BACKUP_DIR` (другая временная папка) и `JOURNAL_PORT=5399`; `JOURNAL_ALERT_DIR` не задаётся (тревожный файл не пишется), файл `serve.local.json` при заданной `JOURNAL_DATA_DIR` не читается — вход работает; настоящие `C:\JournalBackups`, Рабочий стол и рабочая база при этом не затронуты. Настоящие списки — после этих проверок и только если владелец так решил (вопрос 4 `owner-summary-5.md`).
+- **К шагу 7.** В «Что перенести в следующие юниты» записать. Юнит 3: ограничение попыток входа уже есть (убрать из списка); ограничение времени ожидания ответа на сайте — компьютер спит, запрос висит; кеш главной студента замерить заново — на своём сервере он может не понадобиться; N1 и M6 доработки 3 закрыты транзакцией. Юнит 6 («копии»): показать администратору на сайте дату последней копии и тревогу; выгрузка копии с сайта. Версия 2: сервер как служба Windows (работает без входа владельца); переезд на сервер колледжа — остановить сервер (`npm run serve:stop`), взять последнюю копию и `secret.key`, на новом месте положить их в папку данных. Известные ограничения: счёт попыток входа живёт в памяти и сбрасывается перезапуском; чужой логин можно закрыть на 15 минут десятью неверными паролями; один пароль можно пробовать по всем номерам билетов (число ошибок за день видно в `serve:status`); пока владелец не вошёл в Windows после перезагрузки, журнал не работает; автозапуск зависит от VBScript (запасной способ — ярлык на `conhost.exe --headless node backend\node\supervisor.js`); адрес `https://janybek.github.io` общий для всех сайтов Pages этой учётной записи; Excel силлабуса — только первое заполнение, но сервер файл принимает (проверка на сервере — позже).
 
 - [ ] **Step 1:** показать владельцу на стенде (`npm run dev:reset`, `http://localhost:5273`) шесть экранов по скриншотам задач 8–12 и вживую; получить приёмку. Кыргызские тексты новых экранов добавить в список на вычитку. Дополнение: показать ещё ~~три~~ изменения по скриншотам задач 14, 15~~, 19 и 20~~ — список времени звонков; день недели → шаблон группы; ~~силлабус преподавателя (вкладки семестров, загрузка файла, правка) и~~ переключатель семестра (зачёркнутое отменено дополнением 2: силлабус показывается по задачам 27–29).
 - [ ] **Step 2:** согласованные решения из раздела «Решения плана» и ответы владельца на вопросы из `owner-summary.md` записать в таблицу решений `aidlc-docs/aidlc-state.md`. Дополнение: то же для строк дополнения и вопросов из `owner-summary-2.md`; в `aidlc-docs/inception/design-v1.md` (раздел 6 «Расписание и темы» и раздел 8) дописать: ~~темы — силлабус преподавателя по семестрам, колонка «семестр» в листе «Темы»,~~ строка `semester` в «Настройках» (зачёркнутое отменено дополнением 2: что писать в разделы 6 и 8 — в «К шагу 2» выше).
