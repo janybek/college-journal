@@ -5,3 +5,10 @@ dev/data/
 .clasprc.json
 .superpowers/
 .claude/settings.local.json
+serve.local.json
+secret.key
+*.sqlite*
+server.state.json
+supervisor.state.json
+stop.request
+server.log*
