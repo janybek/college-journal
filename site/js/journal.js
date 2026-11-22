@@ -175,3 +175,41 @@ export function logLine(row) {
   }
   return line('journal.log.other', { field: r.field || '', before, after });
 }
+
+// ---- The results of a unit (windows «Рубежный контроль», «СРС», «Текущий контроль») ----
+
+const RESULT_COLUMN = { control: 'control', self: 'self', current: 'manual' };
+
+// The value saved now in the field of one student for a unit: control, self-work or the manual current points; null when none.
+export function savedResult(journal, studentId, unit, field) {
+  const result = journal.results && journal.results[studentId];
+  const row = result && result.units.find((u) => u.unit === unit);
+  const value = row ? row[RESULT_COLUMN[field]] : null;
+  return value === undefined ? null : value;
+}
+
+// '' -> null (not set); '30' -> 30; above max, a comma, a sign or letters -> undefined (an error at the field).
+export function parsePoints(text, max) {
+  const clean = String(text === null || text === undefined ? '' : text).trim();
+  if (clean === '') return null;
+  if (!/^\d{1,3}$/.test(clean)) return undefined;
+  const value = Number(clean);
+  return value <= max ? value : undefined;
+}
+
+// The items for journal.saveResults: only the students whose value differs from the saved one.
+// draft: Map(studentId -> number | null) -> [{ studentId, value }]
+export function resultItems(draft, journal, unit, field) {
+  const items = [];
+  for (const [studentId, value] of draft) {
+    if (value !== savedResult(journal, studentId, unit, field)) items.push({ studentId, value });
+  }
+  return items;
+}
+
+// The reason is needed as on the server: always for the manual current points and for the office; for the own teacher
+// only when a value that was already set is changed (the first value needs none).
+export function needsReason(items, journal, unit, field, isOwnTeacher) {
+  if (field === 'current' || !isOwnTeacher) return true;
+  return items.some((item) => savedResult(journal, item.studentId, unit, field) !== null);
+}

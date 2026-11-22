@@ -6179,3 +6179,74 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 .cl-extras .mk-act__input { width: 6rem; }
 
 .dialog--cell .field__label { font-size: 1rem; }
+
+/* Task 21: the heads «РК» and «СРС» and the cell of the current control open the windows of the results of a unit. */
+.jg-unit-head.is-open { position: relative; cursor: pointer; min-width: 4.5rem; }
+
+.jg-unit-head.is-open > span:not(.jg-tip) { position: relative; z-index: 2; pointer-events: none; }
+
+.jg-unit-head.is-open .jg-unit-open {
+  inset: 3px;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-inner);
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.jg-unit-head.is-open:hover .jg-unit-open,
+.jg-unit-head.is-open .jg-unit-open:focus-visible { border-color: var(--primary); background: var(--primary-line); }
+
+.jg-unit-head.is-open .jg-unit-open:focus-visible { outline: 2px solid var(--primary-ink); outline-offset: 1px; }
+
+.jg-unit-head__act { display: inline-flex !important; justify-content: center; margin-top: 2px; color: var(--primary-ink); }
+
+.jg-unit-head__act .icon { width: 12px; height: 12px; }
+
+.jg-pts.is-open { position: relative; cursor: pointer; }
+
+.jg-pts.is-open:hover .jg-cell-open { background: var(--primary-line); box-shadow: inset 0 0 0 1px var(--primary); }
+
+.jg-pts__in { position: relative; pointer-events: none; }
+
+.dialog--unit { width: min(calc(100% - 1rem), 36rem); }
+
+.ju-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.ju-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-4);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.ju-row__who { display: flex; flex: 1 1 12rem; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); min-width: 0; }
+
+.ju-row__name { font-size: 1rem; font-weight: 500; overflow-wrap: anywhere; }
+
+.ju-row__field { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); }
+
+.ju-row__of { color: var(--text-muted); font-size: 1rem; white-space: nowrap; }
+
+.ju-input { width: 9.5rem; min-height: 44px; font-size: 1rem; text-align: center; font-variant-numeric: tabular-nums; }
+
+.ju-input.is-low { border-color: var(--danger); color: var(--danger); font-weight: 700; }
+
+.ju-row__error { flex: 1 0 100%; margin: 0; font-size: 1rem; }
+
+.ju-row__error[hidden],
+.ju-row [hidden] { display: none; }
+
+.dialog--unit .ju-list { max-height: 50vh; overflow-y: auto; padding-right: var(--space-3); }
+
+.dialog--unit .field__hint,
+.dialog--unit .field__label { font-size: 1rem; }
+
+.mk-reason[hidden] { display: none; }
+
+@media (max-width: 600px) {
+  .dialog--unit .ju-list { max-height: none; overflow: visible; padding-right: 0; }
+}

@@ -282,6 +282,7 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
     go.removeAttribute('aria-disabled');
     go.removeAttribute('aria-busy');
     go.replaceChildren(icon('check'), t('common.save'));
+    if (reasonArea) reasonArea.disabled = false;
   };
 
   const ask = () => { actions.hidden = true; asking.hidden = false; focusById('journal-cell-stay'); };
@@ -321,12 +322,13 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
     }
     busy = true;
     markBusy(go, 'common.saving');
+    if (reasonArea) reasonArea.disabled = true;
     try {
       const data = await call('journal.savePair', mode === 'free' ? { pairId: pairNow().id, marks: [mark] } : { pairId: pairNow().id, marks: [mark], reason: text });
       busy = false;
+      onSaved(data);
       if (!dialog.isConnected) return;
       journal = data.journal;
-      onSaved(data);
       resetDraft();
       drawSummary();
       drawForm();

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -138,4 +138,39 @@ test('pairScore: the points of a student for a pair as the server counts them; n
   assert.equal(pairScore({ status: 'present' }, { ...pair, lessonType: 'control' }, scheme), null);
   assert.equal(pairScore({ status: 'present' }, { ...pair, status: 'planned' }, scheme), null);
   assert.equal(pairScore(null, pair, scheme), null);
+});
+
+const RJ = { results: {
+  a: { units: [{ unit: 1, control: 30, self: null, manual: null }] },
+  b: { units: [{ unit: 1, control: null, self: 12, manual: 20 }] },
+  c: { units: [] },
+} };
+
+test('parsePoints: empty is not set, whole numbers up to the maximum, anything else is an error', () => {
+  assert.equal(parsePoints('', 40), null);
+  assert.equal(parsePoints('  ', 40), null);
+  assert.equal(parsePoints('0', 40), 0);
+  assert.equal(parsePoints('40', 40), 40);
+  assert.equal(parsePoints(' 30 ', 40), 30);
+  assert.equal(parsePoints('41', 40), undefined);
+  assert.equal(parsePoints('3,5', 40), undefined);
+  assert.equal(parsePoints('3.5', 40), undefined);
+  assert.equal(parsePoints('-1', 40), undefined);
+  assert.equal(parsePoints('abc', 40), undefined);
+});
+
+test('resultItems: only the changed students; an empty field over a saved value gives null', () => {
+  assert.equal(savedResult(RJ, 'a', 1, 'control'), 30);
+  assert.equal(savedResult(RJ, 'b', 1, 'current'), 20);
+  assert.equal(savedResult(RJ, 'c', 1, 'control'), null);
+  const draft = new Map([['a', 30], ['b', 5], ['c', null]]);
+  assert.deepEqual(resultItems(draft, RJ, 1, 'control'), [{ studentId: 'b', value: 5 }]);
+  assert.deepEqual(resultItems(new Map([['a', null], ['c', 7]]), RJ, 1, 'control'), [{ studentId: 'a', value: null }, { studentId: 'c', value: 7 }]);
+});
+
+test('needsReason: the first value of the own teacher needs none; a change, the office and the manual current always do', () => {
+  assert.equal(needsReason([{ studentId: 'c', value: 7 }], RJ, 1, 'control', true), false);
+  assert.equal(needsReason([{ studentId: 'c', value: 7 }, { studentId: 'a', value: 31 }], RJ, 1, 'control', true), true);
+  assert.equal(needsReason([{ studentId: 'c', value: 7 }], RJ, 1, 'control', false), true);
+  assert.equal(needsReason([{ studentId: 'c', value: 7 }], RJ, 1, 'current', true), true);
 });

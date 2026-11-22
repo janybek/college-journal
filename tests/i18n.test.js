@@ -347,3 +347,16 @@ test('task 20: the window of a cell and the history of changes have their texts 
     for (const k of ['status', 'activity']) assert.ok(dict['journal.log.mark.' + k].includes('{before}') && dict['journal.log.mark.' + k].includes('{after}'));
   }
 });
+
+test('task 21: the windows of the results of a unit have their texts in every language', () => {
+  const keys = ['title.control', 'title.self', 'title.current', 'hint', 'of', 'notSet', 'low', 'error.bad', 'reasonHint.change', 'reasonHint.office', 'reasonHint.current',
+    'unsaved', 'stay', 'discard', 'open.control', 'open.self', 'open.current', 'calc.label', 'calc.value', 'calc.none', 'manual.now', 'manual.label', 'manual.hint',
+    'reset', 'manual.none'].map((k) => 'journal.unit.' + k);
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) {
+    for (const k of ['title.control', 'title.self', 'title.current']) assert.ok(dict['journal.unit.' + k].includes('{n}'));
+    for (const k of ['hint', 'of', 'error.bad', 'manual.hint']) assert.ok(dict['journal.unit.' + k].includes('{max}'));
+    for (const p of ['{auto}', '{max}', '{earned}', '{possible}']) assert.ok(dict['journal.unit.calc.value'].includes(p));
+    assert.ok(dict['journal.unit.open.current'].includes('{name}'));
+  }
+});

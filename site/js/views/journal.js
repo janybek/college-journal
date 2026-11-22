@@ -4,6 +4,7 @@ import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '
 import { journalColumns, cellView, pairHead, canMark, pairHint } from '../journal.js';
 import { openMarksDialog } from './journalPair.js';
 import { openCellDialog } from './journalCell.js';
+import { openUnitDialog, openCurrentDialog } from './journalUnit.js';
 import { icon } from '../icons.js';
 import { getUser } from '../session.js';
 import { activeRole } from '../shell.js';
@@ -132,9 +133,15 @@ function head(column, journal) {
     const label = t('journal.col.' + column.field);
     const unit = journal.units.find((u) => u.unit === column.unit);
     const max = { current: journal.scheme.current, self: journal.scheme.self, control: journal.scheme.control, total: 100 }[column.field];
-    return el('th', { scope: 'col', class: `jg-unit-head jg-unit-head--${column.field}`, tabindex: '0' },
+    const open = journal.can.results && (column.field === 'control' || column.field === 'self');
+    return el('th', { scope: 'col', class: `jg-unit-head jg-unit-head--${column.field}${open ? ' is-open' : ''}`, tabindex: open ? null : '0' },
+      open ? el('button', {
+        type: 'button', class: 'jg-open jg-unit-open', id: unitOpenId(column), 'aria-haspopup': 'dialog',
+        'aria-label': t('journal.unit.open.' + column.field, { n: column.unit }), onclick: () => openUnit(column.unit, column.field),
+      }) : null,
       el('span', { class: 'jg-unit-head__unit' }, t('journal.col.unit', { n: column.unit })),
       el('span', { class: 'jg-unit-head__label' }, label),
+      open ? el('span', { class: 'jg-unit-head__act', 'aria-hidden': 'true' }, icon('pencil')) : null,
       tip([unit && unit.title ? unit.title + '. ' : '', t('journal.tip.' + column.field, { max })].join('')));
   }
   const key = column.type === 'outside' ? 'journal.col.outside' : 'journal.col.' + column.field;
@@ -166,6 +173,42 @@ function pairHeadCell(pair) {
 }
 
 const openId = (pair) => `journal-open-${pair.id}`;
+const unitOpenId = (column) => `journal-unit-open-${column.unit}-${column.field}`;
+const currentOpenId = (unit, student) => `journal-current-open-${unit}-${student.id}`;
+
+// Only the teacher of the subject enters the first value without a reason (the server says the same).
+function isOwnTeacher(journal) {
+  const user = getUser();
+  return !!user && Array.isArray(user.roles) && user.roles.includes('teacher') && journal.subject.teacherId === user.id;
+}
+
+// The window of the unit control or the self-work of a unit; the grid is drawn again from the answer.
+function openUnit(unit, field) {
+  const owner = state;
+  openUnitDialog({
+    journal: owner.data.journal, unit, field, isOwn: isOwnTeacher(owner.data.journal),
+    onSaved: (data) => {
+      if (state !== owner) return;
+      owner.data = data;
+      refresh();
+    },
+    onClosed: () => focusById(unitOpenId({ unit, field })),
+  });
+}
+
+// The window of the manual current control of a student.
+function openCurrent(unit, student) {
+  const owner = state;
+  openCurrentDialog({
+    journal: owner.data.journal, unit, student,
+    onSaved: (data) => {
+      if (state !== owner) return;
+      owner.data = data;
+      refresh();
+    },
+    onClosed: () => focusById(currentOpenId(unit, student)),
+  });
+}
 
 // The window of the marks of a pair; the grid is drawn again from the answer to the save.
 function openMarks(pair) {
@@ -199,7 +242,7 @@ function cell(column, student, result, journal, scheme) {
   if (!result) return el('td', { class: 'jg-empty' }, '—');
   if (column.type === 'unit') {
     const row = result.units.find((u) => u.unit === column.unit);
-    return row ? unitCell(column.field, row, scheme) : el('td', { class: 'jg-empty' }, '—');
+    return row ? unitCell(column.field, row, scheme, journal, student) : el('td', { class: 'jg-empty' }, '—');
   }
   if (column.type === 'outside') return el('td', { class: 'jg-num jg-outside', title: t('journal.tip.outside', result.outside) }, pointText(result.outside.possible > 0 ? result.outside.earned : null));
   const { attendance } = result;
@@ -208,11 +251,19 @@ function cell(column, student, result, journal, scheme) {
   return el('td', { class: 'jg-num jg-sum jg-sum--final', title: result.word ? t('journal.grade.' + result.word) : null }, pointText(result.preliminary));
 }
 
-function unitCell(field, row, scheme) {
+function unitCell(field, row, scheme, journal, student) {
   if (field === 'current') {
     const manual = row.manual !== null;
-    return el('td', { class: `jg-num jg-pts${row.currentLow ? ' is-low' : ''}`, title: [t('journal.tip.current', { max: scheme.current }), manual ? t('journal.tip.manual') : null].filter(Boolean).join(', ') },
-      pointText(row.current), manual ? el('span', { class: 'jg-star' }, '*') : null);
+    const open = journal.can.results && !student.left;
+    const title = [t('journal.tip.current', { max: scheme.current }), manual ? t('journal.tip.manual') : null].filter(Boolean).join(', ');
+    const inner = [pointText(row.current), manual ? el('span', { class: 'jg-star' }, '*') : null];
+    return el('td', { class: `jg-num jg-pts${row.currentLow ? ' is-low' : ''}${open ? ' is-open' : ''}`, title },
+      open ? el('button', {
+        type: 'button', class: 'jg-cell-open', id: currentOpenId(row.unit, student), 'aria-haspopup': 'dialog',
+        'aria-label': `${t('journal.unit.open.current', { n: row.unit, name: student.fullName || '—' })}. ${title}`,
+        onclick: () => openCurrent(row.unit, student),
+      }) : null,
+      open ? el('span', { class: 'jg-pts__in' }, ...inner) : inner);
   }
   if (field === 'self') return el('td', { class: 'jg-num jg-pts', title: t('journal.tip.self', { max: scheme.self }) }, pointText(row.self));
   if (field === 'control') return el('td', { class: `jg-num jg-pts${row.controlLow ? ' is-low' : ''}`, title: t('journal.tip.control', { max: scheme.control }) }, pointText(row.control));
