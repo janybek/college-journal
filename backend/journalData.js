@@ -1,6 +1,6 @@
 // The journal of a subject: reading with points, units and rights. No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
-import { localDate, localTime } from '../core/dates.js';
+import { localDate, localDateTime, localTime } from '../core/dates.js';
 import { FIXED_STATUSES } from '../core/schema.js';
 import { readSettings } from '../core/settings.js';
 import { readScheme } from '../core/scoring.js';
@@ -10,7 +10,7 @@ import { lessonNumbers } from '../core/syllabusPlan.js';
 import { compareNames } from '../core/names.js';
 import { isSubstitution } from '../core/schedule.js';
 import { firstPairId, studentResults } from '../core/grades.js';
-import { markMode, markState } from '../core/journal.js';
+import { checkMark, checkReason, markChanges, markMode, markState, normalizeMark } from '../core/journal.js';
 
 export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'units', 'settings', 'attendance', 'unitResults'];
 
@@ -210,4 +210,121 @@ export function journalList(rows, platform, user) {
   }
   list.sort((a, b) => compareNames(a.groupName, b.groupName) || compareNames(a.name, b.name) || cmp(a.subjectId, b.subjectId));
   return { today: now.date, subjects: list };
+}
+
+const MARKS_MAX = 200;
+const sameMark = (a, b) => a.status === b.status && a.noCoat === b.noCoat && a.activity === b.activity;
+
+// Writes the marks of one pair: the new rows in one batch, the changed ones in another; a pair not yet held becomes closed.
+// Low level: no rights, no term. items: [{ studentId, status, noCoat, activity }]; existing: Map(studentId -> the row of the pair).
+// -> { inserted, updated (the saved rows), closed (the pair was closed by this write) }
+export function writeMarks(store, { pair, subject, items, existing, actorId, at, source = 'teacher' }) {
+  const stamp = { source, markedBy: actorId, markedAt: at };
+  const fresh = [];
+  const patches = [];
+  for (const item of items) {
+    const next = { status: item.status, noCoat: item.noCoat === true, activity: item.activity === undefined ? null : item.activity };
+    const old = existing.get(item.studentId);
+    if (!old) fresh.push({ pairId: pair.id, studentId: item.studentId, ...next, ...stamp });
+    else if (!sameMark({ status: old.status, noCoat: old.noCoat === true, activity: old.activity ?? null }, next)) patches.push({ id: old.id, patch: { ...next, ...stamp } });
+  }
+  const inserted = fresh.length > 0 ? store.insertMany('attendance', fresh) : [];
+  const updated = patches.length > 0 ? store.updateMany('attendance', patches) : [];
+  const closed = pair.status === 'planned' && items.length > 0;
+  if (closed) store.updateMany('pairs', [{ id: pair.id, patch: { status: 'closed', substitute: isSubstitution(pair, subject) } }]);
+  return { inserted, updated, closed };
+}
+
+const badRef = (index) => ({ index, field: 'studentId', code: 'bad_ref' });
+const markOf = (row) => (row ? { status: row.status, noCoat: row.noCoat === true, activity: row.activity ?? null } : null);
+
+// 'journal.savePair': the marks of every student of a pair, all or nothing. Returns { journal }.
+export function savePairMarks(store, platform, data, user) {
+  const rows = readJournalRows(store);
+  const pair = typeof data.pairId === 'string' ? rows.pairs.find((p) => p.id === data.pairId) : undefined;
+  if (!pair) throw new AppError('not_found');
+  const marks = data.marks;
+  if (!Array.isArray(marks) || marks.length === 0 || marks.length > MARKS_MAX) throw new AppError('bad_request');
+  const seen = new Set();
+  for (const m of marks) {
+    if (m === null || typeof m !== 'object' || Array.isArray(m) || typeof m.studentId !== 'string' || seen.has(m.studentId)) throw new AppError('bad_request');
+    seen.add(m.studentId);
+  }
+
+  const subject = rows.subjects.find((s) => s.id === pair.subjectId);
+  const viewer = viewerOf(user);
+  const teacher = viewer.teacher && (pair.teacherId === user.id || (!!subject && subject.teacherId === user.id));
+  if (!subject || (!teacher && !viewer.manager)) throw new AppError('forbidden');
+
+  const scheme = readScheme(rows.settings);
+  const settings = readSettings(rows.settings);
+  const nowMs = platform.now();
+  const state = markState(pair, { date: localDate(nowMs), time: localTime(nowMs) }, scheme);
+  if (state === 'future') throw new AppError('too_early');
+  if (state === 'cancelled' || state === 'missed') throw new AppError('pair_locked');
+  const held = FIXED_STATUSES.includes(pair.status);
+  const mode = markMode({ state, held, teacher, manager: viewer.manager });
+  if (mode === 'none') throw new AppError('journal_closed');
+
+  // the saved marks of this pair: of the rows of one student the last one
+  const byStudent = new Map();
+  for (const row of rows.attendance) {
+    if (row.pairId !== pair.id) continue;
+    const list = byStudent.get(row.studentId) || [];
+    list.push(row);
+    byStudent.set(row.studentId, list);
+  }
+  const existing = new Map([...byStudent].map(([id, list]) => [id, lastOf(list, 'markedAt')]));
+
+  // who is on the list: the active students of the group (a held pair also keeps the students who have a mark on it)
+  const active = rows.students.filter((s) => s.groupId === pair.groupId && s.active === true);
+  const activeIds = new Set(active.map((s) => s.id));
+  const known = new Set(rows.students.map((s) => s.id));
+  const refs = [];
+  marks.forEach((m, index) => {
+    if (!activeIds.has(m.studentId) && !(held && existing.has(m.studentId) && known.has(m.studentId))) refs.push(badRef(index));
+  });
+  if (refs.length > 0) throw new AppError('invalid', { fields: refs });
+  if (!held && active.some((s) => !seen.has(s.id))) throw new AppError('invalid', { fields: [{ field: 'marks', code: 'incomplete' }] });
+
+  // every mark against the rules of its mode
+  const all = rows.pairs.filter((p) => p.subjectId === subject.id && inSemester(p.date, settings));
+  const markPair = { first: pair.id === firstPairId(all), lessonType: pair.lessonType };
+  const problems = [];
+  const items = [];
+  marks.forEach((m, index) => {
+    const next = normalizeMark(m);
+    if (next === null) { problems.push({ index, field: 'status', code: 'bad_value' }); return; }
+    const old = markOf(existing.get(m.studentId));
+    for (const e of checkMark(old, next, { mode, pair: markPair, scheme })) problems.push({ index, ...e });
+    items.push({ studentId: m.studentId, old, next });
+  });
+  if (problems.length > 0) throw new AppError('invalid', { fields: problems });
+
+  const changed = items.filter((i) => markChanges(i.old, i.next).length > 0);
+  let reason = '';
+  if (mode !== 'free' && changed.length > 0) {
+    const code = checkReason(data.reason);
+    if (code) throw new AppError('invalid', { fields: [{ field: 'reason', code }] });
+    reason = data.reason.trim();
+  }
+  if (changed.length === 0) return { journal: journalView(rows, platform, subject.id, user) };
+
+  const at = localDateTime(nowMs);
+  const written = writeMarks(store, { pair, subject, items: changed.map((i) => ({ studentId: i.studentId, ...i.next })), existing, actorId: user.id, at });
+  const entry = { at, actorId: user.id, subjectId: subject.id, pairId: pair.id, reason, late: state === 'late' };
+  const log = [];
+  if (!held && mode === 'reason') log.push({ ...entry, entity: 'pair', field: 'status', before: 'planned', after: 'closed' });
+  // a first mark of a pair is not logged; the mark of a student on a held pair is, even a new one
+  if (held) for (const i of changed) for (const c of markChanges(i.old, i.next)) log.push({ ...entry, entity: 'mark', studentId: i.studentId, ...c });
+  if (log.length > 0) store.insertMany('changeLog', log);
+
+  // the answer is built from the rows as they are now, without a second read
+  const replaced = new Map(written.updated.map((r) => [r.id, r]));
+  const after = {
+    ...rows,
+    attendance: [...rows.attendance.map((r) => replaced.get(r.id) || r), ...written.inserted],
+    pairs: rows.pairs.map((p) => (p.id === pair.id && written.closed ? { ...p, status: 'closed', substitute: isSubstitution(pair, subject) } : p)),
+  };
+  return { journal: journalView(after, platform, subject.id, user) };
 }
