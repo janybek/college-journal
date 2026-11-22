@@ -24,3 +24,9 @@ test('time helpers', () => {
   assert.equal(minutesOf('09:40'), 580);
   assert.equal(addMinutes('08:00', 90), '09:30');
 });
+
+test('localTime and localDateTime: Bishkek clock', async () => {
+  const { localTime, localDateTime } = await import('../core/dates.js');
+  assert.equal(localTime(Date.UTC(2026, 8, 7, 18, 30)), '00:30');
+  assert.equal(localDateTime(Date.UTC(2026, 8, 7, 18, 30, 5)), '2026-09-08 00:30:05');
+});

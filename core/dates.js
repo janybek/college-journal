@@ -48,3 +48,13 @@ export function addMinutes(time, n) {
   const total = minutesOf(time) + n;
   return String(Math.floor(total / 60)).padStart(2, '0') + ':' + String(total % 60).padStart(2, '0');
 }
+
+// 'HH:MM' of a timestamp (ms) in Bishkek.
+export function localTime(ms) {
+  return new Date(ms + TZ_OFFSET_MS).toISOString().slice(11, 16);
+}
+
+// 'YYYY-MM-DD HH:MM:SS' of a timestamp (ms) in Bishkek.
+export function localDateTime(ms) {
+  return new Date(ms + TZ_OFFSET_MS).toISOString().slice(0, 19).replace('T', ' ');
+}
