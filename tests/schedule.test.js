@@ -43,6 +43,13 @@ test('planGeneration: changes, removals, locked pairs', () => {
   assert.deepEqual(planGeneration({ template: T2, subjects, settings: S, pairs: E4, from: '2026-09-01' }).toUpdate, [{ id: 'p3', patch: { roomId: 'r_2' } }]);
 });
 
+test('planGeneration: a substitution pair is not replaceable, a plain one is', () => {
+  const pairs = E.map((p) => (p.id === 'p1' ? { ...p, teacherId: 'sx', substitute: true } : p.id === 'p3' ? { ...p, teacherId: 'sx', substitute: false } : p));
+  const plan = planGeneration({ template: T, subjects, settings: S, pairs, from: '2026-09-01' });
+  assert.deepEqual(plan.toUpdate, [{ id: 'p3', patch: { teacherId: 'sf_1' } }]);
+  assert.deepEqual(plan.toRemove, []);
+});
+
 test('planGeneration: a changed subject empties the whole lesson', () => {
   const T6 = T.map((r) => (r.id === 'wt_1' ? { ...r, subjectId: 'sb_3' } : r));
   const E6 = E.map((p) => (p.id === 'p1' ? { ...p, topicId: 'tp_1', lessonType: 'lecture', part: 1 } : p));

@@ -224,6 +224,19 @@ test('a pair given to another teacher is stored as a substitution; giving it bac
   assert.deepEqual([back.substitution, store.get('pairs', x.pair15).substitute], [false, false]);
 });
 
+test('a plain schedule.generate leaves a substitution pair with the old teacher: the new one is not double-booked', () => {
+  const x = setup();
+  const { call, store } = x;
+  // teacher3 is busy at the time of pair15 (a pair of another group)
+  store.insert('pairs', { date: '2026-09-15', slot: 1, planDate: '2026-09-15', planSlot: 1, startTime: '08:00', status: 'planned',
+    groupId: x.g2, subjectId: x.sb2, teacherId: x.ids.teacher3, roomId: '', topicId: '', lessonType: '', part: null, note: '', changed: false, substitute: false });
+  const saved = call('dir.save', { table: 'subjects', row: { ...store.get('subjects', x.sb1), teacherId: x.ids.teacher3 } }, x.dean);
+  assert.equal(saved.data.skippedBusy, 1);
+  assert.equal(call('schedule.generate', {}, x.dean).ok, true);
+  const p = store.get('pairs', x.pair15);
+  assert.deepEqual([p.teacherId, p.substitute], [x.ids.teacher1, true]);
+});
+
 test('a new teacher of a subject: held and past pairs of the old one are no substitution, busy ones are, a return clears it', () => {
   const x = setup();
   const { call, store } = x;

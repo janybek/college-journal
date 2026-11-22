@@ -52,7 +52,7 @@ export function planGeneration({ template, subjects, settings, pairs, from, rest
   }
 
   const considered = (pairs || []).filter(p => p.planDate >= from);
-  const replaceable = p => p.status === 'planned' && p.changed === false;
+  const replaceable = p => p.status === 'planned' && p.changed === false && p.substitute !== true;
   const fixed = considered.filter(p => !replaceable(p));
   // A hand-moved pair keeps its old plan date but still occupies its new place, so every fixed pair still ahead counts as busy.
   const ahead = (pairs || []).filter(p => !replaceable(p) && (p.planDate >= from || p.date >= from));
