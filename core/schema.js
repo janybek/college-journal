@@ -12,8 +12,13 @@ export const LESSON_KINDS = ['lecture', 'practice', 'seminar', 'lab', 'control']
 export const OUTCOME_KINDS = ['knowledge', 'skill', 'attitude', 'prerequisite', 'postrequisite'];
 export const LITERATURE_KINDS = ['main', 'extra'];
 export const RULE_KINDS = ['behavior', 'ethics', 'sanction_behavior', 'sanction_ethics'];
+export const ATTENDANCE_STATUSES = ['present', 'late', 'absent', 'excused', 'madeup'];   // был, опоздал, не был, уважительная причина, отработано
+export const ATTENDED_STATUSES = ['present', 'late', 'madeup'];
+export const MARK_SOURCES = ['teacher'];             // как отмечено; юнит 4 допишет 'code' и 'qr'
+export const RESULT_FIELDS = ['control', 'self', 'current'];
+export const LOG_ENTITIES = ['mark', 'unit', 'pair'];
 
-const col = (key, title, type = 'string') => ({ key, title, type });
+const col =(key, title, type = 'string') => ({ key, title, type });
 
 export const SCHEMA = {
   groups: {
@@ -141,7 +146,26 @@ export const SCHEMA = {
       col('groupId', 'группа'), col('subjectId', 'предмет'), col('teacherId', 'преподаватель'), col('roomId', 'аудитория'),
       col('topicId', 'тема'), col('lessonType', 'тип занятия'), col('part', 'часть', 'int'), col('status', 'статус'), col('planDate', 'дата по плану'),
       col('planSlot', '№ пары по плану', 'int'), col('changed', 'изменена вручную', 'bool'), col('note', 'примечание'),
+      col('substitute', 'замена', 'bool'),
     ],
+  },
+  attendance: {
+    sheet: 'Посещаемость', prefix: 'at',
+    columns: [col('id', 'id'), col('pairId', 'пара'), col('studentId', 'студент'), col('status', 'статус'),
+      col('noCoat', 'без халата', 'bool'), col('activity', 'активность', 'int'), col('source', 'как отмечено'),
+      col('markedBy', 'кто отметил'), col('markedAt', 'когда отмечено')],
+  },
+  unitResults: {
+    sheet: 'Итоги юнитов', prefix: 'ur',
+    columns: [col('id', 'id'), col('subjectId', 'предмет'), col('studentId', 'студент'), col('planSemester', 'семестр по плану', 'int'),
+      col('unit', 'юнит', 'int'), col('control', 'рубежный контроль', 'int'), col('self', 'СРС', 'int'),
+      col('currentManual', 'текущий контроль вручную', 'int'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено')],
+  },
+  changeLog: {
+    sheet: 'Журнал изменений', prefix: 'cl',
+    columns: [col('id', 'id'), col('at', 'когда'), col('actorId', 'кто'), col('entity', 'что'), col('subjectId', 'предмет'),
+      col('pairId', 'пара'), col('studentId', 'студент'), col('unit', 'юнит', 'int'), col('field', 'поле'),
+      col('before', 'было'), col('after', 'стало'), col('reason', 'причина'), col('late', 'после срока', 'bool')],
   },
 };
 

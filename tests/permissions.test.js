@@ -39,7 +39,7 @@ test('actionKind', () => {
 });
 
 test('listPermissions', () => {
-  assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.subjects', 'syllabus.get']);
+  assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get']);
   const dean = listPermissions(['dean']);
   assert.ok(dean.includes('import.apply:students'));
   assert.ok(!dean.includes('dir.save:staff'));
@@ -75,8 +75,9 @@ test('a file fills the draft: the deanery, the administrator and a teacher (of h
   for (const role of ['admin', 'dean', 'teacher']) for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.apply']) assert.equal(can([role], action, 'topics'), false);
   assert.equal(can(['teacher'], 'dir.save', 'weekTemplate'), false);
   assert.deepEqual(listPermissions(['teacher']),
-    ['schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects']);
-  assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.subjects', 'syllabus.get']);
+    ['journal.get', 'journal.list', 'journal.log', 'journal.saveResults', 'journal.savePair',
+      'schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects'].sort());
+  assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get']);
   assert.equal(can(['dean'], 'topics.plan'), false);
   assert.equal(can(['student'], 'student.subjects'), true);
   assert.equal(can(['teacher'], 'student.subjects'), false);
@@ -87,6 +88,16 @@ test('disciplines and subjects actions', () => {
   assert.deepEqual([can(['dean'], 'dir.save', 'disciplines'), can(['prorector'], 'dir.list', 'disciplines'), can(['prorector'], 'dir.save', 'disciplines'),
     can(['teacher'], 'dir.list', 'disciplines'), can(['dean'], 'import.apply', 'disciplines')], [true, true, false, false, true]);
   assert.deepEqual([can(['dean'], 'subjects.add'), can(['prorector'], 'subjects.add'), can(['prorector'], 'subjects.overview'), can(['teacher'], 'subjects.overview')], [true, false, true, false]);
+});
+
+test('journal and scoring rights', () => {
+  for (const action of ['journal.savePair', 'journal.saveResults', 'journal.missPair', 'journal.reopenPair', 'scoring.save']) assert.equal(can(['prorector'], action), false);
+  for (const action of ['journal.list', 'journal.get', 'journal.savePair', 'journal.saveResults', 'journal.log']) assert.equal(can(['teacher'], action), true);
+  for (const action of ['journal.missPair', 'journal.reopenPair', 'scoring.get', 'scoring.save', 'student.grades']) assert.equal(can(['teacher'], action), false);
+  assert.deepEqual(listPermissions(['student']).filter((p) => p.startsWith('journal.') || p.startsWith('scoring.')), []);
+  assert.equal(can(['student'], 'student.grades'), true);
+  for (const action of ['journal.list', 'journal.get', 'journal.log', 'scoring.get']) assert.equal(can(['prorector'], action), true);
+  for (const table of ['attendance', 'unitResults', 'changeLog']) for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.apply']) assert.equal(can(['admin'], action, table), false);
 });
 
 test('syllabus form actions by role', () => {

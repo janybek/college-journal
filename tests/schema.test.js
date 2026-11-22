@@ -1,10 +1,27 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { SCHEMA, SEMESTERS, tableNames, PAIR_STATUSES, FIXED_STATUSES, LESSON_TYPES, WEEKDAYS, SYLLABUS_STATUSES, OPEN_STATUSES, LESSON_KINDS } from '../core/schema.js';
+import { SCHEMA, SEMESTERS, tableNames, PAIR_STATUSES, FIXED_STATUSES, LESSON_TYPES, WEEKDAYS, SYLLABUS_STATUSES, OPEN_STATUSES, LESSON_KINDS,
+  ATTENDANCE_STATUSES, ATTENDED_STATUSES, MARK_SOURCES, RESULT_FIELDS, LOG_ENTITIES } from '../core/schema.js';
 
 test('tableNames lists tables in schema order', () => {
   assert.deepEqual(tableNames(), ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'translations', 'settings', 'weekTemplate',
-    'syllabi', 'topics', 'units', 'outcomes', 'selfWork', 'literature', 'software', 'grading', 'rules', 'pairs']);
+    'syllabi', 'topics', 'units', 'outcomes', 'selfWork', 'literature', 'software', 'grading', 'rules', 'pairs',
+    'attendance', 'unitResults', 'changeLog']);
+});
+
+test('journal tables, substitute column and statuses', () => {
+  assert.deepEqual(tableNames().slice(-3), ['attendance', 'unitResults', 'changeLog']);
+  assert.deepEqual(SCHEMA.attendance.columns.map((c) => c.key), ['id', 'pairId', 'studentId', 'status', 'noCoat', 'activity', 'source', 'markedBy', 'markedAt']);
+  assert.deepEqual(SCHEMA.unitResults.columns.map((c) => c.key), ['id', 'subjectId', 'studentId', 'planSemester', 'unit', 'control', 'self', 'currentManual', 'updatedBy', 'updatedAt']);
+  assert.deepEqual(SCHEMA.changeLog.columns.map((c) => c.key), ['id', 'at', 'actorId', 'entity', 'subjectId', 'pairId', 'studentId', 'unit', 'field', 'before', 'after', 'reason', 'late']);
+  assert.deepEqual(SCHEMA.pairs.columns.at(-1), { key: 'substitute', title: 'замена', type: 'bool' });
+  assert.equal(new Set(Object.values(SCHEMA).map((d) => d.sheet)).size, tableNames().length);
+  assert.equal(new Set(Object.values(SCHEMA).map((d) => d.prefix)).size, tableNames().length);
+  assert.deepEqual(ATTENDANCE_STATUSES, ['present', 'late', 'absent', 'excused', 'madeup']);
+  assert.deepEqual(ATTENDED_STATUSES, ['present', 'late', 'madeup']);
+  assert.deepEqual(MARK_SOURCES, ['teacher']);
+  assert.deepEqual(RESULT_FIELDS, ['control', 'self', 'current']);
+  assert.deepEqual(LOG_ENTITIES, ['mark', 'unit', 'pair']);
 });
 
 test('students sheet and column titles', () => {
@@ -16,7 +33,7 @@ test('students sheet and column titles', () => {
 test('schedule tables', () => {
   assert.equal(SCHEMA.pairs.sheet, 'Пары');
   assert.deepEqual(SCHEMA.pairs.columns.map(c => c.title), ['id', 'дата', '№ пары', 'время начала', 'группа', 'предмет', 'преподаватель',
-    'аудитория', 'тема', 'тип занятия', 'часть', 'статус', 'дата по плану', '№ пары по плану', 'изменена вручную', 'примечание']);
+    'аудитория', 'тема', 'тип занятия', 'часть', 'статус', 'дата по плану', '№ пары по плану', 'изменена вручную', 'примечание', 'замена']);
   assert.deepEqual(SCHEMA.topics.columns.map(c => c.title),
     ['id', 'силлабус', '№ по порядку', 'юнит', 'вид занятия', 'название', 'часы', 'формы текущего контроля', 'СРС, ч', 'описание', 'название юнита', 'скопирована из']);
   assert.deepEqual(SCHEMA.topics.columns.map(c => c.key),
@@ -25,7 +42,7 @@ test('schedule tables', () => {
   assert.deepEqual(SEMESTERS, [1, 2]);
   assert.deepEqual(SCHEMA.weekTemplate.columns.map(c => c.title), ['id', 'день недели', '№ пары', 'предмет', 'аудитория']);
   assert.deepEqual(SCHEMA.pairs.columns.filter(c => c.type !== 'string').map(c => [c.key, c.type]),
-    [['slot', 'int'], ['part', 'int'], ['planSlot', 'int'], ['changed', 'bool']]);
+    [['slot', 'int'], ['part', 'int'], ['planSlot', 'int'], ['changed', 'bool'], ['substitute', 'bool']]);
   assert.deepEqual([SCHEMA.weekTemplate.prefix, SCHEMA.topics.prefix, SCHEMA.pairs.prefix], ['wt', 'tp', 'p']);
   assert.deepEqual(PAIR_STATUSES, ['planned', 'running', 'closed', 'missed', 'cancelled']);
   assert.deepEqual(FIXED_STATUSES, ['running', 'closed']);

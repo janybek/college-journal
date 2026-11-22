@@ -41,6 +41,16 @@ const ROLE_ACTIONS = {
   'syllabus.queue': { admin: true, dean: true, prorector: true },
   'student.subjects': { student: true },
   'schedule.mine': { teacher: true, student: true },
+  'scoring.get': { admin: true, dean: true, prorector: true },
+  'scoring.save': { admin: true, dean: true },
+  'journal.list': { admin: true, dean: true, prorector: true, teacher: true },
+  'journal.get': { admin: true, dean: true, prorector: true, teacher: true },
+  'journal.savePair': { admin: true, dean: true, teacher: true },
+  'journal.saveResults': { admin: true, dean: true, teacher: true },
+  'journal.missPair': { admin: true, dean: true },
+  'journal.reopenPair': { admin: true, dean: true },
+  'journal.log': { admin: true, dean: true, prorector: true, teacher: true },
+  'student.grades': { student: true },
 };
 
 const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);
