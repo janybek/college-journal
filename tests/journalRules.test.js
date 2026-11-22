@@ -44,6 +44,8 @@ test('checkMark', () => {
   assert.deepEqual(checkMark(mk('absent'), mk('excused', null, true), ctx('limited')), [{ field: 'status', code: 'locked' }]);
   assert.deepEqual(checkMark(null, mk('present'), ctx('limited')), [{ field: 'status', code: 'locked' }]);
   assert.deepEqual(checkMark(mk('present', 5), mk('present', 5), ctx('none')), []);
+  assert.deepEqual(checkMark(mk('present'), mk('madeup'), ctx('limited')), [{ field: 'status', code: 'locked' }]);
+  assert.deepEqual(checkMark(mk('late'), mk('madeup'), ctx('limited')), [{ field: 'status', code: 'locked' }]);
   assert.deepEqual(checkMark(mk('present', 5), mk('absent'), ctx('none')), [{ field: 'status', code: 'locked' }]);
   assert.deepEqual(checkMark(mk('absent'), mk('absent'), ctx('limited')), []);
 });
