@@ -42,10 +42,14 @@ export function navFor(permissionList, role) {
   if (parts.includes('subjects') && list.includes('teacher.mySubjects')) {
     const items = [{ ...HOME, textKey: 'home.mySubjects', icon: 'book' }];
     if (list.includes('schedule.mine')) items.push({ name: 'mySchedule', href: '#/my', textKey: 'my.title', icon: 'calendar' });
+    if (list.includes('journal.list')) items.push({ name: 'journalList', href: '#/journal', textKey: 'journal.title', icon: 'table' });
     return [{ titleKey: 'nav.teaching', items }];
   }
   const groups = [{ titleKey: null, items: [HOME] }];
   if (!parts.includes('office')) return groups;
+  if (list.includes('journal.list')) {
+    groups.push({ titleKey: 'nav.journal', items: [{ name: 'journalList', href: '#/journal', textKey: 'journal.list.title', icon: 'table', hintKey: 'journal.hint' }] });
+  }
   const schedule = [];
   if (list.includes('schedule.list')) {
     schedule.push({ name: 'schedule', href: '#/schedule', textKey: 'schedule.title', icon: 'calendar', hintKey: 'schedule.hint' });
@@ -181,6 +185,8 @@ function studentFrame(main, { onLang, onLogout }) {
 // teacher's «Мои предметы» (their home).
 function currentName(view, params, role) {
   if (view === 'directory') return params.table;
+  // A journal of a subject belongs to the list of journals.
+  if (view === 'journal') return 'journalList';
   if (view === 'syllabus' || view === 'syllabusForm') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;
 }
@@ -265,6 +271,7 @@ function crumbs(groups, view, params, current, role) {
     else if (view === 'subjects') [groupKey, pageKey] = ['nav.schedule', 'subjects.title'];
     else if (view === 'review') [groupKey, pageKey] = ['nav.schedule', 'review.title'];
     else if (view === 'mySchedule') [groupKey, pageKey] = ['nav.teaching', 'my.title'];
+    else if (view === 'journalList' || view === 'journal') [groupKey, pageKey] = ['nav.journal', 'journal.list.title'];
     else pageKey = 'nav.home';
   }
   // «Расписание › Расписание»: a page named like its group is one crumb.

@@ -18,11 +18,13 @@ import * as syllabus from './views/syllabus.js';
 import * as subjects from './views/subjects.js';
 import * as syllabusForm from './views/syllabusForm.js';
 import * as review from './views/review.js';
+import * as journalList from './views/journalList.js';
+import * as journal from './views/journal.js';
 import { refreshReviewCount } from './reviewCount.js';
 
 // Puts the screen chosen by the router into its frame (shell.js: sign-in card, student bar or staff sidebar).
 // A screen may export leave(): it is called when another screen replaces it, to drop what it held.
-const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm, review };
+const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm, review, journalList, journal };
 const page = document.getElementById('page');
 let shownView = null;
 let shownHash = location.hash;

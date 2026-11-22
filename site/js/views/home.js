@@ -196,8 +196,9 @@ function subjectsSection(user) {
 function subjectsBody(user, redraw) {
   if (subjects.list) {
     if (subjects.list.length === 0) return emptyState('book', el('p', {}, t('home.noSubjects')));
-    const plans = (Array.isArray(user.permissions) ? user.permissions : []).includes('syllabus.get');
-    return el('ul', { class: 'card list' }, subjects.list.map((subject) => subjectRow(subject, plans)));
+    const granted = Array.isArray(user.permissions) ? user.permissions : [];
+    const rights = { plans: granted.includes('syllabus.get'), journal: granted.includes('journal.get') };
+    return el('ul', { class: 'card list' }, subjects.list.map((subject) => subjectRow(subject, rights)));
   }
   if (subjects.errorKey && !subjects.pending) {
     return emptyState('alert',
@@ -212,7 +213,8 @@ function subjectsBody(user, redraw) {
 
 // A subject of the teacher: the group, the students, the state of the syllabus. A returned syllabus is the one thing
 // waiting on the teacher: its row carries the warning colour and says what to do; its button stands out.
-function subjectRow(subject, plans) {
+// Beside the syllabus, the journal of the subject.
+function subjectRow(subject, rights) {
   const mark = teacherBadge(subject.syllabus);
   const returned = mark.key === 'home.syllabusState.returned';
   const nameId = 'subject-' + subject.id;
@@ -225,10 +227,14 @@ function subjectRow(subject, plans) {
     subject.groupName ? badge(subject.groupName, 'primary') : null,
     el('span', { class: 'subject__count' }, t('home.studentCount', { count: subject.studentCount })),
     el('span', { class: 'subject__mark', id: markId }, badge(t(mark.key), mark.tone, true)),
-    plans ? el('a', {
-      class: 'button subject__plan ' + (returned ? 'button--primary' : 'button--secondary'),
-      href: '#/syllabus/' + subject.id, 'aria-describedby': nameId + ' ' + markId,
-    }, icon('clipboard'), t('home.syllabus')) : null);
+    rights.plans || rights.journal ? el('span', { class: 'subject__actions' },
+      rights.plans ? el('a', {
+        class: 'button subject__plan ' + (returned ? 'button--primary' : 'button--secondary'),
+        href: '#/syllabus/' + subject.id, 'aria-describedby': nameId + ' ' + markId,
+      }, icon('clipboard'), t('home.syllabus')) : null,
+      rights.journal ? el('a', {
+        class: 'button button--secondary subject__plan', href: '#/journal/' + subject.id, 'aria-describedby': nameId,
+      }, icon('table'), t('journal.title')) : null) : null);
 }
 
 function loadSubjects(user) {

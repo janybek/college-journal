@@ -108,3 +108,15 @@ test('resolveRoute: the syllabus form of a version and its tab need syllabus.for
   assert.equal(resolveRoute('#/syllabus-form/sy_1', { mustChangePassword: false, permissions: ['syllabus.get'] }).view, 'home');      // студент
   assert.equal(resolveRoute('#/syllabus-form', teacher).view, 'home');
 });
+
+test('resolveRoute: the list of journals needs journal.list, a journal of a subject journal.get', () => {
+  const teacher = { mustChangePassword: false, permissions: ['journal.list', 'journal.get'] };
+  const student = { mustChangePassword: false, permissions: ['schedule.mine', 'syllabus.get'] };
+  assert.deepEqual(resolveRoute('#/journal', teacher), { view: 'journalList', params: {} });
+  assert.deepEqual(resolveRoute('#/journal/sb_1', teacher), { view: 'journal', params: { subjectId: 'sb_1' } });
+  assert.equal(resolveRoute('#/journal', student).view, 'home');
+  assert.equal(resolveRoute('#/journal/sb_1', student).view, 'home');
+  assert.equal(resolveRoute('#/journal', { mustChangePassword: false, permissions: ['journal.get'] }).view, 'home');
+  assert.equal(resolveRoute('#/journal/sb_1', { mustChangePassword: false, permissions: ['journal.list'] }).view, 'home');
+  assert.equal(resolveRoute('#/journal/sb_1/x', teacher).view, 'home');
+});

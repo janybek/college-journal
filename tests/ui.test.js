@@ -130,3 +130,17 @@ test('navFor: a teacher with schedule.mine gets «Моё расписание» 
   assert.deepEqual(navFor([...DEAN, 'schedule.mine'], 'teacher')[0].items[1],
     { name: 'mySchedule', href: '#/my', textKey: 'my.title', icon: 'calendar' });
 });
+
+test('navFor: the teacher gets «Журнал» after «Моё расписание»; the office a group «Журнал» before «Расписание»; the student nothing', () => {
+  assert.deepEqual(navFor([...DEAN, 'schedule.mine', 'journal.list'], 'teacher')[0].items.map((i) => i.name), ['home', 'mySchedule', 'journalList']);
+  assert.deepEqual(navFor([...DEAN, 'schedule.mine', 'journal.list'], 'teacher')[0].items[2],
+    { name: 'journalList', href: '#/journal', textKey: 'journal.title', icon: 'table' });
+  const office = navFor(['schedule.list', 'settings.get', 'journal.list', 'journal.get'], 'dean');
+  assert.deepEqual(office.map((g) => g.titleKey), [null, 'nav.journal', 'nav.schedule']);
+  assert.deepEqual(office[1].items.map((i) => i.name), ['journalList']);
+  assert.equal(office[1].items[0].hintKey, 'journal.hint');
+  assert.equal(office[1].items[0].href, '#/journal');
+  for (const role of ['admin', 'prorector']) assert.ok(navFor(['journal.list'], role).some((g) => g.titleKey === 'nav.journal'), role);
+  assert.equal(navFor(['schedule.list'], 'dean').some((g) => g.titleKey === 'nav.journal'), false);
+  assert.equal(navFor(['journal.list', 'schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'journalList'), false);
+});

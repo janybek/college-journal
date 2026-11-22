@@ -37,6 +37,10 @@ export function resolveRoute(hash, user) {
     if (template[2]) params.weekday = Number(template[2]);
     return { view: 'weekTemplate', params };
   }
+  // «Журналы»: the list; #/journal/<subjectId>: the journal of a subject.
+  if (path === '/journal' && permissions.includes('journal.list')) return { view: 'journalList', params: {} };
+  const journal = /^\/journal\/([^/]+)$/.exec(path);
+  if (journal && permissions.includes('journal.get')) return { view: 'journal', params: { subjectId: journal[1] } };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
   return { view: 'home', params: {} };

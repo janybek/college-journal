@@ -286,3 +286,13 @@ test('task 44: the review queue, the syllabus marks of the subject lists; the te
     assert.doesNotMatch(ru[key], /загружа?ен|загружает деканат/i, key);
   }
 });
+
+test('task 17: the list of journals and its menu items have their texts in every language', () => {
+  const keys = ['journal.title', 'journal.hint', 'journal.loading', 'nav.journal', 'journal.list.title', 'journal.list.leadTeacher', 'journal.list.leadOffice',
+    'journal.list.col.group', 'journal.list.col.subject', 'journal.list.col.teacher', 'journal.list.col.held', 'journal.list.col.unfilled',
+    'journal.list.unfilled', 'journal.list.overdue', 'journal.list.filled', 'journal.list.cover', 'journal.list.empty', 'journal.list.allGroups'];
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) for (const key of ['journal.list.unfilled', 'journal.list.overdue']) assert.ok(dict[key].includes('{n}'), key);
+  assert.equal(ru['journal.list.empty'], 'Журналов пока нет');
+  assert.equal(ru['journal.loading'], 'Журнал загружается');
+});

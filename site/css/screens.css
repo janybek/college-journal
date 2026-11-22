@@ -5475,3 +5475,117 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
   background: var(--warning-wash);
   color: var(--warning);
 }
+
+/* Task 17: «Журналы». A row is a subject of a group; the whole row is the link to its journal. The rail on the left
+   says what waits there: red — pairs past their deadline, amber — pairs still open for marks, none — all filled in. */
+
+.journals__toolbar { border-bottom: 1px solid var(--border); }
+
+.journals-table { min-width: 46rem; }
+
+.journals-table--teacher { min-width: 34rem; }
+
+.journals-row { position: relative; }
+
+.journals-table tbody .journals-row.is-overdue td:first-child { box-shadow: inset 3px 0 0 var(--danger); }
+
+.journals-table tbody .journals-row.is-unfilled td:first-child { box-shadow: inset 3px 0 0 var(--warning); }
+
+.journals-table .journals-table__group { width: 1%; white-space: nowrap; }
+
+.journals-table__name {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-3);
+  min-width: 0;
+}
+
+.journals-table__subject { font-weight: 600; }
+
+.journals-table .discipline__name { overflow-wrap: anywhere; }
+
+.journals-table__link {
+  color: var(--text);
+  text-decoration: none;
+}
+
+.journals-table__link::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+}
+
+.journals-table__link:focus-visible { outline: none; }
+
+.journals-table__link:focus-visible::after {
+  outline: 2px solid var(--primary);
+  outline-offset: -2px;
+  border-radius: var(--radius-inner);
+}
+
+.journals-row:hover .journals-table__link .discipline__name { text-decoration: underline; }
+
+.journals-table .person { min-width: 0; }
+
+.journals-table .journals-table__held {
+  width: 1%;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.journals-table__badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.journals-table__badges .badge { white-space: nowrap; }
+
+.journals-table__filled {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.journals-table__filled .icon {
+  width: 0.9375rem;
+  height: 0.9375rem;
+  color: var(--success);
+}
+
+.journals-table .journals-table__go {
+  width: 1%;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.journals-table__chevron {
+  width: 1rem;
+  height: 1rem;
+  color: var(--text-muted);
+  transition: color 0.15s ease-out, transform 0.15s ease-out;
+}
+
+.journals-row:hover .journals-table__chevron {
+  color: var(--primary-ink);
+  transform: translateX(2px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .journals-table__chevron { transition: none; }
+
+  .journals-row:hover .journals-table__chevron { transform: none; }
+}
+
+/* «Мои предметы»: the syllabus and the journal of a subject stay together when the row wraps. */
+.subject__actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
