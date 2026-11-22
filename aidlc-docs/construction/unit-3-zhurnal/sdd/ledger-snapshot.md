@@ -58,3 +58,9 @@ Owner stops: after task 19 (block 1), 21 (block 2), 25 (block 3), 26 (block 4).
 - Coordinator: stand journal-dev for block 1 — Informatics 01-1 pair p_51b2eff1 moved 16.11→21.11 (Sat), status planned, its 22 marks and log rows removed in dev/data/db.json (Sunday: teacher1 had nothing to mark). dev:reset restores.
 - Block 1 owner note 1 (button-like pair head) + minor pairHint teacher-only → fix brief block-1-fix-brief.md; dispatched journal-screens (sonnet), BASE 270ae2b. Ruling: «Пропуски» = н + ув kept (owner did not object; ask again at final).
 - Block 1 fix: complete (commits 4bd5a26..bfcf7e8 approx; coordinator looked at the stand: 22.11 unfilled head blue «Отметить», 21.11 filled — quiet pencil; 687 tests). No AI review: visual round; pairHint change covered by test. Waiting for the owner's look at the fix.
+- BLOCK 1 ACCEPTED by the owner 22.11 («Принимаю, дальше»). Next: block 2 (tasks 20 +review, 21).
+- Task 20: dispatched journal-screens (sonnet), BASE 79388fd
+- Task 20: implementer DONE 1c7e56d (691 tests; added pairScore copy of server rule, window stays open after save). Review dispatched (sonnet, rights strict).
+- Task 20: complete (commits 79388fd..1c7e56d, review clean; probe scratchpad/fuzz.mjs — pairScore = server rule on 1400 combos). minor → task 21: journalCell.js:834 onSaved skipped when the dialog closed mid-save (grid stale until reload) — call onSaved before the isConnected check; reason field not disabled while busy.
+- Task 21: dispatched journal-screens (sonnet), BASE 1c7e56d. No AI review per owner ruling (only 19, 20, 22, 26).
+- Task 21: complete (commits 1c7e56d..873a3be, no AI review per owner ruling; 695 tests). Note: no RED run (tests written after the functions) — process deviation, tests themselves follow the brief. Task-20 minor (onSaved before isConnected, reason disabled while busy) fixed here. BLOCK 2 STOP.
