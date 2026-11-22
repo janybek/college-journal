@@ -1,4 +1,4 @@
-import { call } from '../api.js';
+import { call, RETRYABLE } from '../api.js';
 import { t, tCount } from '../i18n.js';
 import {
   el, errorKey, fieldErrorKey, hasText, dataTable, holdOnLeave, markBusy, modal, showModal, focusById, refresh,
@@ -416,7 +416,7 @@ async function apply() {
     if (state !== owner) return;
     owner.applyErrorKey = errorKey(error.code);
     // A dropped connection or a server failure may leave part of the rows written.
-    owner.applyLost = error.code === 'network' || error.code === 'internal';
+    owner.applyLost = RETRYABLE.includes(error.code);
   }
   owner.applying = false;
   refresh();

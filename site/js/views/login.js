@@ -63,7 +63,7 @@ async function signIn() {
   } catch (error) {
     state.busy = false;
     state.messageKey = errorKey(error.code);
-    if (error.code === 'bad_credentials') state.password = '';
+    if (error.code === 'bad_credentials' || error.code === 'too_many_attempts') state.password = '';
     refresh();
   }
 }

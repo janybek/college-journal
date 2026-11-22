@@ -9,9 +9,7 @@ import {
   PLAN_KINDS, TABS, checkLine, checkTabs, emptyItem, errorKeyOf, errorMap, errorsAfterEdit, isDirty, keptOrder, placeErrors, sameValue, sectionData, statusKind,
   submitOutcome, unitAbout,
 } from '../syllabusForm.js';
-import { draftFileData, fileLabels, fileName } from '../syllabus.js';
-import { syllabusBook } from '../excel.js';
-import { loadXlsx } from '../xlsxLoader.js';
+import { canFillFromFile } from '../fillFromFile.js';
 import { renderTab } from './syllabusFormTabs.js';
 import { leaveUpload, renderUpload, startUpload } from './syllabusUpload.js';
 import { refreshReviewCount } from '../reviewCount.js';
@@ -199,8 +197,9 @@ function head() {
     actions());
 }
 
-// «Загрузить из Excel», «Скачать (Excel)» and «Отправить на утверждение» for a version that is edited. The file and the
-// sending wait until every tab is saved: the file replaces what the form shows, the server checks what is stored.
+// «Заполнить из файла» and «Отправить на утверждение» for a version that is edited. The file is for the first fill only:
+// it is there while the syllabus has no approved version and the draft has no lessons. The file and the sending wait
+// until every tab is saved: the file replaces what the form shows, the server checks what is stored.
 function actions() {
   if (!editable()) return null;
   const { can, subject } = state.form;
@@ -208,19 +207,18 @@ function actions() {
   const waiting = dirty.length > 0;
   const hintId = 'sf-actions-hint';
   const described = waiting ? hintId : null;
-  const upload = el('button', {
+  const first = canFillFromFile({ hasApproved: state.form.syllabus.copyOfApproved, topicRows: ((state.saved && state.saved.lessons) || []).length });
+  const upload = first ? el('button', {
     type: 'button', id: 'sf-upload', class: 'button button--secondary', disabled: waiting || state.locked || !subject.id, 'aria-describedby': described,
     onclick: uploadFile,
-  }, icon('upload'), t('sform.file.upload'));
-  const download = el('button', { type: 'button', id: 'sf-download', class: 'button button--secondary', onclick: downloadDraft },
-    icon('download'), t('syllabus.download'));
+  }, icon('upload'), t('syllabus.fillFromFile')) : null;
   const submit = can.submit ? el('button', {
     type: 'button', id: 'sf-submit', class: 'button button--primary', disabled: waiting || state.locked, 'aria-describedby': described,
     onclick: checkBeforeSubmit,
   }, icon('checkCircle'), t('sform.submit')) : null;
   if (submit && state.submitting === 'check') markBusy(submit, 'sform.submit.checking');
   return el('div', { class: 'sform-actions', id: 'sf-actions' },
-    el('div', { class: 'sform-actions__buttons' }, upload, download, submit),
+    el('div', { class: 'sform-actions__buttons' }, upload, submit),
     waiting ? el('p', { class: 'sform-actions__hint', id: hintId }, icon('info'),
       el('span', {}, t('sform.actions.saveFirst', { tabs: dirty.map((tab) => t('sform.tab.' + tab)).join(', ') }))) : null,
     state.actionError ? note('error', t(state.actionError), { role: 'alert', class: 'sform-actions__error' }) : null);
@@ -651,29 +649,7 @@ function submitDialog({ warnings }) {
 
 // ---- The file ----
 
-// The draft as a file: what is saved, one lesson per row in the order of the pairs.
-async function downloadDraft() {
-  const owner = state;
-  let XLSX;
-  try {
-    XLSX = await loadXlsx();
-  } catch (error) {
-    if (state !== owner) return;
-    owner.actionError = 'import.error.library';
-    refresh();
-    return;
-  }
-  if (state !== owner) return;
-  const { subject } = owner.form;
-  XLSX.writeFile(syllabusBook(XLSX, fileLabels(t), draftFileData({ ...owner.form, doc: owner.saved })),
-    fileName([t('syllabus.title'), subject.name, subject.teacherName]));
-  if (owner.actionError) {
-    owner.actionError = null;
-    refresh();
-  }
-}
-
-// A file of the template fills the title and the plan of the draft (the check window of syllabusUpload.js); then
+// A file of the template fills the title and the plan of the first draft (the check window of syllabusUpload.js); then
 // the form is read again and opens «Тематические планы» of the version the file filled.
 function uploadFile() {
   if (dirtyTabs().length > 0 || state.locked) return;

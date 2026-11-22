@@ -1,4 +1,4 @@
-import { call } from '../api.js';
+import { call, RETRYABLE } from '../api.js';
 import { getUser } from '../session.js';
 import { t, getLang, LANGS, DEFAULT_LANG } from '../i18n.js';
 import {
@@ -26,9 +26,6 @@ const blank = (table) => ({
   dialog: null,        // { kind: 'edit' | 'remove' | 'reset' | 'password', ... }
 });
 let state = blank(null);
-
-// Failures worth trying again; any other answer would not change on a retry.
-const RETRYABLE_ERRORS = ['network', 'internal'];
 
 const can = (action, table) => permissions().includes(`${action}:${table}`);
 
@@ -447,7 +444,7 @@ function showConfirmError(d, error) {
   if (error.code === 'in_use') d.messageKey = hasText(`dir.inUse.${table}`) ? `dir.inUse.${table}` : 'error.in_use';
   else if (error.code === 'invalid' && fields.length > 0) d.messageKey = fieldErrorKey(table, fields[0].field, fields[0].code);
   else d.messageKey = errorKey(error.code);
-  d.blocked = !RETRYABLE_ERRORS.includes(error.code);
+  d.blocked = !RETRYABLE.includes(error.code);
   if (error.code === 'not_found') state.rows = state.rows.filter((row) => row.id !== d.row.id);
 }
 

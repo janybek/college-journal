@@ -1,4 +1,4 @@
-import { call } from '../api.js';
+import { call, RETRYABLE } from '../api.js';
 import { t, tCount } from '../i18n.js';
 import {
   el, errorKey, fieldErrorKey, selectField, modal, showModal, focusById, focusFirstInvalid, markBusy, refresh,
@@ -8,6 +8,7 @@ import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { freeGroups, nextRow, addRequest, syllabusBadge, approvedNote, pairsNote, addedTeachers, withoutRow } from '../subjects.js';
 import { setReviewCount } from '../reviewCount.js';
+import { canFillFromFile } from '../fillFromFile.js';
 import { startUpload, renderUpload, leaveUpload } from './syllabusUpload.js';
 
 // «Предметы» of the deanery (#/subjects): who teaches which discipline in which group, and where each syllabus stands.
@@ -17,11 +18,9 @@ import { startUpload, renderUpload, leaveUpload } from './syllabusUpload.js';
 // the group). «Добавить предмет» is one window in two steps: the discipline picked from «Дисциплины» (never typed)
 // and the groups with their teachers, then — the subjects saved — the syllabus of each teacher with its upload.
 // The syllabus of a row is one mark (subjects.js: an open version first, else the approved one); beside the mark of
-// an open version, in grey, what is approved meanwhile. «Загрузить (Excel)» fills the draft (never what is in effect);
+// an open version, in grey, what is approved meanwhile. «Заполнить из файла» fills the first draft (never what is in effect);
 // once written, a note leads to the form. The upload itself (template, check window) is syllabusUpload.js. The server checks every right; the screen only
 // leaves out the buttons the person's `permissions` do not allow (the vice-rector reads the table).
-
-const RETRYABLE = ['network', 'internal'];
 
 const blank = () => ({
   data: null,          // the answer of subjects.overview; null until it comes
@@ -208,9 +207,9 @@ function syllabusMark(row) {
     also ? el('span', { class: 'syllabus-mark__note' }, badgeText(also)) : null);
 }
 
-// A file goes into the open version (made from the approved one when there is none); a version under review is the
-// deanery's to decide first, so it takes no file. An approved syllabus with nothing open is changed from its page.
-const takesFile = (row) => row.open !== 'review' && (row.syllabusStatus !== 'approved' || row.open !== null);
+// The file is for the first fill only: no approved version and no draft yet. The overview does not count the rows of a
+// draft, so any open version is taken as filled; an empty draft offers the file in its own form.
+const takesFile = (row) => canFillFromFile({ hasApproved: row.syllabusStatus === 'approved', topicRows: row.open === null ? 0 : 1 });
 
 // «Открыть»: the version someone has to act on — the new one while it is under review or while nothing is approved;
 // otherwise the approved one of the half of the year that is on.
@@ -220,7 +219,7 @@ function syllabusHref(row) {
   return '#/syllabus/' + subjectId;
 }
 
-// The state of the syllabus, and what to do about it: «Загрузить (Excel)» into the draft (with the right to upload;
+// The state of the syllabus, and what to do about it: «Заполнить из файла» into the draft (with the right to upload;
 // uploadId null without it), «Открыть» always — the page offers the template while there is no syllabus.
 function syllabusState(row, uploadId, openId, describedBy) {
   return el('div', { class: 'syllabus-state' },
@@ -239,7 +238,7 @@ function uploadTarget(row) {
   };
 }
 
-// «Загрузить (Excel)»: the file of this teacher's syllabus, checked in the window of syllabusUpload.js, fills the draft.
+// «Заполнить из файла»: the file of this teacher's syllabus, checked in the window of syllabusUpload.js, fills the draft.
 // Once it is written, the overview is read again and a note leads to the form of the draft of the half of the year
 // that is on (or of the one the file held). Focus goes back to the button, or to «Открыть» of the same teacher.
 function upload(row, id, openId) {
@@ -268,7 +267,7 @@ function uploadedNote(linkId) {
 
 function uploadButton(row, id, openId, describedBy) {
   return el('button', { type: 'button', id, class: 'button button--secondary', 'aria-describedby': describedBy, onclick: () => upload(row, id, openId) },
-    icon('upload'), t('syllabus.upload'));
+    icon('upload'), t('syllabus.fillFromFile'));
 }
 
 // Dialogs
@@ -488,7 +487,7 @@ function addedItem(row, uploadRight) {
         uploadRight && takesFile(row) ? el('button', {
           type: 'button', id: uploadId, class: 'button button--primary', 'aria-describedby': nameId,
           onclick: () => upload(row, uploadId, openId),
-        }, icon('upload'), t('syllabus.upload')) : null,
+        }, icon('upload'), t('syllabus.fillFromFile')) : null,
         el('a', { id: openId, class: 'button button--secondary', href: syllabusHref(row), 'aria-describedby': nameId }, t('subjects.open')))));
 }
 

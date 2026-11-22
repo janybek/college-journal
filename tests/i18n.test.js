@@ -48,11 +48,11 @@ test('every code of the syllabus check has a text; the old texts of the syllabus
     assert.ok(ru['syllabus.warning.' + code], code);
   }
   assert.ok(ru['syllabus.error.bad_hours'].includes('1 пара = 2 часа'));
-  for (const key of ['syllabus.upload', 'syllabus.template', 'syllabus.download', 'syllabus.check.title', 'syllabus.check.whose', 'syllabus.check.summary',
+  for (const key of ['syllabus.fillFromFile', 'syllabus.template', 'syllabus.check.title', 'syllabus.check.whose', 'syllabus.check.summary',
     'syllabus.check.first', 'syllabus.check.replace', 'syllabus.check.failed', 'syllabus.check.apply', 'syllabus.done', 'syllabus.where', 'syllabus.whereSheet',
     'syllabus.fileError.dateCell', 'syllabus.fileError.tooMany', 'syllabus.help.title']) assert.ok(ru[key], key);
   for (const key of ['order', 'hours', 'semester', 'control', 'columns']) assert.ok(ru['syllabus.help.' + key], key);
-  assert.equal(ru['syllabus.upload'], 'Загрузить (Excel)');
+  assert.equal(ru['syllabus.fillFromFile'], 'Заполнить из файла');
   for (const dict of [ru, ky, en]) {
     for (const gone of ['syllabus.lead', 'syllabus.step.subject', 'syllabus.subjectHint', 'syllabus.sheet', 'syllabus.back', 'topics.import']) assert.equal(gone in dict, false, gone);
   }
@@ -162,8 +162,16 @@ test('translate falls back lang -> ru -> key and fills params', () => {
 
 test('every server error code has a text', () => {
   for (const code of ['bad_credentials', 'unauthorized', 'forbidden', 'invalid', 'in_use', 'internal', 'network', 'must_change_password',
-    'required', 'too_long', 'bad_value', 'duplicate', 'bad_ref', 'last_admin', 'too_short', 'same_as_login', 'too_simple', 'too_many_rows'])
+    'required', 'too_long', 'bad_value', 'duplicate', 'bad_ref', 'last_admin', 'too_short', 'same_as_login', 'too_simple', 'too_many_rows', 'server_down', 'too_many_attempts'])
     assert.ok(ru['error.' + code], code);
+});
+
+test('the messages about the server and the file button have a text in all three languages, not the key itself', () => {
+  for (const [lang, dict] of Object.entries({ ru, ky, en }))
+    for (const key of ['error.server_down', 'error.too_many_attempts', 'syllabus.fillFromFile']) {
+      assert.ok(dict[key], lang + ' ' + key);
+      assert.notEqual(dict[key], key, lang + ' ' + key);
+    }
 });
 
 test('the syllabus page has its texts: a part of the course is a unit, the control lesson a module; «Темы» and the plan page are gone', () => {
@@ -245,7 +253,7 @@ test('task 43: the syllabus page has texts of the states, the buttons, the windo
   ];
   for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
   assert.equal(ru['syllabus.hidden'], 'Силлабус обновляется: новая версия на утверждении в деканате.');
-  assert.equal(ru['syllabus.emptyHint.staff'], 'Заполните силлабус на сайте или загрузите файл Excel.');
+  assert.equal(ru['syllabus.emptyHint.staff'], 'Заполните силлабус на сайте. Готовую таблицу Excel можно загрузить один раз — при первом заполнении.');
   assert.equal(ru['syllabus.emptyHint.student'], 'Преподаватель ещё не заполнил силлабус.');
   assert.equal(ru['syllabus.approve.text'], 'Версия станет действующей: темы лягут на будущие пары всех групп преподавателя. Проведённые пары не изменятся.');
   // the texts of the time when the deanery uploaded the file and the teacher only looked are gone

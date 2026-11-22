@@ -1,4 +1,4 @@
-import { call } from '../api.js';
+import { call, RETRYABLE } from '../api.js';
 import { t, tCount, getLang } from '../i18n.js';
 import {
   el, errorKey, fieldErrorKey, selectField, modal, showModal, focusById, focusFirstInvalid, markBusy, refresh,
@@ -18,8 +18,6 @@ import { isTime, addMinutes, dayParts } from '../dates.js';
 
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const FORM_FIELDS = ['subjectId', 'roomId'];
-// Failures worth trying again; any other answer would not change on a retry.
-const RETRYABLE_ERRORS = ['network', 'internal'];
 
 const blank = () => ({
   data: null,          // { groups, subjects, rooms, staff, template, bells, pairMinutes, semester }; null until loaded
@@ -406,7 +404,7 @@ async function generate(d, options) {
     d.busy = false;
     if (owner.dialog !== d) return;
     d.messageKey = generationErrorKey(error);
-    d.blocked = !RETRYABLE_ERRORS.includes(error.code);
+    d.blocked = !RETRYABLE.includes(error.code);
     refresh();
   }
 }

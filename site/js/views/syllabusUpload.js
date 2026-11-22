@@ -1,15 +1,15 @@
-import { call } from '../api.js';
+import { call, RETRYABLE } from '../api.js';
 import { getUser } from '../session.js';
 import { t, tCount } from '../i18n.js';
 import { el, errorKey, hasText, modal, showModal, note, markBusy, focusById, refresh } from '../ui.js';
 import { icon } from '../icons.js';
 import { loadXlsx } from '../xlsxLoader.js';
 import { bookSheets, syllabusBook, READ_OPTIONS } from '../excel.js';
-import { fileLabels, fileData, fileName, renamedHint } from '../syllabus.js';
+import { fileLabels, fileData, renamedHint } from '../syllabus.js';
 import { dayMonth } from './pairParts.js';
 
-// The Excel file of a syllabus, for the screens that show one: the template and «Скачать (Excel)» on the syllabus
-// page for the staff; a file into the draft from the syllabus form and from «Предметы» of the deanery. A chosen
+// The Excel file of a syllabus, for the screens that show one: the template on the syllabus page for the staff (the
+// file is for the first fill only, so a filled syllabus is not offered as a file); a file into the draft from the syllabus form and from «Предметы» of the deanery. A chosen
 // file is read here (every sheet, dates caught before anything is sent), checked by syllabus.preview and shown in
 // the check window: whose syllabus it is, what each semester holds and what it changes, remarks, errors with their
 // sheet and Excel row. «Загрузить» is there only when the file has no errors; nothing is written before it.
@@ -18,7 +18,6 @@ import { dayMonth } from './pairParts.js';
 
 const MAX_FILE_BYTES = 5 * 1024 * 1024;
 const MAX_ERRORS_SHOWN = 200;
-const RETRYABLE = ['network', 'internal'];
 const HELP = [['order', 'layers'], ['hours', 'clock'], ['semester', 'calendar'], ['control', 'checkCircle'], ['columns', 'grid']];
 
 const blank = () => ({
@@ -39,8 +38,8 @@ export function forgetUploadNote() {
   state.done = null;
 }
 
-// The file of the syllabus page for the staff: «Как заполнить шаблон» and the template (no syllabus yet) or the version
-// shown as a file. A file is uploaded from the form now («Загрузить из Excel» there fills the draft).
+// The file of the syllabus page for the staff: «Как заполнить шаблон» and the template while there is no syllabus yet.
+// A file is uploaded from the form or from «Предметы» («Заполнить из файла»), for the first fill only.
 export function uploadControls(view) {
   const user = getUser();
   if (!user || user.kind === 'student') return null;
@@ -52,8 +51,8 @@ export function uploadControls(view) {
         onclick: () => { state.helpOpen = !state.helpOpen; refresh(); },
       }, icon('info'), el('span', {}, t('syllabus.help.title')), icon('chevron', 'help-toggle__chevron')),
       el('span', { class: 'syllabus-tools__buttons' },
-        el('button', { type: 'button', id: 'syllabus-download', class: 'button button--secondary', onclick: () => download(view) },
-          icon('download'), t(syllabus === null ? 'syllabus.template' : 'syllabus.download')))),
+        syllabus === null ? el('button', { type: 'button', id: 'syllabus-download', class: 'button button--secondary', onclick: () => download(view) },
+          icon('download'), t('syllabus.template')) : null)),
     state.downloadErrorKey ? note('error', t(state.downloadErrorKey), { role: 'alert' }) : null,
     state.done === subject.id ? note('success', t('syllabus.done'), { role: 'status' }) : null,
     helpPanel());
@@ -81,20 +80,7 @@ async function download(view) {
     refresh();
     return;
   }
-  // Both semesters of the year are approved: the file holds the whole syllabus, so the other semester is read too.
-  // A new version is a file of its own semester.
-  let other = null;
-  if (view.syllabus !== null && view.shown !== 'open' && view.semesters.length === 2) {
-    try {
-      other = await call('syllabus.get', { subjectId: view.subject.id, semester: view.semester === 1 ? 2 : 1 });
-    } catch (error) {
-      state.downloadErrorKey = errorKey(error.code);
-      refresh();
-      return;
-    }
-  }
-  const name = view.syllabus === null ? 'syllabus-template.xlsx' : fileName([t('syllabus.title'), view.subject.name, view.subject.teacherName]);
-  XLSX.writeFile(syllabusBook(XLSX, fileLabels(t), fileData(view, other)), name);
+  XLSX.writeFile(syllabusBook(XLSX, fileLabels(t), fileData(view, null)), 'syllabus-template.xlsx');
   if (state.downloadErrorKey) {
     state.downloadErrorKey = null;
     refresh();

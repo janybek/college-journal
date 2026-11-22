@@ -1,4 +1,4 @@
-import { call } from '../api.js';
+import { call, RETRYABLE } from '../api.js';
 import { t, getLang } from '../i18n.js';
 import {
   el, errorKey, fieldErrorKey, field, selectField, modal, showModal, focusById, focusFirstInvalid, markBusy, refresh,
@@ -24,8 +24,6 @@ const MODES = ['group', 'teacher', 'day'];
 const FIELDS = ['teacherId', 'date', 'slot', 'roomId', 'note'];
 const PLACE_FIELDS = ['date', 'slot', 'teacherId', 'roomId'];
 const FIELD_IDS = { teacherId: 'pair-teacher', date: 'pair-date', slot: 'pair-slot', roomId: 'pair-room', note: 'pair-note', cancelNote: 'pair-cancel-note' };
-// Failures worth trying again; any other answer would not change on a retry.
-const RETRYABLE_ERRORS = ['network', 'internal'];
 // Answers that mean the pair is no longer what the screen shows: the week is read again when the dialog closes.
 const STALE_ERRORS = ['pair_locked', 'in_past', 'not_found'];
 // Earlier years are half-typed ones (0002, 0020, 0202 on the way to 2026): they are not requested.
@@ -558,7 +556,7 @@ function showErrors(d, error) {
   const fields = error.code === 'invalid' && Array.isArray(error.fields) ? error.fields : [];
   if (fields.length === 0) {
     d.messageKey = errorKey(error.code);
-    d.blocked = !RETRYABLE_ERRORS.includes(error.code);
+    d.blocked = !RETRYABLE.includes(error.code);
     d.stale = STALE_ERRORS.includes(error.code);
     return;
   }

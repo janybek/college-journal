@@ -11,6 +11,17 @@ export class ApiError extends Error {
   }
 }
 
+// Failures worth trying again; any other answer would not change on a retry.
+export const RETRYABLE = ['network', 'server_down', 'internal'];
+
+// No usable answer: a phone without internet is «network»; a device that is online but got nothing (the computer of the
+// journal is off, the tunnel answers with an error page) is «server_down».
+export function failureCode(online) {
+  return online === false ? 'network' : 'server_down';
+}
+
+const failure = () => new ApiError(failureCode(globalThis.navigator ? globalThis.navigator.onLine : undefined));
+
 let sessionEnded = () => {};
 
 // Registers what to do after the server rejected the session (the session is already cleared then).
@@ -30,9 +41,9 @@ export async function call(action, data = {}) {
     });
     body = await response.json();
   } catch (error) {
-    throw new ApiError('network');
+    throw failure();
   }
-  if (body === null || typeof body !== 'object' || typeof body.ok !== 'boolean') throw new ApiError('network');
+  if (body === null || typeof body !== 'object' || typeof body.ok !== 'boolean') throw failure();
   if (body.ok) return body.data;
   const error = body.error !== null && typeof body.error === 'object' ? body.error : {};
   const code = typeof error.code === 'string' ? error.code : 'internal';
