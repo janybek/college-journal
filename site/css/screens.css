@@ -5847,6 +5847,63 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 
 .jg-open:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 
+/* The head of a pair that can be marked looks like a button: a framed face behind the text, a pencil, a caption.
+   The unfilled pair is the loudest (it is the main thing a teacher does); a filled one that may still be corrected is calm. */
+.jg-pair-head.is-open { min-width: 4.75rem; }
+
+.jg-pair-head.is-open > span:not(.jg-tip):not(.jg-state) { position: relative; z-index: 2; }
+
+.jg-pair-head.is-open > span { pointer-events: none; }
+
+.jg-pair-head.is-open .jg-state { z-index: 2; }
+
+.jg-pair-head.is-open .jg-open {
+  inset: 3px;
+  width: calc(100% - 6px);
+  height: calc(100% - 6px);
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-inner);
+  background: transparent;
+  transition: background-color 0.12s, border-color 0.12s;
+}
+
+.jg-pair-head.is-open.is-planned .jg-open { border: 1.5px solid var(--primary); background: var(--primary-wash); }
+
+.jg-pair-head.is-open:hover .jg-open,
+.jg-pair-head.is-open .jg-open:focus-visible { border-color: var(--primary); background: var(--primary-line); }
+
+.jg-pair-head.is-open .jg-open:focus-visible { outline: 2px solid var(--primary-ink); outline-offset: 1px; }
+
+.jg-pair-head__act {
+  display: inline-flex !important;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  margin-top: 2px;
+  color: var(--primary-ink);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.jg-pair-head__act .icon { width: 12px; height: 12px; }
+
+.journal-grid thead .jg-pair-head.is-open:hover { background: transparent; }
+
+.jg-open-sample {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.25rem;
+  border: 1.5px solid var(--primary);
+  border-radius: 6px;
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+}
+
+.jg-open-sample .icon { width: 12px; height: 12px; }
+
 .dialog--marks {
   width: min(calc(100% - 1rem), 68rem);
   overflow: hidden;

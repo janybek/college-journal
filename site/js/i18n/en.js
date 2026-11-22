@@ -1179,6 +1179,8 @@ export default {
   'journal.emptyStudents': 'There are no students in the group yet.',
   'journal.marks.title': 'Class marks',
   'journal.marks.when': '{date} · class {slot} · {time}',
+  'journal.markAction': 'Mark',
+  'journal.legend.open': 'click a date to mark the class',
   'journal.marks.open': 'Mark the class: {date}, {kind}',
   'journal.marks.list': 'Students of the group',
   'journal.marks.kind.none': 'Type of class not set',

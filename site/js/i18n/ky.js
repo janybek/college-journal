@@ -1179,6 +1179,8 @@ export default {
   'journal.emptyStudents': 'Топто азырынча студенттер жок.',
   'journal.marks.title': 'Сабактын белгилери',
   'journal.marks.when': '{date} · {slot}-сабак · {time}',
+  'journal.markAction': 'Белгилөө',
+  'journal.legend.open': 'сабакты белгилөө үчүн датаны басыңыз',
   'journal.marks.open': 'Сабакты белгилөө: {date}, {kind}',
   'journal.marks.list': 'Топтун студенттери',
   'journal.marks.kind.none': 'Сабактын түрү көрсөтүлгөн эмес',

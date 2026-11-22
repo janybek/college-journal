@@ -3,12 +3,15 @@ import { t } from '../i18n.js';
 import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '../ui.js';
 import { journalColumns, cellView, pairHead, canMark, pairHint } from '../journal.js';
 import { openMarksDialog } from './journalPair.js';
+import { icon } from '../icons.js';
+import { getUser } from '../session.js';
+import { activeRole } from '../shell.js';
 
 // The journal of a subject (#/journal/<subjectId>): the grid of students and pairs, read only (journal.get).
 // Rows are students (those who left stand last, dimmed); columns are pairs, and after the last pair of a unit
 // its four columns (current control, self-work, unit control, total), then the summary of attendance.
-// The head of a pair the person may fill in (mode `free` or `reason`) opens the window of its marks; nothing else is
-// clickable yet. The server decides what is
+// The head of a pair the person may fill in (mode `free` or `reason`) looks like a button and opens the window of its
+// marks; nothing else is clickable yet. The server decides what is
 // in the answer (a teacher who only substituted gets just their pairs, no unit totals); the screen only draws it.
 
 const blank = (subjectId = null) => ({
@@ -86,14 +89,14 @@ function body(journal) {
   return el('div', { class: 'journal' },
     notes,
     el('p', { class: 'journal__scheme', id: 'journal-scheme' }, t('journal.scheme', { attendance: journal.scheme.attendance, activity: journal.scheme.activity })),
-    legend(),
+    legend(journal.pairs.some(canMark)),
     journal.students.length === 0
       ? emptyState('table', el('p', { class: 'empty__title' }, t('journal.emptyStudents')))
       : grid(journal));
 }
 
 // The key to the marks of the grid.
-function legend() {
+function legend(withOpen) {
   const item = (text, ...marks) => el('li', { class: 'journal-legend__item' }, marks, el('span', {}, text));
   const chip = (status) => el('span', { class: `jg-mark jg-mark--${cellView({ status }).tone}`, 'aria-hidden': 'true' }, t(cellView({ status }).key));
   return el('ul', { class: 'journal-legend', 'aria-label': t('journal.legend.title') },
@@ -101,7 +104,8 @@ function legend() {
     ['unfilled', 'overdue', 'missed'].map((name) => item(t('journal.state.' + name), el('span', { class: `jg-state jg-state--${name}`, 'aria-hidden': 'true' }))),
     item(t('journal.legend.noCoat'), el('span', { class: 'jg-coat', 'aria-hidden': 'true' })),
     item(t('journal.legend.activity'), el('span', { class: 'jg-act', 'aria-hidden': 'true' }, '5')),
-    item(t('journal.legend.manual'), el('span', { class: 'jg-star', 'aria-hidden': 'true' }, '*')));
+    item(t('journal.legend.manual'), el('span', { class: 'jg-star', 'aria-hidden': 'true' }, '*')),
+    withOpen ? item(t('journal.legend.open'), el('span', { class: 'jg-open-sample', 'aria-hidden': 'true' }, icon('pencil'))) : null);
 }
 
 function grid(journal) {
@@ -143,7 +147,7 @@ function pairHeadCell(pair) {
   const { kindKey, stateKey } = pairHead(pair);
   const narrow = pair.status === 'cancelled' || pair.status === 'missed';
   const topic = pair.topicName ? t('journal.topic', { n: pair.number === '' ? '' : pair.number, name: pair.topicName }) : t('journal.topicNone');
-  const hint = pairHint(pair);
+  const hint = pairHint(pair, activeRole(getUser()));
   const tipText = [topic, stateKey ? t(stateKey) : null, pair.substitution ? t('journal.sub', { name: pair.teacherName }) : null, hint ? t(hint) : null].filter(Boolean).join(' · ');
   const open = canMark(pair);
   return el('th', { scope: 'col', class: `jg-pair-head${narrow ? ' is-narrow' : ''}${pair.status === 'planned' ? ' is-planned' : ''}${open ? ' is-open' : ''}`, tabindex: open ? null : '0', 'data-pair': pair.id },
@@ -155,6 +159,8 @@ function pairHeadCell(pair) {
     el('span', { class: `jg-pair-head__kind jg-kind--${pair.lessonType || 'none'}` }, t(kindKey)),
     stateKey ? el('span', { class: `jg-state jg-state--${stateKey.slice('journal.state.'.length)}`, 'aria-hidden': 'true' }) : null,
     pair.substitution ? el('span', { class: 'jg-pair-head__sub' }, surname(pair.teacherName)) : null,
+    open ? el('span', { class: 'jg-pair-head__act', 'aria-hidden': 'true' }, icon('pencil'),
+      pair.status === 'planned' ? el('span', { class: 'jg-pair-head__act-text' }, t('journal.markAction')) : null) : null,
     tip(tipText));
 }
 

@@ -1179,6 +1179,8 @@ export default {
   'journal.emptyStudents': 'В группе пока нет студентов.',
   'journal.marks.title': 'Отметки пары',
   'journal.marks.when': '{date} · пара {slot} · {time}',
+  'journal.markAction': 'Отметить',
+  'journal.legend.open': 'нажмите на дату, чтобы отметить пару',
   'journal.marks.open': 'Отметить пару: {date}, {kind}',
   'journal.marks.list': 'Студенты группы',
   'journal.marks.kind.none': 'Вид занятия не указан',

@@ -87,7 +87,10 @@ test('canMark and pairHint: only free and reason heads open; the others say why'
   assert.equal(canMark({ mode: 'limited' }), false);
   assert.equal(canMark({ mode: 'none' }), false);
   assert.equal(pairHint({ mode: 'none', state: 'future', status: 'planned' }), 'journal.marks.notBegun');
-  assert.equal(pairHint({ mode: 'none', state: 'late', status: 'planned' }), 'journal.marks.termPassed');
+  assert.equal(pairHint({ mode: 'none', state: 'late', status: 'planned' }, 'teacher'), 'journal.marks.termPassed');
+  assert.equal(pairHint({ mode: 'none', state: 'late', status: 'planned' }, 'prorector'), null);
+  assert.equal(pairHint({ mode: 'none', state: 'late', status: 'planned' }, 'dean'), null);
+  assert.equal(pairHint({ mode: 'none', state: 'future', status: 'planned' }, 'prorector'), 'journal.marks.notBegun');
   assert.equal(pairHint({ mode: 'limited', state: 'late', status: 'closed' }), null);
   assert.equal(pairHint({ mode: 'free', state: 'open', status: 'planned' }), null);
 });

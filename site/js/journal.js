@@ -73,11 +73,11 @@ const NO_ACTIVITY = ['absent', 'excused'];
 // Whether the head of a pair opens the window: only the pairs the person may fill in freely or with a reason.
 export const canMark = (pair) => pair.mode === 'free' || pair.mode === 'reason';
 
-// The hint of a head that does not open: the pair has not begun; the term has passed (a teacher goes to the deanery).
-export function pairHint(pair) {
+// The hint of a head that does not open: the pair has not begun; the term has passed (only a teacher is sent to the deanery).
+export function pairHint(pair, role) {
   if (canMark(pair)) return null;
   if (pair.state === 'future') return 'journal.marks.notBegun';
-  if (pair.status === 'planned' && pair.state === 'late' && pair.mode === 'none') return 'journal.marks.termPassed';
+  if (pair.status === 'planned' && pair.state === 'late' && pair.mode === 'none' && role === 'teacher') return 'journal.marks.termPassed';
   return null;
 }
 
