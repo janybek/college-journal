@@ -14,7 +14,9 @@ export const LITERATURE_KINDS = ['main', 'extra'];
 export const RULE_KINDS = ['behavior', 'ethics', 'sanction_behavior', 'sanction_ethics'];
 export const ATTENDANCE_STATUSES = ['present', 'late', 'absent', 'excused', 'madeup'];   // был, опоздал, не был, уважительная причина, отработано
 export const ATTENDED_STATUSES = ['present', 'late', 'madeup'];
-export const MARK_SOURCES = ['teacher'];             // как отмечено; юнит 4 допишет 'code' и 'qr'
+export const MARK_SOURCES = ['teacher', 'code', 'qr', 'auto'];   // рукой, по коду, по QR, «не был» в конце окна
+export const CHECKIN_WAYS = ['code', 'qr'];
+export const CHECKIN_RESULTS = ['ok', 'wrong'];
 export const RESULT_FIELDS = ['control', 'self', 'current'];
 export const LOG_ENTITIES = ['mark', 'unit', 'pair'];
 
@@ -147,6 +149,8 @@ export const SCHEMA = {
       col('topicId', 'тема'), col('lessonType', 'тип занятия'), col('part', 'часть', 'int'), col('status', 'статус'), col('planDate', 'дата по плану'),
       col('planSlot', '№ пары по плану', 'int'), col('changed', 'изменена вручную', 'bool'), col('note', 'примечание'),
       col('substitute', 'замена', 'bool'),
+      col('startedAt', 'фактический старт'), col('startedBy', 'кто начал'), col('checkinUntil', 'отметка до'),
+      col('checkinClosed', 'отметка закрыта', 'bool'), col('finishedAt', 'пара закрыта'), col('finishedBy', 'кто закрыл'),
     ],
   },
   attendance: {
@@ -166,6 +170,11 @@ export const SCHEMA = {
     columns: [col('id', 'id'), col('at', 'когда'), col('actorId', 'кто'), col('entity', 'что'), col('subjectId', 'предмет'),
       col('pairId', 'пара'), col('studentId', 'студент'), col('unit', 'юнит', 'int'), col('field', 'поле'),
       col('before', 'было'), col('after', 'стало'), col('reason', 'причина'), col('late', 'после срока', 'bool')],
+  },
+  checkins: {
+    sheet: 'Отметки с телефона', prefix: 'ci',
+    columns: [col('id', 'id'), col('pairId', 'пара'), col('studentId', 'студент'), col('device', 'устройство'),
+      col('way', 'как'), col('result', 'результат'), col('at', 'когда')],
   },
 };
 

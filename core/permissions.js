@@ -8,7 +8,7 @@ const DEAN_EDIT_TABLES = [...DEAN_TABLES, ...SCHEDULE_TABLES];
 const IMPORT_TABLES = ALL_TABLES;
 const DEAN_IMPORT_TABLES = DEAN_TABLES;
 
-const PUBLIC_ACTIONS = ['auth.login', 'i18n.overrides'];
+const PUBLIC_ACTIONS = ['auth.login', 'i18n.overrides', 'checkin.pass'];
 const ANY_ACTIONS = ['auth.me', 'auth.changePassword', 'user.setLang'];
 
 // action -> role -> allowed tables (or true for actions without a table)
@@ -51,6 +51,13 @@ const ROLE_ACTIONS = {
   'journal.reopenPair': { admin: true, dean: true },
   'journal.log': { admin: true, dean: true, prorector: true, teacher: true },
   'student.grades': { student: true },
+  'lesson.mine': { teacher: true },
+  'lesson.get': { teacher: true },
+  'lesson.start': { teacher: true },
+  'lesson.endCheckin': { teacher: true },
+  'lesson.finish': { teacher: true },
+  'checkin.current': { student: true },
+  'checkin.mark': { student: true },
 };
 
 const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);

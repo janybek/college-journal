@@ -17,6 +17,21 @@ const platform = createNodePlatform({ now: () => 1000, secret: 's' });
 const tableNames = () => Object.keys(SCHEMA);
 const repoUrl = (file) => pathToFileURL(path.join(import.meta.dirname, '..', file)).href;
 
+test('ensureTables adds the phone check-in table and the six lesson columns to an old base; old pairs read as not started', (t) => {
+  const { db } = tmpBase(t, { empty: true });
+  const oldColumns = SCHEMA.pairs.columns.slice(0, -6);
+  db.exec(`CREATE TABLE "pairs" (${oldColumns.map((c) => `"${c.key}" TEXT`).join(', ')}); INSERT INTO "pairs" ("id", "status") VALUES ('p_1', 'planned')`);
+  const result = ensureTables(SCHEMA, db);
+  assert.ok(result.created.includes('checkins'));
+  assert.deepEqual(result.added.map(([table, key]) => table + '.' + key),
+    ['startedAt', 'startedBy', 'checkinUntil', 'checkinClosed', 'finishedAt', 'finishedBy'].map((k) => 'pairs.' + k));
+  const store = createSqliteStore(SCHEMA, platform, db);
+  assert.deepEqual(store.list('checkins'), []);
+  const pair = store.get('pairs', 'p_1');
+  assert.deepEqual([pair.startedAt, pair.startedBy, pair.checkinUntil, pair.checkinClosed, pair.finishedAt, pair.finishedBy], ['', '', '', false, '', '']);
+  assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
+});
+
 // A file base in a temporary folder. One t.after per test: it closes every base still open (db and what the test gave to keep), then removes the folder.
 function tmpBase(t, { empty = false } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'journal-sqlite-'));

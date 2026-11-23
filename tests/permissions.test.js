@@ -39,7 +39,7 @@ test('actionKind', () => {
 });
 
 test('listPermissions', () => {
-  assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get']);
+  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get']);
   const dean = listPermissions(['dean']);
   assert.ok(dean.includes('import.apply:students'));
   assert.ok(!dean.includes('dir.save:staff'));
@@ -76,8 +76,9 @@ test('a file fills the draft: the deanery, the administrator and a teacher (of h
   assert.equal(can(['teacher'], 'dir.save', 'weekTemplate'), false);
   assert.deepEqual(listPermissions(['teacher']),
     ['journal.get', 'journal.list', 'journal.log', 'journal.saveResults', 'journal.savePair',
+      'lesson.mine', 'lesson.get', 'lesson.start', 'lesson.endCheckin', 'lesson.finish',
       'schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects'].sort());
-  assert.deepEqual(listPermissions(['student']), ['schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get']);
+  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get']);
   assert.equal(can(['dean'], 'topics.plan'), false);
   assert.equal(can(['student'], 'student.subjects'), true);
   assert.equal(can(['teacher'], 'student.subjects'), false);
@@ -106,4 +107,20 @@ test('syllabus form actions by role', () => {
   for (const action of ['syllabus.startDraft', 'syllabus.saveSection', 'syllabus.submit']) assert.deepEqual(who(action), [true, true, false, true, false], action);
   assert.deepEqual([who('syllabus.form'), who('syllabus.approve'), who('syllabus.return'), who('syllabus.queue')],
     [[true, true, true, true, false], [true, true, false, false, false], [true, true, false, false, false], [true, true, true, false, false]]);
+});
+
+test('phone check-in: the pass is public, lessons are for the teacher, marks for the student, the table is closed to directories and import', () => {
+  assert.equal(actionKind('checkin.pass'), 'public');
+  for (const action of ['lesson.mine', 'lesson.get', 'lesson.start', 'lesson.endCheckin', 'lesson.finish']) {
+    assert.equal(can(['teacher'], action), true, action);
+    assert.equal(can(['dean', 'teacher'], action), true, action);
+    for (const role of ['admin', 'dean', 'prorector', 'student']) assert.equal(can([role], action), false, role + ' ' + action);
+  }
+  for (const action of ['checkin.current', 'checkin.mark']) {
+    assert.equal(can(['student'], action), true);
+    for (const role of ['admin', 'dean', 'prorector', 'teacher']) assert.equal(can([role], action), false, role + ' ' + action);
+  }
+  for (const role of ['admin', 'dean', 'prorector', 'teacher', 'student']) {
+    for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.preview', 'import.apply']) assert.equal(can([role], action, 'checkins'), false, role + ' ' + action);
+  }
 });

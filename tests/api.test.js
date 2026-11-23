@@ -189,7 +189,7 @@ test('publicUser', () => {
   const row = { id: 'sf_1', fullName: 'A', roles: 'teacher', lang: 'en', mustChangePassword: false, passwordHash: 'x' };
   assert.deepEqual(publicUser(row, 'staff'), {
     id: 'sf_1', kind: 'staff', fullName: 'A', roles: ['teacher'], lang: 'en', mustChangePassword: false,
-    groupId: null, groupName: null, permissions: ['journal.get', 'journal.list', 'journal.log', 'journal.savePair', 'journal.saveResults', 'schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects'],
+    groupId: null, groupName: null, permissions: ['journal.get', 'journal.list', 'journal.log', 'journal.savePair', 'journal.saveResults', 'lesson.endCheckin', 'lesson.finish', 'lesson.get', 'lesson.mine', 'lesson.start', 'schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects'],
   });
   const studentRow = { id: 'st_1', fullName: 'S', groupId: 'g_1', cardNo: 'S1', lang: 'ky', mustChangePassword: false };
   const student = publicUser(studentRow, 'student');
