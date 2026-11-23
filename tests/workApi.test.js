@@ -50,7 +50,8 @@ test('work.get, work.list, work.overview: who reads what', () => {
   for (const token of [t.dean, t.prorector, t.admin, t.teacher1]) assert.equal(call('work.get', { assignmentId: id }, token).ok, true);
   assert.equal(call('work.get', { assignmentId: id }, t.teacher2).error.code, 'forbidden');
   assert.equal(call('work.get', { assignmentId: id }, t.teacher3).error.code, 'forbidden');
-  assert.equal(call('work.get', { assignmentId: id }, t.a1).error.code, 'not_found');
+  assert.equal(call('work.get', { assignmentId: id }, t.a1).ok, true);          // the student of the group reads his own view
+  assert.equal(call('work.get', { assignmentId: id }, t.b1).error.code, 'not_found');
   for (const bad of [[id], 5, null, 'as_nope', ` ${id} `]) assert.equal(call('work.get', { assignmentId: bad }, t.teacher1).error.code, 'not_found');
 
   const list = call('work.list', { subjectId: sb1 }, t.teacher1).data;

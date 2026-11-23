@@ -211,6 +211,14 @@ export function removeAssignment(store, platform, data, user) {
   return {};
 }
 
+// The topic of the assignment and the title of its unit in the syllabus it follows.
+export function assignmentPlace(rows, subject, assignment, settings) {
+  const topic = assignment.topicId ? rows.topics.find((t) => t.id === assignment.topicId) : undefined;
+  const syllabus = topic ? rows.syllabi.find((s) => s.id === topic.syllabusId) : syllabusFor(subject, rows.syllabi, settings.semester);
+  const unitRow = syllabus ? rows.units.find((u) => u.syllabusId === syllabus.id && u.unit === assignment.unit) : undefined;
+  return { topic, unitTitle: unitRow ? unitRow.title ?? '' : '' };
+}
+
 // The answer of 'work.get' to the staff: the students of the group with their attempts. Pending and dropped files are never shown.
 export function staffWorkView(rows, platform, assignment, user) {
   const { subject, rights } = rightsOf(rows, assignment, user);
@@ -218,9 +226,7 @@ export function staffWorkView(rows, platform, assignment, user) {
   const nowMs = platform.now();
   const settings = readSettings(rows.settings);
   const byStudent = attemptsByStudent(rows, assignment.id);
-  const topic = assignment.topicId ? rows.topics.find((t) => t.id === assignment.topicId) : undefined;
-  const syllabus = topic ? rows.syllabi.find((s) => s.id === topic.syllabusId) : syllabusFor(subject, rows.syllabi, settings.semester);
-  const unitRow = syllabus ? rows.units.find((u) => u.syllabusId === syllabus.id && u.unit === assignment.unit) : undefined;
+  const { topic, unitTitle } = assignmentPlace(rows, subject, assignment, settings);
 
   const filesOf = new Map();
   for (const f of rows.files) {
@@ -252,7 +258,7 @@ export function staffWorkView(rows, platform, assignment, user) {
     now: localDateTime(nowMs),
     assignment: {
       id: assignment.id, subjectId: subject.id, subjectName: subject.name, groupName: groupNameOf(rows, subject), teacherName: nameOf(rows.staff, subject.teacherId),
-      kind: assignment.kind, unit: assignment.unit, unitTitle: unitRow ? unitRow.title ?? '' : '', topicId: assignment.topicId, topicName: topic ? topic.name : '',
+      kind: assignment.kind, unit: assignment.unit, unitTitle, topicId: assignment.topicId, topicName: topic ? topic.name : '',
       title: assignment.title, description: assignment.description, dueAt: assignment.dueAt, maxPoints: assignment.maxPoints, createdAt: assignment.createdAt,
       locked: byStudent.size > 0,
     },
