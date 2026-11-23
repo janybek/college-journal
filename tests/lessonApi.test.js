@@ -198,3 +198,32 @@ test('lesson.*: each table is read once, the start writes the pairs at most twic
   assert.ok(spy.writes['updateMany:pairs'] <= 2);
   assert.deepEqual(Object.keys(spy.writes).filter((k) => !['updateMany:pairs', 'insertMany:attendance'].includes(k)), []);
 });
+
+test('lesson.start: a second pair started inside the window of the first closes it at that moment', () => {
+  const s = setup();
+  const { call, t, at, tick, store, sb1, ids, a1, a2, a3 } = s;
+  const p1006 = s.pairOf(sb1, '2026-10-06').id;
+  const p1006b = secondPair(s, '2026-10-06');
+  at('2026-10-06', '09:29:00');
+  assert.equal(call('lesson.start', { pairId: p1006 }, t.teacher1).ok, true);
+  const code = call('lesson.get', { pairId: p1006 }, t.teacher1).data.lesson.code.now;
+  assert.equal(call('checkin.mark', { pairId: p1006, device: '1'.repeat(32), code }, t.a1).data.result, 'ok');
+  tick(60000);
+  assert.equal(call('lesson.start', { pairId: p1006b }, t.teacher1).ok, true);
+  const first = store.get('pairs', p1006);
+  assert.deepEqual([first.status, first.finishedAt, first.finishedBy, first.checkinUntil, first.checkinClosed],
+    ['closed', '2026-10-06 09:30:00', ids.teacher1, '2026-10-06 09:30:00', true]);
+  assert.deepEqual(store.list('attendance').filter((x) => x.pairId === p1006).map((x) => [x.studentId, x.status, x.source, x.markedAt]).sort(),
+    [[a1, 'present', 'code', '2026-10-06 09:29:00'], [a2, 'absent', 'auto', '2026-10-06 09:30:00'], [a3, 'absent', 'auto', '2026-10-06 09:30:00']].sort());
+  assert.equal(store.get('pairs', p1006b).status, 'running');
+});
+
+test('lesson.mine: each table is read at most once', () => {
+  const s = setup();
+  const { call, t, at, spy } = s;
+  at('2026-09-22', '07:58');
+  spy.reset();
+  assert.equal(call('lesson.mine', {}, t.teacher1).ok, true);
+  assert.ok(Object.keys(spy.lists).length > 0);
+  for (const [table, n] of Object.entries(spy.lists)) assert.ok(n <= 1, table);
+});

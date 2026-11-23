@@ -115,7 +115,7 @@ function save(data, ctx) {
 const BLOCKERS = {
   disciplines: (id) => [['subjects', (r) => r.disciplineId === id], ['syllabi', (r) => r.disciplineId === id]],
   groups: (id) => [['students', (r) => r.groupId === id], ['subjects', (r) => r.groupId === id], ['pairs', (r) => r.groupId === id]],
-  students: (id) => [['attendance', (r) => r.studentId === id], ['unitResults', (r) => r.studentId === id], ['changeLog', (r) => r.studentId === id]],
+  students: (id) => [['attendance', (r) => r.studentId === id], ['checkins', (r) => r.studentId === id], ['unitResults', (r) => r.studentId === id], ['changeLog', (r) => r.studentId === id]],
   staff: (id) => [
     ['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id], ['syllabi', (r) => r.teacherId === id],
     ['attendance', (r) => r.markedBy === id], ['unitResults', (r) => r.updatedBy === id], ['changeLog', (r) => r.actorId === id],

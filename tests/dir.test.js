@@ -149,6 +149,9 @@ test('remove: marks, unit results and the change log keep students, staff and su
   store.insert('unitResults', { subjectId: free.id, studentId: 'st_x', unit: 1, control: 30, updatedBy: dean3.id });
   assert.equal(call('dir.remove', { table: 'subjects', id: free.id }, admin).error.code, 'in_use');
   assert.equal(call('dir.remove', { table: 'staff', id: dean3.id }, admin).error.code, 'in_use');
+  const st3 = mk('c3');
+  store.insert('checkins', { pairId: 'p_x', studentId: st3.id, device: 'a'.repeat(32), way: 'code', result: 'wrong', at: '2026-09-22 07:58:00' });
+  assert.equal(call('dir.remove', { table: 'students', id: st3.id }, admin).error.code, 'in_use');
   const clean = mk('c3');
   assert.deepEqual(call('dir.remove', { table: 'students', id: clean.id }, admin).data, {});
 });
