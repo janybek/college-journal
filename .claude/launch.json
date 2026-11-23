@@ -3,6 +3,7 @@
   "configurations": [
     { "name": "journal-dev", "runtimeExecutable": "node", "runtimeArgs": ["dev/server.js"], "port": 5273 },
     { "name": "journal-dev-reset", "runtimeExecutable": "node", "runtimeArgs": ["dev/server.js", "--reset"], "port": 5273 },
-    { "name": "journal-dev-real", "runtimeExecutable": "node", "runtimeArgs": ["dev/server.js", "--real"], "port": 5273 }
+    { "name": "journal-dev-real", "runtimeExecutable": "node", "runtimeArgs": ["dev/server.js", "--real"], "port": 5273 },
+    { "name": "journal-dev-lesson", "runtimeExecutable": "node", "runtimeArgs": ["dev/server.js", "--reset", "--lesson-now"], "port": 5273 }
   ]
 }

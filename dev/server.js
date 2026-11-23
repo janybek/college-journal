@@ -8,7 +8,7 @@ import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { handleRequest } from '../backend/api.js';
 import { createLoginGuard } from '../core/loginGuard.js';
 import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from '../backend/node/http.js';
-import { seed, seedAdmin } from './seed.js';
+import { seed, seedAdmin, prepareLessonNow } from './seed.js';
 import { upgradeFile } from './upgrade.js';
 
 // Local stand: serves the static site and answers the production API from a JSON file. Node only.
@@ -53,14 +53,19 @@ function serveFile(req, res, siteDir, pathname) {
   res.end(req.method === 'HEAD' ? undefined : body);
 }
 
-// Arguments of a direct run -> { mode, dataFile } (files relative to `root`) or { error: 'reset_refused' }.
+// Arguments of a direct run -> { mode, dataFile } (files relative to `root`; with --lesson-now also lessonNow: true) or
+// { error: 'reset_refused' } or { error: 'lesson_refused' }.
 // --reset deletes only the fictional data file; the real one is never deleted by any arguments.
+// --lesson-now puts a pair at the current time: the real data is not edited, so it is refused with --real.
 export function standArgs(argv, root = ROOT) {
   const real = argv.includes('--real');
   const reset = argv.includes('--reset');
+  const lessonNow = argv.includes('--lesson-now');
   if (real && reset) return { error: 'reset_refused' };
+  if (real && lessonNow) return { error: 'lesson_refused' };
   if (reset) fs.rmSync(path.resolve(root, DATA_FILES.demo), { force: true });
-  return real ? { mode: 'real', dataFile: DATA_FILES.real } : { mode: 'demo', dataFile: DATA_FILES.demo };
+  if (real) return { mode: 'real', dataFile: DATA_FILES.real };
+  return lessonNow ? { mode: 'demo', dataFile: DATA_FILES.demo, lessonNow: true } : { mode: 'demo', dataFile: DATA_FILES.demo };
 }
 
 // What fills a missing data file. The real data file never gets the fictional people, whatever the mode.
@@ -70,7 +75,8 @@ export function seederFor(dataPath, mode) {
 
 // mode 'demo': a missing data file is filled with the fictional stand. mode 'real': a missing file gets an empty base and one admin;
 // the fictional seed is never called, so no invented people, subjects or pairs get in.
-export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, siteDir = 'site', maxBodyBytes = MAX_BODY_BYTES, mode = 'demo' } = {}) {
+// lessonNow: after the seed of a fresh fictional file a pair of «Информатика» of 01-1 is put at the current time (the real data is never edited).
+export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, siteDir = 'site', maxBodyBytes = MAX_BODY_BYTES, mode = 'demo', lessonNow = false } = {}) {
   const dataPath = path.resolve(ROOT, dataFile);
   const sitePath = path.resolve(ROOT, siteDir);
   const platform = createNodePlatform();
@@ -81,6 +87,7 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   }
   const store = createFileStore(SCHEMA, platform, dataPath);
   if (fresh) seederFor(dataPath, mode)(store, platform);
+  if (lessonNow && fresh && mode !== 'real' && seederFor(dataPath, mode) === seed) prepareLessonNow(store, platform);
   const ctx = { store, platform, loginGuard: createLoginGuard(), log: (error) => console.error(error) };
 
   const server = http.createServer(async (req, res) => {
@@ -121,9 +128,11 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const args = standArgs(process.argv.slice(2));
   if (args.error) {
-    console.error('--reset не работает с --real: настоящие данные стенда не стираются. Если файл правда нужно удалить, удалите dev/data/real.json руками.');
+    console.error(args.error === 'lesson_refused'
+      ? '--lesson-now не работает с --real: пара «сейчас» правит данные, а настоящие данные стенд не правит. Запустите без --real (npm run dev:lesson).'
+      : '--reset не работает с --real: настоящие данные стенда не стираются. Если файл правда нужно удалить, удалите dev/data/real.json руками.');
     process.exit(1);
   }
-  const server = await startDevServer({ port: 5273, dataFile: args.dataFile, mode: args.mode });
+  const server = await startDevServer({ port: 5273, dataFile: args.dataFile, mode: args.mode, lessonNow: args.lessonNow });
   console.log(`${server.url}  data: ${path.resolve(ROOT, args.dataFile)}`);
 }

@@ -1,5 +1,5 @@
 import { hashPassword } from '../core/auth.js';
-import { addDays, addMinutes, localDate, mondayOf } from '../core/dates.js';
+import { addDays, addMinutes, localDate, localTime, minutesOf, mondayOf } from '../core/dates.js';
 import { DEFAULT_BELLS, settingsToRows } from '../core/settings.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { generateSchedule, relayout, todayOf } from '../backend/scheduleData.js';
@@ -350,4 +350,36 @@ function seedMarks(store, platform) {
   const view = journalView(readJournalRows(store), platform, first.id, teacher1);
   const calculated = view.results[group1[3].id].units[0].current;
   saveUnitResults(store, platform, { subjectId: first.id, unit: 1, field: 'current', items: [{ studentId: group1[3].id, value: Math.min(40, calculated + 2) }], reason: 'Участие в олимпиаде' }, teacher1);
+}
+
+// The stand of the QR screens: puts a pair of «Информатика» of 01-1 (teacher1) on the current time, so the screens can be tried at any hour.
+// Today's planned pair of that subject is taken (only its start time changes), else the nearest future one moves to today ({ date, startTime, changed }).
+// The start time is the Bishkek time now, rounded down to 5 minutes; after 22:00 it is now minus 10 minutes, not later than 22:25 (the bells go to 22:25).
+// After 23:30 nothing is prepared (the window and the 90 minutes of the pair would cross midnight). The topic and the pair number stay as they are;
+// the start time not matching the slot is allowed on the stand only: the pair is a trial one. -> the id of the pair or null.
+export function prepareLessonNow(store, platform) {
+  const nowMs = platform.now();
+  const today = localDate(nowMs);
+  const minutes = minutesOf(localTime(nowMs));
+  if (minutes >= 23 * 60 + 30) {
+    console.log('После 23:30 стенд не готовит пару «сейчас»: пара и окно отметки перешли бы через полночь.');
+    return null;
+  }
+  const rounded = minutes - (minutes % 5);
+  const start = addMinutes('00:00', rounded >= 22 * 60 ? Math.min(rounded - 10, 22 * 60 + 25) : rounded);
+  const group = store.list('groups').find((g) => g.name === '01-1');
+  const teacher = store.list('staff').find((p) => p.login === 'teacher1');
+  const subject = group && teacher && store.list('subjects').find((s) => s.name === 'Информатика' && s.groupId === group.id && s.teacherId === teacher.id);
+  if (!subject) return null;
+  const planned = store.list('pairs').filter((p) => p.subjectId === subject.id && p.status === 'planned');
+  const order = (a, b) => a.date.localeCompare(b.date) || a.slot - b.slot;
+  const own = planned.filter((p) => p.date === today).sort(order)[0];
+  if (own) {
+    store.update('pairs', own.id, { startTime: start });
+    return own.id;
+  }
+  const next = planned.filter((p) => p.date > today).sort(order)[0];
+  if (!next) return null;
+  store.update('pairs', next.id, { date: today, startTime: start, changed: true });
+  return next.id;
 }

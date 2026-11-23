@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { codeAt, issuePass, pairKey } from '../core/lesson.js';
+import { codeAt, issuePass, lessonClock, pairKey } from '../core/lesson.js';
 import { parseLocalDateTime } from '../core/dates.js';
 import { dev, setup } from './journalSetup.js';
 
@@ -35,6 +35,14 @@ test('checkin.mark: the code, one phone, five wrong codes, the QR pass, the clos
   assert.deepEqual(mark(t.a1, { code: code().now, device: dev(9) }).data, { result: 'already', status: 'present', at: '07:58' });
   assert.equal(mark(t.a2, { code: code().now }).error.code, 'device_used');
   // the previous code is still accepted, a changed one is not, a very old one counts as expired
+  // (a code of this step that repeats at step +2 or +3 would still be accepted there: move the clock one step on and take the next code)
+  const repeats = () => {
+    const pair = store.get('pairs', p0922);
+    const step = lessonClock(pair, platform.now()).step;
+    const key0 = pairKey(platform, pair);
+    return [2, 3].some((k) => codeAt(platform, key0, step) === codeAt(platform, key0, step + k));
+  };
+  while (repeats()) tick(15000);
   const first = code();
   tick(15000);
   assert.equal(mark(t.a2, { code: first.now, device: dev(2) }).data.result, 'ok');
@@ -54,6 +62,12 @@ test('checkin.mark: the code, one phone, five wrong codes, the QR pass, the clos
   const qr = call('checkin.pass', { pairId: p0922, qr: code().qr, device: dev(3) }, undefined).data;
   assert.deepEqual(Object.keys(qr).sort(), ['checkinLeftMs', 'pass']);
   assert.equal(mark(t.a3, { pass: qr.pass, device: dev(4) }).error.code, 'bad_pass');
+  // a pass with a changed expiry and the old signature is not a pass
+  const [head, body, sign] = qr.pass.split('.');
+  const forged = [head, encodeURIComponent(JSON.stringify({ ...JSON.parse(decodeURIComponent(body)), exp: JSON.parse(decodeURIComponent(body)).exp + 3600000 })), sign].join('.');
+  const beforeForged = snapshot();
+  assert.equal(mark(t.a3, { pass: forged, device: dev(3) }).error.code, 'bad_pass');
+  assert.deepEqual(snapshot(), beforeForged);
   assert.equal(mark(t.a3, { pass: qr.pass, device: dev(3) }).data.result, 'ok');
   assert.equal(store.list('attendance').find((x) => x.pairId === p0922 && x.studentId === a3).source, 'qr');
   assert.equal(call('checkin.pass', { pairId: p0922, qr: 'f'.repeat(16), device: dev(5) }, undefined).error.code, 'bad_code');
@@ -112,9 +126,10 @@ test('checkin: passes, rights, current, settling, one read per table', () => {
   const again = call('checkin.pass', { pairId: p0922, qr: lesson().code.qr, device: dev(7) });
   assert.equal(again.ok, true);
   assert.deepEqual(call('checkin.current', {}, t.a1).data.pair.mark, { status: 'present', at: '07:58' });
+  const qrNow = lesson().code.qr;
   spy.reset();
-  call('checkin.pass', { pairId: p0922, qr: lesson().code.qr, device: dev(7) });
-  assert.ok(spy.lists.pairs <= 2);
+  call('checkin.pass', { pairId: p0922, qr: qrNow, device: dev(7) });
+  assert.equal(spy.lists.pairs, 1);
   // the window ended: the others are "absent" once, the mark of a1 is not touched
   const passOfA2 = call('checkin.pass', { pairId: p0922, qr: lesson().code.qr, device: dev(2) }).data.pass;
   tick(5 * 60000);

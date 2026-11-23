@@ -8,6 +8,7 @@
     "dev": "node dev/server.js",
     "dev:reset": "node dev/server.js --reset",
     "dev:real": "node dev/server.js --real",
+    "dev:lesson": "node dev/server.js --reset --lesson-now",
     "build:gas": "node scripts/build-gas.js",
     "serve": "node backend/node/server.js",
     "serve:init": "node backend/node/server.js --init",

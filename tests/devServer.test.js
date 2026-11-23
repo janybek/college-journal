@@ -9,12 +9,14 @@ import { SCHEMA } from '../core/schema.js';
 import http from 'node:http';
 import { fileURLToPath } from 'node:url';
 import { startDevServer, MAX_BODY_BYTES, DATA_FILES, standArgs, seederFor } from '../dev/server.js';
-import { seed, seedAdmin, DEV_PASSWORD } from '../dev/seed.js';
+import { seed, seedAdmin, prepareLessonNow, DEV_PASSWORD } from '../dev/seed.js';
 import { createFileStore } from '../backend/store/fileStore.js';
 import { pairViews } from '../backend/scheduleData.js';
 import { verifyPassword } from '../core/auth.js';
 import { readSettings, DEFAULT_BELLS } from '../core/settings.js';
 import { LOGIN_LIMIT } from '../core/loginGuard.js';
+import { handleRequest } from '../backend/api.js';
+import { bishkek, dev } from './journalSetup.js';
 
 function tempDirs(t) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'journal-dev-'));
@@ -294,4 +296,110 @@ test('the stand limits login attempts by the same rule; a restart clears the cou
   await srv.close();
   const again = await start(t, { dataFile, siteDir });
   assert.equal((await again.post(right)).ok, true);
+});
+
+// A stand of the fictional people with a clock that stands where the test puts it (Bishkek time).
+function lessonStand(date, time) {
+  const now = bishkek(date, time);
+  const platform = createNodePlatform({ now: () => now, secret: 'test-secret' });
+  const store = createMemoryStore(SCHEMA, platform);
+  seed(store, platform);
+  const call = (action, data, token) => handleRequest(JSON.stringify({ action, data, token }), { store, platform, log: () => {} });
+  const login = (name) => call('auth.login', { login: name, password: DEV_PASSWORD }).data.token;
+  const pairsOf = () => store.list('pairs');
+  const subject = store.list('subjects').find((x) => x.name === 'Информатика' && x.groupId === store.list('groups').find((g) => g.name === '01-1').id);
+  const ownPairs = () => pairsOf().filter((x) => x.subjectId === subject.id);
+  return { store, platform, call, login, pairsOf, ownPairs };
+}
+
+test('--lesson-now: the flag is read, the key appears only with it, the real stand refuses it', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'journal-args-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const data = path.join(root, 'dev', 'data');
+  fs.mkdirSync(data, { recursive: true });
+  for (const name of ['db.json', 'real.json']) fs.writeFileSync(path.join(data, name), '{"keep":1}');
+  assert.deepEqual(standArgs(['--real', '--lesson-now'], root), { error: 'lesson_refused' });
+  assert.deepEqual(standArgs(['--lesson-now', '--real'], root), { error: 'lesson_refused' });
+  assert.deepEqual(['db.json', 'real.json'].map((name) => fs.readFileSync(path.join(data, name), 'utf8')), ['{"keep":1}', '{"keep":1}']);
+  assert.deepEqual(standArgs(['--lesson-now'], root), { mode: 'demo', dataFile: DATA_FILES.demo, lessonNow: true });
+  assert.equal(fs.existsSync(path.join(data, 'db.json')), true);
+  assert.deepEqual(standArgs(['--reset', '--lesson-now'], root), { mode: 'demo', dataFile: DATA_FILES.demo, lessonNow: true });
+  assert.equal(fs.existsSync(path.join(data, 'db.json')), false);
+  assert.deepEqual(standArgs([], root), { mode: 'demo', dataFile: DATA_FILES.demo });
+  assert.deepEqual(standArgs(['--real'], root), { mode: 'real', dataFile: DATA_FILES.real });
+  assert.equal(fs.readFileSync(path.join(data, 'real.json'), 'utf8'), '{"keep":1}');
+  const pkg = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', 'package.json'), 'utf8'));
+  const launch = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '..', '.claude', 'launch.json'), 'utf8'));
+  assert.equal(pkg.scripts['dev:lesson'], 'node dev/server.js --reset --lesson-now');
+  assert.deepEqual(launch.configurations.find((c) => c.name === 'journal-dev-lesson'),
+    { name: 'journal-dev-lesson', runtimeExecutable: 'node', runtimeArgs: ['dev/server.js', '--reset', '--lesson-now'], port: 5273 });
+});
+
+test('prepareLessonNow: Wednesday 12:03 - the nearest informatics pair of 01-1 comes to today at 12:00 and works end to end', () => {
+  const s = lessonStand('2026-11-18', '12:03');
+  const before = s.pairsOf();
+  assert.equal(s.ownPairs().some((x) => x.date === '2026-11-18'), false);
+  const nearest = s.ownPairs().filter((x) => x.date > '2026-11-18' && x.status === 'planned').sort((a, b) => a.date.localeCompare(b.date) || a.slot - b.slot)[0];
+  const id = prepareLessonNow(s.store, s.platform);
+  assert.equal(id, nearest.id);
+  const moved = s.store.get('pairs', id);
+  assert.deepEqual([moved.date, moved.startTime, moved.changed, moved.slot, moved.topicId, moved.status], ['2026-11-18', '12:00', true, nearest.slot, nearest.topicId, 'planned']);
+  assert.deepEqual(s.pairsOf().filter((x) => x.id !== id), before.filter((x) => x.id !== id));
+  const teacher = s.login('teacher1');
+  const mine = s.call('lesson.mine', {}, teacher).data.pairs;
+  assert.deepEqual(mine.map((x) => [x.id, x.lesson, x.startTime, x.problem]), [[id, 'start', '12:00', null]]);
+  assert.equal(s.call('lesson.start', { pairId: id }, teacher).ok, true);
+  const code = s.call('lesson.get', { pairId: id }, teacher).data.lesson.code.now;
+  const marked = s.call('checkin.mark', { pairId: id, device: dev(1), code }, s.login('S1001'));
+  assert.deepEqual([marked.ok, marked.data.result], [true, 'ok']);
+});
+
+test('prepareLessonNow: Monday - the informatics pair of today is taken, only its time changes, no other pair moves', () => {
+  const s = lessonStand('2026-11-16', '12:03');
+  const before = s.pairsOf();
+  const today = s.ownPairs().filter((x) => x.date === '2026-11-16');
+  assert.equal(today.length, 1);
+  const id = prepareLessonNow(s.store, s.platform);
+  assert.equal(id, today[0].id);
+  assert.deepEqual(s.pairsOf().filter((x) => x.id !== id), before.filter((x) => x.id !== id));
+  assert.deepEqual(s.store.get('pairs', id), { ...today[0], startTime: '12:00' });
+  assert.equal(s.call('lesson.start', { pairId: id }, s.login('teacher1')).ok, true);
+});
+
+test('prepareLessonNow: the time is rounded down to 5 minutes; after 22:00 it is now minus 10 minutes, not later than 22:25; after 23:30 nothing', () => {
+  const timeAt = (clock) => {
+    const s = lessonStand('2026-11-18', clock);
+    const id = prepareLessonNow(s.store, s.platform);
+    return id === null ? null : s.store.get('pairs', id).startTime;
+  };
+  assert.equal(timeAt('09:59'), '09:55');
+  assert.equal(timeAt('21:59'), '21:55');
+  assert.equal(timeAt('22:05'), '21:55');
+  assert.equal(timeAt('22:40'), '22:25');
+  assert.equal(timeAt('23:29'), '22:25');
+  const late = lessonStand('2026-11-18', '23:30');
+  const before = late.pairsOf();
+  const logged = [];
+  const log = console.log;
+  console.log = (...args) => logged.push(args.join(' '));
+  try { assert.equal(prepareLessonNow(late.store, late.platform), null); } finally { console.log = log; }
+  assert.equal(logged.length, 1);
+  assert.deepEqual(late.pairsOf(), before);
+});
+
+test('the stand moves a pair with --lesson-now only: without the flag every pair keeps its bell time', async (t) => {
+  const { dataFile, siteDir } = tempDirs(t);
+  const plain = await startDevServer({ port: 0, dataFile, siteDir });
+  await plain.close();
+  const platform = createNodePlatform();
+  const bells = new Set(DEFAULT_BELLS);
+  assert.equal(createFileStore(SCHEMA, platform, dataFile).list('pairs').every((x) => bells.has(x.startTime)), true);
+  const minutes = new Date(platform.now() + 6 * 3600000).toISOString().slice(11, 16).split(':').reduce((h, m) => h * 60 + Number(m));
+  if (minutes >= 23 * 60 + 30) return;       // after 23:30 the stand prepares no pair (checked above with a fixed clock)
+  const other = tempDirs(t);
+  const lesson = await startDevServer({ port: 0, dataFile: other.dataFile, siteDir: other.siteDir, lessonNow: true });
+  await lesson.close();
+  const store = createFileStore(SCHEMA, platform, other.dataFile);
+  assert.equal(store.list('pairs').filter((x) => !bells.has(x.startTime)).length <= 1, true);
+  assert.equal(store.list('pairs').some((x) => x.startedAt !== ''), false);
 });
