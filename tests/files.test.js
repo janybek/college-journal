@@ -27,6 +27,8 @@ test('cleanFileName strips paths and control characters', () => {
   const astral = cleanFileName('\u{1F600}'.repeat(300) + '.pdf');
   assert.deepEqual([Array.from(astral).length, astral.endsWith('.pdf')], [120, true]);
   assert.equal(cleanFileName('a/'), 'file');
+  assert.deepEqual(['a\\b.pdf', '..\\..\\evil.pdf', 'C:\\x\\y.pdf'].map(cleanFileName), ['b.pdf', 'evil.pdf', 'y.pdf']);
+  assert.deepEqual(['..', '.', 'x/..', 'x\\..', ' . '].map(cleanFileName), ['file', 'file', 'file', 'file', 'file']);
 });
 
 test('base64Bytes validates strictly', () => {

@@ -14,9 +14,9 @@ const BAD_CHARS = /[\u0000-\u001F\u007F\u202A-\u202E\u2066-\u2069]/g;
 
 export function cleanFileName(raw) {
   if (typeof raw !== 'string') return 'file';
-  const parts = raw.split(/[\/]/);
+  const parts = raw.split(/[\\/]/);
   let name = parts[parts.length - 1].replace(BAD_CHARS, '').trim();
-  if (!name) return 'file';
+  if (!name || name === '.' || name === '..') return 'file';
   const chars = Array.from(name);
   if (chars.length > FILE_LIMITS.nameMax) {
     const dot = name.lastIndexOf('.');
