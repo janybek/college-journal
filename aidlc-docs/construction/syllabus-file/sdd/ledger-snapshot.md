@@ -29,3 +29,8 @@ Task 4: implementer DONE_WITH_CONCERNS c1afcf3 (923 tests, build:gas ok, 20 shot
 Task 4: complete (commits 5b6e012..c1afcf3, review clean)
 Task 4: minor (deferred → final review): hidden file input stays in document.body after leaving the form (syllabusAttach.js:558); failed dropFile has no «Повторить» (629-643); no test for openFile missingKey branch; dayOf (499) — check server sends local `at`.
 All 4 tasks complete (923 tests). Shots sent to the owner; waiting for owner acceptance of the block, then final review (opus).
+Owner accepted the block (task 4 screens) 24.11. Final review (opus) dispatched over e6edf1d..c1afcf3.
+Final review (opus): готово, 0 code fixes; 3 minor + 2 notes — aidlc-docs/construction/syllabus-file/sdd/final-review-findings.md. No fix wave needed.
+Ruling: stand keeps the sample PDF only on approved v1 «Информатики» (returned v2 without file), contrary to plan.md:416 — the owner accepted screenshots built on this; code and test agree — cost if wrong: on the stand the teacher's returned copy shows no file (cosmetic, stand only).
+Ruling: rollback note rewritten by the final review (old sweep deletes syllabus files at the first start, serve:backup before rollback) — goes into aidlc-state at deploy — cost if wrong: files restored from C:\JournalBackups\files.
+Ruling: `.doc` checked only by the common Office header, PDF by `%PDF-` — known limit, same rule as unit 5 — cost: an Excel named .doc is accepted and Word cannot open it.
