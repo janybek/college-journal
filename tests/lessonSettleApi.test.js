@@ -146,6 +146,25 @@ test('settleLessons: schedule lists read the pairs once; a due pair adds one rea
   }
 });
 
+test('settleLessons: a transfer, a cancel and a restore with a due pair read every table once', () => {
+  const s = setup();
+  const { call, t, at, spy, store, sb1, pairOf } = s;
+  const p1013 = pairOf(sb1, '2026-10-13').id;
+  const p1020 = pairOf(sb1, '2026-10-20').id;
+  const p1027 = pairOf(sb1, '2026-10-27').id;
+  startWithMark(s, p1013, '2026-10-13 07:58:00', '2026-10-13 07:59:00');
+  at('2026-10-13', '09:30');
+  const cases = [['schedule.changePair', { id: p1020, slot: 2 }], ['schedule.cancelPair', { id: p1027 }], ['schedule.restorePair', { id: p1027 }]];
+  for (const [action, data] of cases) {
+    store.update('pairs', p1013, { status: 'running', checkinClosed: false, finishedAt: '', finishedBy: '' });
+    store.list('attendance').filter((r) => r.source === 'auto').forEach((r) => store.remove('attendance', r.id));
+    spy.reset();
+    assert.equal(call(action, data, t.dean).ok, true, action);
+    assert.equal(store.get('pairs', p1013).status, 'closed', action);
+    for (const [table, count] of Object.entries(spy.lists)) assert.equal(count, 1, action + ' ' + table);
+  }
+});
+
 test('reopenPair of a closed QR pair clears what the start wrote', () => {
   const s = setup();
   const { call, t, at, store, sb1, pairOf } = s;

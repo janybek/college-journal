@@ -44,7 +44,7 @@ const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const nameOf = (rows, id) => (rows.find((r) => r.id === id) || { fullName: '' }).fullName;
 
 // Of several rows of one key the last one wins: by `stamp`, then by id.
-function lastOf(list, stamp) {
+export function lastOf(list, stamp) {
   let best = null;
   for (const row of list) {
     const order = best === null ? 1 : cmp(row[stamp] || '', best[stamp] || '') || cmp(row.id, best.id);
