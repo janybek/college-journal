@@ -450,3 +450,17 @@ test('the assignments screens and the codes of the work answers have texts in al
   for (const [lang, dict] of [['ru', ru], ['ky', ky], ['en', en]]) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
   for (const dict of [ru, ky, en]) assert.ok(dict['work.due.today'].includes('{time}') && dict['work.due.date'].includes('{date}'));
 });
+
+test('the screens of the student for the assignments have texts in all three languages, with the same parameters', () => {
+  const mine = (dict) => Object.keys(dict).filter((key) => /^work\.(home|mine|pick)\./.test(key) || key.startsWith('work.upload.error.') || key.startsWith('work.submit.error.'));
+  const keys = mine(ru);
+  for (const key of ['work.home.fresh', 'work.home.soon', 'work.home.overdue', 'work.home.returned', 'work.home.none', 'work.home.all', 'work.mine.title', 'work.mine.submit', 'work.mine.resubmit',
+    'work.mine.submitted', 'work.mine.late', 'work.pick.badType', 'work.pick.tooBig', 'work.pick.tooMany', 'work.upload.error.photo_unreadable', 'work.upload.error.network']) assert.ok(keys.includes(key), key);
+  for (const code of ['bad_type', 'bad_file', 'too_big', 'too_many', 'empty', 'upload_limit', 'photo_unreadable', 'already_checked', 'files_unavailable', 'network']) assert.ok(ru['work.upload.error.' + code], code);
+  for (const [lang, dict] of [['ky', ky], ['en', en]]) {
+    assert.deepEqual(mine(dict).sort(), [...keys].sort(), lang);
+    for (const key of keys) assert.deepEqual(ru[key].match(/\{\w+\}/g)?.sort(), dict[key].match(/\{\w+\}/g)?.sort(), lang + ' ' + key);
+  }
+  assert.equal(ru['work.pick.badType'], 'Такой файл не принимается: фото, PDF, Word, Excel, PowerPoint');
+  assert.equal(ru['work.upload.error.bad_file'], 'Файл не похож на свой тип или повреждён');
+});

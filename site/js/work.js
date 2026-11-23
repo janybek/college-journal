@@ -59,6 +59,15 @@ export function dueText(dueAt, now) {
   return { key: 'work.due.date', params: { date: day + '.' + month, time }, tone: 'neutral' };
 }
 
+// The deadline of a work that is already handed in: only the date and the time (it is no longer «overdue» for him).
+export function dueDateText(dueAt) {
+  const [, month, day] = dateOf(dueAt).split('-');
+  return { key: 'work.due.date', params: { date: day + '.' + month, time: timeOf(dueAt) }, tone: 'neutral' };
+}
+
+// What the student sees as the deadline of his work: the live line until the work is handed in or after it is sent back, the date after.
+export const dueOfWork = (dueAt, now, state) => (state === 'none' || state === 'returned' ? dueText(dueAt, now) : dueDateText(dueAt));
+
 const STATE_TONES = { none: 'neutral', submitted: 'primary', checked: 'success', returned: 'warning' };
 
 export function stateView(state, late) {
@@ -130,3 +139,45 @@ export function base64ToBytes(text) {
   for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
   return bytes;
 }
+
+// ---- The student: the card on the home screen, the choice of files, the failures of an upload ----
+
+const MAX_FILE_BYTES = 10485760;
+const MAX_FILES = 5;
+
+// The lines of the card «Задания» of the home screen from the counts of work.mine: only the ones that are not zero.
+export function homeCardLines(counts) {
+  const c = counts && typeof counts === 'object' ? counts : {};
+  const rows = [['fresh', 'neutral'], ['soon', 'warning'], ['overdue', 'danger'], ['returned', 'warning']];
+  return rows.filter(([name]) => Number.isInteger(c[name]) && c[name] > 0)
+    .map(([name, tone]) => ({ key: 'work.home.' + name, params: { n: c[name] }, tone }));
+}
+
+// A photo is any file the phone calls an image (HEIC of an iPhone too): it is shrunk and sent as JPEG.
+export const isPhoto = (file) => !!file && typeof file.type === 'string' && file.type.startsWith('image/');
+
+// What is wrong with a chosen file before it is read: its kind (kindOfName of the name; a photo needs none), its size
+// (a photo is shrunk first, so its size is not checked), the count (`count` files are already in the list).
+export function pickProblem(file, kind, count) {
+  if (!isPhoto(file)) {
+    if (kind === null || kind === undefined) return 'work.pick.badType';
+    if (file.size > MAX_FILE_BYTES) return 'work.pick.tooBig';
+  }
+  return count >= MAX_FILES ? 'work.pick.tooMany' : null;
+}
+
+// The failures of an upload that have a text of their own for the student.
+const UPLOAD_ERRORS = ['bad_type', 'bad_file', 'too_big', 'too_many', 'empty', 'upload_limit', 'photo_unreadable', 'already_checked', 'files_unavailable', 'network'];
+const FIELD_CODES = ['bad_type', 'bad_file', 'too_big', 'too_many', 'empty'];
+
+// The code of a failure: the code of the first fitting field of an `invalid` answer, else the code of the error itself.
+export function uploadErrorCode(error) {
+  if (!error) return 'internal';
+  if (error.code === 'invalid' && Array.isArray(error.fields)) {
+    const found = error.fields.find((f) => f && FIELD_CODES.includes(f.code));
+    if (found) return found.code;
+  }
+  return typeof error.code === 'string' ? error.code : typeof error.message === 'string' && UPLOAD_ERRORS.includes(error.message) ? error.message : 'internal';
+}
+
+export const uploadErrorKey = (code) => (UPLOAD_ERRORS.includes(code) ? 'work.upload.error.' + code : null);

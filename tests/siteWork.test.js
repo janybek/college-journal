@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FILE_MIME, mimeOf, viewWay, downloadName, sizeText, dueText, stateView, kindOfName, defaultDue, formProblems, gradeDraft, gradeNeedsReason, base64ToBytes } from '../site/js/work.js';
+import { FILE_MIME, mimeOf, viewWay, downloadName, sizeText, dueText, stateView, kindOfName, defaultDue, formProblems, gradeDraft, gradeNeedsReason, base64ToBytes, homeCardLines, pickProblem, uploadErrorCode, uploadErrorKey, dueOfWork, dueDateText } from '../site/js/work.js';
+import { fitSize, photoName } from '../site/js/photo.js';
 import { kindByName, FILE_KINDS } from '../core/files.js';
 
 test('how a file is shown: by its kind only', () => {
@@ -78,4 +79,64 @@ test('when a change of the grade needs a reason', () => {
 test('base64 becomes bytes', () => {
   assert.deepEqual([...base64ToBytes('QUJD')], [65, 66, 67]);
   assert.ok(base64ToBytes('QUJD') instanceof Uint8Array);
+});
+
+test('the size of a photo after shrinking: the long side is at most 1600, the proportions stay, small ones are not enlarged', () => {
+  assert.deepEqual(fitSize(4000, 3000), { width: 1600, height: 1200 });
+  assert.deepEqual(fitSize(3000, 4000), { width: 1200, height: 1600 });
+  assert.deepEqual(fitSize(800, 600), { width: 800, height: 600 });
+  assert.deepEqual(fitSize(1601, 1), { width: 1600, height: 1 });
+  assert.deepEqual(fitSize(1600, 1600), { width: 1600, height: 1600 });
+  assert.deepEqual(fitSize(10000, 10), { width: 1600, height: 2 });
+});
+
+test('the name of a shrunk photo ends with .jpg', () => {
+  assert.equal(photoName('IMG_1.HEIC'), 'IMG_1.jpg');
+  assert.equal(photoName('a.b.png'), 'a.b.jpg');
+  assert.equal(photoName('noext'), 'noext.jpg');
+  assert.equal(photoName(''), 'photo.jpg');
+});
+
+test('the card of the student shows only the counts that are not zero, in a fixed order', () => {
+  assert.deepEqual(homeCardLines({ fresh: 2, soon: 1, overdue: 0, returned: 1 }).map((l) => l.key), ['work.home.fresh', 'work.home.soon', 'work.home.returned']);
+  assert.deepEqual(homeCardLines({ fresh: 2, soon: 1, overdue: 0, returned: 1 })[0], { key: 'work.home.fresh', params: { n: 2 }, tone: 'neutral' });
+  assert.deepEqual(homeCardLines({ fresh: 0, soon: 0, overdue: 3, returned: 0 }), [{ key: 'work.home.overdue', params: { n: 3 }, tone: 'danger' }]);
+  assert.deepEqual(homeCardLines({ fresh: 0, soon: 0, overdue: 0, returned: 0 }), []);
+  assert.deepEqual(homeCardLines(null), []);
+});
+
+test('a file is checked before it is read: kind, size, count; photos are shrunk, so only their count counts', () => {
+  const MB = 1048576;
+  const file = (name, size, type = '') => ({ name, size, type });
+  assert.equal(pickProblem(file('a.exe', 10), kindOfName('a.exe'), 0), 'work.pick.badType');
+  assert.equal(pickProblem(file('a.pdf', 11 * MB), 'pdf', 0), 'work.pick.tooBig');
+  assert.equal(pickProblem(file('a.pdf', 10 * MB), 'pdf', 0), null);
+  assert.equal(pickProblem(file('a.pdf', 1), 'pdf', 5), 'work.pick.tooMany');
+  assert.equal(pickProblem(file('a.pdf', 1), 'pdf', 4), null);
+  assert.equal(pickProblem(file('big.jpg', 15 * MB, 'image/jpeg'), 'jpg', 0), null);
+  assert.equal(pickProblem(file('IMG.HEIC', 15 * MB, 'image/heic'), null, 0), null);
+  assert.equal(pickProblem(file('big.jpg', 15 * MB, 'image/jpeg'), 'jpg', 5), 'work.pick.tooMany');
+});
+
+test('the code of an upload failure: the code of a field, else the code of the answer; and the text key of it', () => {
+  const fieldError = (code) => ({ code: 'invalid', fields: [{ field: 'data', code }] });
+  assert.equal(uploadErrorCode(fieldError('bad_file')), 'bad_file');
+  assert.equal(uploadErrorCode(fieldError('too_big')), 'too_big');
+  assert.equal(uploadErrorCode({ code: 'invalid', fields: [{ field: 'name', code: 'bad_type' }] }), 'bad_type');
+  assert.equal(uploadErrorCode({ code: 'invalid', fields: [] }), 'invalid');
+  assert.equal(uploadErrorCode({ code: 'upload_limit' }), 'upload_limit');
+  assert.equal(uploadErrorCode(new Error('photo_unreadable')), 'photo_unreadable');
+  assert.equal(uploadErrorCode(null), 'internal');
+  assert.equal(uploadErrorKey('bad_type'), 'work.upload.error.bad_type');
+  assert.equal(uploadErrorKey('__proto__'), null);
+  assert.equal(uploadErrorKey('forbidden'), null);
+});
+
+test('the deadline of a student: live until the work is handed in or sent back, only the date after', () => {
+  const now = '2026-09-28 10:00:00';
+  const due = '2026-09-27 23:59:00';
+  assert.equal(dueOfWork(due, now, 'none').key, 'work.due.overdue');
+  assert.equal(dueOfWork(due, now, 'returned').key, 'work.due.overdue');
+  assert.deepEqual(dueOfWork(due, now, 'submitted'), { key: 'work.due.date', params: { date: '27.09', time: '23:59' }, tone: 'neutral' });
+  assert.deepEqual(dueOfWork(due, now, 'checked'), dueDateText(due));
 });

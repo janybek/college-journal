@@ -3,7 +3,7 @@ import { getUser } from '../session.js';
 import { t } from '../i18n.js';
 import { el, errorKey, avatarTone, badge, emptyState, pageHeader, note, iconButton, refresh } from '../ui.js';
 import { icon } from '../icons.js';
-import { dueText } from '../work.js';
+import { dueText, dueOfWork, stateView } from '../work.js';
 import { openTaskForm, confirmDialog } from './taskForm.js';
 
 // «Задания» (#/tasks): the subjects whose assignments the person sees (work.overview), and #/tasks/<subjectId>: the
@@ -15,8 +15,12 @@ const blank = () => ({
 });
 let state = blank();
 
+const blankMine = () => ({ data: null, loading: false, loadErrorKey: null, ticket: 0 });
+let mine = blankMine();
+
 export function leave() {
   state = blank();
+  mine = blankMine();
 }
 
 const isStudent = () => {
@@ -27,7 +31,7 @@ const isStudent = () => {
 export function render(root, params) {
   const subjectId = params.subjectId ?? null;
   if (state.subjectId !== subjectId) state = { ...blank(), subjectId };
-  if (isStudent()) return root.append(soon());
+  if (isStudent()) return root.append(...renderMine());
   if (state.data === null && !state.loading && state.loadErrorKey === null) load();
   const subject = state.data && subjectId !== null ? state.data.subject : null;
   root.append(...[
@@ -45,7 +49,7 @@ export function render(root, params) {
   ].filter(Boolean));
 }
 
-// The route of a task for the student and a task of anyone, until their own screens come.
+// The route of a task for anyone who has no screen of his own for it.
 export function renderTask(root) {
   root.append(soon());
 }
@@ -211,4 +215,67 @@ async function askRemove(assignment) {
     return;
   }
   if (state === owner) reloadAfter('tasks.removed');
+}
+
+// ---- The student: his tasks by subject ----
+
+async function loadMine() {
+  const owner = mine;
+  const ticket = ++owner.ticket;
+  owner.loading = true;
+  try {
+    const data = await call('work.mine', {});
+    if (mine !== owner || owner.ticket !== ticket) return;
+    Object.assign(owner, { data, loadErrorKey: null });
+  } catch (error) {
+    if (mine !== owner || owner.ticket !== ticket) return;
+    owner.loadErrorKey = errorKey(error.code);
+  } finally {
+    if (mine === owner && owner.ticket === ticket) owner.loading = false;
+  }
+  refresh();
+}
+
+function renderMine() {
+  if (mine.data === null && !mine.loading && mine.loadErrorKey === null) loadMine();
+  return [
+    pageHeader({ id: 'tasks-title', title: t('tasks.title'), lead: t('work.mine.lead') }),
+    mine.data === null ? mineLoading() : mineBody(mine.data),
+  ];
+}
+
+function mineLoading() {
+  if (!mine.loadErrorKey) return el('p', { class: 'loading' }, t('common.loading'));
+  const failure = emptyState('alert',
+    el('p', {}, t(mine.loadErrorKey)),
+    el('button', { type: 'button', class: 'button button--secondary', onclick: () => { mine.loadErrorKey = null; loadMine(); refresh(); } }, t('common.retry')));
+  failure.setAttribute('role', 'alert');
+  return failure;
+}
+
+function mineBody(data) {
+  if (data.tasks.length === 0) return emptyState('clipboard', el('p', { class: 'empty__title', id: 'tasks-mine-empty' }, t('work.mine.empty')));
+  const groups = new Map();
+  for (const task of data.tasks) {
+    if (!groups.has(task.subjectId)) groups.set(task.subjectId, { name: task.subjectName, tasks: [] });
+    groups.get(task.subjectId).tasks.push(task);
+  }
+  return el('div', { class: 'mine-groups' }, [...groups.entries()].map(([subjectId, group]) => el('section', { class: 'mine-group', 'aria-labelledby': 'mine-group-' + subjectId },
+    el('h2', { class: 'mine-group__title', id: 'mine-group-' + subjectId }, group.name || '—'),
+    el('ul', { class: 'mine-tasks' }, group.tasks.map((task) => el('li', {}, mineTask(task, data.now)))))));
+}
+
+function mineTask(task, now) {
+  const view = stateView(task.state, task.late);
+  const due = dueOfWork(task.dueAt, now, task.state);
+  return el('a', { class: 'card mine-task mine-task--' + task.state, id: 'task-open-' + task.id, href: '#/task/' + encodeURIComponent(task.id) },
+    el('span', { class: 'mine-task__top' },
+      badge(t('work.kind.' + task.kind), task.kind === 'srs' ? 'primary' : 'neutral'),
+      badge(t(view.key), view.tone),
+      view.lateKey ? badge(t(view.lateKey), 'warning') : null),
+    el('span', { class: 'mine-task__title' }, task.title),
+    el('span', { class: 'mine-task__meta' },
+      task.state === 'checked' ? null : el('span', { class: 'task-due task-due--' + due.tone }, t(due.key, due.params)),
+      task.state === 'checked' && Number.isInteger(task.points) ? el('span', { class: 'mine-task__points' }, t('work.mine.points', { n: task.points, max: task.maxPoints })) : null),
+    icon('chevron', 'mine-task__chevron'));
 }

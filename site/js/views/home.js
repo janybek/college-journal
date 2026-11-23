@@ -7,10 +7,10 @@ import { activeRole, menuParts, navFor, countBadge } from '../shell.js';
 import { pairCard, weekdayDate, lessonPieces } from './pairParts.js';
 import { teacherBadge } from '../subjects.js';
 import { todayAction, clockText, cameMark } from '../lesson.js';
+import { homeCardLines } from '../work.js';
 
 // Sections later units fill in; for now the student sees what is coming.
 const STUDENT_SECTIONS = [
-  ['home.homework', 'home.homeworkSoon', 'clipboard'],
   ['home.news', 'home.newsSoon', 'bell'],
 ];
 
@@ -18,6 +18,8 @@ const STUDENT_SECTIONS = [
 const subjects = { owner: null, list: null, errorKey: null, pending: null };
 // The student's pairs of «today» (the server says which day that is), kept the same way.
 const today = { owner: null, date: null, pairs: null, errorKey: null, pending: null };
+// The counts of the student's assignments (work.mine), kept the same way.
+const work = { owner: null, data: null, errorKey: null, pending: null };
 // The subjects of the student's group, kept the same way.
 const groupSubjects = { owner: null, list: null, errorKey: null, pending: null };
 
@@ -38,6 +40,7 @@ function renderStudent(root, user) {
           el('span', { class: 'muted' }, t('home.group')),
           user.groupName ? badge(user.groupName, 'primary') : el('span', { class: 'muted' }, t('home.noGroup'))))),
     hereSection(user),
+    homeworkSection(user),
     todaySection(user),
     studentSubjectsSection(user),
     el('a', { class: 'card soon soon--link', href: '#/grades' },
@@ -110,6 +113,52 @@ function hereCard() {
       el('p', { class: 'here-card__now' }, t('checkin.now', { place })),
       el('p', { class: 'here-card__left', id: 'home-here-left' }, t('checkin.left', { time: clockText(hereLeft()) }))),
     el('a', { class: 'button button--primary here-card__go', href: '#/here' }, icon('checkCircle'), t('checkin.go')))];
+}
+
+// «Задания»: how many assignments are new, due by tomorrow, overdue or sent back, and the way to the whole list.
+function homeworkSection(user) {
+  const body = el('div', { class: 'homework__body', 'aria-live': 'polite' });
+  const draw = () => body.replaceChildren(...homeworkBody(user, draw));
+  draw();
+  loadWork(user).then(draw);
+  return el('section', { class: 'card homework', 'aria-labelledby': 'home-homework' },
+    el('header', { class: 'today__head' },
+      el('span', { class: 'soon__icon homework__icon' }, icon('clipboard')),
+      el('h2', { class: 'soon__title', id: 'home-homework' }, t('home.homework'))),
+    body,
+    el('a', { class: 'button button--primary homework__all', id: 'home-homework-all', href: '#/tasks' }, t('work.home.all')));
+}
+
+function homeworkBody(user, redraw) {
+  if (work.data) {
+    const lines = homeCardLines(work.data.counts);
+    if (lines.length === 0) return [el('p', { class: 'homework__none', id: 'home-homework-none' }, t('work.home.none'))];
+    return [el('ul', { class: 'homework__lines', id: 'home-homework-lines' }, lines.map((line) => el('li', { class: 'homework__line homework__line--' + line.tone }, t(line.key, line.params))))];
+  }
+  if (work.errorKey && !work.pending) {
+    return [el('div', { class: 'today__failed', role: 'alert' },
+      el('p', {}, t(work.errorKey)),
+      el('button', {
+        type: 'button', class: 'button button--secondary',
+        onclick: () => { loadWork(user).then(redraw); redraw(); },
+      }, t('common.retry')))];
+  }
+  return [el('p', { class: 'loading' }, t('common.loading'))];
+}
+
+function loadWork(user) {
+  if (work.owner !== user.id) Object.assign(work, { owner: user.id, data: null, errorKey: null, pending: null });
+  if (!work.pending) {
+    const owner = user.id;
+    const mine = () => work.owner === owner;
+    work.pending = call('work.mine', {})
+      .then(
+        (data) => { if (mine()) Object.assign(work, { data, errorKey: null }); },
+        (error) => { if (mine()) work.errorKey = errorKey(error.code); },
+      )
+      .finally(() => { if (mine()) work.pending = null; });
+  }
+  return work.pending;
 }
 
 // «Сегодня»: the pairs of the student's group today, as on the week, and the way to the whole week.

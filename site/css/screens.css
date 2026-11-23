@@ -7310,3 +7310,162 @@ a.gr-card:hover { border-color: var(--primary-line); }
   .file-view__shown .button { flex: 1 1 100%; min-height: 2.75rem; }
   .task-info { padding: var(--space-3) var(--space-4); }
 }
+
+/* The student's assignments: the card on the home screen, the list by subject (#/tasks), the work and the form (#/task/<id>) */
+
+.homework { display: grid; gap: var(--space-4); padding: var(--space-4); }
+
+.homework__icon { background: var(--warning-wash); color: var(--warning); }
+
+.homework__lines { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.homework__line {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 2.75rem;
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius-inner);
+  background: var(--muted);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.homework__line--warning { border-color: var(--warning-line); border-left-color: var(--warning); background: var(--warning-wash); color: var(--text); }
+
+.homework__line--danger { border-color: var(--danger-line); border-left-color: var(--danger); background: var(--danger-wash); color: var(--text); }
+
+.homework__line--neutral { border-left-color: var(--primary); }
+
+.homework__none {
+  margin: 0;
+  padding: var(--space-4);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-inner);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.homework__all { justify-content: center; min-height: 2.75rem; }
+
+.mine-groups { display: grid; gap: var(--space-6); }
+
+.mine-group { display: grid; gap: var(--space-3); }
+
+.mine-group__title { margin: 0; font-size: 1.125rem; font-weight: 600; letter-spacing: -0.015em; overflow-wrap: anywhere; }
+
+.mine-tasks { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.mine-task {
+  position: relative;
+  display: grid;
+  gap: var(--space-2);
+  min-height: 2.75rem;
+  padding: var(--space-4) calc(var(--space-4) + 1.5rem) var(--space-4) var(--space-4);
+  border-left: 4px solid var(--border-strong);
+  color: var(--text);
+  text-decoration: none;
+}
+
+.mine-task:hover { background: var(--row-hover); }
+
+.mine-task:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.mine-task--returned { border-left-color: var(--warning); }
+
+.mine-task--submitted { border-left-color: var(--primary); }
+
+.mine-task--checked { border-left-color: var(--success); }
+
+.mine-task__top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+.mine-task__title { font-size: 1.0625rem; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+
+.mine-task__meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); color: var(--text-muted); }
+
+.mine-task__points { color: var(--success); font-weight: 600; }
+
+.mine-task__chevron { position: absolute; top: 50%; right: var(--space-4); width: 1.25rem; height: 1.25rem; margin-top: -0.625rem; color: var(--text-muted); }
+
+.mine-screen { gap: var(--space-4); }
+
+.mine-work { display: grid; gap: var(--space-4); padding: var(--space-4); }
+
+.mine-work > * { min-width: 0; }
+
+.mine-work__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2) var(--space-3); }
+
+.mine-work__state { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+
+.mine-work__hint { margin: 0; color: var(--text-muted); }
+
+.mine-points { margin: 0; color: var(--success); font-size: 1.375rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+
+.mine-comment { display: grid; gap: var(--space-1); padding: var(--space-4); border: 1px solid var(--warning-line); border-left: 4px solid var(--warning); border-radius: var(--radius-inner); background: var(--warning-wash); }
+
+.mine-comment p { margin: 0; }
+
+.mine-comment__label { color: var(--text-muted); font-weight: 600; }
+
+.mine-comment__text { font-size: 1.125rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+.mine-form { display: grid; gap: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+
+.mine-form .field__textarea { min-height: 8rem; resize: vertical; }
+
+.mine-form__hint { margin: 0; min-height: 1.4em; }
+
+.mine-form__submit { width: 100%; min-height: 3rem; font-size: 1.0625rem; }
+
+.mine-files { display: grid; gap: var(--space-3); }
+
+.mine-files__add { justify-self: start; min-height: 2.75rem; cursor: pointer; }
+
+.mine-files__add:focus-within { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.mine-files__hint { margin: 0; }
+
+.mine-file-list { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.mine-file { display: grid; gap: var(--space-2); padding: var(--space-3); border: 1px solid var(--border-strong); border-radius: var(--radius-inner); background: var(--surface); }
+
+.mine-file--error { border-color: var(--danger-line); }
+
+.mine-file__main { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: var(--space-1) var(--space-3); }
+
+.mine-file__name { min-width: 0; padding: 0; border: 0; background: none; color: var(--text); font: inherit; font-weight: 500; text-align: left; overflow-wrap: anywhere; }
+
+.mine-file__open { min-height: 2.75rem; color: var(--primary-ink); text-decoration: underline; cursor: pointer; }
+
+.mine-file__size { color: var(--text-muted); white-space: nowrap; }
+
+.mine-file__status { display: flex; align-items: center; gap: var(--space-3); margin: 0; color: var(--text-muted); }
+
+.mine-file__status--done { color: var(--success); font-weight: 500; }
+
+.mine-file__status .icon { width: 1.125rem; height: 1.125rem; }
+
+.mine-progress { flex: 1; width: 100%; height: 0.75rem; min-width: 6rem; overflow: hidden; border: 0; border-radius: 999px; background: var(--muted); accent-color: var(--primary); }
+
+.mine-progress::-webkit-progress-bar { background: var(--muted); }
+
+.mine-progress::-webkit-progress-value { background: var(--primary); border-radius: 999px; }
+
+.mine-progress::-moz-progress-bar { background: var(--primary); border-radius: 999px; }
+
+.mine-file__error { display: flex; align-items: flex-start; gap: var(--space-2); margin: 0; color: var(--danger); font-weight: 500; }
+
+.mine-file__error .icon { flex: none; width: 1.125rem; height: 1.125rem; margin-top: 0.2rem; }
+
+.mine-file__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.mine-file__button { min-height: 2.75rem; }
+
+.student .file-chip__kind { font-size: 1rem; }
+
+.student .file-chip { min-height: 2.75rem; }
+
+.student .attempt__text--none,
+.student .attempt__checked { font-size: 1rem; }

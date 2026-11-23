@@ -1,9 +1,10 @@
-import { call } from '../api.js';
+import { call, upload, RETRYABLE } from '../api.js';
 import { getUser } from '../session.js';
 import { t } from '../i18n.js';
 import { el, errorKey, avatar, badge, emptyState, pageHeader, note, field, markBusy, focusFirstInvalid, holdOnLeave, modal, showModal, refresh } from '../ui.js';
 import { icon } from '../icons.js';
-import { dueText, stateView, sizeText, formProblems, currentOf, gradeDraft, gradeNeedsReason } from '../work.js';
+import { dueText, dueOfWork, stateView, sizeText, formProblems, currentOf, gradeDraft, gradeNeedsReason, kindOfName, isPhoto, pickProblem, uploadErrorCode, uploadErrorKey } from '../work.js';
+import { preparePhoto, readAsBase64 } from '../photo.js';
 import { openTaskForm } from './taskForm.js';
 import { openFile } from './fileView.js';
 import { renderTask as soon } from './tasks.js';
@@ -11,6 +12,7 @@ import { renderTask as soon } from './tasks.js';
 // The screen of one assignment for the staff (#/task/<id>): the students of the group on the left, the work of the chosen one
 // on the right, and, for the teacher of the subject, the grade (work.grade). The office and the prorector read the same and
 // do not see the grade block (can.grade of the answer). Everything from the server (names, texts, comments, names of files) is text.
+// For a student the same address is his own work: the task, his attempts, and the form that hands in a text and files (the end of this file).
 
 const COMMENT_MAX = 2000;
 const REASON_MAX = 300;
@@ -24,6 +26,7 @@ let state = blank();
 export function leave() {
   holdOnLeave(null);
   state = blank();
+  mine = blankMine();
 }
 
 const isStaff = () => {
@@ -38,6 +41,7 @@ const stamp = (text) => {
 };
 
 export function render(root, params) {
+  if (isStudent()) return root.append(...renderMineTask(params));
   if (!isStaff()) return soon(root);
   const assignmentId = params.assignmentId ?? null;
   if (state.assignmentId !== assignmentId) {
@@ -407,4 +411,354 @@ function gradeBlock(student, current, assignment) {
         type: 'button', id: 'grade-next', class: 'button button--secondary grade__next', 'aria-disabled': next ? null : 'true', title: next ? null : t('work.grade.nextNone'),
         onclick: () => { if (next) select(next.id); },
       }, t('work.grade.next'), icon('chevron'))));
+}
+
+// ---- The student: his work on the assignment ----
+
+const TEXT_MAX = 5000;
+const ACCEPT = '.jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*';
+
+const isStudent = () => {
+  const permissions = getUser()?.permissions;
+  return Array.isArray(permissions) && permissions.includes('work.mine') && !permissions.includes('work.overview');
+};
+
+// items: the files of the work being handed in. phase: 'preparing' (waiting for its turn, shrinking, reading), 'uploading',
+// 'done' (the server holds it as a pending file: fileId), 'error'. A failed item keeps its payload (what to send again) only
+// when sending it again may help; a refused one is `rejected` and can only be removed.
+const blankMine = (assignmentId = null) => ({
+  assignmentId, data: null, loading: false, loadErrorKey: null, ticket: 0, text: '', seeded: false, items: [], queue: Promise.resolve(),
+  nextUid: 1, busy: false, problemKey: null, doneTime: null, prevOpen: false,
+});
+let mine = blankMine();
+
+const loadingFiles = (o) => o.items.some((i) => i.phase === 'preparing' || i.phase === 'uploading');
+const failedFiles = (o) => o.items.some((i) => i.phase === 'error' && !i.rejected);
+const doneFiles = (o) => o.items.filter((i) => i.phase === 'done');
+
+function renderMineTask(params) {
+  const assignmentId = params.assignmentId ?? null;
+  if (mine.assignmentId !== assignmentId) mine = blankMine(assignmentId);
+  if (mine.data === null && !mine.loading && mine.loadErrorKey === null) loadMineTask();
+  const data = mine.data;
+  return [
+    pageHeader({
+      id: 'task-title', title: data ? data.assignment.title : t('tasks.title'),
+      actions: el('a', { class: 'button button--secondary', id: 'task-back', href: '#/tasks' }, t('work.mine.back')),
+    }),
+    data === null ? mineLoading() : el('div', { class: 'task-screen mine-screen' }, mineInfo(data), mineWork(data)),
+  ];
+}
+
+async function loadMineTask() {
+  const owner = mine;
+  const ticket = ++owner.ticket;
+  owner.loading = true;
+  try {
+    const data = await call('work.get', { assignmentId: owner.assignmentId });
+    if (mine !== owner || owner.ticket !== ticket) return;
+    Object.assign(owner, { data, loadErrorKey: null });
+    if (!owner.seeded) {
+      owner.seeded = true;
+      // what was uploaded earlier and not handed in is still on the server
+      if (data.canSubmit) owner.items = data.mine.pending.map((f) => ({ uid: owner.nextUid++, name: f.name, size: f.size, kind: f.kind, phase: 'done', fileId: f.id, payload: null, rejected: false, errorKey: null, share: 1 }));
+    }
+  } catch (error) {
+    if (mine !== owner || owner.ticket !== ticket) return;
+    owner.loadErrorKey = errorKey(error.code);
+  } finally {
+    if (mine === owner && owner.ticket === ticket) owner.loading = false;
+  }
+  refresh();
+}
+
+function mineLoading() {
+  if (!mine.loadErrorKey) return el('p', { class: 'loading' }, t('common.loading'));
+  const failure = emptyState('alert',
+    el('p', {}, t(mine.loadErrorKey)),
+    el('button', { type: 'button', class: 'button button--secondary', onclick: () => { mine.loadErrorKey = null; loadMineTask(); refresh(); } }, t('common.retry')));
+  failure.setAttribute('role', 'alert');
+  return failure;
+}
+
+function mineInfo(data) {
+  const { assignment, now } = data;
+  const due = dueOfWork(assignment.dueAt, now, data.mine.state);
+  const unit = assignment.unit === null ? null : assignment.unitTitle ? t('work.unitTitled', { n: assignment.unit, title: assignment.unitTitle }) : t('work.unit', { n: assignment.unit });
+  return el('section', { class: 'card task-info', 'aria-labelledby': 'task-title' },
+    el('p', { class: 'task-info__eyebrow', id: 'task-place' }, [t('work.kind.' + assignment.kind + '.long'), unit, assignment.topicName || null].filter(Boolean).join(' · ')),
+    el('p', { class: 'task-info__meta' },
+      el('span', { class: 'task-due task-due--' + due.tone, id: 'task-due' }, t(due.key, due.params)),
+      el('span', { id: 'task-max' }, t('work.max', { n: assignment.maxPoints })),
+      el('span', {}, [assignment.subjectName, assignment.teacherName].filter(Boolean).join(' · '))),
+    assignment.description ? el('p', { class: 'task-info__text', id: 'task-description' }, assignment.description) : null);
+}
+
+// ---- «Моя работа» ----
+
+function mineWork(data) {
+  const m = data.mine;
+  const current = currentOf({ attempts: m.attempts });
+  const earlier = m.attempts.filter((a) => a !== current).sort((x, y) => y.n - x.n);
+  const view = stateView(m.state, m.late);
+  const hint = { none: current ? null : 'work.mine.noneHint', returned: 'work.mine.returnedHint', checked: 'work.mine.checkedHint', submitted: 'work.mine.submittedHint' }[m.state];
+  return el('section', { class: 'card mine-work', 'aria-labelledby': 'mine-work-title' },
+    el('header', { class: 'mine-work__head' },
+      el('h2', { class: 'check__heading', id: 'mine-work-title' }, t('work.mine.title')),
+      el('span', { class: 'mine-work__state', id: 'mine-state' },
+        m.state === 'none' && m.overdue ? badge(t('work.due.overdue'), 'danger') : badge(t(view.key), view.tone, m.state !== 'none'),
+        view.lateKey ? badge(t(view.lateKey), 'warning') : null)),
+    mine.doneTime ? note('success', t('work.mine.submitted', { time: mine.doneTime }), { id: 'mine-done', role: 'status' }) : null,
+    hint ? el('p', { class: 'mine-work__hint', id: 'mine-hint' }, t(hint)) : null,
+    m.state === 'checked' && Number.isInteger(m.points) ? el('p', { class: 'mine-points', id: 'mine-points' }, t('work.grade.given', { n: m.points, max: data.assignment.maxPoints })) : null,
+    current && current.comment !== '' ? el('div', { class: 'mine-comment', id: 'mine-comment' },
+      el('p', { class: 'mine-comment__label' }, t('work.mine.comment')),
+      el('p', { class: 'mine-comment__text' }, current.comment)) : null,
+    current ? mineAttempt(current, true) : null,
+    data.canSubmit ? mineForm(data) : null,
+    earlier.length > 0 ? minePrevious(earlier) : null);
+}
+
+function mineAttempt(a, isCurrent) {
+  const sent = stamp(a.submittedAt);
+  return el('div', { class: 'attempt' + (isCurrent ? ' attempt--current' : ''), id: isCurrent ? 'mine-current' : null },
+    el('p', { class: 'attempt__head' },
+      el('strong', {}, t('work.attempt', { n: a.n })),
+      el('span', { class: 'attempt__time' }, t('work.sentAt', sent)),
+      a.late ? badge(t('work.state.late'), 'warning') : null,
+      isCurrent ? null : badge(a.status === 'replaced' ? t('work.mine.replaced') : a.status === 'checked' && Number.isInteger(a.points) ? t('work.state.checkedPoints', { n: a.points }) : t('work.state.' + a.status), stateView(a.status, false).tone)),
+    a.text !== '' ? el('p', { class: 'attempt__text' }, a.text) : (a.files.length === 0 ? el('p', { class: 'attempt__text attempt__text--none' }, t('work.noText')) : null),
+    a.files.length > 0 ? el('ul', { class: 'file-list', 'aria-label': t('work.files') }, a.files.map((f) => el('li', {},
+      el('button', { type: 'button', class: 'file-chip', id: 'file-' + f.id, onclick: () => { openFile({ fileId: f.id, name: f.name, kind: f.kind }); } },
+        el('span', { class: 'file-chip__kind', 'aria-hidden': 'true' }, f.kind),
+        el('span', { class: 'file-chip__name' }, f.name),
+        el('span', { class: 'file-chip__size' }, t(sizeText(f.size).key, sizeText(f.size).params)))))) : null,
+    isCurrent || a.comment === '' ? null : el('div', { class: 'attempt__result' }, el('p', { class: 'attempt__text' }, a.comment)));
+}
+
+function minePrevious(earlier) {
+  return el('div', { class: 'check__previous' },
+    el('button', {
+      type: 'button', id: 'mine-prev-toggle', class: 'button button--secondary', 'aria-expanded': String(mine.prevOpen),
+      onclick: () => { mine.prevOpen = !mine.prevOpen; refresh(); },
+    }, t('work.prev', { n: earlier.length })),
+    mine.prevOpen ? el('div', { class: 'check__previous-list', id: 'mine-prev' }, earlier.map((a) => mineAttempt(a, false))) : null);
+}
+
+// ---- The form of handing in ----
+
+// Why «Сдать» cannot be pressed now: a key of the dictionary, 'busy', or null when it can.
+function submitBlock(o) {
+  if (o.busy) return 'busy';
+  if (loadingFiles(o)) return 'work.mine.waitUpload';
+  if (failedFiles(o)) return 'work.mine.fixFiles';
+  if (o.text.trim() === '' && doneFiles(o).length === 0) return 'work.mine.needSomething';
+  return null;
+}
+
+const hintOf = (block) => (block === null || block === 'busy' ? '' : t(block));
+
+// Updates the button and its hint without redrawing the page (typing must not lose the caret).
+function syncSubmit() {
+  const button = document.getElementById('mine-submit');
+  if (!button) return;
+  const block = submitBlock(mine);
+  button.disabled = block !== null;
+  const hint = document.getElementById('mine-submit-hint');
+  if (hint) hint.textContent = hintOf(block);
+}
+
+function mineForm(data) {
+  const again = data.mine.attempts.length > 0;
+  const late = data.assignment.dueAt < data.now;
+  const block = submitBlock(mine);
+  return el('form', { class: 'mine-form', id: 'mine-form', novalidate: true, onsubmit: (event) => { event.preventDefault(); submit(); } },
+    textArea({
+      id: 'mine-text', label: t('work.mine.text'), value: mine.text, rows: '6', max: String(TEXT_MAX), error: null,
+      hint: t('work.mine.textCount', { n: mine.text.length, max: TEXT_MAX }),
+      onInput: (value) => {
+        mine.text = value;
+        const count = document.getElementById('mine-text-hint');
+        if (count) count.textContent = t('work.mine.textCount', { n: value.length, max: TEXT_MAX });
+        syncSubmit();
+      },
+    }),
+    filesBlock(),
+    late ? note('warning', t('work.mine.late'), { id: 'mine-late' }) : null,
+    mine.problemKey ? note('error', t(mine.problemKey), { id: 'mine-problem', role: 'alert' }) : null,
+    el('p', { class: 'field__hint mine-form__hint', id: 'mine-submit-hint', 'aria-live': 'polite' }, hintOf(block)),
+    el('button', { type: 'submit', class: 'button button--primary mine-form__submit', id: 'mine-submit', disabled: block !== null, 'aria-busy': mine.busy ? 'true' : null },
+      t(mine.busy ? 'work.mine.submitting' : again ? 'work.mine.resubmit' : 'work.mine.submit')));
+}
+
+function filesBlock() {
+  const input = el('input', {
+    type: 'file', multiple: true, accept: ACCEPT, id: 'mine-file-input', class: 'visually-hidden',
+    onchange: () => { const chosen = [...input.files]; input.value = ''; addFiles(chosen); },
+  });
+  return el('div', { class: 'mine-files' },
+    el('label', { class: 'button button--secondary mine-files__add', for: 'mine-file-input' }, icon('plus'), t('work.mine.addFiles'), input),
+    el('p', { class: 'field__hint mine-files__hint' }, t('work.mine.filesHint')),
+    mine.items.length > 0 ? el('ul', { class: 'mine-file-list', id: 'mine-files', 'aria-label': t('work.mine.filesList') }, mine.items.map(fileRow)) : null);
+}
+
+const shown = (share) => Math.round(share * 100);
+
+function fileRow(item) {
+  const size = item.size > 0 ? sizeText(item.size) : null;
+  const name = item.phase === 'done'
+    ? el('button', { type: 'button', class: 'mine-file__name mine-file__open', id: 'mine-open-' + item.uid, onclick: () => { openFile({ fileId: item.fileId, name: item.name, kind: item.kind }); } }, item.name)
+    : el('span', { class: 'mine-file__name' }, item.name);
+  let status = null;
+  if (item.phase === 'preparing') status = el('p', { class: 'mine-file__status' }, t('work.mine.preparing'));
+  if (item.phase === 'uploading') {
+    status = el('div', { class: 'mine-file__status' },
+      el('progress', { class: 'mine-progress', max: '1', value: String(item.share), id: 'mine-progress-' + item.uid, 'aria-label': item.name }),
+      el('span', { id: 'mine-percent-' + item.uid }, t('work.mine.uploading', { n: shown(item.share) })));
+  }
+  if (item.phase === 'done') status = el('p', { class: 'mine-file__status mine-file__status--done' }, icon('check'), t('work.mine.uploaded'));
+  return el('li', { class: 'mine-file mine-file--' + item.phase, id: 'mine-file-' + item.uid },
+    el('div', { class: 'mine-file__main' }, name, size ? el('span', { class: 'mine-file__size' }, t(size.key, size.params)) : null),
+    status,
+    item.phase === 'error' ? el('p', { class: 'mine-file__error', role: 'alert' }, icon('alert'), t(item.errorKey)) : null,
+    item.noteKey ? el('p', { class: 'mine-file__error', role: 'alert' }, icon('alert'), t(item.noteKey)) : null,
+    item.phase === 'done' || item.phase === 'error' ? el('div', { class: 'mine-file__actions' },
+      item.phase === 'error' && item.payload ? el('button', { type: 'button', class: 'button button--primary mine-file__button', id: 'mine-retry-' + item.uid, onclick: () => retryItem(item) }, t('work.mine.retry')) : null,
+      el('button', { type: 'button', class: 'button button--secondary mine-file__button', id: 'mine-remove-' + item.uid, disabled: item.dropping === true, onclick: () => removeItem(item) }, t('work.mine.remove'))) : null);
+}
+
+// ---- Choosing, shrinking and uploading the files (one by one) ----
+
+function addFiles(files) {
+  const owner = mine;
+  owner.problemKey = null;
+  for (const file of files) {
+    const count = owner.items.filter((i) => !i.rejected).length;
+    const kind = kindOfName(file.name);
+    const problem = pickProblem(file, kind, count);
+    const item = { uid: owner.nextUid++, name: file.name, size: isPhoto(file) ? 0 : file.size, kind: kind ?? '', phase: 'preparing', fileId: null, payload: null, rejected: false, errorKey: null, share: 0 };
+    owner.items.push(item);
+    if (problem) {
+      Object.assign(item, { phase: 'error', rejected: true, errorKey: problem });
+      continue;
+    }
+    // one file at a time: a phone shrinks and sends better that way
+    owner.queue = owner.queue.then(() => prepareAndSend(owner, item, file));
+  }
+  refresh();
+}
+
+async function prepareAndSend(owner, item, file) {
+  try {
+    item.payload = isPhoto(file) ? await preparePhoto(file) : { name: file.name, data: await readAsBase64(file) };
+  } catch (error) {
+    failItem(owner, item, error);
+    return;
+  }
+  await sendItem(owner, item);
+}
+
+async function sendItem(owner, item) {
+  Object.assign(item, { phase: 'uploading', share: 0, errorKey: null });
+  if (mine === owner) refresh();
+  try {
+    const { file } = await upload('work.upload', { assignmentId: owner.assignmentId, name: item.payload.name, data: item.payload.data }, {
+      onProgress: (share) => {
+        item.share = share;
+        const bar = document.getElementById('mine-progress-' + item.uid);
+        const percent = document.getElementById('mine-percent-' + item.uid);
+        if (mine === owner && bar) bar.value = share;
+        if (mine === owner && percent) percent.textContent = t('work.mine.uploading', { n: shown(share) });
+      },
+    });
+    Object.assign(item, { phase: 'done', fileId: file.id, name: file.name, kind: file.kind, size: file.size, payload: null, share: 1, errorKey: null });
+  } catch (error) {
+    failItem(owner, item, error);
+    return;
+  }
+  if (mine === owner) refresh();
+}
+
+function failItem(owner, item, error) {
+  const code = uploadErrorCode(error);
+  const again = RETRYABLE.includes(code) && item.payload !== null;
+  Object.assign(item, { phase: 'error', rejected: !again, errorKey: uploadErrorKey(code) ?? errorKey(code) });
+  if (!again) item.payload = null;
+  if (code === 'already_checked' && mine === owner) reloadMine();
+  if (mine === owner) refresh();
+}
+
+function retryItem(item) {
+  const owner = mine;
+  if (item.payload === null || item.phase !== 'error') return;
+  Object.assign(item, { phase: 'preparing', errorKey: null });
+  owner.queue = owner.queue.then(() => sendItem(owner, item));
+  refresh();
+}
+
+async function removeItem(item) {
+  const owner = mine;
+  if (item.fileId !== null) {
+    item.dropping = true;
+    item.noteKey = null;
+    refresh();
+    try {
+      await call('work.dropFile', { fileId: item.fileId });
+    } catch (error) {
+      if (error.code !== 'not_found') {
+        item.dropping = false;
+        item.noteKey = errorKey(error.code);
+        if (mine === owner) refresh();
+        return;
+      }
+    }
+  }
+  owner.items = owner.items.filter((i) => i !== item);
+  if (mine === owner) refresh();
+}
+
+// ---- Handing in ----
+
+function reloadMine() {
+  mine.data = null;
+  mine.loadErrorKey = null;
+  loadMineTask();
+}
+
+async function submit() {
+  const owner = mine;
+  if (owner.busy || submitBlock(owner) !== null) return;
+  owner.busy = true;
+  owner.problemKey = null;
+  owner.doneTime = null;
+  refresh();
+  const ready = doneFiles(owner);
+  try {
+    const result = await call('work.submit', { assignmentId: owner.assignmentId, text: owner.text, fileIds: ready.map((i) => i.fileId) });
+    if (mine !== owner) return;
+    const latest = currentOf({ attempts: result.work.mine.attempts });
+    Object.assign(owner, { data: result.work, items: [], text: '', doneTime: latest ? latest.submittedAt.slice(11, 16) : null, prevOpen: false });
+  } catch (error) {
+    if (mine !== owner) return;
+    owner.problemKey = submitProblem(error, ready);
+    if (error.code === 'already_checked') reloadMine();
+  } finally {
+    owner.busy = false;
+    if (mine === owner) {
+      refresh();
+      // the answer «Работа сдана» is at the top of the work, the button was at its bottom
+      const done = document.getElementById('mine-done');
+      if (done && owner.doneTime !== null && owner.problemKey === null) done.scrollIntoView({ block: 'center' });
+    }
+  }
+}
+
+// The text of a failure of work.submit; a file the server no longer knows becomes an error row (it must be added again).
+function submitProblem(error, ready) {
+  const fields = error.code === 'invalid' && Array.isArray(error.fields) ? error.fields : [];
+  const stale = fields.filter((f) => f && f.code === 'bad_ref' && Number.isInteger(f.index) && ready[f.index]);
+  for (const f of stale) Object.assign(ready[f.index], { phase: 'error', rejected: true, fileId: null, errorKey: 'work.submit.error.bad_ref' });
+  if (fields.some((f) => f && f.code === 'bad_ref')) return 'work.submit.error.bad_ref';
+  if (fields.some((f) => f && f.code === 'empty')) return 'work.submit.error.empty';
+  return errorKey(error.code);
 }
