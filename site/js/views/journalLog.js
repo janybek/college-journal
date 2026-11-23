@@ -8,7 +8,7 @@ import { logLine } from '../journal.js';
 // (journal.log), the newest first. The whole log is for the deanery, the admin and the vice-rector; the log of one subject
 // also for its teacher. The first request goes without dates: the answer carries «today» of the server, and the dates
 // «last 30 days» are counted from it (the clock of the device is not trusted); every next request carries the dates.
-// The group chooses the subjects of the list below it and narrows the rows; the subject goes to the server. Reasons and
+// The group chooses the subjects of the list below it and goes to the server with the subject (the server filters before the limit). Reasons and
 // names are only ever text. The server checks every right; a refusal is shown as the usual «no rights» state.
 
 const PAGE = 200;
@@ -83,6 +83,7 @@ function query() {
   if (isDate(state.to)) data.to = state.to;
   const subjectId = state.subjectId || state.pickedSubjectId;
   if (subjectId) data.subjectId = subjectId;
+  if (!state.subjectId && state.groupId !== '') data.groupId = state.groupId;
   return data;
 }
 
@@ -152,12 +153,7 @@ function toolbar() {
 }
 
 function body() {
-  let rows = state.data.rows;
-  // A group without a subject chosen: the server has no group filter, so the rows of other groups are left out here.
-  if (!state.subjectId && state.pickedSubjectId === '' && state.groupId !== '') {
-    const ids = new Set(state.list.filter((s) => s.groupId === state.groupId).map((s) => s.subjectId));
-    rows = rows.filter((row) => ids.has(row.subjectId));
-  }
+  const rows = state.data.rows;
   const canMore = state.data.more && state.limit < MAX;
   return el('section', { class: 'card table-card jlog', 'aria-labelledby': 'jlog-title' },
     toolbar(),

@@ -193,9 +193,21 @@ test('pairActions: the deanery actions on a pair by its status and state; none w
 test('unitLine: all three results, only the current control, nothing yet', () => {
   assert.deepEqual(unitLine({ unit: 1, current: 38, self: 16, control: 30, total: 84 }),
     { key: 'grades.unit.full', params: { current: 38, self: 16, control: 30, total: 84 } });
-  assert.deepEqual(unitLine({ unit: 2, current: 31, self: null, control: null, total: null }), { key: 'grades.unit.partial', params: { current: 31 } });
-  assert.deepEqual(unitLine({ unit: 2, current: 31, self: 10, control: null, total: null }), { key: 'grades.unit.partial', params: { current: 31 } });
+  const parts = (u) => unitLine({ unit: 2, total: null, ...u }).parts.map((p) => p.key.replace('grades.unit.part.', '') + '=' + Object.values(p.params)[0]);
+  assert.deepEqual(parts({ current: 31, self: null, control: null }), ['current=31']);
+  assert.deepEqual(parts({ current: 38, self: null, control: 18 }), ['current=38', 'control=18']);
+  assert.deepEqual(parts({ current: null, self: 12, control: null }), ['self=12']);
+  assert.deepEqual(parts({ current: null, self: 12, control: 18 }), ['self=12', 'control=18']);
+  assert.deepEqual(parts({ current: 31, self: 10, control: null }), ['current=31', 'self=10']);
+  assert.equal(unitLine({ unit: 2, current: 38, self: null, control: 18, total: null }).key, 'grades.unit.parts');
   assert.deepEqual(unitLine({ unit: 3, current: null, self: null, control: null, total: null }), { key: 'grades.unit.empty', params: {} });
+});
+
+test('changedMarks: an active student without a saved mark on a held pair is sent with what the window shows', () => {
+  const journal = { pairs: [{ id: 'p1', status: 'closed' }], students: [{ id: 's1', fullName: 'A' }, { id: 's2', fullName: 'B' }], marks: { p1: { s1: { status: 'present', noCoat: false, activity: null } } } };
+  const draft = draftMarks(journal, 'p1');
+  const sent = changedMarks(draft, journal, 'p1');
+  assert.deepEqual(sent.map((m) => m.studentId + ':' + m.status), ['s2:present']);
 });
 
 test('absenceList: only absent, excused and madeup, the newest first', () => {

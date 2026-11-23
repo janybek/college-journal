@@ -403,7 +403,7 @@ test('task 25: the course and semester check has its texts in every language', (
 });
 
 test('the student grades screen: its keys exist in all three dictionaries; the old placeholder is gone', () => {
-  for (const key of ['grades.title', 'grades.unit.full', 'grades.unit.partial', 'grades.unit.empty', 'grades.points', 'grades.notCounted', 'grades.notFound', 'grades.back', 'grades.how.title', 'home.gradesLead']) {
+  for (const key of ['grades.title', 'grades.unit.full', 'grades.unit.part.current', 'grades.unit.part.self', 'grades.unit.part.control', 'grades.unit.empty', 'grades.points', 'grades.notCounted', 'grades.notFound', 'grades.back', 'grades.how.title', 'home.gradesLead']) {
     for (const dict of [ru, ky, en]) assert.ok(dict[key], key);
   }
   for (const dict of [ru, ky, en]) assert.equal('home.gradesSoon' in dict, false);

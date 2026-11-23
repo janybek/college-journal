@@ -67,7 +67,7 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
     if (mark ? sameAsSaved() : !touched) return null;
     return { studentId: student.id, status: draft.status, noCoat: draft.noCoat, activity: activityAllowed(draft.status, pairNow()) ? activityOf() : null };
   };
-  const isDirty = () => reason.trim() !== '' || toSend() !== null;
+  const isDirty = () => reason.trim() !== '' || toSend() !== null || draft.activityBad;
 
   // ---- the parts of the window ----
   const summary = el('div', { class: 'cl-summary' });
@@ -120,7 +120,7 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
     const activity = el('input', {
       type: 'number', class: 'field__input mk-act__input', id: 'journal-cell-act', min: '0', max: String(maxActivity), step: '1',
       inputmode: 'numeric', placeholder: t('journal.marks.activityPlaceholder', { max: maxActivity }),
-      oninput: () => setActivity(activity.value),
+      oninput: () => setActivity(activity.value, activity.validity.badInput),
     });
     const error = el('p', { class: 'field__error mk-row__error', role: 'alert', hidden: true });
     rows = { buttons, coatBox, activity, error };
@@ -154,7 +154,7 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
     const activity = el('input', {
       type: 'number', class: 'field__input mk-act__input', id: 'journal-cell-act', min: '0', max: String(journal.scheme.activity), step: '1',
       inputmode: 'numeric', placeholder: t('journal.marks.activityPlaceholder', { max: journal.scheme.activity }),
-      oninput: () => setActivity(activity.value),
+      oninput: () => setActivity(activity.value, activity.validity.badInput),
     });
     const activityBox = activityAllowed('madeup', pair)
       ? el('label', { class: 'mk-act', for: activity.id }, el('span', { class: 'mk-act__label' }, t('journal.marks.activity')), activity) : null;
@@ -237,10 +237,10 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
     changed();
   }
 
-  function setActivity(text) {
+  function setActivity(text, unreadable = false) {
     draft.activityText = text;
     const clean = text.trim();
-    draft.activityBad = clean !== '' && !(/^\d+$/.test(clean) && Number(clean) <= journal.scheme.activity);
+    draft.activityBad = unreadable || (clean !== '' && !(/^\d+$/.test(clean) && Number(clean) <= journal.scheme.activity));
     touched = true;
     clearFieldError();
     problem.replaceChildren();
@@ -382,7 +382,13 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
   }
 
   // ---- the window ----
-  const onHash = () => dialog.close();
+  // Browser «Back» with unsaved changes: put the address back and ask, as Escape does; otherwise close as before.
+  const openedAt = window.location.hash;
+  const onHash = () => {
+    if (window.location.hash === openedAt) return;
+    if (!busy && isDirty()) { window.location.hash = openedAt; ask(); return; }
+    dialog.close();
+  };
   const pair0 = pairNow();
   const dialog = modal({
     id: 'journal-cell', labelledBy: 'journal-cell-name', className: 'dialog--cell',

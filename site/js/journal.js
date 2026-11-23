@@ -117,7 +117,8 @@ export function draftMarks(journal, pairId) {
 export function changedMarks(draft, journal, pairId) {
   const pair = journal.pairs.find((p) => p.id === pairId);
   const held = pair && (pair.status === 'running' || pair.status === 'closed');
-  const base = new Map(draftMarks(journal, pairId).map((m) => [m.studentId, m]));
+  const saved = (journal.marks && journal.marks[pairId]) || {};
+  const base = new Map(Object.keys(saved).map((id) => [id, { status: saved[id].status, noCoat: saved[id].noCoat === true, activity: saved[id].activity !== undefined ? saved[id].activity : null }]));
   return draft
     .filter((m) => {
       const old = base.get(m.studentId);
@@ -228,12 +229,17 @@ export function needsReason(items, journal, unit, field, isOwnTeacher) {
 
 const ABSENCE_STATUSES = ['absent', 'excused', 'madeup'];
 
-// The line of a unit: all three results and the total, only the current control, or nothing yet.
+// The line of a unit: all three results and the total; otherwise every part that exists (`parts`), or nothing yet.
 export function unitLine(unit) {
   const { current, self, control, total } = unit;
-  if (current === null || current === undefined) return { key: 'grades.unit.empty', params: {} };
-  if (self === null || self === undefined || control === null || control === undefined) return { key: 'grades.unit.partial', params: { current } };
-  return { key: 'grades.unit.full', params: { current, self, control, total } };
+  const has = (v) => v !== null && v !== undefined;
+  if (has(current) && has(self) && has(control)) return { key: 'grades.unit.full', params: { current, self, control, total } };
+  const parts = [];
+  if (has(current)) parts.push({ key: 'grades.unit.part.current', params: { current } });
+  if (has(self)) parts.push({ key: 'grades.unit.part.self', params: { self } });
+  if (has(control)) parts.push({ key: 'grades.unit.part.control', params: { control } });
+  if (!parts.length) return { key: 'grades.unit.empty', params: {} };
+  return { key: 'grades.unit.parts', params: {}, parts };
 }
 
 // The pairs the student was away from (or made up for), the newest first.

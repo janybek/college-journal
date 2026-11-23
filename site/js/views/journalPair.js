@@ -67,7 +67,7 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
     const activity = el('input', {
       type: 'number', class: 'field__input mk-act__input', id: `journal-marks-act-${index}`, min: '0', max: String(maxActivity), step: '1',
       inputmode: 'numeric', placeholder: t('journal.marks.activityPlaceholder', { max: maxActivity }), 'aria-describedby': nameId,
-      oninput: () => setActivity(index, activity.value),
+      oninput: () => setActivity(index, activity.value, activity.validity.badInput),
     });
     const error = el('p', { class: 'field__error mk-row__error', role: 'alert', hidden: true });
     const li = el('li', { class: 'mk-row', 'data-student': mark.studentId },
@@ -123,11 +123,11 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
     change(index);
   }
 
-  function setActivity(index, text) {
+  function setActivity(index, text, unreadable = false) {
     const mark = draft[index];
     mark.activityText = text;
     const clean = text.trim();
-    mark.activityBad = clean !== '' && !(/^\d+$/.test(clean) && Number(clean) <= maxActivity);
+    mark.activityBad = unreadable || (clean !== '' && !(/^\d+$/.test(clean) && Number(clean) <= maxActivity));
     mark.activity = clean === '' || mark.activityBad ? null : Number(clean);
     clearRowError(index);
     problem.replaceChildren();
@@ -139,7 +139,7 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
   }
 
   const isDirty = () => reason.trim() !== '' || draft.some((m, i) => (
-    m.status !== initial[i].status || m.noCoat !== initial[i].noCoat || m.activityText !== initial[i].activityText));
+    m.status !== initial[i].status || m.noCoat !== initial[i].noCoat || m.activityText !== initial[i].activityText || m.activityBad));
 
   // ---- the question when closing with unsaved marks ----
   const asking = el('div', { class: 'mk-ask', role: 'alert', hidden: true },
@@ -223,7 +223,13 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
   }
   go.addEventListener('click', save);
 
-  const onHash = () => dialog.close();
+  // Browser «Back» with unsaved changes: put the address back and ask, as Escape does; otherwise close as before.
+  const openedAt = window.location.hash;
+  const onHash = () => {
+    if (window.location.hash === openedAt) return;
+    if (!busy && isDirty()) { window.location.hash = openedAt; ask(); return; }
+    dialog.close();
+  };
   const kind = pair.lessonType ? t('lessonType.' + pair.lessonType) : t('journal.marks.kind.none');
   const topic = pair.topicName ? t('journal.topic', { n: pair.number, name: pair.topicName }) : t('journal.topicNone');
   const dialog = modal({

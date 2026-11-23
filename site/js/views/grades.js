@@ -143,7 +143,7 @@ function unitBlock(unit, scheme) {
   return el('div', { class: 'gr-unit' },
     el('p', { class: 'gr-unit__name' }, unit.title ? t('grades.unitTitled', { n: unit.unit, title: unit.title }) : t('grades.unitName', { n: unit.unit }),
       unit.total !== null && unit.word ? badge(t('journal.grade.' + unit.word), wordTone(unit.word)) : null),
-    el('p', { class: 'gr-unit__line' }, t(line.key, params)),
+    el('p', { class: 'gr-unit__line' }, line.parts ? line.parts.map((part) => t(part.key, { ...part.params, ...params })).join(' · ') : t(line.key, params)),
     unit.currentLow ? lowNote('grades.low.current', scheme) : null,
     unit.controlLow ? lowNote('grades.low.control', scheme) : null);
 }

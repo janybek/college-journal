@@ -4,6 +4,11 @@ import { tabOf } from './syllabusForm.js';
 // Maps the address (#/...) and the signed-in user to a screen. Pure: no DOM, no storage.
 // Tables such as weekTemplate are listed through dir.* too, but have screens of their own:
 // only the directories of DIR_TABLES open on the directory screen.
+// The id from an address part: URI-decoded; a broken escape (%E0%A4%A) gives null, and the address is not found.
+function idOf(raw) {
+  try { return decodeURIComponent(raw); } catch (error) { return null; }
+}
+
 export function resolveRoute(hash, user) {
   if (!user) return { view: 'login', params: {} };
   if (user.mustChangePassword === true) return { view: 'changePassword', params: {} };
@@ -40,16 +45,16 @@ export function resolveRoute(hash, user) {
   // «Журналы»: the list; #/journal/<subjectId>: the journal of a subject.
   if (path === '/journal' && permissions.includes('journal.list')) return { view: 'journalList', params: {} };
   const journal = /^\/journal\/([^/]+)$/.exec(path);
-  if (journal && permissions.includes('journal.get')) return { view: 'journal', params: { subjectId: journal[1] } };
+  if (journal && permissions.includes('journal.get') && idOf(journal[1]) !== null) return { view: 'journal', params: { subjectId: idOf(journal[1]) } };
   // «Журнал изменений»: the whole log is for the admin, the deanery and the vice-rector; the log of one subject also for its teacher.
   const office = Array.isArray(user.roles) && user.roles.some((role) => ['admin', 'dean', 'prorector'].includes(role));
   if (path === '/journal-log' && office && permissions.includes('journal.log')) return { view: 'journalLog', params: {} };
   const log = /^\/journal-log\/([^/]+)$/.exec(path);
-  if (log && permissions.includes('journal.log')) return { view: 'journalLog', params: { subjectId: log[1] } };
+  if (log && permissions.includes('journal.log') && idOf(log[1]) !== null) return { view: 'journalLog', params: { subjectId: idOf(log[1]) } };
   // «Оценки» of a student: all subjects; #/grades/<subjectId>: one of them (the screen looks it up in its own answer).
   if (path === '/grades' && permissions.includes('student.grades')) return { view: 'grades', params: {} };
   const grades = /^\/grades\/([^/]+)$/.exec(path);
-  if (grades && permissions.includes('student.grades')) return { view: 'grades', params: { subjectId: grades[1] } };
+  if (grades && permissions.includes('student.grades') && idOf(grades[1]) !== null) return { view: 'grades', params: { subjectId: idOf(grades[1]) } };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
   return { view: 'home', params: {} };

@@ -39,7 +39,7 @@ const blank = () => ({
   busy: null,          // 'check' | 'send' | 'approve': a request of a button of the bar is on its way
   checks: null,        // { errors, warnings } of the check before sending that found errors
   submitAsk: null,     // { warnings }: the question before the version is sent
-  approveAsk: null,    // { errors, errorKey }: the window «Утвердить силлабус?»
+  approveAsk: null,    // { errors, errorKey, warning }: the window «Утвердить силлабус?»
   actionError: null,   // a dictionary key: a button of the bar did not work
   done: null,          // { key, at }: what the last decision did («Силлабус утверждён…») and the address key it is shown on
 });
@@ -206,7 +206,7 @@ function actionButton(view, action, main) {
   const handlers = {
     fill: () => openForm(view), continue: () => openForm(view), edit: () => openForm(view),
     submit: () => checkBeforeSubmit(view),
-    approve: () => { state.approveAsk = { errors: null, errorKey: null }; state.actionError = null; refresh(); },
+    approve: () => { state.approveAsk = { errors: null, errorKey: null, warning: null }; state.actionError = null; refresh(); loadCourseWarning(); },
     giveBack: () => openReturnDialog(view.state.open.syllabusId, () => {
       if (state.view !== view) return;
       Object.assign(state, { done: { key: 'syllabus.return.done', at: state.key }, checks: null });
@@ -358,12 +358,29 @@ function checksPanel(view) {
 
 // ---- «Утвердить» ----
 
+// The only warning the deanery sees before approving: groups of another year than the syllabus. It comes from the form
+// check of the version (the same text the teacher sees when sending); if it does not come, the window just has no line.
+async function loadCourseWarning() {
+  const owner = state;
+  const open = owner.view && owner.view.state ? owner.view.state.open : null;
+  if (!open) return;
+  try {
+    const result = await call('syllabus.form', { syllabusId: open.syllabusId });
+    const warning = ((result.checks && result.checks.warnings) || []).find((item) => item.code === 'group_course');
+    if (state !== owner || !owner.approveAsk || !warning) return;
+    owner.approveAsk = { ...owner.approveAsk, warning };
+    refresh();
+  } catch (error) {
+    // no warning line; the approval itself is checked by the server
+  }
+}
+
 async function approve() {
   if (state.busy) return;
   const owner = state;
   const view = owner.view;
   Object.assign(owner, { busy: 'approve' });
-  owner.approveAsk = { errors: null, errorKey: null };
+  owner.approveAsk = { ...owner.approveAsk, errors: null, errorKey: null };
   refresh();
   try {
     const result = await call('syllabus.approve', { syllabusId: view.state.open.syllabusId });
@@ -378,10 +395,10 @@ async function approve() {
       else reload();
       return;
     }
-    owner.approveAsk = { errors: (result.checks && result.checks.errors) || [], errorKey: null };
+    owner.approveAsk = { ...owner.approveAsk, errors: (result.checks && result.checks.errors) || [], errorKey: null };
   } catch (error) {
     if (state !== owner) return;
-    owner.approveAsk = { errors: null, errorKey: FINAL_ERRORS[error.code] ?? errorKey(error.code) };
+    owner.approveAsk = { ...owner.approveAsk, errors: null, errorKey: FINAL_ERRORS[error.code] ?? errorKey(error.code) };
   } finally {
     if (state === owner) owner.busy = null;
   }
@@ -405,6 +422,7 @@ function approveDialog(ask) {
   const dialog = modal({ id: 'syllabus-approve-ask', labelledBy: 'syllabus-approve-title', className: 'dialog--confirm dialog--approve', onClose: close, canCancel: () => !state.busy },
     el('h2', { class: 'dialog__title', id: 'syllabus-approve-title' }, t('syllabus.approve.title')),
     el('p', {}, t('syllabus.approve.text')),
+    ask.warning ? el('p', { class: 'sform-submit__empty', id: 'syllabus-approve-warning' }, icon('alert'), el('span', {}, checkText(ask.warning))) : null,
     blocked ? el('div', { class: 'approve-checks', role: 'alert' },
       el('p', { class: 'approve-checks__lead' }, icon('alert'), el('span', {}, t('syllabus.approve.failed'))),
       checkList(ask.errors, id, 'error'),

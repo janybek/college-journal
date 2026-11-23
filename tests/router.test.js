@@ -133,6 +133,11 @@ test('resolveRoute: the change log is for the deanery, the admin and the vice-re
   assert.deepEqual(resolveRoute('#/journal-log/sb_1', teacher), { view: 'journalLog', params: { subjectId: 'sb_1' } });
   assert.deepEqual(resolveRoute('#/journal-log/sb_1', office), { view: 'journalLog', params: { subjectId: 'sb_1' } });
   assert.equal(resolveRoute('#/journal-log', student).view, 'home');
+  // a broken escape in the id is «not found», not an exception; a good one is decoded
+  assert.equal(resolveRoute('#/journal-log/%E0%A4%A', teacher).view, 'home');
+  assert.equal(resolveRoute('#/journal/%E0%A4%A', teacher).view, 'home');
+  assert.equal(resolveRoute('#/grades/%', student).view, 'home');
+  assert.deepEqual(resolveRoute('#/journal-log/sb%5F1', teacher), { view: 'journalLog', params: { subjectId: 'sb_1' } });
   assert.equal(resolveRoute('#/journal-log/sb_1', student).view, 'home');
   assert.equal(resolveRoute('#/journal-log/sb_1/x', office).view, 'home');
 });
