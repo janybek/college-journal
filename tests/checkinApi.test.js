@@ -170,3 +170,22 @@ test('checkin.mark: a pair started again does not carry over wrong codes, phones
   assert.equal(mark(t.a1, { code: lesson().code.now, device: dev(2) }).data.result, 'ok');
   assert.equal(store.list('attendance').find((x) => x.pairId === p0922 && x.studentId === a1).source, 'code');
 });
+
+test('checkin.current: with two running pairs of one group the one with an open check-in is current', () => {
+  for (const [startFirst, startSecond] of [['08:05', '09:32'], ['09:29', '09:40']]) {
+    const s = setup();
+    const { call, t, at, store, p0922, ids } = s;
+    const { id, ...row } = store.get('pairs', p0922);
+    const p2 = store.insert('pairs', { ...row, slot: 2, startTime: '09:40', planSlot: 2, teacherId: ids.teacher2, substitute: true }).id;
+    at('2026-09-22', startFirst);
+    assert.equal(call('lesson.start', { pairId: p0922 }, t.teacher1).ok, true);
+    // only the first pair is running and it is in its check-in: it is the current one
+    assert.equal(call('checkin.current', {}, t.a1).data.pair.id, p0922);
+    at('2026-09-22', startSecond);
+    const started = call('lesson.start', { pairId: p2 }, t.teacher2);
+    assert.equal(started.ok, true);
+    const current = call('checkin.current', {}, t.a1).data.pair;
+    assert.deepEqual([current.id, current.phase], [p2, 'checkin']);
+    assert.equal(call('checkin.mark', { pairId: current.id, device: dev(1), code: started.data.lesson.code.now }, t.a1).data.result, 'ok');
+  }
+});

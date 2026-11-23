@@ -154,7 +154,7 @@ function form(pair) {
   else if (S.code.length !== 4) submit.setAttribute('aria-disabled', 'true');
   const input = el('input', {
     id: 'here-code', name: 'code', class: 'here__code', type: 'text', value: S.code, inputmode: 'numeric', pattern: '[0-9]*',
-    autocomplete: 'one-time-code', maxlength: 4, autocapitalize: 'off', spellcheck: 'false', 'aria-describedby': 'here-hint',
+    autocomplete: 'one-time-code', autocapitalize: 'off', spellcheck: 'false', 'aria-describedby': 'here-hint',
     oninput: () => {
       S.code = cleanCode(input.value);
       if (input.value !== S.code) input.value = S.code;

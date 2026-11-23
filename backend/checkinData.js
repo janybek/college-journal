@@ -19,9 +19,14 @@ export function checkinCurrent(store, platform, user) {
   const settled = settleLessons(store, platform, { attendance: store.list('attendance') });
   const today = localDate(platform.now());
   const nowMs = platform.now();
-  const pair = settled.pairs
-    .filter((p) => p.status === 'running' && p.date === today && p.groupId === user.row.groupId && ['checkin', 'lesson'].includes(lessonClock(p, nowMs).phase))
-    .sort((a, b) => a.slot - b.slot)[0];
+  // The pair whose check-in is open comes first (the latest start); else a pair already in its lesson (the latest start).
+  const running = settled.pairs
+    .filter((p) => p.status === 'running' && p.date === today && p.groupId === user.row.groupId)
+    .map((p) => ({ p, phase: lessonClock(p, nowMs).phase }))
+    .filter((x) => x.phase === 'checkin' || x.phase === 'lesson');
+  const latest = (list) => list.sort((a, b) => String(b.p.startedAt).localeCompare(String(a.p.startedAt)) || b.p.slot - a.p.slot)[0];
+  const best = latest(running.filter((x) => x.phase === 'checkin')) || latest(running);
+  const pair = best ? best.p : null;
   if (!pair) return { pair: null };
   const subject = store.list('subjects').find((s) => s.id === pair.subjectId);
   const room = store.list('rooms').find((r) => r.id === pair.roomId);

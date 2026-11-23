@@ -23,6 +23,13 @@ export function qrLink(pageUrl, pairId, qr) {
   return (hash === -1 ? url : url.slice(0, hash)) + '#/q/' + encodeURIComponent(pairId) + '/' + qr;
 }
 
+// Pixels per module of the QR (the quiet zone is inside `modules`): in full screen about two thirds of the height
+// (never wider than 90 % of the width), otherwise half of the height up to 440 px; a whole number, at least 2.
+export function qrCell(height, width, modules, fullscreen) {
+  const target = fullscreen ? Math.min(height * 0.66, width * 0.9) : Math.min(height * 0.5, 440);
+  return Math.max(2, Math.floor(target / modules));
+}
+
 const ARRIVED = ['present', 'late', 'madeup'];
 
 // True when the mark of checkin.current says the student came (a teacher's «не был» is not a check-in).

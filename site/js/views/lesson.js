@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { getPref } from '../session.js';
 import { applyTheme, pickTheme } from '../theme.js';
 import { qrMatrix } from '../qr.js';
-import { clockText, qrLink, arrivedList, stageOf, lessonDraft, lessonChanges, sourceKey } from '../lesson.js';
+import { clockText, qrLink, arrivedList, stageOf, lessonDraft, lessonChanges, sourceKey, qrCell } from '../lesson.js';
 import { activityAllowed, coatAllowed } from '../journal.js';
 
 // The screen of a started pair for the projector (#/lesson/<pairId>). Always light, whatever theme the teacher chose.
@@ -635,8 +635,7 @@ function askEnd() {
 function paintQr(canvas) {
   const matrix = qrMatrix(qrLink(location.href, S.lesson.pair.id, canvas.dataset.qr));
   const modules = matrix.size + 8;
-  const target = document.fullscreenElement ? window.innerHeight * 0.62 : Math.min(window.innerHeight * 0.5, 440);
-  const cell = Math.max(2, Math.floor(target / modules));
+  const cell = qrCell(window.innerHeight, window.innerWidth, modules, Boolean(document.fullscreenElement));
   const side = cell * modules;
   canvas.width = side;
   canvas.height = side;

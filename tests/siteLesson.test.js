@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shortName, clockText, qrLink, arrivedList, stageOf, todayAction, lessonDraft, lessonChanges, sourceKey, readQrLink, cleanCode, checkinMessage, cameMark } from '../site/js/lesson.js';
+import { shortName, clockText, qrLink, arrivedList, stageOf, todayAction, lessonDraft, lessonChanges, sourceKey, readQrLink, cleanCode, checkinMessage, cameMark, qrCell } from '../site/js/lesson.js';
 import { deviceId, keepPass, takePass } from '../site/js/device.js';
 
 test('shortName: surname and the first initial', () => {
@@ -110,4 +110,19 @@ test('deviceId: 32 hex characters, the same on every call; a pass is taken once'
 test('cameMark: present, late and made-up marks count as a check-in; «не был» and no mark do not', () => {
   assert.deepEqual(['present', 'late', 'madeup', 'absent', 'excused'].map((status) => cameMark({ status })), [true, true, true, false, false]);
   assert.deepEqual([null, undefined].map(cameMark), [false, false]);
+});
+
+test('qrCell: in full screen the QR with its quiet zone is at least 60 % of the height, a whole pixel per module', () => {
+  for (const version of [1, 2, 3, 4, 5, 6]) {
+    const modules = 17 + 4 * version + 8;
+    for (const height of [720, 768, 1080, 1440]) {
+      const cell = qrCell(height, height * 16 / 9, modules, true);
+      assert.ok(Number.isInteger(cell) && cell >= 2);
+      assert.ok(cell * modules >= 0.6 * height, `version ${version}, height ${height}: ${cell * modules}`);
+      assert.ok(cell * modules <= 0.7 * height);
+    }
+  }
+  assert.equal(qrCell(1000, 300, 45, true), 6);
+  assert.equal(qrCell(1000, 800, 45, false), 9);
+  assert.equal(qrCell(100, 100, 45, true), 2);
 });

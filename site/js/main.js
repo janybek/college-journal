@@ -111,7 +111,7 @@ function sessionEnded() {
 // address goes back while it asks; after "leave" the person goes where they were heading. A screen that stays on
 // the same work at the new address (another tab of the same syllabus form: keepsHold) is not left.
 async function hashChanged() {
-  if (readQrLink(location.hash)) await takeQrLink();
+  takeQrLink();
   if (!isLeaveHeld() || location.hash === shownHash || staysOnWork()) {
     renderCurrent();
     return;
@@ -126,16 +126,24 @@ function staysOnWork() {
   return next.view === shownView && typeof VIEWS[shownView].keepsHold === 'function' && VIEWS[shownView].keepsHold(next.params);
 }
 
-// A QR link (#/q/<pair>/<key>): the key is exchanged at once for a pass, with no sign-in needed, and the address
-// becomes #/here, so the key stays neither in the address bar nor in the history. The pass waits for the check-in
-// screen; why it was not given is remembered to be shown there. A staff member just goes home.
-async function takeQrLink() {
+// A QR link (#/q/<pair>/<key>): the address becomes #/here at once (the key stays neither in the address bar nor in
+// the history) and the screen is drawn; the key is exchanged for a pass in the background, with no sign-in needed,
+// so a slow network shows «Загрузка…», not a blank page. When the exchange ends, the check-in screen starts afresh
+// and takes the pass (or the note of why there is none). A staff member just goes home.
+function takeQrLink() {
   const link = readQrLink(location.hash);
   if (!link) return;
   const user = currentUser();
   const student = Boolean(user) && Array.isArray(user.permissions) && user.permissions.includes('checkin.mark');
   history.replaceState(null, '', user && !student ? '#/' : '#/here');
   if (user && !student) return;
+  exchangeQrLink(link).then(() => {
+    if (shownView === 'checkin') VIEWS.checkin.leave();
+    if (shownView !== null) renderCurrent();
+  });
+}
+
+async function exchangeQrLink(link) {
   try {
     const data = await call('checkin.pass', { pairId: link.pairId, qr: link.qr, device: deviceId() });
     keepPass({ pairId: link.pairId, pass: data.pass });
@@ -189,7 +197,7 @@ async function refreshUser() {
 }
 
 async function start() {
-  await takeQrLink();
+  takeQrLink();
   const user = currentUser();
   setLang(pickLang({ deviceLang: getPref('lang'), userLang: user ? user.lang : null }).lang);
   onTextsChange(renderCurrent);
