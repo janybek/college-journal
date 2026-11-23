@@ -99,3 +99,10 @@ Task 10: complete (commits 6c3fd32..fcb6a58, review clean)
 Task 11: complete (commits 459bde4..a49abbd, review clean)
 - 23.11.2026 Блок 2 (задача 11) собран, 893 теста. Стоп: приёмка владельцем. На стенде возвращённое «Эссе» — у S1004 (у S1001 оно проверено 8 из 10).
 - 23.11.2026 Блок 2 принят владельцем («Принимаю блок 2»), без замечаний.
+- Task 12: base 9e445ed; implementer agent afcc73259d6e06548 (journal-screens, sonnet); после — строгая проверка (права чтения, «Оценки»)
+- Task 12: implementer DONE_WITH_CONCERNS c626c9a (898 tests, RED записан). dean,teacher «сам оценивает свой» на стенде не проверить (у dean нет предметов) — покрыто тестом staffMay; фильтр группы по названию (в work.overview нет groupId); новые overviewRows/overviewGroups/staffMay в work.js; journalLog.js не менялся.
+- Task 12: review (sonnet, strict) agent af9100b992170ba7a
+- Task 12: review (sonnet, strict) Approved, 0 Important. Проба scratchpad\task12-probes\p1.mjs.
+- Task 12: minor (deferred, к общей проверке): journal.js:397 keyed + journalLog.js:190 — название задания вида 'journal.col.self' / 'work.xxx' переводится как ключ словаря (в журнале изменений «СРС» вместо названия); в ветке work брать из keyed только before/after у status; нет теста на такое название.
+Task 12: complete (commits 9e445ed..c626c9a, review clean)
+- 24.11.2026 Блок 3 (задача 12) собран, 898 тестов. Стоп: приёмка владельцем. dean,teacher «сам оценивает свой» на стенде не показать — у dean нет предметов.
