@@ -151,7 +151,7 @@ test('work.save: a change that changes nothing writes nothing; one write per tab
 
 test('work.remove: only the teacher of the subject, nothing with attempts, pending files are dropped', () => {
   const s = setup();
-  const { call, t, at, store, snapshot, files, a1, a2 } = s;
+  const { call, t, at, store, snapshot, files } = s;
   at('2026-09-22', '10:00');
   const save = saver(s);
   const id = save({}).data.assignment.id;
@@ -179,7 +179,6 @@ test('work.remove: only the teacher of the subject, nothing with attempts, pendi
   const again = snapshot();
   assert.equal(call('work.remove', { assignmentId: kept }, t.teacher1).error.code, 'in_use');
   assert.deepEqual(snapshot(), again);
-  assert.ok(a1 && a2);
 });
 
 test('the teacher of the subject changes: the new one works, the old one does not', () => {
@@ -260,7 +259,7 @@ test('work.get of the staff: students, attempts, files, the left ones; pending f
 
 test('work.list counts the current attempt of every active student of the group', () => {
   const s = setup();
-  const { call, t, at, a4, sb1, a1 } = s;
+  const { call, t, at, sb1 } = s;
   at('2026-09-22', '10:00');
   const id = s.task({ dueAt: '2026-09-25 23:59:00' });
   s.attempt(id, 'a1', { n: 1, status: 'returned', comment: 'x' });
@@ -274,7 +273,6 @@ test('work.list counts the current attempt of every active student of the group'
   assert.deepEqual(list.assignments[0].counts, { total: 3, none: 1, submitted: 1, checked: 1, returned: 0 });
   const over = call('work.overview', {}, t.teacher1).data.subjects[0];
   assert.deepEqual([over.assignments, over.toCheck], [1, 2]);
-  assert.ok(a1 && a4);
 });
 
 test('lesson.get tells whether the teacher of the subject may give a task, and the unit of the pair', () => {
@@ -287,6 +285,10 @@ test('lesson.get tells whether the teacher of the subject may give a task, and t
   assert.deepEqual([mine.assign, mine.pair.unit, mine.pair.topicId], [true, 2, store.get('pairs', p0922).topicId]);
   const sub = call('lesson.get', { pairId: p0915 }, t.teacher3).data.lesson;
   assert.deepEqual([sub.assign, sub.pair.unit], [false, 2]);
+  // the office and the students do not lead the pair: the answer is a refusal, there is no button to give a task
+  assert.equal(call('lesson.get', { pairId: p0922 }, t.dean).error.code, 'forbidden');
+  assert.equal(call('lesson.get', { pairId: p0922 }, t.prorector).error.code, 'forbidden');
+  assert.equal(call('lesson.get', { pairId: p0922 }, t.a1).error.code, 'forbidden');
 });
 
 test('without a file box the assignments still work', () => {

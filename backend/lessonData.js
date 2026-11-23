@@ -16,6 +16,7 @@ import { LESSON, codeAt, lessonClock, pairKey, qrAt, startFrom, startProblem } f
 import { JOURNAL_TABLES, lastOf, readJournalRows, viewerOf } from './journalData.js';
 import { settleLessons } from './lessonSettle.js';
 import { pairViews } from './scheduleData.js';
+import { subjectRights } from './workData.js';
 
 export const LESSON_TABLES = [...JOURNAL_TABLES, 'rooms', 'checkins'];
 
@@ -124,7 +125,7 @@ export function lessonView(rows, platform, pair, user) {
     total: listed.length,
     students,
     scheme: { activity: scheme.activity },
-    assign: !!subject && subject.teacherId === user.id,
+    assign: !!subject && subjectRights(subject, user).manage,
   };
 }
 
