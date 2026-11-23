@@ -18,7 +18,10 @@ export const MARK_SOURCES = ['teacher', 'code', 'qr', 'auto'];   // рукой, 
 export const CHECKIN_WAYS = ['code', 'qr'];
 export const CHECKIN_RESULTS = ['ok', 'wrong'];
 export const RESULT_FIELDS = ['control', 'self', 'current'];
-export const LOG_ENTITIES = ['mark', 'unit', 'pair'];
+export const WORK_KINDS = ['hw', 'srs'];                                   // ДЗ, СРС
+export const WORK_STATUSES = ['submitted', 'replaced', 'checked', 'returned']; // сдано, заменено новой попыткой, проверено, возвращено
+export const FILE_STATES = ['pending', 'attached', 'dropped'];             // загружен и ждёт «Сдать», в сдаче, убран студентом
+export const LOG_ENTITIES = ['mark', 'unit', 'pair', 'work'];
 
 const col =(key, title, type = 'string') => ({ key, title, type });
 
@@ -169,12 +172,31 @@ export const SCHEMA = {
     sheet: 'Журнал изменений', prefix: 'cl',
     columns: [col('id', 'id'), col('at', 'когда'), col('actorId', 'кто'), col('entity', 'что'), col('subjectId', 'предмет'),
       col('pairId', 'пара'), col('studentId', 'студент'), col('unit', 'юнит', 'int'), col('field', 'поле'),
-      col('before', 'было'), col('after', 'стало'), col('reason', 'причина'), col('late', 'после срока', 'bool')],
+      col('before', 'было'), col('after', 'стало'), col('reason', 'причина'), col('late', 'после срока', 'bool'), col('assignmentId', 'задание')],
   },
   checkins: {
     sheet: 'Отметки с телефона', prefix: 'ci',
     columns: [col('id', 'id'), col('pairId', 'пара'), col('studentId', 'студент'), col('device', 'устройство'),
       col('way', 'как'), col('result', 'результат'), col('at', 'когда')],
+  },
+  assignments: {
+    sheet: 'Задания', prefix: 'as',
+    columns: [col('id', 'id'), col('subjectId', 'предмет'), col('kind', 'тип'), col('planSemester', 'семестр по плану', 'int'),
+      col('unit', 'юнит', 'int'), col('topicId', 'тема'), col('pairId', 'выдано на паре'), col('title', 'название'),
+      col('description', 'описание'), col('dueAt', 'срок сдачи'), col('maxPoints', 'максимум баллов', 'int'),
+      col('createdBy', 'кто выдал'), col('createdAt', 'когда выдано'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено')],
+  },
+  submissions: {
+    sheet: 'Сдачи', prefix: 'su',
+    columns: [col('id', 'id'), col('assignmentId', 'задание'), col('studentId', 'студент'), col('n', 'попытка', 'int'),
+      col('text', 'текст'), col('paper', 'на бумаге', 'bool'), col('submittedAt', 'когда сдано'), col('status', 'статус'),
+      col('points', 'баллы', 'int'), col('comment', 'комментарий'), col('checkedBy', 'кто проверил'), col('checkedAt', 'когда проверено')],
+  },
+  files: {
+    sheet: 'Файлы', prefix: 'fl',
+    columns: [col('id', 'id'), col('assignmentId', 'задание'), col('submissionId', 'сдача'), col('ownerId', 'студент'),
+      col('state', 'состояние'), col('name', 'имя файла'), col('kind', 'вид'), col('size', 'размер, байт', 'int'),
+      col('stored', 'имя на диске'), col('at', 'когда загружен')],
   },
 };
 

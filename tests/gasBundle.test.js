@@ -30,6 +30,7 @@ test('bundle has no Node-only references and carries the three entry points', ()
   assert.doesNotMatch(code, /require\(/);
   assert.doesNotMatch(code, /node:/);
   assert.doesNotMatch(code, /\bprocess\b/);
+  assert.doesNotMatch(code, /\bBuffer\b/);
   assert.match(code, /function doPost\(e\) \{ return App\.doPost\(e\); \}/);
   assert.match(code, /function doGet\(e\) \{ return App\.doGet\(e\); \}/);
   assert.match(code, /function setup\(\) \{ return App\.setup\(\); \}/);
@@ -185,11 +186,11 @@ test('hashes made inside the Apps Script bundle verify with the Node platform', 
 
 const SECTION_SHEETS = ['Юниты', 'Результаты обучения', 'СРС', 'Литература', 'Программное обеспечение', 'Оценивание', 'Правила'];
 
-test('setup creates all 23 sheets, adds sixteen columns to an old syllabus sheet and a second setup changes nothing', () => {
+test('setup creates all 26 sheets, adds sixteen columns to an old syllabus sheet and a second setup changes nothing', () => {
   const { gas, sandbox } = load();
   sandbox.setup();
   const [fresh] = gas.spreadsheets.values();
-  assert.equal(Object.keys(SCHEMA).length, 23);
+  assert.equal(Object.keys(SCHEMA).length, 26);
   for (const def of Object.values(SCHEMA)) assert.ok(fresh.getSheetByName(def.sheet), def.sheet);
   for (const name of SECTION_SHEETS) assert.ok(fresh.getSheetByName(name), name);
 

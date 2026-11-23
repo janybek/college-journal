@@ -39,7 +39,7 @@ test('actionKind', () => {
 });
 
 test('listPermissions', () => {
-  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get']);
+  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
   const dean = listPermissions(['dean']);
   assert.ok(dean.includes('import.apply:students'));
   assert.ok(!dean.includes('dir.save:staff'));
@@ -77,8 +77,9 @@ test('a file fills the draft: the deanery, the administrator and a teacher (of h
   assert.deepEqual(listPermissions(['teacher']),
     ['journal.get', 'journal.list', 'journal.log', 'journal.saveResults', 'journal.savePair',
       'lesson.mine', 'lesson.get', 'lesson.start', 'lesson.endCheckin', 'lesson.finish',
-      'schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects'].sort());
-  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get']);
+      'schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects',
+      'work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save'].sort());
+  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
   assert.equal(can(['dean'], 'topics.plan'), false);
   assert.equal(can(['student'], 'student.subjects'), true);
   assert.equal(can(['teacher'], 'student.subjects'), false);
@@ -123,4 +124,46 @@ test('phone check-in: the pass is public, lessons are for the teacher, marks for
   for (const role of ['admin', 'dean', 'prorector', 'teacher', 'student']) {
     for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.preview', 'import.apply']) assert.equal(can([role], action, 'checkins'), false, role + ' ' + action);
   }
+});
+
+test('unit 5: the rights of work.* actions, role by role', () => {
+  const roles = ['admin', 'dean', 'prorector', 'teacher', 'student'];
+  const table = {
+    'work.overview': ['admin', 'dean', 'prorector', 'teacher'],
+    'work.list': ['admin', 'dean', 'prorector', 'teacher'],
+    'work.get': roles,
+    'work.save': ['teacher'],
+    'work.remove': ['teacher'],
+    'work.grade': ['teacher'],
+    'work.mine': ['student'],
+    'work.upload': ['student'],
+    'work.dropFile': ['student'],
+    'work.submit': ['student'],
+    'work.file': roles,
+  };
+  for (const [action, allowed] of Object.entries(table)) {
+    assert.equal(actionKind(action), 'role', action);
+    for (const role of roles) assert.equal(can([role], action), allowed.includes(role), role + ' ' + action);
+    assert.equal(can([], action), false, 'no roles ' + action);
+  }
+  for (const action of ['work.save', 'work.remove', 'work.grade']) {
+    assert.equal(can(['teacher'], action), true);
+    for (const role of ['admin', 'dean', 'prorector', 'student']) assert.equal(can([role], action), false, role + ' ' + action);
+  }
+  for (const action of ['work.mine', 'work.upload', 'work.dropFile', 'work.submit']) {
+    assert.equal(can(['student'], action), true);
+    for (const role of ['admin', 'dean', 'prorector', 'teacher']) assert.equal(can([role], action), false, role + ' ' + action);
+  }
+  for (const role of roles) assert.equal(can([role], 'work.file'), true);
+  for (const action of ['work.overview', 'work.list']) assert.equal(can(['student'], action), false);
+  assert.equal(can(['dean', 'teacher'], 'work.save'), true);
+  assert.equal(can(['dean', 'teacher'], 'work.upload'), false);
+  for (const t of ['assignments', 'submissions', 'files']) {
+    for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.preview', 'import.apply']) {
+      for (const role of roles) assert.equal(can([role], action, t), false, role + ' ' + action + ' ' + t);
+    }
+  }
+  assert.deepEqual(listPermissions(['student']).filter((p) => p.startsWith('work.')), ['work.file', 'work.get', 'work.mine', 'work.submit', 'work.dropFile', 'work.upload'].sort());
+  assert.deepEqual(listPermissions(['teacher']).filter((p) => p.startsWith('work.')), ['work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save']);
+  for (const role of ['admin', 'dean', 'prorector']) assert.deepEqual(listPermissions([role]).filter((p) => p.startsWith('work.')), ['work.file', 'work.get', 'work.list', 'work.overview']);
 });

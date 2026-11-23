@@ -27,6 +27,8 @@ test('assignment: kind, unit and topic', () => {
   assert.equal(checkAssignment({ ...ok, kind: 'hw', unit: null, topicId: '' }, ctx).value.unit, null);
   assert.deepEqual(bad({ topicId: 't1' }), [{ field: 'topicId', code: 'bad_ref' }]);
   assert.deepEqual(bad({ topicId: 'nope' }), [{ field: 'topicId', code: 'bad_ref' }]);
+  for (const topicId of [['t3'], 3, {}, true]) assert.deepEqual(bad({ topicId }), [{ field: 'topicId', code: 'bad_ref' }], JSON.stringify(topicId));
+  for (const topicId of [undefined, null, '']) assert.deepEqual(bad({ topicId }), [], String(topicId));
 });
 
 test('assignment: title, description, due and points', () => {

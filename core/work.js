@@ -1,8 +1,7 @@
 // Rules of assignments (homework and self-work), their checking and the self-work points counted from them.
 // Pure functions: time comes in as nowMs.
 import { isDate, isTime, parseLocalDateTime, localDate, addDays } from './dates.js';
-
-const KINDS = ['hw', 'srs'];
+import { WORK_KINDS } from './schema.js';
 
 export const WORK = Object.freeze({ titleMax: 200, descriptionMax: 5000, textMax: 5000, commentMax: 2000, pointsMax: 100, soonMs: 172800000, farMs: 366 * 86400000 });
 
@@ -14,10 +13,12 @@ export function checkAssignment(input, { units, topics, nowMs, old = null, locke
   const add = (field, code) => problems.push({ field, code });
 
   const kind = src.kind;
-  const kindOk = KINDS.includes(kind);
+  const kindOk = WORK_KINDS.includes(kind);
   if (!kindOk) add('kind', 'bad_value');
 
-  const topicId = typeof src.topicId === 'string' ? src.topicId : '';
+  const topicRaw = src.topicId === undefined || src.topicId === null ? '' : src.topicId;
+  const topicBad = typeof topicRaw !== 'string';
+  const topicId = topicBad ? '' : topicRaw;
   const unitIn = src.unit === undefined ? null : src.unit;
   const unitEff = unitIn === null ? (kind === 'hw' && topicId !== '' && old && topicId === old.topicId ? old.unit : null) : unitIn;
   const unchanged = !!old && kindOk && kind === old.kind && topicId === old.topicId && unitEff === old.unit;
@@ -50,7 +51,8 @@ export function checkAssignment(input, { units, topics, nowMs, old = null, locke
     if (!unchanged && topicId !== old.topicId) topicProblem = 'locked';
   }
   if (unitProblem) add('unit', unitProblem);
-  if (topicProblem) add('topicId', topicProblem);
+  if (topicBad) add('topicId', 'bad_ref');
+  else if (topicProblem) add('topicId', topicProblem);
 
   const title = typeof src.title === 'string' ? src.title.trim() : '';
   if (title === '') add('title', 'empty');

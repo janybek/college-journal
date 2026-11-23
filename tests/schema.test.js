@@ -1,22 +1,22 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SCHEMA, SEMESTERS, tableNames, PAIR_STATUSES, FIXED_STATUSES, LESSON_TYPES, WEEKDAYS, SYLLABUS_STATUSES, OPEN_STATUSES, LESSON_KINDS,
-  ATTENDANCE_STATUSES, ATTENDED_STATUSES, MARK_SOURCES, CHECKIN_WAYS, CHECKIN_RESULTS, RESULT_FIELDS, LOG_ENTITIES } from '../core/schema.js';
+  ATTENDANCE_STATUSES, ATTENDED_STATUSES, MARK_SOURCES, CHECKIN_WAYS, CHECKIN_RESULTS, RESULT_FIELDS, LOG_ENTITIES, WORK_KINDS, WORK_STATUSES, FILE_STATES } from '../core/schema.js';
 
 test('tableNames lists tables in schema order', () => {
   assert.deepEqual(tableNames(), ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'translations', 'settings', 'weekTemplate',
     'syllabi', 'topics', 'units', 'outcomes', 'selfWork', 'literature', 'software', 'grading', 'rules', 'pairs',
-    'attendance', 'unitResults', 'changeLog', 'checkins']);
+    'attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files']);
 });
 
 test('journal tables, substitute column and statuses', () => {
-  assert.deepEqual(tableNames().slice(-4), ['attendance', 'unitResults', 'changeLog', 'checkins']);
+  assert.deepEqual(tableNames().slice(-7), ['attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files']);
   assert.deepEqual(SCHEMA.attendance.columns.map((c) => c.key), ['id', 'pairId', 'studentId', 'status', 'noCoat', 'activity', 'source', 'markedBy', 'markedAt']);
   assert.deepEqual(SCHEMA.unitResults.columns.map((c) => c.key), ['id', 'subjectId', 'studentId', 'planSemester', 'unit', 'control', 'self', 'currentManual', 'updatedBy', 'updatedAt']);
-  assert.deepEqual(SCHEMA.changeLog.columns.map((c) => c.key), ['id', 'at', 'actorId', 'entity', 'subjectId', 'pairId', 'studentId', 'unit', 'field', 'before', 'after', 'reason', 'late']);
+  assert.deepEqual(SCHEMA.changeLog.columns.map((c) => c.key), ['id', 'at', 'actorId', 'entity', 'subjectId', 'pairId', 'studentId', 'unit', 'field', 'before', 'after', 'reason', 'late', 'assignmentId']);
   assert.deepEqual(SCHEMA.pairs.columns.slice(-7).map((c) => [c.key, c.type]), [['substitute', 'bool'], ['startedAt', 'string'], ['startedBy', 'string'],
     ['checkinUntil', 'string'], ['checkinClosed', 'bool'], ['finishedAt', 'string'], ['finishedBy', 'string']]);
-  assert.equal(tableNames().at(-1), 'checkins');
+  assert.equal(tableNames().at(-1), 'files');
   assert.deepEqual(SCHEMA.checkins.columns.map((c) => c.key), ['id', 'pairId', 'studentId', 'device', 'way', 'result', 'at']);
   assert.deepEqual([SCHEMA.checkins.sheet, SCHEMA.checkins.prefix], ['Отметки с телефона', 'ci']);
   assert.deepEqual([MARK_SOURCES, CHECKIN_WAYS, CHECKIN_RESULTS], [['teacher', 'code', 'qr', 'auto'], ['code', 'qr'], ['ok', 'wrong']]);
@@ -25,7 +25,7 @@ test('journal tables, substitute column and statuses', () => {
   assert.deepEqual(ATTENDANCE_STATUSES, ['present', 'late', 'absent', 'excused', 'madeup']);
   assert.deepEqual(ATTENDED_STATUSES, ['present', 'late', 'madeup']);
   assert.deepEqual(RESULT_FIELDS, ['control', 'self', 'current']);
-  assert.deepEqual(LOG_ENTITIES, ['mark', 'unit', 'pair']);
+  assert.deepEqual(LOG_ENTITIES, ['mark', 'unit', 'pair', 'work']);
 });
 
 test('students sheet and column titles', () => {
@@ -86,4 +86,15 @@ test('syllabus version fields and section sheets', () => {
   for (const t of tableNames()) assert.equal(new Set(SCHEMA[t].columns.map((c) => c.title)).size, SCHEMA[t].columns.length, t);
   assert.deepEqual([SYLLABUS_STATUSES, OPEN_STATUSES, LESSON_KINDS], [['draft', 'review', 'returned', 'approved', 'archived'], ['draft', 'review', 'returned'],
     ['lecture', 'practice', 'seminar', 'lab', 'control']]);
+});
+
+test('unit 5 tables: assignments, submissions, files, the work log column and the constants', () => {
+  assert.deepEqual(tableNames().slice(-4), ['checkins', 'assignments', 'submissions', 'files']);
+  assert.deepEqual(SCHEMA.assignments.columns.map((c) => c.key), ['id', 'subjectId', 'kind', 'planSemester', 'unit', 'topicId', 'pairId', 'title', 'description', 'dueAt', 'maxPoints', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt']);
+  assert.deepEqual(SCHEMA.submissions.columns.map((c) => [c.key, c.type]).filter(([, t]) => t !== 'string'), [['n', 'int'], ['paper', 'bool'], ['points', 'int']]);
+  assert.deepEqual(SCHEMA.files.columns.map((c) => c.key), ['id', 'assignmentId', 'submissionId', 'ownerId', 'state', 'name', 'kind', 'size', 'stored', 'at']);
+  assert.deepEqual([SCHEMA.assignments.sheet, SCHEMA.submissions.sheet, SCHEMA.files.sheet, SCHEMA.assignments.prefix, SCHEMA.submissions.prefix, SCHEMA.files.prefix],
+    ['Задания', 'Сдачи', 'Файлы', 'as', 'su', 'fl']);
+  assert.equal(SCHEMA.changeLog.columns.at(-1).key, 'assignmentId');
+  assert.deepEqual([WORK_KINDS, WORK_STATUSES, FILE_STATES, LOG_ENTITIES], [['hw', 'srs'], ['submitted', 'replaced', 'checked', 'returned'], ['pending', 'attached', 'dropped'], ['mark', 'unit', 'pair', 'work']]);
 });

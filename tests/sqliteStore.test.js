@@ -190,3 +190,16 @@ test('a process killed in the middle of a request: the base opens, is whole and 
   const store = createSqliteStore(SCHEMA, platform, after);
   assert.deepEqual([store.list('rooms').map((r) => r.name), store.list('groups'), after.prepare('PRAGMA integrity_check').get().integrity_check], [['до'], [], 'ok']);
 });
+
+test('ensureTables on a unit 4 base adds the work tables and changeLog.assignmentId; old log rows read assignmentId as empty', (t) => {
+  const { db } = tmpBase(t, { empty: true });
+  const oldColumns = SCHEMA.changeLog.columns.slice(0, -1);
+  db.exec(`CREATE TABLE "changeLog" (${oldColumns.map((c) => `"${c.key}" TEXT`).join(', ')}); INSERT INTO "changeLog" ("id", "entity", "field") VALUES ('cl_1', 'mark', 'status')`);
+  const result = ensureTables(SCHEMA, db);
+  for (const name of ['assignments', 'submissions', 'files']) assert.ok(result.created.includes(name), name);
+  assert.deepEqual(result.added.map(([table, key]) => table + '.' + key), ['changeLog.assignmentId']);
+  const store = createSqliteStore(SCHEMA, platform, db);
+  for (const name of ['assignments', 'submissions', 'files']) assert.deepEqual(store.list(name), [], name);
+  assert.equal(store.get('changeLog', 'cl_1').assignmentId, '');
+  assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
+});

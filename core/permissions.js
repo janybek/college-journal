@@ -58,6 +58,17 @@ const ROLE_ACTIONS = {
   'lesson.finish': { teacher: true },
   'checkin.current': { student: true },
   'checkin.mark': { student: true },
+  'work.overview': { admin: true, dean: true, prorector: true, teacher: true },
+  'work.list': { admin: true, dean: true, prorector: true, teacher: true },
+  'work.get': { admin: true, dean: true, prorector: true, teacher: true, student: true },
+  'work.save': { teacher: true },
+  'work.remove': { teacher: true },
+  'work.grade': { teacher: true },
+  'work.mine': { student: true },
+  'work.upload': { student: true },
+  'work.dropFile': { student: true },
+  'work.submit': { student: true },
+  'work.file': { admin: true, dean: true, prorector: true, teacher: true, student: true },
 };
 
 const has = (object, key) => Object.prototype.hasOwnProperty.call(object, key);

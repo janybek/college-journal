@@ -45,7 +45,7 @@ test('journal.savePair: the first marks, the refusals and nothing written', () =
   assert.equal(store.list('changeLog').length, 0);
   call('journal.savePair', { pairId: p0908, marks: [{ studentId: a1, status: 'present', activity: 9 }] }, t.teacher1);
   assert.deepEqual(store.list('changeLog').map(({ id, at: when, ...r }) => r), [{ actorId: ids.teacher1, entity: 'mark', subjectId: s.sb1, pairId: p0908, studentId: a1,
-    unit: null, field: 'activity', before: '7', after: '9', reason: '', late: false }]);
+    unit: null, field: 'activity', before: '7', after: '9', reason: '', late: false, assignmentId: '' }]);
   call('journal.savePair', { pairId: p0908, marks: [{ studentId: a1, status: 'present', activity: 9 }] }, t.teacher1);
   assert.equal(store.list('changeLog').length, 1);
 });
