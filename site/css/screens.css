@@ -7482,3 +7482,93 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .gr-tasks { justify-self: stretch; min-height: 2.75rem; }
 .tasks-filter__empty { color: var(--text-muted); }
 .tasks-toolbar { align-items: flex-end; }
+
+/* Syllabus file: the block on the title tab of the form, the button of the syllabus page */
+.sform-file {
+  display: grid;
+  gap: var(--space-3);
+  min-width: 0;
+  padding: var(--space-4) var(--space-5);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.sform-file__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); }
+
+.sform-file__title { padding: 0; border: 0; }
+
+.sform-file__hint { margin: 0; color: var(--text-muted); font-size: var(--hint-fs); }
+
+.sform-file__row { display: flex; align-items: center; gap: var(--space-3); min-width: 0; }
+
+.sform-file__tile {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 3rem;
+  height: 3.5rem;
+  border-radius: var(--radius-inner);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.sform-file__tile[data-kind="pdf"] { background: var(--danger-wash); color: var(--danger); box-shadow: inset 0 0 0 1px var(--danger-line); }
+
+.sform-file__tile[data-kind="word"] { background: var(--primary-wash); color: var(--primary-ink); box-shadow: inset 0 0 0 1px var(--primary-line); }
+
+.sform-file__text { display: grid; gap: 2px; min-width: 0; }
+
+.sform-file__name {
+  justify-self: start;
+  max-width: 100%;
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary-ink);
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+  cursor: pointer;
+}
+
+.sform-file__name:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+
+.sform-file__meta { margin: 0; color: var(--text-muted); font-size: var(--hint-fs); font-variant-numeric: tabular-nums; }
+
+.sform-file__none { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--text-muted); }
+
+.sform-file__none .icon { width: 1.125rem; height: 1.125rem; }
+
+.sform-file__actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.sform-file__actions .button { min-height: 2.75rem; }
+
+.sform-file__progress { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-3); }
+
+.sform-file__progress .mine-progress { flex: 1 1 10rem; }
+
+.sform-file__percent { color: var(--text-muted); font-size: var(--hint-fs); font-variant-numeric: tabular-nums; }
+
+.sform-file__problem { display: grid; gap: var(--space-2); justify-items: start; }
+
+.sform-file__problem .button { min-height: 2.75rem; }
+
+.syllabus-head__file { justify-self: start; min-height: 2.75rem; }
+
+.syllabus-head__file-size { color: var(--text-muted); font-size: var(--hint-fs); font-weight: 500; white-space: nowrap; }
+
+.student .syllabus-head__file { font-size: 1rem; }
+
+@media (max-width: 37.5rem) {
+  .student .syllabus-head__text { flex: 1 1 100%; }
+
+  .student .syllabus-head__file { justify-self: stretch; justify-content: center; width: 100%; }
+}

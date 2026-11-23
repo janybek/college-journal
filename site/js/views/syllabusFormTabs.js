@@ -2,6 +2,7 @@ import { t } from '../i18n.js';
 import { el, badge, emptyState, iconButton, note } from '../ui.js';
 import { icon } from '../icons.js';
 import { PLAN_KINDS, canMove, emptyItem, listAdd, moveLesson, pairNumbers, tableNumbers, unitAbout, unitHasContent } from '../syllabusForm.js';
+import { fileBlock } from './syllabusAttach.js';
 import { boundField, entryField, entryList, lessonTable, listError, numberOf, pointList } from './syllabusFormParts.js';
 
 // The tabs of the syllabus form. renderTab(tab, ctx) draws the body of one tab from ctx.doc (the document being
@@ -48,6 +49,7 @@ function titleTab(ctx) {
   const { subject, syllabus } = ctx.form;
   const groups = subject.groups.map((group) => group.groupName).filter(Boolean);
   return [
+    fileBlock({ syllabusId: syllabus.id, file: syllabus.file, canEdit: !ctx.readOnly, onChange: ctx.fileChanged }),
     el('section', { class: 'sform-fixed', 'aria-labelledby': 'sf-fixed-title' },
       el('div', { class: 'sform-fixed__head' },
         el('h3', { class: 'sform-block__title', id: 'sf-fixed-title' }, t('sform.title.fixed')),

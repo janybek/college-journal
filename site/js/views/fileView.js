@@ -9,8 +9,9 @@ import { mimeOf, viewWay, downloadName, base64ToBytes } from '../work.js';
 // shows a picture on the page, opens a PDF in a new tab and offers anything else for saving. The address of the Blob is
 // dropped when the window closes. The name of the file is only ever text.
 
-// openFile({ fileId, name, kind }) resolves when the window is closed.
-export function openFile({ fileId, name, kind, host = document.body }) {
+// openFile({ fileId, name, kind }) resolves when the window is closed. request: what takes the file (work.file by default;
+// the syllabus asks syllabus.file); a missing file shows missingKey when the screen has a text of its own for it.
+export function openFile({ fileId, name, kind, host = document.body, request = () => call('work.file', { fileId }), missingKey = null }) {
   return new Promise((resolve) => {
     let url = null;
     let closed = false;
@@ -42,9 +43,9 @@ export function openFile({ fileId, name, kind, host = document.body }) {
     async function load() {
       let file;
       try {
-        file = (await call('work.file', { fileId })).file;
+        file = (await request()).file;
       } catch (error) {
-        if (!closed) fail(errorKey(error.code));
+        if (!closed) fail(error.code === 'file_missing' && missingKey ? missingKey : errorKey(error.code));
         return;
       }
       if (closed) return;

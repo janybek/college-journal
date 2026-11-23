@@ -8,7 +8,9 @@ import { dayParts, isDate } from '../dates.js';
 import {
   shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, versionLine, pageActions, linesOf, safeLink, keptDone,
 } from '../syllabus.js';
-import { TABS, checkLine, submitOutcome } from '../syllabusForm.js';
+import { TABS, checkLine, submitOutcome, fileDownloadKey } from '../syllabusForm.js';
+import { sizeText } from '../work.js';
+import { openFile } from './fileView.js';
 import { topicText, lessonTypeKey } from '../pairs.js';
 import { uploadControls, renderUpload, leaveUpload, forgetUploadNote } from './syllabusUpload.js';
 import { refreshReviewCount } from '../reviewCount.js';
@@ -157,8 +159,22 @@ function head(view) {
       el('h1', { class: 'page-title', id: 'syllabus-title' }, subject.name),
       subject.groupName || subject.teacherName ? el('p', { class: 'syllabus-head__who' },
         subject.groupName ? badge(subject.groupName, 'primary') : null,
-        subject.teacherName ? el('span', { class: 'syllabus-head__teacher' }, icon('briefcase'), subject.teacherName) : null) : null),
+        subject.teacherName ? el('span', { class: 'syllabus-head__teacher' }, icon('briefcase'), subject.teacherName) : null) : null,
+      fileButton(view)),
     uploadControls(view));
+}
+
+// The file of the shown version (the full syllabus of the college): one button that opens it; the same for everyone who sees the page.
+function fileButton(view) {
+  const { syllabus } = view;
+  const file = syllabus ? syllabus.file : null;
+  const key = file ? fileDownloadKey(file.kind) : null;
+  if (!key) return null;
+  const size = sizeText(file.size);
+  return el('button', {
+    type: 'button', id: 'syllabus-file', class: 'button button--secondary syllabus-head__file',
+    onclick: () => openFile({ fileId: '', name: file.name, kind: file.kind, request: () => call('syllabus.file', { syllabusId: syllabus.id }), missingKey: 'syllabus.file.missing' }),
+  }, icon('download'), el('span', {}, t(key)), el('span', { class: 'syllabus-head__file-size' }, t(size.key, size.params)));
 }
 
 // ---- The bar of the version: its status, the other version, the buttons ----

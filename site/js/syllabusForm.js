@@ -1,6 +1,8 @@
 // The syllabus form (#/syllabus-form/<version>/<tab>) without the DOM: the tabs, list editing, what a section sends
 // to syllabus.saveSection, the errors of the server by field, the numbers of the lessons before they are saved.
 
+import { kindOfName, uploadErrorCode } from './work.js';
+
 export const TABS = ['title', 'goals', 'plan', 'selfWork', 'literature', 'software', 'policies', 'units', 'order'];
 
 // The kinds of lessons of a unit, in the order of its tables.
@@ -314,4 +316,30 @@ export function unitAbout(units, n) {
     texts: ABOUT_FIELDS.some((f) => typeof entry[f] === 'string' && entry[f].trim() !== ''),
     books: Array.isArray(entry.literature) ? entry.literature.length : 0,
   };
+}
+
+// ---- The file of a version (the block «Файл силлабуса» of the title tab, the button of the page) ----
+
+export const SYLLABUS_FILE_KINDS = ['pdf', 'docx', 'doc'];
+const FILE_MAX_BYTES = 10485760;
+const FILE_ERRORS = ['bad_type', 'bad_file', 'too_big', 'empty', 'upload_limit', 'files_unavailable', 'syllabus_locked'];
+
+// A chosen file before it is read: null, or the key of what is wrong (the kind by the name, the size by the browser).
+export function syllabusFileProblem({ name, size }) {
+  if (!SYLLABUS_FILE_KINDS.includes(kindOfName(name))) return 'sform.file.error.bad_type';
+  if (size > FILE_MAX_BYTES) return 'sform.file.error.too_big';
+  return size > 0 ? null : 'sform.file.error.empty';
+}
+
+// The text of a failed upload, remove or read; null when the screen takes errorKey(code) instead.
+export function syllabusFileErrorKey(error) {
+  const code = uploadErrorCode(error);
+  if (code === 'upload_slow') return 'work.upload.error.upload_slow';
+  return FILE_ERRORS.includes(code) ? 'sform.file.error.' + code : null;
+}
+
+// The key of the button that takes the file of the version; null for a kind that is not offered.
+export function fileDownloadKey(kind) {
+  if (kind === 'pdf') return 'syllabus.file.download.pdf';
+  return kind === 'docx' || kind === 'doc' ? 'syllabus.file.download.word' : null;
 }

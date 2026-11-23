@@ -222,7 +222,7 @@ test('the syllabus form has its texts: the tabs, the statuses, the errors of a s
 });
 
 test('the syllabus form of task 42: the checks before submitting, the file into the draft, no «soon» any more', () => {
-  const CHECK_KEYS = ['title.department', 'title.academicYear', 'title.course', 'title.planSemester', 'title.credits', 'goals.goal', 'plan.empty', 'plan.unit_empty',
+  const CHECK_KEYS = ['title.department', 'title.academicYear', 'title.course', 'title.planSemester', 'title.credits', 'goals.goal', 'goals.empty', 'plan.empty', 'plan.unit_empty',
     'plan.bad_hours', 'plan.held_missing', 'plan.held_hours', 'plan.held_kind', 'selfWork.bad_unit', 'literature.empty', 'software.empty', 'policies.empty', 'units.empty',
     'plan.bad_kind', 'order.control_first'];
   for (const dict of [ru, ky, en]) {

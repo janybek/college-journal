@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   TABS, tabOf, listAdd, listRemove, listMove, emptyItem, sectionData, isDirty, errorMap, tableNumbers, unitHasContent, unitAbout, withoutBlankRows,
   pairNumbers, canMove, moveLesson, checkTabs, checkLine, placeErrors, errorsAfterEdit, statusKind, keptOrder, submitOutcome,
+  syllabusFileProblem, syllabusFileErrorKey, fileDownloadKey, SYLLABUS_FILE_KINDS,
 } from '../site/js/syllabusForm.js';
 
 const units = [{ unit: 1, title: 'Основы', lecture: [{ id: 'tp_1', name: 'Л', hours: 2, controlForms: '', selfHours: null, description: '', number: 1 }], practice: [], seminar: [], lab: [], control: [] },
@@ -200,4 +201,15 @@ test('M2 (task 42): what an answer of syllabus.submit means for the form', () =>
   assert.equal(submitOutcome({ submitted: false, checks: { errors: [], warnings: [] } }), 'failed');
   assert.equal(submitOutcome({ submitted: false }), 'failed');
   assert.equal(submitOutcome(null), 'failed');
+});
+
+test('the file of a syllabus: kinds, problems before reading, error keys, the download key', () => {
+  assert.deepEqual(SYLLABUS_FILE_KINDS, ['pdf', 'docx', 'doc']);
+  assert.deepEqual([{ name: 'Силлабус.PDF', size: 10 }, { name: 'a.docx', size: 10485760 }, { name: 'a.doc', size: 1 }].map(syllabusFileProblem), [null, null, null]);
+  assert.deepEqual([{ name: 'a.xlsx', size: 1 }, { name: 'a.jpg', size: 1 }, { name: 'a', size: 1 }, { name: 'a.pdf', size: 10485761 }, { name: 'a.pdf', size: 0 }].map(syllabusFileProblem),
+    ['sform.file.error.bad_type', 'sform.file.error.bad_type', 'sform.file.error.bad_type', 'sform.file.error.too_big', 'sform.file.error.empty']);
+  assert.deepEqual([{ code: 'invalid', fields: [{ field: 'data', code: 'bad_file' }] }, { code: 'syllabus_locked' }, { code: 'too_big' }, { code: 'upload_slow' }, { code: 'network' }, { code: 'forbidden' }]
+    .map(syllabusFileErrorKey), ['sform.file.error.bad_file', 'sform.file.error.syllabus_locked', 'sform.file.error.too_big', 'work.upload.error.upload_slow', null, null]);
+  assert.deepEqual(['pdf', 'docx', 'doc', 'xlsx', undefined].map(fileDownloadKey),
+    ['syllabus.file.download.pdf', 'syllabus.file.download.word', 'syllabus.file.download.word', null, null]);
 });

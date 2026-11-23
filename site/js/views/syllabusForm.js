@@ -11,6 +11,7 @@ import {
 } from '../syllabusForm.js';
 import { canFillFromFile } from '../fillFromFile.js';
 import { renderTab } from './syllabusFormTabs.js';
+import { leaveAttach } from './syllabusAttach.js';
 import { leaveUpload, renderUpload, startUpload } from './syllabusUpload.js';
 import { refreshReviewCount } from '../reviewCount.js';
 
@@ -67,6 +68,7 @@ export function leave() {
   release();
   if (state.ask) state.ask.resolve(false);
   leaveUpload();
+  leaveAttach();
   state = blank();
 }
 
@@ -317,6 +319,10 @@ function context(section, errors, placed) {
     form: state.form,
     readOnly: !editable(),
     planDirty: planDirty(),
+    fileChanged: (file) => {
+      state.form.syllabus.file = file;
+      refresh();
+    },
     error: (key) => {
       const code = errors.get(key) ?? null;
       if (code) placed.add(key);
