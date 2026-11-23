@@ -1,6 +1,6 @@
 import { call } from '../api.js';
 import { t } from '../i18n.js';
-import { el, errorKey, fieldErrorKey, badge, focusById, markBusy, modal, note } from '../ui.js';
+import { el, errorKey, fieldErrorKey, badge, focusById, holdOnLeave, markBusy, modal, note } from '../ui.js';
 import { icon } from '../icons.js';
 import { activityAllowed, cellView, coatAllowed, lateOptions, logLine, pairScore } from '../journal.js';
 
@@ -25,6 +25,8 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
   document.getElementById('journal-cell')?.remove();
   let journal = first;
   let busy = false;
+  let leaveAsk = null;     // { promise, resolve }: the question put by the browser «Back» or a link, answered by «Остаться» / «Закрыть без сохранения»
+  const answerLeave = (agree) => { if (agree) holdOnLeave(null); if (leaveAsk) { leaveAsk.resolve(agree); leaveAsk = null; } };
   let historyTicket = 0;
 
   const pairNow = () => journal.pairs.find((p) => p.id === firstPair.id) || firstPair;
@@ -78,8 +80,8 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
   const asking = el('div', { class: 'mk-ask', role: 'alert', hidden: true },
     el('p', { class: 'mk-ask__text' }, t('journal.marks.unsaved')),
     el('div', { class: 'dialog__actions' },
-      el('button', { type: 'button', id: 'journal-cell-stay', class: 'button button--secondary', onclick: () => { asking.hidden = true; actions.hidden = false; focusById('journal-cell-save', 'journal-cell-cancel'); } }, t('journal.marks.stay')),
-      el('button', { type: 'button', id: 'journal-cell-discard', class: 'button button--danger', onclick: () => dialog.close() }, t('journal.marks.discard'))));
+      el('button', { type: 'button', id: 'journal-cell-stay', class: 'button button--secondary', onclick: () => { asking.hidden = true; actions.hidden = false; answerLeave(false); focusById('journal-cell-save', 'journal-cell-cancel'); } }, t('journal.marks.stay')),
+      el('button', { type: 'button', id: 'journal-cell-discard', class: 'button button--danger', onclick: () => { answerLeave(true); dialog.close(); } }, t('journal.marks.discard'))));
 
   let rows;                // the controls of the editor
   let reasonArea = null;
@@ -382,18 +384,24 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
   }
 
   // ---- the window ----
-  // Browser «Back» with unsaved changes: put the address back and ask, as Escape does; otherwise close as before.
-  const openedAt = window.location.hash;
-  const onHash = () => {
-    if (window.location.hash === openedAt) return;
-    if (!busy && isDirty()) { window.location.hash = openedAt; ask(); return; }
-    dialog.close();
+  // Back or a link with unsaved changes: the shared leave guard (main.js keeps the address and the screen, and waits for this answer).
+  const mayLeave = () => {
+    if (busy) return Promise.resolve(false);
+    if (!isDirty()) { holdOnLeave(null); return Promise.resolve(true); }
+    if (!leaveAsk) { const q = {}; q.promise = new Promise((resolve) => { q.resolve = resolve; }); leaveAsk = q; }
+    ask();
+    return leaveAsk.promise;
   };
+  // main.js has already put the address back when a question is pending; only a real move (after the answer) closes the window.
+  const openedAt = window.location.hash;
+  const onHash = () => { if (window.location.hash !== openedAt) dialog.close(); };
   const pair0 = pairNow();
   const dialog = modal({
     id: 'journal-cell', labelledBy: 'journal-cell-name', className: 'dialog--cell',
     onClose: () => {
       window.removeEventListener('hashchange', onHash);
+      holdOnLeave(null);
+      answerLeave(true);
       dialog.remove();
       if (onClosed) onClosed();
     },
@@ -415,6 +423,7 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
   drawSummary();
   drawForm();
   window.addEventListener('hashchange', onHash);
+  holdOnLeave(mayLeave);
   document.body.append(dialog);
   dialog.showModal();
   focusById('journal-cell-cancel');

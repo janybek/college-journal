@@ -1,6 +1,6 @@
 import { call } from '../api.js';
 import { t } from '../i18n.js';
-import { el, errorKey, fieldErrorKey, badge, focusById, markBusy, modal, note } from '../ui.js';
+import { el, errorKey, fieldErrorKey, badge, focusById, holdOnLeave, markBusy, modal, note } from '../ui.js';
 import { icon } from '../icons.js';
 import { draftMarks, changedMarks, activityAllowed, coatAllowed } from '../journal.js';
 
@@ -26,6 +26,8 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
   const draft = initial.map((m) => ({ ...m }));
   let reason = '';
   let busy = false;
+  let leaveAsk = null;     // { promise, resolve }: the question put by the browser «Back» or a link, answered by «Остаться» / «Закрыть без сохранения»
+  const answerLeave = (agree) => { if (agree) holdOnLeave(null); if (leaveAsk) { leaveAsk.resolve(agree); leaveAsk = null; } };
   let sent = [];
 
   const rows = draft.map((mark, index) => buildRow(mark, index));
@@ -145,8 +147,8 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
   const asking = el('div', { class: 'mk-ask', role: 'alert', hidden: true },
     el('p', { class: 'mk-ask__text' }, t('journal.marks.unsaved')),
     el('div', { class: 'dialog__actions' },
-      el('button', { type: 'button', id: 'journal-marks-stay', class: 'button button--secondary', onclick: () => { asking.hidden = true; actions.hidden = false; focusById('journal-marks-save'); } }, t('journal.marks.stay')),
-      el('button', { type: 'button', id: 'journal-marks-discard', class: 'button button--danger', onclick: () => dialog.close() }, t('journal.marks.discard'))));
+      el('button', { type: 'button', id: 'journal-marks-stay', class: 'button button--secondary', onclick: () => { asking.hidden = true; actions.hidden = false; answerLeave(false); focusById('journal-marks-save'); } }, t('journal.marks.stay')),
+      el('button', { type: 'button', id: 'journal-marks-discard', class: 'button button--danger', onclick: () => { answerLeave(true); dialog.close(); } }, t('journal.marks.discard'))));
   const ask = () => {
     actions.hidden = true;
     asking.hidden = false;
@@ -223,19 +225,25 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
   }
   go.addEventListener('click', save);
 
-  // Browser «Back» with unsaved changes: put the address back and ask, as Escape does; otherwise close as before.
-  const openedAt = window.location.hash;
-  const onHash = () => {
-    if (window.location.hash === openedAt) return;
-    if (!busy && isDirty()) { window.location.hash = openedAt; ask(); return; }
-    dialog.close();
+  // Back or a link with unsaved changes: the shared leave guard (main.js keeps the address and the screen, and waits for this answer).
+  const mayLeave = () => {
+    if (busy) return Promise.resolve(false);
+    if (!isDirty()) { holdOnLeave(null); return Promise.resolve(true); }
+    if (!leaveAsk) { const q = {}; q.promise = new Promise((resolve) => { q.resolve = resolve; }); leaveAsk = q; }
+    ask();
+    return leaveAsk.promise;
   };
+  // main.js has already put the address back when a question is pending; only a real move (after the answer) closes the window.
+  const openedAt = window.location.hash;
+  const onHash = () => { if (window.location.hash !== openedAt) dialog.close(); };
   const kind = pair.lessonType ? t('lessonType.' + pair.lessonType) : t('journal.marks.kind.none');
   const topic = pair.topicName ? t('journal.topic', { n: pair.number, name: pair.topicName }) : t('journal.topicNone');
   const dialog = modal({
     id: 'journal-marks', labelledBy: 'journal-marks-title', className: 'dialog--marks',
     onClose: () => {
       window.removeEventListener('hashchange', onHash);
+      holdOnLeave(null);
+      answerLeave(true);
       dialog.remove();
       if (onClosed) onClosed();
     },
@@ -261,6 +269,7 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
   asking);
   draft.forEach((_, index) => paint(index));
   window.addEventListener('hashchange', onHash);
+  holdOnLeave(mayLeave);
   document.body.append(dialog);
   dialog.showModal();
   focusById(held ? 'journal-marks-cancel' : 'journal-marks-all', 'journal-marks-cancel');
