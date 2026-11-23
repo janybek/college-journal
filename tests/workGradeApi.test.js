@@ -32,7 +32,7 @@ function scenario() {
 
 test('work.grade: every refusal leaves the tables and the disk as they were', () => {
   const s = scenario();
-  const { t, a3, b1, A, B, grade, snapshot } = s;
+  const { t, b1, A, B, grade, snapshot } = s;
   const before = snapshot();
   for (const token of [t.teacher2, t.teacher3, t.dean, t.prorector, t.admin, t.a1, 'bad-token']) assert.notEqual(grade(A, 'a1', {}, token).ok, true);
   for (const data of [{ points: 11 }, { points: -1 }, { points: 2.5 }, { points: '8' }, { verdict: 'returned', points: 3, comment: 'x' }, { verdict: 'returned', points: null, comment: ' ' }, { studentId: b1 }, { attemptId: 'zzz' }, { attemptId: '' }]) {
@@ -52,7 +52,6 @@ test('work.grade: every refusal leaves the tables and the disk as they were', ()
   assert.notEqual(s.call('work.grade', undefined, t.teacher1).ok, true);
   assert.equal(grade(B, 'a3', { points: 25 }).ok, false);
   assert.equal(grade(B, 'a3', { points: 12 }, t.teacher2).ok, false);
-  assert.ok(a3);
   assert.deepEqual(snapshot(), before);
 });
 
@@ -96,9 +95,24 @@ test('work.grade: the first grade, the log rows, a repeat, a change needs a reas
   assert.equal(workLog(store).length, 4);
 });
 
+test('work.grade: a comment-only edit of a checked work keeps who checked it and when', () => {
+  const s = scenario();
+  const { store, ids, A, a1, grade, at } = s;
+  const rowOf = () => store.list('submissions').find((r) => r.assignmentId === A && r.studentId === a1);
+  assert.equal(grade(A, 'a1', {}).ok, true);
+  const first = rowOf();
+  assert.deepEqual([first.checkedBy, first.checkedAt], [ids.teacher1, '2026-09-24 12:00:00']);
+  at('2026-09-25', '09:30');
+  assert.equal(grade(A, 'a1', { comment: 'позже дописал замечание' }).ok, true);
+  assert.deepEqual([rowOf().comment, rowOf().checkedBy, rowOf().checkedAt, rowOf().points, rowOf().status], ['позже дописал замечание', ids.teacher1, '2026-09-24 12:00:00', 8, 'checked']);
+  // a change of the points is a new check: who and when move
+  assert.equal(grade(A, 'a1', { points: 9, reason: 'перепроверил' }).ok, true);
+  assert.equal(rowOf().checkedAt, '2026-09-25 09:30:00');
+});
+
 test('work.grade: a returned work, with and without a reason', () => {
   const s = scenario();
-  const { store, A, B, a1, a3, grade, snapshot } = s;
+  const { store, A, B, a1, grade, snapshot } = s;
   grade(A, 'a1', {});
   // a submitted work is returned without a reason
   assert.equal(grade(B, 'a1', { verdict: 'returned', points: null, comment: 'переделай' }).ok, true);
@@ -112,12 +126,11 @@ test('work.grade: a returned work, with and without a reason', () => {
     [['points', '8', '', A, 2, 'нашёл ошибку'], ['status', 'checked', 'returned', A, 2, 'нашёл ошибку']]);
   const row = store.list('submissions').find((r) => r.assignmentId === A && r.studentId === a1);
   assert.deepEqual([row.status, row.points, row.comment], ['returned', null, 'ещё раз']);
-  assert.ok(a3);
 });
 
 test('work.grade: the attempt the teacher saw must still be the current one', () => {
   const s = scenario();
-  const { store, A, B, a1, ids, cur, grade, snapshot, attempt } = s;
+  const { store, A, B, ids, cur, grade, snapshot, attempt } = s;
   const seen = cur(B, 'a1');
   attempt(B, 'a1', { n: 2, submittedAt: '2026-09-24 11:00:00' });   // the student handed in again
   const before = snapshot();
@@ -128,12 +141,11 @@ test('work.grade: the attempt the teacher saw must still be the current one', ()
   assert.equal(grade(B, 'a1', { points: 15 }).ok, true);
   assert.equal(store.list('submissions').filter((r) => r.assignmentId === B && r.studentId === ids.a1 && r.status === 'checked').length, 1);
   assert.equal(store.list('submissions').find((r) => r.id === seen).status, 'submitted');
-  assert.ok(a1);
 });
 
 test('work.grade: a student who left the group is graded; a student of another group is not', () => {
   const s = scenario();
-  const { store, A, a4, ids, grade, snapshot, attempt } = s;
+  const { store, A, a4, grade, snapshot, attempt } = s;
   assert.equal(grade(A, 'a4', { attemptId: '' }).error.fields[0].code, 'bad_ref');   // left, no attempts
   attempt(A, 'a4');
   assert.equal(grade(A, 'a4', {}).ok, true);
@@ -141,7 +153,6 @@ test('work.grade: a student who left the group is graded; a student of another g
   const before = snapshot();
   assert.equal(grade(A, 'b1', { attemptId: '' }).ok, false);
   assert.deepEqual(snapshot(), before);
-  assert.ok(ids);
 });
 
 test('the unit self-work counted from the assignments, 24.09 and 28.09', () => {
@@ -197,12 +208,11 @@ test('the unit self-work counted from the assignments, 24.09 and 28.09', () => {
   // the scheme "current 40, self 30, control 30": 23 of 30 is 23
   assert.equal(call('scoring.save', { scheme: { ...DEFAULT_SCHEME, current: 40, self: 30, control: 30 } }, t.dean).ok, true);
   assert.deepEqual([unit2('a1').self, unit2('a1').selfWork.value], [23, 23]);
-  assert.ok(snapshot() && A && B);
 });
 
 test('journal.saveResults: the self-work of a unit with assignments is not typed by hand', () => {
   const s = scenario();
-  const { call, store, t, a1, a2, sb1, snapshot, grade, A } = s;
+  const { call, store, t, a1, a2, sb1, snapshot } = s;
   const save = (unit, items, token = t.teacher1) => call('journal.saveResults', { subjectId: sb1, unit, field: 'self', items }, token);
   const before = snapshot();
   const logBefore = JSON.stringify(store.list('changeLog'));
@@ -221,7 +231,6 @@ test('journal.saveResults: the self-work of a unit with assignments is not typed
   assert.equal(save(1, [{ studentId: a1, value: 10 }]).ok, true);
   assert.equal(call('journal.saveResults', { subjectId: sb1, unit: 2, field: 'control', items: [{ studentId: a2, value: 20 }] }, t.teacher1).ok, true);
   assert.equal(call('journal.saveResults', { subjectId: sb1, unit: 2, field: 'current', items: [{ studentId: a2, value: 20 }], reason: 'x' }, t.teacher1).ok, true);
-  assert.ok(grade && A);
 });
 
 test('a manual self-work comes back when the assignments of the unit are removed', () => {

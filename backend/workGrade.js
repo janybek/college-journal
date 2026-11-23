@@ -61,7 +61,9 @@ export function gradeWork(store, platform, data, user) {
     reason = data.reason.trim();
   }
 
-  const [saved] = store.updateMany('submissions', [{ id: current.id, patch: { status: verdict, points, comment, checkedBy: user.id, checkedAt: at } }]);
+  // only the comment changes: "who checked and when" belongs to the grade, so it stays
+  const patch = !pointsChanged && !statusChanged ? { comment } : { status: verdict, points, comment, checkedBy: user.id, checkedAt: at };
+  const [saved] = store.updateMany('submissions', [{ id: current.id, patch }]);
   const log = [];
   if (pointsChanged) log.push({ ...entry, field: 'points', before: logText(oldPoints), after: logText(points), reason });
   if (statusChanged) log.push({ ...entry, field: 'status', before: current.status, after: verdict, reason });
