@@ -72,3 +72,17 @@ Task 7: complete (commits 69371a3..73ad32e, review clean)
 - Task 8: minor (deferred): tests/seedWork.test.js:494 «первые 5 студентов» без сортировки по cardNo (seedWork сортирует); demo.js — файл на диске внутри транзакции, при откате остаётся сирота до уборки (допустимо).
 Task 8: complete (commits 73ad32e..6eb6ebe, review clean)
 - 23.11.2026 Серверная часть (задачи 1–8) готова, 869 тестов. Дальше — блок 1 экранов (задачи 9, 10), новый чат координатора. Для задачи 9: work.save без пары — pairId не передавать вовсе ('' / null — not_found). Для общей проверки — все строки «minor (deferred)» выше.
+- 23.11.2026 новый чат координатора (после /clear): прежний проверяющий завершён, фоновых агентов нет.
+- Task 9: base b70f688
+- Task 9: implementer agent a0dc787c3d2c80721 (journal-screens, sonnet); в поручение: work.save без пары — pairId не передавать; headless Chrome, остановка только по PID
+- Task 9: implementer DONE_WITH_CONCERNS 6c3fd32 (880 tests). Отступления: меню строки — две кнопки-иконки; openTaskForm сам читает work.get/work.list, параметры + host, onClosed; RED не записан; ky/en и заглушка студента и режим конторы глазами не смотрены; 93 новых ky-ключа на вычитку.
+- Task 9: Ruling: проверка ИИ не запускается — в плане «Проверка ИИ — не нужна», правило владельца 22.11 (экраны без прав/данных студентов принимает владелец по блокам); координатор посмотрел скриншоты 08, 09, 11 — вид верный. Если неверно — недостатки всплывут на приёмке блока 1.
+Task 9: complete (commits b70f688..6c3fd32, owner block review)
+- Task 10: base 6c3fd32
+- Task 10: implementer agent a87d4a6241c1c2ce9 (journal-screens, sonnet); после — строгая проверка (баллы, файлы)
+- Task 10: implementer DONE_WITH_CONCERNS fcb6a58 (883 tests, RED записан). Ждущий в «Эссе» отсутствует на стенде — проверено на «Презентации»; PDF не открывался (нет на стенде); «Сохранить» в вопросе о несохранённом всегда «Проверено»; двойное окно ухода при смене адреса из консоли (общий holdOnLeave в main.js).
+- Task 10: review (sonnet, strict) agent ace7c95f5b9863d3b
+- Task 10: review (sonnet, strict) Approved, 0 Important. Пробы: scratchpad\task10-probes\server.js, probe.html (openFile в headless Chrome: разметка в имени, подмена kind, неверный base64, revokeObjectURL).
+- Task 10: minor (deferred): task.js:682 settleUnsaved всегда save('checked') — у возвращённой попытки без баллов сервер откажет (ошибка у поля, данные целы); task.js:760 refresh() теряет прокрутку; holdOnLeave в main.js — второе окно ухода при смене адреса из консоли; task.js и openFile без DOM-тестов.
+Task 10: complete (commits 6c3fd32..fcb6a58, review clean)
+- 23.11.2026 Блок 1 экранов (задачи 9, 10) собран, 883 теста. Стоп: приёмка владельцем на стенде. На стенде в «Эссе» нет ждущих работ — ждущие в «Презентации».
