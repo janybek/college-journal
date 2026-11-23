@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FILE_MIME, mimeOf, viewWay, downloadName, sizeText, dueText, stateView, kindOfName, defaultDue, formProblems, gradeDraft, gradeNeedsReason, base64ToBytes, homeCardLines, pickProblem, uploadErrorCode, uploadErrorKey, dueOfWork, dueDateText } from '../site/js/work.js';
+import { FILE_MIME, mimeOf, viewWay, downloadName, sizeText, dueText, stateView, kindOfName, defaultDue, formProblems, gradeDraft, gradeNeedsReason, base64ToBytes, homeCardLines, pickProblem, uploadErrorCode, uploadErrorKey, dueOfWork, dueDateText, mayStillSend } from '../site/js/work.js';
 import { fitSize, photoName } from '../site/js/photo.js';
 import { kindByName, FILE_KINDS } from '../core/files.js';
 
@@ -139,4 +139,12 @@ test('the deadline of a student: live until the work is handed in or sent back, 
   assert.equal(dueOfWork(due, now, 'returned').key, 'work.due.overdue');
   assert.deepEqual(dueOfWork(due, now, 'submitted'), { key: 'work.due.date', params: { date: '27.09', time: '23:59' }, tone: 'neutral' });
   assert.deepEqual(dueOfWork(due, now, 'checked'), dueDateText(due));
+});
+
+test('a queued upload is sent only on its own screen and under the token of the person who chose the files', () => {
+  assert.equal(mayStillSend(true, 'tok-a', 'tok-a'), true);
+  assert.equal(mayStillSend(false, 'tok-a', 'tok-a'), false);   // the screen was left
+  assert.equal(mayStillSend(true, 'tok-a', 'tok-b'), false);    // another student signed in
+  assert.equal(mayStillSend(true, 'tok-a', null), false);       // the session ended (unauthorized)
+  assert.equal(mayStillSend(true, null, null), false);
 });

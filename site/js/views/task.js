@@ -1,9 +1,9 @@
 import { call, upload, RETRYABLE } from '../api.js';
-import { getUser } from '../session.js';
+import { getUser, getToken } from '../session.js';
 import { t } from '../i18n.js';
 import { el, errorKey, avatar, badge, emptyState, pageHeader, note, field, markBusy, focusFirstInvalid, holdOnLeave, modal, showModal, refresh } from '../ui.js';
 import { icon } from '../icons.js';
-import { dueText, dueOfWork, stateView, sizeText, formProblems, currentOf, gradeDraft, gradeNeedsReason, kindOfName, isPhoto, pickProblem, uploadErrorCode, uploadErrorKey } from '../work.js';
+import { dueText, dueOfWork, stateView, sizeText, formProblems, currentOf, gradeDraft, gradeNeedsReason, kindOfName, isPhoto, pickProblem, uploadErrorCode, uploadErrorKey, mayStillSend } from '../work.js';
 import { preparePhoto, readAsBase64 } from '../photo.js';
 import { openTaskForm } from './taskForm.js';
 import { openFile } from './fileView.js';
@@ -427,7 +427,7 @@ const isStudent = () => {
 // 'done' (the server holds it as a pending file: fileId), 'error'. A failed item keeps its payload (what to send again) only
 // when sending it again may help; a refused one is `rejected` and can only be removed.
 const blankMine = (assignmentId = null) => ({
-  assignmentId, data: null, loading: false, loadErrorKey: null, ticket: 0, text: '', seeded: false, items: [], queue: Promise.resolve(),
+  assignmentId, token: getToken(), data: null, loading: false, loadErrorKey: null, ticket: 0, text: '', seeded: false, items: [], queue: Promise.resolve(),
   nextUid: 1, busy: false, problemKey: null, doneTime: null, prevOpen: false,
 });
 let mine = blankMine();
@@ -435,6 +435,9 @@ let mine = blankMine();
 const loadingFiles = (o) => o.items.some((i) => i.phase === 'preparing' || i.phase === 'uploading');
 const failedFiles = (o) => o.items.some((i) => i.phase === 'error' && !i.rejected);
 const doneFiles = (o) => o.items.filter((i) => i.phase === 'done');
+
+// The queue of an upload works only for the screen and the session it began in: after leaving or a change of the token it stops.
+const alive = (owner) => mayStillSend(mine === owner, owner.token, getToken());
 
 function renderMineTask(params) {
   const assignmentId = params.assignmentId ?? null;
@@ -624,7 +627,7 @@ function fileRow(item) {
     item.noteKey ? el('p', { class: 'mine-file__error', role: 'alert' }, icon('alert'), t(item.noteKey)) : null,
     item.phase === 'done' || item.phase === 'error' ? el('div', { class: 'mine-file__actions' },
       item.phase === 'error' && item.payload ? el('button', { type: 'button', class: 'button button--primary mine-file__button', id: 'mine-retry-' + item.uid, onclick: () => retryItem(item) }, t('work.mine.retry')) : null,
-      el('button', { type: 'button', class: 'button button--secondary mine-file__button', id: 'mine-remove-' + item.uid, disabled: item.dropping === true, onclick: () => removeItem(item) }, t('work.mine.remove'))) : null);
+      el('button', { type: 'button', class: 'button button--secondary mine-file__button', id: 'mine-remove-' + item.uid, disabled: item.dropping === true || mine.busy, onclick: () => removeItem(item) }, t('work.mine.remove'))) : null);
 }
 
 // ---- Choosing, shrinking and uploading the files (one by one) ----
@@ -649,16 +652,19 @@ function addFiles(files) {
 }
 
 async function prepareAndSend(owner, item, file) {
+  if (!alive(owner)) return;
   try {
     item.payload = isPhoto(file) ? await preparePhoto(file) : { name: file.name, data: await readAsBase64(file) };
   } catch (error) {
     failItem(owner, item, error);
     return;
   }
+  if (!alive(owner)) return;
   await sendItem(owner, item);
 }
 
 async function sendItem(owner, item) {
+  if (!alive(owner)) return;
   Object.assign(item, { phase: 'uploading', share: 0, errorKey: null });
   if (mine === owner) refresh();
   try {
@@ -690,7 +696,7 @@ function failItem(owner, item, error) {
 
 function retryItem(item) {
   const owner = mine;
-  if (item.payload === null || item.phase !== 'error') return;
+  if (!alive(owner) || item.payload === null || item.phase !== 'error') return;
   Object.assign(item, { phase: 'preparing', errorKey: null });
   owner.queue = owner.queue.then(() => sendItem(owner, item));
   refresh();

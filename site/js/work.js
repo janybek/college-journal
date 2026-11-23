@@ -181,3 +181,6 @@ export function uploadErrorCode(error) {
 }
 
 export const uploadErrorKey = (code) => (UPLOAD_ERRORS.includes(code) ? 'work.upload.error.' + code : null);
+
+// May a queued upload still be sent: its screen is still the open one and the person who chose the files is still signed in.
+export const mayStillSend = (sameScreen, ownerToken, token) => sameScreen === true && typeof token === 'string' && token !== '' && token === ownerToken;
