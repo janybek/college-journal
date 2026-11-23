@@ -16,5 +16,42 @@ Branch: main (project practice). Plan written by opus (Fable weekly 85%), commit
 - 23.11 new coordinator chat: compact-ui agent had been cut off (code in the working copy, no shots, no commit; its stand on 5273 PID 3080 stopped by PID). Ruling: resume it with a new journal-screens (sonnet) on the uncommitted diff, not from scratch — cost if wrong: one more round.
 - Contracts for unit 4: done (implementer/reviewer/rereview copied from plan-unit-3-zhurnal; Global Constraints and Review Focus of plan-unit-4 put in).
 - Correction: the first compact-ui agent was NOT cut off — it was still running after /clear and committed f2d2e50 (719 tests; dean reason mode 1366×768: 12 rows instead of 4; 1366×600: 8 instead of 2; menu keeps scrollTop). The duplicate agent stopped by the coordinator before any commit; its stand on 5273 (PID 30120) stopped by PID. Coordinator checked: git clean, npm test 719/719, shots before/after pair + menu. Lesson: after /clear check ListAgents for running agents before relaunching a task.
-- compact-ui: waiting for the owner's acceptance by screenshots.
+- OWNER 23.11: compact-ui f2d2e50 ACCEPTED («Принимаю»). Not deployed (site deploy only on request).
 - RESUME HERE: after the owner accepts compact-ui (f2d2e50) — Task 1 (journal-logic, sonnet). Owner stops: block 1 after tasks 10–11, block 2 after 12; task 13 = final review (opus) + deploy only on the owner's request.
+- Task 1: BASE 34ea381; dispatched journal-logic (sonnet), brief task-1-brief.md, report task-1-report.md
+- Task 1: implementer DONE 5518d86 (723 tests, build:gas ok); dispatching journal-reviewer (sonnet, light review)
+- Task 1: review (sonnet) Approved, 0 critical/important. minor (deferred): lessonClock of a closed pair with empty checkinUntil gives checkinLeftMs/checkinEndMs NaN (core/lesson.js:102,115) — pass to the next journal-logic task; no midnight probe for startProblem (code compares localDate).
+Task 1: complete (commits 34ea381..5518d86, review clean)
+- Task 2: BASE 5518d86; dispatched journal-logic (sonnet) with task-1 minor (NaN checkinLeftMs) attached
+- Task 2: implementer DONE bafab81 (727 tests, build:gas ok, task-1 minor fixed in same commit); dispatching journal-reviewer (sonnet, light)
+- Task 2: review (sonnet) Approved, 0 critical/important. minor (deferred, no action): matchCode does not type-check pair.id/startedAt (lessonClock already gates).
+Task 2: complete (commits 5518d86..bafab81, review clean)
+- Task 3: BASE bafab81; dispatched journal-logic (sonnet) with data-model.md (plan section «Модель данных»); strict review planned. Ruling: test line numbers in brief may have shifted — implementer finds the named checks by content — cost if wrong: one extra check edited, reviewer sees it in diff.
+- Task 3: implementer DONE eb45e97 (729 tests, build:gas ok); dispatching journal-reviewer (sonnet, STRICT rights probes)
+- Task 3: strict review (sonnet) Approved, 0 findings; probes scratchpad/probe3.mjs (roles with spaces/case/objects, checkins via dir/import for all roles) all refused. Note: nested [['teacher']] passes can() — unreachable (roles always from rolesOf).
+Task 3: complete (commits bafab81..eb45e97, review clean)
+- Task 4: BASE eb45e97; dispatched journal-logic (sonnet)
+- Task 4: implementer DONE 5790716 (734 tests, build:gas ok); edge choices: running pair with unreadable startedAt skipped, unreadable checkinUntil → startedAt+5min; dispatching journal-reviewer (sonnet)
+- Task 4: review (sonnet) Approved, 0 critical/important; probes scratchpad/p4.mjs. minor (deferred → task 5, journal-logic): tests for the two edge choices (unreadable startedAt skipped, unreadable checkinUntil → startedAt+5min). minor (deferred → task 6 / final review): running pair with unreadable startedAt stays running forever (blocks move/cancel) — server never writes it; consider a manual way out.
+Task 4: complete (commits eb45e97..5790716, review clean)
+- Task 5: BASE 5790716; dispatched journal-logic (sonnet) + task-4 minor (2 edge tests in tests/lessonSettle.test.js)
+- Task 5: implementer DONE_WITH_CONCERNS d732556 (741 tests): no honest RED (code before tests); N4 via common formula ceil(|dark*20-cells*10|/cells)-1; self-decoder round-trips ~40 texts v1–10; no external reference matrix (no QR libs on this PC: qrcode/segno/cv2/pyzbar/zxing absent). Ruling: accept concerns into review, readability = owner's phone at block 1 as planned — cost if wrong: a fix round against Nayuki at block 1. Dispatching journal-reviewer (sonnet).
+- Task 5: review (sonnet) Approved, 0 critical/important. minor (deferred → final review): N4 ceil(x)-1 differs from standard floor(x) when x integer (v2/v7 only) — mask choice only, readability unaffected; fix Math.floor(|d*20-cells*10|/cells). Test decoder partly mirrors encoder — standard guarded by external vectors + owner's phone at block 1.
+Task 5: complete (commits 5790716..d732556, review clean)
+- Task 6: BASE d732556; dispatched journal-server (sonnet) with server-test-helpers.md (plan section); STRICT review planned. Carried: task-4 minor (stuck running pair with unreadable startedAt) as a note only, no new requirement.
+- Task 6: implementer DONE 3b072b4 (747 tests, unit 3 tests unchanged, build:gas ok); dispatching journal-reviewer (sonnet, STRICT)
+- Task 6: strict review (sonnet) Approved, 0 critical/important; probes scratchpad/probe6.test.js (reads once in 8 actions, pair_locked snapshots equal, no service fields/foreign ids in grades). ⚠ SQLite rollback of settle on refusal verified by reading only — covered in task 8 (SQLite). minor (deferred → task 7, journal-server): pin read counters for schedule.changePair/cancelPair/restorePair in tests. minor (final review): running pair with unreadable startedAt never closes.
+Task 6: complete (commits d732556..3b072b4, review clean)
+- Task 7: BASE 3b072b4; dispatched journal-server (sonnet) + task-6 minor (read counters for schedule.changePair/cancelPair/restorePair); STRICT review planned
+- Task 7: implementer DONE c085339 (754 tests); deviations: exported lastOf; attended counts only active group students; lesson.mine without checkins; case (a) first pair started 08:10 instead of 09:29. Dispatching journal-reviewer (sonnet, STRICT).
+- Task 7: strict review (sonnet) Approved; probes scratchpad/probe7.test.js (codes not leaked anywhere, pair key not stored, odd pairIds → not_found, foreign pair → forbidden incl. dean,teacher and subject teacher on substitution). 4 deviations accepted. Gap: brief scenario (a) (first pair started 09:29:00, second at 09:30:00 → first closed 09:30:00 by teacher, window cut) not pinned in tests (test uses 08:10); reviewer's probe shows behaviour correct.
+- Ruling: the scenario (a) test and lesson.mine per-table read counters go into task 8 (same journal-server agent type, same test helpers) instead of a fix round — behaviour already proven by the reviewer's probe — cost if wrong: one fix round later if task 8 review finds it missing.
+Task 7: complete (commits 3b072b4..c085339, 1 gap carried to task 8)
+- Task 8: BASE c085339; dispatched journal-server (sonnet) + carried from task 7: scenario (a) test (09:29:00 start, 09:30:00 second start) and lesson.mine per-table read counters; + SQLite check that a refused request after a due window leaves the base consistent and the next request settles (task-6 ⚠). STRICT review planned.
+- Task 8: implementer DONE 348d273 (762 tests; load 25 marks 212 ms on SQLite); no RED run; flaky ~2/10000 'code_expired' check unguarded (brief asked to shift clock on collision). Dispatching journal-reviewer (sonnet, STRICT).
+- Task 8: strict review (sonnet) Approved, 0 critical/important; probes scratchpad/probe8.mjs, probe8b.mjs (odd data/device/code/pass → bad_request, staff → forbidden, forged exp → bad_pass, other group → forbidden, same device → device_used; current has no codes/foreign ids); load 221 ms. minor (deferred → task 9, journal-server): guard the code collision flake in tests/checkinApi.test.js:210-214 as the brief says; tighten checkin.pass spy to pairs === 1; add a forged-exp pass test.
+Task 8: complete (commits c085339..348d273, review clean)
+- Task 9: BASE 348d273; dispatched journal-server (sonnet) + task-8 minors (collision guard, checkin.pass spy === 1, forged-exp pass test)
+- Task 9: implementer DONE 3ba2b5a (767 tests; dev:lesson checked, stopped by own PID 28848); task-8 minors done. Dispatching journal-reviewer (sonnet, light).
+- Task 9: review (sonnet) Approved, 0 critical/important. minor (deferred → final review): --lesson-now without --reset silently prepares nothing (unreachable via npm run dev:lesson); real-clock stand test is weak but honest.
+Task 9: complete (commits 348d273..3ba2b5a, review clean)
