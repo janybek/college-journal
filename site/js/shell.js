@@ -131,9 +131,11 @@ export function renderShell(host, { user, view, params }, handlers) {
     drawerOpen = false;
     drawerHash = location.hash;
   }
-  const main = el('main', { id: 'app', class: 'content', tabindex: '-1' });
+  const main = el('main', { id: 'app', class: 'content' + (view === 'lesson' ? ' lp' : ''), tabindex: '-1' });
   let frame;
-  if (view === 'login' || view === 'changePassword') frame = authFrame(user, main, handlers);
+  // the screen of a pair is a whole-window panel for the projector: no menu, no top bar
+  if (view === 'lesson') frame = el('div', { class: 'lesson-frame' }, main);
+  else if (view === 'login' || view === 'changePassword') frame = authFrame(user, main, handlers);
   else if (user.kind === 'student') frame = studentFrame(main, handlers);
   else frame = staffFrame(user, view, params, main, handlers);
   const savedScroll = host.querySelector('.sidebar__nav')?.scrollTop ?? 0;

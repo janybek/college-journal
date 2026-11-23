@@ -4,8 +4,9 @@ import { t } from '../i18n.js';
 import { el, errorKey, avatar, badge, emptyState, pageHeader } from '../ui.js';
 import { icon } from '../icons.js';
 import { activeRole, menuParts, navFor, countBadge } from '../shell.js';
-import { pairCard, weekdayDate } from './pairParts.js';
+import { pairCard, weekdayDate, lessonPieces } from './pairParts.js';
 import { teacherBadge } from '../subjects.js';
+import { todayAction } from '../lesson.js';
 
 // Sections later units fill in; for now the student sees what is coming.
 const STUDENT_SECTIONS = [
@@ -171,10 +172,99 @@ function renderStaff(root, user) {
       sections.push(section('home-' + group.items[0].name, t(group.titleKey), el('ul', { class: 'tiles' }, group.items.map(tile))));
     }
   }
+  if (parts.includes('subjects') && permissions.includes('lesson.mine')) sections.push(lessonsSection(user));
   if (parts.includes('subjects') && permissions.includes('teacher.mySubjects')) sections.push(subjectsSection(user));
   root.append(
     pageHeader({ id: 'home-name', title: user.fullName, lead: role ? t('role.' + role) : null }),
     ...(sections.length > 0 ? sections : [emptyState('info', el('p', {}, t('home.nothing')))]));
+}
+
+// ---- «Пары сегодня» of the teacher: start a pair or open the screen of a started one ----
+
+const LESSONS_EVERY_MS = 60000;
+const lessons = { owner: null, pairs: null, errorKey: null, pending: null, timer: null, message: {} };
+
+// Stops what the home screen keeps running (called by main.js when another screen replaces it).
+export function leave() {
+  clearInterval(lessons.timer);
+  lessons.timer = null;
+}
+
+// The section appears only when there are pairs today; it asks again every minute while the page is open and visible.
+function lessonsSection(user) {
+  const host = el('div', { class: 'lessons-host' });
+  const draw = () => host.replaceChildren(...lessonsBody(user, draw));
+  draw();
+  const load = () => loadLessons(user).then(() => { if (host.isConnected) draw(); });
+  load();
+  clearInterval(lessons.timer);
+  lessons.timer = setInterval(() => { if (!document.hidden) load(); }, LESSONS_EVERY_MS);
+  return host;
+}
+
+function lessonsBody(user, redraw) {
+  if (lessons.owner === user.id && lessons.pairs && lessons.pairs.length > 0) {
+    return [section('home-lessons', t('home.lessons.title'),
+      el('ul', { class: 'lessons', 'aria-live': 'polite' }, lessons.pairs.map((pair) => el('li', {}, lessonCard(pair, redraw)))))];
+  }
+  if (lessons.owner === user.id && lessons.errorKey && !lessons.pairs && !lessons.pending) {
+    return [section('home-lessons', t('home.lessons.title'), el('div', { class: 'today__failed', role: 'alert' },
+      el('p', {}, t(lessons.errorKey)),
+      el('button', { type: 'button', class: 'button button--secondary', onclick: () => { loadLessons(user).then(redraw); redraw(); } }, t('common.retry'))))];
+  }
+  return [];
+}
+
+function lessonCard(pair, redraw) {
+  const action = todayAction(pair);
+  const hint = pair.status === 'closed' ? 'home.lessons.closed'
+    : pair.problem === 'start_early' ? 'home.lessons.from'
+      : pair.problem === 'start_late' ? 'home.lessons.late' : null;
+  const failed = lessons.message[pair.id];
+  const open = () => { location.hash = '#/lesson/' + encodeURIComponent(pair.id); };
+  const start = el('button', {
+    type: 'button', class: 'button button--primary lesson-card__act', id: 'home-lesson-' + pair.id,
+    onclick: async () => {
+      if (start.getAttribute('aria-disabled') === 'true') return;
+      start.setAttribute('aria-disabled', 'true');
+      try {
+        await call('lesson.start', { pairId: pair.id });
+        delete lessons.message[pair.id];
+        open();
+      } catch (error) {
+        lessons.message[pair.id] = errorKey(error.code);
+        redraw();
+      }
+    },
+  }, icon('grid'), t('home.lessons.start'));
+  return el('article', { class: 'card lesson-card' + (pair.status === 'running' ? ' is-running' : '') },
+    el('p', { class: 'lesson-card__time' }, pair.startTime, el('span', { class: 'lesson-card__end' }, pair.endTime)),
+    el('div', { class: 'lesson-card__main' },
+      el('h3', { class: 'lesson-card__subject' }, pair.subjectName),
+      el('p', { class: 'lesson-card__meta' },
+        pair.groupName ? badge(pair.groupName, 'primary') : null,
+        pair.roomName ? el('span', {}, t('lesson.room', { room: pair.roomName })) : null),
+      el('p', { class: 'lesson-card__topic' }, pair.topic ? lessonPieces(pair.topic) : t('home.lessons.noTopic'))),
+    el('div', { class: 'lesson-card__side' },
+      action === 'start' ? start : null,
+      action === 'open' ? el('a', { class: 'button button--primary lesson-card__act', href: '#/lesson/' + encodeURIComponent(pair.id) }, icon('grid'), t('home.lessons.open')) : null,
+      !action && hint ? el('p', { class: 'lesson-card__hint' }, t(hint, { time: pair.startFrom })) : null,
+      failed ? el('p', { class: 'lesson-card__hint lesson-card__hint--error', role: 'alert' }, t(failed, { time: pair.startFrom })) : null));
+}
+
+function loadLessons(user) {
+  if (lessons.owner !== user.id) Object.assign(lessons, { owner: user.id, pairs: null, errorKey: null, pending: null, message: {} });
+  if (!lessons.pending) {
+    const owner = user.id;
+    const mine = () => lessons.owner === owner;
+    lessons.pending = call('lesson.mine', {})
+      .then(
+        (data) => { if (mine()) Object.assign(lessons, { pairs: data.pairs, errorKey: null }); },
+        (error) => { if (mine()) lessons.errorKey = errorKey(error.code); },
+      )
+      .finally(() => { if (mine()) lessons.pending = null; });
+  }
+  return lessons.pending;
 }
 
 function section(id, title, body) {

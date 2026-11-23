@@ -11,6 +11,7 @@ import { openUnitDialog, openCurrentDialog } from './journalUnit.js';
 import { icon } from '../icons.js';
 import { getUser, getPref, setPref } from '../session.js';
 import { activeRole } from '../shell.js';
+import { todayAction } from '../lesson.js';
 
 // The journal of a subject (#/journal/<subjectId>): the grid of students and pairs, read only (journal.get).
 // Rows are students (those who left stand last, dimmed); columns are pairs, and after the last pair of a unit
@@ -254,7 +255,32 @@ function todayRow(pair) {
     canMark(pair) ? el('button', {
       type: 'button', class: 'button button--primary jv-today__act', id: todayOpenId(pair), 'aria-haspopup': 'dialog',
       onclick: () => openMarks(pair, todayOpenId(pair)),
-    }, icon('pencil'), t(pair.status === 'planned' ? 'journal.markAction' : 'journal.today.edit')) : null);
+    }, icon('pencil'), t(pair.status === 'planned' ? 'journal.markAction' : 'journal.today.edit')) : null,
+    todayAction(pair) ? startButton(pair) : null);
+}
+
+// «Начать пару с QR» starts the pair and opens its screen; «Экран пары» opens the screen of a started one.
+function startButton(pair) {
+  const open = todayAction(pair) === 'open';
+  const id = `journal-today-start-${pair.id}`;
+  const failure = el('span', { class: 'jv-today__hint', role: 'alert', id: id + '-error' });
+  const button = el('button', {
+    type: 'button', class: 'button button--secondary jv-today__act', id,
+    onclick: async () => {
+      if (open) { location.hash = '#/lesson/' + encodeURIComponent(pair.id); return; }
+      if (button.getAttribute('aria-disabled') === 'true') return;
+      button.setAttribute('aria-disabled', 'true');
+      failure.textContent = '';
+      try {
+        await call('lesson.start', { pairId: pair.id });
+        location.hash = '#/lesson/' + encodeURIComponent(pair.id);
+      } catch (error) {
+        button.removeAttribute('aria-disabled');
+        failure.textContent = t(errorKey(error.code));
+      }
+    },
+  }, icon('grid'), t(open ? 'lesson.open' : 'lesson.startQr'));
+  return el('span', { class: 'jv-today__start' }, button, failure);
 }
 
 // The key to the marks of the grid.

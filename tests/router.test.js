@@ -151,3 +151,12 @@ test('resolveRoute: the grades of a student need student.grades', () => {
   assert.equal(resolveRoute('#/grades', staff).view, 'home');
   assert.equal(resolveRoute('#/grades/sb_1', staff).view, 'home');
 });
+
+test('resolveRoute: the pair screen needs lesson.get', () => {
+  const teacher = { mustChangePassword: false, permissions: ['lesson.get', 'lesson.mine'] };
+  assert.deepEqual(resolveRoute('#/lesson/p_1', teacher), { view: 'lesson', params: { pairId: 'p_1' } });
+  assert.deepEqual(resolveRoute('#/lesson/p%2F1', teacher), { view: 'lesson', params: { pairId: 'p/1' } });
+  assert.equal(resolveRoute('#/lesson/p_1', { mustChangePassword: false, permissions: ['journal.get'] }).view, 'home');
+  assert.equal(resolveRoute('#/lesson/%E0%A4%A', teacher).view, 'home');
+  assert.equal(resolveRoute('#/lesson/p_1/x', teacher).view, 'home');
+});

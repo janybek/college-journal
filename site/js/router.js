@@ -46,6 +46,9 @@ export function resolveRoute(hash, user) {
   if (path === '/journal' && permissions.includes('journal.list')) return { view: 'journalList', params: {} };
   const journal = /^\/journal\/([^/]+)$/.exec(path);
   if (journal && permissions.includes('journal.get') && idOf(journal[1]) !== null) return { view: 'journal', params: { subjectId: idOf(journal[1]) } };
+  // #/lesson/<pairId>: the screen of a started pair for the projector (the server lets in only its teacher).
+  const lesson = /^\/lesson\/([^/]+)$/.exec(path);
+  if (lesson && permissions.includes('lesson.get') && idOf(lesson[1]) !== null) return { view: 'lesson', params: { pairId: idOf(lesson[1]) } };
   // «Журнал изменений»: the whole log is for the admin, the deanery and the vice-rector; the log of one subject also for its teacher.
   const office = Array.isArray(user.roles) && user.roles.some((role) => ['admin', 'dean', 'prorector'].includes(role));
   if (path === '/journal-log' && office && permissions.includes('journal.log')) return { view: 'journalLog', params: {} };

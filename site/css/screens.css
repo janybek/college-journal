@@ -6705,3 +6705,170 @@ a.gr-card:hover { border-color: var(--primary-line); }
   .dialog--marks .button,
   .dialog--cell .button { min-height: 40px; }
 }
+
+/* ---- Unit 4: the pairs of today (home), the start button (journal) and the pair screen for the projector ---- */
+
+.jv-today__start { display: grid; gap: var(--space-1); justify-items: start; min-width: 0; }
+.jv-today__start .jv-today__hint { font-size: 1rem; color: var(--danger); }
+@media (max-width: 40rem) {
+  .jv-today__start { width: 100%; justify-items: stretch; }
+}
+
+.lessons {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(21rem, 100%), 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lesson-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: var(--space-2) var(--space-4);
+  align-items: start;
+  height: 100%;
+  padding: var(--space-4) var(--space-5);
+  border-left: 4px solid var(--border-strong);
+}
+
+.lesson-card.is-running { border-left-color: var(--success); }
+
+.lesson-card__time {
+  display: grid;
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.1;
+  letter-spacing: var(--tracking-title);
+  font-variant-numeric: tabular-nums;
+}
+
+.lesson-card__end { font-size: var(--hint-fs); font-weight: 500; color: var(--text-muted); letter-spacing: 0; }
+.lesson-card__main { display: grid; gap: var(--space-1); min-width: 0; }
+.lesson-card__subject { margin: 0; font-size: 1rem; font-weight: 600; overflow-wrap: anywhere; }
+.lesson-card__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin: 0; color: var(--text-muted); }
+.lesson-card__topic { margin: 0; color: var(--text-muted); overflow-wrap: anywhere; }
+.lesson-card__side { grid-column: 1 / -1; display: grid; gap: var(--space-2); }
+.lesson-card__act { min-height: 2.75rem; width: 100%; }
+.lesson-card__hint { margin: 0; color: var(--text-muted); }
+.lesson-card__hint--error { color: var(--danger); }
+
+/* The pair screen: the whole window, always light. Sizes are for a projector, so the type is large. */
+
+.lesson-frame { min-height: 100vh; background: var(--bg); color: var(--text); }
+
+.content.lp {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-6);
+  max-width: none;
+  min-height: 100vh;
+  margin: 0;
+  padding: var(--space-6) var(--space-7);
+  background: var(--bg);
+  font-size: 1rem;
+}
+
+.lp-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3) var(--space-5); }
+.lp-head__title { min-width: 0; flex: 1 1 18rem; }
+.lp-head__name { margin: 0; font-size: 1.75rem; font-weight: 700; line-height: 1.15; letter-spacing: var(--tracking-title); overflow-wrap: anywhere; }
+.lp-head__topic { margin: var(--space-1) 0 0; font-size: 1.125rem; color: var(--text-muted); overflow-wrap: anywhere; }
+.lp-head__tools { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+.lp-tool { min-height: 2.75rem; font-size: 1rem; }
+
+.lp-tabs { display: inline-flex; gap: 2px; padding: 3px; border-radius: var(--radius-control); background: var(--seg-track); }
+
+.lp-tab {
+  min-height: 2.75rem;
+  padding: 0 var(--space-5);
+  border: 0;
+  border-radius: var(--radius-inner);
+  background: transparent;
+  color: var(--text-muted);
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.lp-tab[aria-selected="true"] { background: var(--seg-active); box-shadow: var(--seg-shadow); color: var(--text); font-weight: 600; }
+.lp-tab:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.lp-body { flex: 1 1 auto; display: grid; align-content: start; }
+.lp-loading, .lp-error { font-size: 1.125rem; }
+.lp-error { display: grid; gap: var(--space-3); justify-items: start; }
+
+.lp-none { display: grid; gap: var(--space-5); justify-items: start; padding: var(--space-7) 0; }
+.lp-none__title { margin: 0; font-size: 2rem; font-weight: 700; letter-spacing: var(--tracking-title); color: var(--text-muted); }
+.lp-big { min-height: 3.5rem; padding: 0 var(--space-7); font-size: 1.125rem; }
+
+.lp-checkin { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: var(--space-8); align-items: start; }
+
+.lp-qr { display: grid; gap: var(--space-4); justify-items: center; }
+
+.lp-qr__canvas {
+  display: block;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+  image-rendering: pixelated;
+}
+
+.lp-code { display: grid; gap: var(--space-2); justify-items: center; }
+.lp-code__label { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
+.lp-code__digits { display: flex; gap: var(--space-3); }
+
+.lp-code__digit {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 5.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  font-family: var(--font-mono);
+  font-size: 3.75rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--primary-ink);
+}
+
+.lp-code__hint { margin: 0; font-size: 1rem; color: var(--text-muted); }
+
+.lp-side { display: grid; gap: var(--space-4); align-content: start; min-width: 0; }
+.lp-side__stage { margin: 0; font-size: 1.25rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--primary-ink); font-variant-numeric: tabular-nums; }
+.lp-side__count { margin: 0; font-size: 3.25rem; font-weight: 700; line-height: 1.05; letter-spacing: var(--tracking-title); }
+.lp-side__none { margin: 0; font-size: 1.25rem; color: var(--text-muted); }
+
+.lp-names { column-count: 2; column-gap: var(--space-6); margin: 0; padding: 0; list-style: none; font-size: 1.375rem; }
+.lp-name { break-inside: avoid; padding: var(--space-1) var(--space-2); border-radius: var(--radius-inner); overflow-wrap: anywhere; }
+.lp-name.is-new { background: var(--success-wash); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .lp-name.is-new { animation: lp-arrive 1.6s ease-out both; }
+}
+
+@keyframes lp-arrive {
+  from { background: var(--success-line); transform: translateX(-6px); }
+  to { background: transparent; transform: none; }
+}
+
+.lp-side .lp-big { justify-self: start; margin-top: var(--space-3); }
+
+.lp:fullscreen { overflow: auto; padding: var(--space-7) var(--space-8); }
+.lp:fullscreen .lp-head__name { font-size: 2.25rem; }
+.lp:fullscreen .lp-code__digit { width: 5.5rem; height: 7rem; font-size: 4.75rem; }
+.lp:fullscreen .lp-side__count { font-size: 4.5rem; }
+.lp:fullscreen .lp-names { font-size: 1.75rem; }
+
+@media (max-width: 62rem) {
+  .content.lp { padding: var(--space-5) var(--space-4); }
+  .lp-checkin { grid-template-columns: minmax(0, 1fr); gap: var(--space-6); }
+  .lp-code__digit { width: 3.5rem; height: 4.5rem; font-size: 3rem; }
+  .lp-side__count { font-size: 2.5rem; }
+  .lp-names { column-count: 1; }
+  .lp-big { width: 100%; }
+}

@@ -408,3 +408,15 @@ test('the student grades screen: its keys exist in all three dictionaries; the o
   }
   for (const dict of [ru, ky, en]) assert.equal('home.gradesSoon' in dict, false);
 });
+
+test('the pair screen and the list of today: their keys exist in all three dictionaries, with the same placeholders', () => {
+  const keys = [...Object.keys(ru).filter((key) => key.startsWith('lesson.') || key.startsWith('home.lessons.')), 'error.start_early', 'error.start_late'];
+  assert.ok(keys.length > 30);
+  const holders = (text) => (text.match(/\{\w+\}/g) ?? []).sort().join();
+  for (const key of keys) {
+    for (const dict of [ru, ky, en]) assert.ok(dict[key], key);
+    assert.equal(holders(ky[key]), holders(ru[key]), 'ky ' + key);
+    assert.equal(holders(en[key]), holders(ru[key]), 'en ' + key);
+  }
+  assert.equal(ru['lesson.end.ask'], 'Закончить отметку? Кто не отметился, получит «не был».');
+});
