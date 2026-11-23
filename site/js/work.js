@@ -167,7 +167,7 @@ export function pickProblem(file, kind, count) {
 }
 
 // The failures of an upload that have a text of their own for the student.
-const UPLOAD_ERRORS = ['bad_type', 'bad_file', 'too_big', 'too_many', 'empty', 'upload_limit', 'photo_unreadable', 'already_checked', 'files_unavailable', 'network'];
+const UPLOAD_ERRORS = ['bad_type', 'bad_file', 'too_big', 'too_many', 'empty', 'upload_limit', 'photo_unreadable', 'already_checked', 'files_unavailable', 'network', 'upload_slow'];
 const FIELD_CODES = ['bad_type', 'bad_file', 'too_big', 'too_many', 'empty'];
 
 // The code of a failure: the code of the first fitting field of an `invalid` answer, else the code of the error itself.

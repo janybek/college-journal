@@ -102,7 +102,7 @@ export function restoreFiles(mirrorDir, dir) {
   return copyMissing(mirrorDir, dir);
 }
 
-export function spaceAlarm({ config, logger, minFreeBytes = MIN_FREE_BYTES, statfs = fs.statfsSync }) {
+export function spaceAlarm({ config, logger, now = () => new Date().getTime(), minFreeBytes = MIN_FREE_BYTES, statfs = fs.statfsSync }) {
   const low = [];
   const free = {};
   let failed = false;
@@ -125,7 +125,7 @@ export function spaceAlarm({ config, logger, minFreeBytes = MIN_FREE_BYTES, stat
       const gib = (n) => (n / 1024 ** 3).toFixed(1);
       const words = { data: 'диск базы и файлов', backup: 'диск копий' };
       fs.writeFileSync(file, [
-        `Дата: ${localDate(new Date().getTime())}`,
+        `Дата: ${localDate(now())}`,
         ...low.map((label) => `Мало места: ${words[label]}, свободно ${gib(free[label])} ГиБ`),
         'Откройте проект „Журнал колледжа“ в Claude и скажите: мало места на диске',
         '',

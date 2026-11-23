@@ -200,6 +200,14 @@ test('work.file: without the box -> files_unavailable', () => {
   assert.equal(s.call('work.file', { fileId: 'fl_nope' }, s.t.a1).error.code, 'files_unavailable');
 });
 
+test('work.dropFile: without the box -> files_unavailable', () => {
+  const { s, id } = prepare({ files: null });
+  const fileId = row(s, { state: 'pending', assignmentId: id });
+  const before = s.snapshot();
+  assert.equal(s.call('work.dropFile', { fileId }, s.t.a1).error.code, 'files_unavailable');
+  assert.deepEqual(s.snapshot(), before);
+});
+
 test('work.dropFile: only the own pending file; the disk keeps it', () => {
   const { s, id, up } = prepare();
   const { call, t, store, files, snapshot } = s;

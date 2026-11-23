@@ -688,7 +688,7 @@ async function sendItem(owner, item) {
 
 function failItem(owner, item, error) {
   const code = uploadErrorCode(error);
-  const again = RETRYABLE.includes(code) && item.payload !== null;
+  const again = (RETRYABLE.includes(code) || code === 'upload_slow') && item.payload !== null;
   Object.assign(item, { phase: 'error', rejected: !again, errorKey: uploadErrorKey(code) ?? errorKey(code) });
   if (!again) item.payload = null;
   if (code === 'already_checked' && mine === owner) reloadMine();

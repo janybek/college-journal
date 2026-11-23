@@ -149,6 +149,8 @@ test('the low-space alarm: under 5 GiB on either disk writes the file, enough re
   const text = fs.readFileSync(alert, 'utf8');
   assert.match(text, /мало места/);
   assert.match(text, /Журнал колледжа/);
+  assert.deepEqual(spaceAlarm({ config, logger: log, statfs: free(4 * GB, 90 * GB), now: () => Date.UTC(2026, 0, 2, 3, 0, 0) }), { low: ['data'] });
+  assert.match(fs.readFileSync(alert, 'utf8'), /Дата: 2026-01-02/);
   assert.deepEqual(spaceAlarm({ config, logger: log, statfs: free(4 * GB, 1 * GB) }), { low: ['data', 'backup'] });
   assert.deepEqual(spaceAlarm({ config, logger: log, statfs: free(6 * GB, 6 * GB) }), { low: [] });
   assert.equal(fs.existsSync(alert), false);

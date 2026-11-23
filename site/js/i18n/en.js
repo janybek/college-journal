@@ -1681,6 +1681,7 @@ export default {
   'work.upload.error.already_checked': 'The work is already checked',
   'work.upload.error.files_unavailable': 'This server does not accept files: hand the work in as text',
   'work.upload.error.network': 'No connection',
+  'work.upload.error.upload_slow': 'The connection is too slow — the file did not finish uploading. Try again with a better connection (for example, Wi-Fi).',
   'work.submit.error.bad_ref': 'One of the files is out of date: remove it and add it again.',
   'work.submit.error.empty': 'Write an answer or add a file.',
   'work.mine.replaced': 'Replaced by a newer one',

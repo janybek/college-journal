@@ -107,6 +107,15 @@ test('lateOptions: after the term only «excused» and «madeup» for a student 
   assert.deepEqual(lateOptions(undefined), []);
 });
 
+test('logLine: an assignment title that looks like a dictionary key stays text', () => {
+  for (const title of ['work.state.checked', 'journal.col.self']) {
+    const line = logLine({ entity: 'work', field: 'status', before: 'submitted', after: 'checked', assignmentTitle: title });
+    assert.equal(line.params.title, title);
+    assert.deepEqual(line.keyParams, ['before', 'after']);
+    assert.deepEqual(logLine({ entity: 'work', field: 'points', before: '8', after: '9', assignmentTitle: title }).keyParams, []);
+  }
+});
+
 test('logLine: a line of the history with the dictionary key, its numbers and the values that are keys themselves', () => {
   assert.deepEqual(logLine({ entity: 'mark', field: 'status', before: 'absent', after: 'madeup' }),
     { key: 'journal.log.mark.status', params: { before: 'journal.marks.status.absent', after: 'journal.marks.status.madeup' }, keyParams: ['before', 'after'] });

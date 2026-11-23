@@ -69,6 +69,17 @@ function utf16le(text) {
 }
 
 // Substring search over bytes (no string conversion of the whole file).
+function hasBytesNoCase(bytes, needle) {
+  const lower = (b) => (b >= 65 && b <= 90 ? b + 32 : b);
+  const last = bytes.length - needle.length;
+  for (let i = 0; i <= last; i++) {
+    let j = 0;
+    while (j < needle.length && lower(bytes[i + j]) === needle[j]) j++;
+    if (j === needle.length) return true;
+  }
+  return false;
+}
+
 function hasBytes(bytes, needle) {
   const first = needle[0];
   const last = bytes.length - needle.length;
@@ -90,7 +101,8 @@ const SIG = {
   ole: [0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1],
 };
 const OOXML_PART = { docx: ascii('word/document.xml'), xlsx: ascii('xl/workbook.xml'), pptx: ascii('ppt/presentation.xml') };
-const ZIP_MACROS = [ascii('vbaProject.bin'), ascii('macrosheets/')];
+// Part names of a package are case-insensitive: the markers are lower-case and compared with lower-cased bytes.
+const ZIP_MACROS = [ascii('vbaproject.bin'), ascii('macrosheets/')];
 const OLE_MACRO = utf16le('_VBA_PROJECT');
 
 export function sniffKind(bytes, kind) {
@@ -100,7 +112,7 @@ export function sniffKind(bytes, kind) {
     if (kind === 'docx' || kind === 'xlsx' || kind === 'pptx') {
       if (!startsWith(bytes, SIG.zip)) return null;
       if (!hasBytes(bytes, OOXML_PART[kind])) return null;
-      if (ZIP_MACROS.some((m) => hasBytes(bytes, m))) return null;
+      if (ZIP_MACROS.some((m) => hasBytesNoCase(bytes, m))) return null;
       return kind;
     }
     if (kind === 'doc' || kind === 'xls' || kind === 'ppt') {

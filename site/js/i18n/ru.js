@@ -1681,6 +1681,7 @@ export default {
   'work.upload.error.already_checked': 'Работа уже проверена',
   'work.upload.error.files_unavailable': 'На этом сервере файлы не принимаются: сдайте работу текстом',
   'work.upload.error.network': 'Нет связи',
+  'work.upload.error.upload_slow': 'Связь слишком медленная — файл не успел загрузиться. Попробуйте ещё раз при лучшей связи (например, через Wi-Fi).',
   'work.submit.error.bad_ref': 'Один из файлов устарел: уберите его и добавьте снова.',
   'work.submit.error.empty': 'Напишите ответ или добавьте файл.',
   'work.mine.replaced': 'Заменена новой',

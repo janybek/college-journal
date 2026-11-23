@@ -194,10 +194,14 @@ export function logLine(row) {
     const dash = (text) => (text === '' ? '—' : text);
     const title = typeof r.assignmentTitle === 'string' && r.assignmentTitle !== '' ? r.assignmentTitle : '—';
     let p;
-    if (r.field === 'status') p = { title, before: before === '' ? '—' : value(before, WORK_STATES, 'work.state.'), after: after === '' ? '—' : value(after, WORK_STATES, 'work.state.') };
+    let keys = [];
+    if (r.field === 'status') {
+      p = { title, before: before === '' ? '—' : value(before, WORK_STATES, 'work.state.'), after: after === '' ? '—' : value(after, WORK_STATES, 'work.state.') };
+      keys = keyed({ before: p.before, after: p.after });
+    }
     else if (r.field === 'dueAt') p = { title, before: dash(dueText(before)), after: dash(dueText(after)) };
     else p = { title, before: dash(before), after: dash(after) };
-    return line('journal.log.work.' + r.field, p, keyed(p));
+    return line('journal.log.work.' + r.field, p, keys);
   }
   if (r.entity === 'pair' && r.field === 'status') {
     const p = { before: value(before, PAIR_STATUS_VALUES, 'journal.log.pairStatus.'), after: value(after, PAIR_STATUS_VALUES, 'journal.log.pairStatus.') };

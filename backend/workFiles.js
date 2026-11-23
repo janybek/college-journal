@@ -43,6 +43,7 @@ export function uploadFile(store, platform, files, data, user) {
 }
 
 export function dropFile(store, platform, files, data, user) {
+  if (!files) throw new AppError('files_unavailable');
   const rows = store.list('files');
   const file = isStr(data.fileId) ? rows.find((f) => f.id === data.fileId) : undefined;
   if (!file || file.ownerId !== user.id || file.state !== 'pending') throw new AppError('not_found');

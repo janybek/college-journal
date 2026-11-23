@@ -59,7 +59,8 @@ function settle(body) {
   throw new ApiError(code, Array.isArray(error.fields) ? error.fields : undefined);
 }
 
-const UPLOAD_TIMEOUT_MS = 180000;
+// Not shorter than the 5-minute limit of the working server: the site must not give up before the server does.
+const UPLOAD_TIMEOUT_MS = 300000;
 
 // The same request as `call`, sent by XMLHttpRequest so that the progress of the upload is known (a file of 10 MB on a
 // phone takes a while). Because of `xhr.upload.onprogress` the browser first sends OPTIONS (CORS preflight); the working
@@ -81,7 +82,7 @@ export function upload(action, data, { onProgress = () => {}, makeXhr = () => ne
       };
     }
     xhr.onerror = fail;
-    xhr.ontimeout = fail;
+    xhr.ontimeout = () => reject(new ApiError('upload_slow'));
     xhr.onabort = fail;
     xhr.onload = () => {
       if (xhr.status === 413) {

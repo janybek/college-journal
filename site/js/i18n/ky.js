@@ -1681,6 +1681,7 @@ export default {
   'work.upload.error.already_checked': 'Иш мурун эле текшерилген',
   'work.upload.error.files_unavailable': 'Бул серверде файлдар кабыл алынбайт: ишти текст менен тапшырыңыз',
   'work.upload.error.network': 'Байланыш жок',
+  'work.upload.error.upload_slow': 'Байланыш өтө жай — файл жүктөлүп бүтө алган жок. Байланыш жакшыраак болгондо (мисалы, Wi-Fi аркылуу) кайра аракет кылыңыз.',
   'work.submit.error.bad_ref': 'Файлдардын бири эскирди: аны алып салып, кайра кошуңуз.',
   'work.submit.error.empty': 'Жооп жазыңыз же файл кошуңуз.',
   'work.mine.replaced': 'Жаңысы менен алмаштырылды',

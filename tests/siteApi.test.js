@@ -79,7 +79,11 @@ test('upload: an error answer keeps its code and fields; unauthorized ends the s
   assert.equal((await run(answer(200, { hello: 1 }))).code, 'server_down');
   assert.equal((await run((x) => x.onerror())).code, 'server_down');
   assert.equal((await run((x) => x.onerror(), false)).code, 'network');
-  assert.equal((await run((x) => x.ontimeout())).code, 'server_down');
+  assert.equal((await run((x) => x.ontimeout())).code, 'upload_slow');
+  assert.equal((await run((x) => x.ontimeout(), false)).code, 'upload_slow');
+  let seen;
+  await upload('work.upload', {}, { makeXhr: () => { const x = fakeXhr((y) => { seen = y.timeout; y.status = 200; y.responseText = '{"ok":true,"data":{}}'; y.onload(); }); return x; } });
+  assert.ok(seen >= 300000);
   assert.equal((await run((x) => x.onabort(), false)).code, 'network');
   let ended = 0;
   onSessionEnd(() => { ended += 1; });
