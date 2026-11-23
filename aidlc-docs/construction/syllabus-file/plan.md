@@ -10,7 +10,7 @@
 
 **Spec:** ответы владельца 24.11.2026 (все по умолчанию) — таблица решений `aidlc-docs/aidlc-state.md`, строка 24.11.2026 «Следующая работа — файл силлабуса (правило 4)»; правило 4 от 22.11.2026; поток силлабуса — `aidlc-docs/construction/unit-2-raspisanie/design-syllabus-form.md`; ящик файлов — план юнита 5 `aidlc-docs/construction/unit-5-dz/plan.md` (задачи 1, 4, 6) и его известные ограничения в `aidlc-state.md`.
 
-**Исходное состояние:** `HEAD bda6d52`, **901 тест** (`npm test` 24.11.2026, все зелёные), `npm run build:gas` собирается. Юниты 1–5 приняты и выложены (сервер и сайт `72fb36b`).
+**Исходное состояние:** `HEAD 454d0f7` (коммит плана), **901 тест** (`npm test` 24.11.2026, все зелёные), `npm run build:gas` собирается. Юниты 1–5 приняты и выложены (сервер и сайт `72fb36b`).
 
 **Порядок.** Сначала сверка плана (opus) с готовым кодом — находки правит отдельный агент в этом файле. Затем задачи 1 → 4 строго по одной; после каждой `npm test` зелёное и `npm run build:gas` собирается. Задачи 1–3 (правила, сервер, уборка и стенд) идут без остановок. Задача 4 — экраны, **один блок приёмки владельцем по скриншотам**. Затем задача 5: одна строгая общая проверка (opus), одна волна исправлений, повторная проверка, выкладка по просьбе владельца. Рабочий каталог — `.superpowers/sdd/plan-syllabus-file/` (памятки `implementer-contract.md`, `reviewer-contract.md`, `rereview-contract.md` копируются из каталога юнита 5, Global Constraints — из этого плана); журнал хода — `progress.md` там же, копия — `aidlc-docs/construction/syllabus-file/sdd/ledger-snapshot.md`.
 
@@ -86,7 +86,7 @@
 | «Изменить» у утверждённой | Черновик указывает на тот же файл; замена в черновике — новый файл, утверждённая остаётся со своим; ни один файл, на который ссылается версия, не удаляется | ответ 6 |
 | «Утвердить», «Вернуть», «Заполнить из файла» | Ссылку на файл не меняют; прежняя утверждённая становится архивной вместе со своим файлом | ответ 6 и правило «никогда не удалять файл, на который ссылаются» |
 | Заменённый или убранный файл | Через сутки уборка удаляет строку и файл, если ни одна версия на него не ссылается | как незакреплённые загрузки юнита 5 |
-| Предел загрузок | Не больше **20** файлов силлабуса в сутки (по Бишкеку) на одного сотрудника — `upload_limit` | место на диске; учебной работе не мешает |
+| Предел загрузок | Тот же, что у файлов юнита 5, **общий на человека**: не больше `FILE_LIMITS.perDayCount` (60) файлов и `FILE_LIMITS.perDayBytes` (200 МиБ) в сутки по Бишкеку, считая все его строки «Файлов» — `upload_limit`. Нового числа нет: деканат, заполняющий силлабусы за 40 преподавателей, не упрётся | место на диске; решение координатора 24.11.2026 по сверке плана |
 | Где на экранах | Форма: блок «Файл силлабуса» **вверху вкладки «Титул»** (первая вкладка — её видят сразу); страница силлабуса (там же деканат утверждает): кнопка «Файл силлабуса (PDF/Word)» под заголовком; студент — «Скачать силлабус (PDF)» / «(Word)» во всю ширину телефона | проще для владельца: одно место в форме, одно на странице |
 | Новая колонка и состояние | `syllabi.fileId` (последняя колонка «файл силлабуса»), состояние «Файлов» `syllabus`. Ничего не удаляется; хранилища дописывают колонку сами при запуске | — |
 | Стенд | На `dev:reset` у утверждённого силлабуса «Информатики» (`teacher1`, 1-е полугодие) прикреплён маленький PDF-образец | приёмка по скриншотам без ручной подготовки |
@@ -100,7 +100,7 @@ export const FILE_STATES = ['pending', 'attached', 'dropped', 'syllabus'];   // 
 ```
 
 - `syllabi.fileId` — `''` (файла нет) или id строки «Файлов» с `state: 'syllabus'`. У старых строк — `''`.
-- Строка файла силлабуса: `{ assignmentId: '', submissionId: '', ownerId: <id сотрудника, который прикрепил>, state: 'syllabus', name, kind: 'pdf' | 'docx' | 'doc', size, stored, at: 'YYYY-MM-DD HH:MM:SS' }`. Колонка `ownerId` подписана «студент» — подпись не меняем (смена заголовка листа Google ломает сверку шапки); смысл записан здесь.
+- Строка файла силлабуса: `{ assignmentId: '', submissionId: '', ownerId: <id сотрудника, который прикрепил>, state: 'syllabus', name, kind: 'pdf' | 'docx' | 'doc', size, stored, at: 'YYYY-MM-DD HH:MM:SS' }`. Колонка `ownerId` подписана «студент» — подпись не меняем (смена заголовка листа Google ломает сверку шапки); смысл записан здесь. Двойной смысл безопасен: id сотрудников начинаются на `sf…`, студентов на `st…` (`core/schema.js:34,42`); проверка удаления студента (`backend/handlers/dir.js:120`) и фильтры `workStudent`/`workFiles` строки силлабуса не задевают.
 - Файл в ответах: `{ name, kind, size, at }` (без `id`, `stored`, `ownerId`); `syllabus.file` — `{ name, kind, size, data }`.
 
 ## Файлы
@@ -108,7 +108,7 @@ export const FILE_STATES = ['pending', 'attached', 'dropped', 'syllabus'];   // 
 ```
 core/syllabusFlow.js     checkSubmit: «Цель курса» — предупреждение
 core/schema.js           syllabi.fileId, FILE_STATES + 'syllabus'
-core/files.js            SYLLABUS_FILE_KINDS, SYLLABUS_UPLOADS_PER_DAY
+core/files.js            SYLLABUS_FILE_KINDS
 core/permissions.js      syllabus.attachFile, syllabus.dropFile, syllabus.file
 core/syllabusDoc.js      draftVersion копирует fileId
 backend/syllabusFiles.js            прикрепить, убрать, скачать                                   новый
@@ -129,14 +129,13 @@ tests/syllabusAttachApi.test.js                                                 
 
 ### Task 1 (Л): «Цель курса» необязательна, колонка файла, права, копия ссылки в черновик
 
-**Files:** Modify `core/syllabusFlow.js`, `core/schema.js`, `core/files.js`, `core/permissions.js`, `core/syllabusDoc.js`; tests `tests/syllabusFlow.test.js`, `tests/syllabusFlowApi.test.js`, `tests/schema.test.js`, `tests/permissions.test.js`, `tests/api.test.js`, `tests/sqliteStore.test.js`, `tests/syllabusDoc.test.js`, `tests/files.test.js`. В прежних тестах правятся только: ожидание ошибок и предупреждений пустого документа (`syllabusFlow.test.js`, тест «checkSubmit: an empty document and a full one»), список ошибок отправки с пробелами (`syllabusFlowApi.test.js`, тест «submit with gaps…»: убрать `['goals', 'goal']`), список колонок `syllabi` (`schema.test.js`, тест «syllabus version fields…»: + `'fileId'` в конце) и `FILE_STATES` (+ `'syllabus'`), списки прав ролей в `permissions.test.js` и `api.test.js` (три новых имени на своих местах по алфавиту), список добавленных колонок в `sqliteStore.test.js` (тест «ensureTables on a unit 4 base…»: + `'syllabi.fileId'` в том порядке, в каком его сообщает хранилище). **Проверка — строгая** (права).
+**Files:** Modify `core/syllabusFlow.js`, `core/schema.js`, `core/files.js`, `core/permissions.js`, `core/syllabusDoc.js`; tests `tests/syllabusFlow.test.js`, `tests/syllabusFlowApi.test.js`, `tests/schema.test.js`, `tests/permissions.test.js`, `tests/api.test.js`, `tests/sqliteStore.test.js`, `tests/syllabusDoc.test.js`, `tests/files.test.js`, `tests/gasBundle.test.js`. В прежних тестах правятся только: ожидание ошибок и предупреждений пустого документа (`syllabusFlow.test.js`, тест «checkSubmit: an empty document and a full one»), список ошибок отправки с пробелами (`syllabusFlowApi.test.js`, тест «submit with gaps…»: убрать `['goals', 'goal']`), список колонок `syllabi` (`schema.test.js`, тест «syllabus version fields…»: + `'fileId'` в конце), `FILE_STATES` (+ `'syllabus'`; он проверяется в другом тесте того же файла — «unit 5 tables: assignments, submissions, files, the work log column and the constants», `schema.test.js:99`), списки прав ролей в `permissions.test.js` и `api.test.js` (три новых имени на своих местах по алфавиту) и `gasBundle.test.js:189` (тест «setup creates all 26 sheets, adds sixteen columns to an old syllabus sheet…»: в названии sixteen → seventeen, `rows[0].length` 27 → 28, строка 207). `sqliteStore.test.js` прежние тесты не правятся: тест «ensureTables on a unit 4 base…» создаёт `syllabi` целиком, `added` остаётся `['changeLog.assignmentId']`, он зелёный без правки; для колонки — только новый тест. **Проверка — строгая** (права).
 
 **Produces:**
 
 ```js
 // core/files.js
 export const SYLLABUS_FILE_KINDS = ['pdf', 'docx', 'doc'];
-export const SYLLABUS_UPLOADS_PER_DAY = 20;
 // core/permissions.js, ROLE_ACTIONS
 'syllabus.attachFile': { admin: true, dean: true, teacher: true },
 'syllabus.dropFile': { admin: true, dean: true, teacher: true },
@@ -144,7 +143,8 @@ export const SYLLABUS_UPLOADS_PER_DAY = 20;
 // core/syllabusDoc.js — draftVersion: row.fileId = approved ? (approved.fileId || '') : ''
 // core/syllabusFlow.js — checkSubmit: вместо ошибки goals/goal/required —
 //   warnings.push({ section: 'goals', code: 'empty' }) первым из предупреждений (до literature)
-// core/schema.js — раздел «Модель данных»
+// core/schema.js — раздел «Модель данных»; над колонкой ownerId таблицы files одна строка комментария о двойном смысле:
+//   // ownerId: id студента; у строки состояния 'syllabus' — id сотрудника, прикрепившего файл (id sf… и st… не пересекаются)
 ```
 
 - [ ] **Step 1: тесты.**
@@ -171,11 +171,12 @@ assert.equal(draftVersion({ ...args, approved: null, number: 1, planSemester: 3,
 assert.equal(SCHEMA.syllabi.columns.at(-1).key, 'fileId');
 assert.deepEqual(FILE_STATES, ['pending', 'attached', 'dropped', 'syllabus']);
 // tests/files.test.js
-assert.deepEqual([SYLLABUS_FILE_KINDS, SYLLABUS_FILE_KINDS.every((k) => FILE_KINDS.includes(k)), SYLLABUS_UPLOADS_PER_DAY], [['pdf', 'docx', 'doc'], true, 20]);
+assert.deepEqual([SYLLABUS_FILE_KINDS, SYLLABUS_FILE_KINDS.every((k) => FILE_KINDS.includes(k))], [['pdf', 'docx', 'doc'], true]);
 // tests/permissions.test.js
 for (const action of ['syllabus.attachFile', 'syllabus.dropFile']) assert.deepEqual(['admin', 'dean', 'prorector', 'teacher', 'student'].map((r) => can([r], action)), [true, true, false, true, false], action);
 assert.deepEqual(['admin', 'dean', 'prorector', 'teacher', 'student'].map((r) => can([r], 'syllabus.file')), [true, true, true, true, true]);
-// tests/sqliteStore.test.js — новый тест: база без syllabi.fileId открывается, колонка добавлена, у старой строки fileId === ''
+// tests/sqliteStore.test.js — новый тест: база без syllabi.fileId открывается, added = [['syllabi', 'fileId']], у старой строки fileId === ''
+// tests/gasBundle.test.js:189 — sixteen -> seventeen, rows[0].length 28
 ```
 
 - [ ] **Step 2:** `npm test` — новые проверки падают. **Step 3:** написать. **Step 4:** `npm test` зелёное; `npm run build:gas` собирается.
@@ -187,7 +188,7 @@ assert.deepEqual(['admin', 'dean', 'prorector', 'teacher', 'student'].map((r) =>
 
 **Files:** Create `backend/syllabusFiles.js`, `tests/syllabusAttachApi.test.js`. Modify `backend/handlers/syllabus.js` (три действия), `backend/syllabusDraft.js` (`fileMetaOf`, `draftForm`), `backend/syllabusData.js` (`shownVersion`), `tests/syllabusSetup.js` (`setup({ makeStore, files })`: `files` по умолчанию `undefined` — без ящика, как раньше; кладётся в `ctx.files` и возвращается). Прежние тесты не правятся (если упадёт проверка, сравнивающая весь объект `syllabus` ответа `syllabus.get` или `syllabus.form` целиком, — дописать в ожидание `id`/`file` и указать в отчёте). **Проверка — строгая** (права, данные студентов, файлы).
 
-**Interfaces — Consumes:** `SYLLABUS_FILE_KINDS`, `SYLLABUS_UPLOADS_PER_DAY` (задача 1), `FILE_LIMITS`, `cleanFileName`, `kindByName`, `base64Bytes`, `sniffKind`, `isStoredName` (`core/files.js`); `rightsOn`, `versionsOf` (`core/syllabusFlow.js`); `plainId` (`core/syllabusSections.js`); `viewerOf`, `versionOf` (`backend/syllabusDraft.js`); `todayOf` (`backend/scheduleData.js`); `localDate`, `localDateTime` (`core/dates.js`); `ctx.files` (ящик юнита 5: `put`, `read`, `decode`, `encode`); в тестах `createMemoryFiles` (`tests/fakes/memoryFiles.js`), `SAMPLE`, `FAKE`, `b64` (`tests/fakes/sampleFiles.js`).
+**Interfaces — Consumes:** `SYLLABUS_FILE_KINDS` (задача 1), `FILE_LIMITS`, `cleanFileName`, `kindByName`, `base64Bytes`, `sniffKind`, `isStoredName` (`core/files.js`); `rightsOn`, `versionsOf` (`core/syllabusFlow.js`); `plainId` (`core/syllabusSections.js`); `viewerOf`, `versionOf` (`backend/syllabusDraft.js`); `todayOf` (`backend/scheduleData.js`); `localDate`, `localDateTime` (`core/dates.js`); `ctx.files` (ящик юнита 5: `put`, `read`, `decode`, `encode`); в тестах `createMemoryFiles` (`tests/fakes/memoryFiles.js`), `SAMPLE`, `FAKE`, `b64` (`tests/fakes/sampleFiles.js`).
 
 **Produces:**
 
@@ -210,7 +211,7 @@ export function fileMetaOf(store, version);   // version.fileId пуст -> null
 3. `rights = rightsOn(version, viewerOf(user, version, subjects))`: `!rights.see` → `forbidden`; `!rights.edit` → `syllabus_locked`.
 4. `name = cleanFileName(data.name)`, `kind = kindByName(name)`; `kind` не из `SYLLABUS_FILE_KINDS` → `invalid` `[{ field: 'name', code: 'bad_type' }]`.
 5. `base64Bytes(data.data)`: `null` → `bad_request`; `0` → `invalid` `data/empty`; больше `FILE_LIMITS.maxBytes` → `invalid` `data/too_big`.
-6. Строки «Файлов» `ownerId === user.id`, `state === 'syllabus'`, дата `at` — сегодня по Бишкеку: уже `SYLLABUS_UPLOADS_PER_DAY` → `upload_limit`.
+6. Строки «Файлов» с `ownerId === user.id` и датой `at` — сегодня по Бишкеку (**любого** состояния, как в `backend/workFiles.js:32-33`): их уже `FILE_LIMITS.perDayCount`, или сумма их `size` плюс размер этого файла (из шага 5) больше `FILE_LIMITS.perDayBytes` → `upload_limit`.
 7. `bytes = files.decode(data.data)`; `sniffKind(bytes, kind)` — `null` → `invalid` `data/bad_file`.
 8. `stored = platform.randomHex(16) + '.bin'`; `files.put(stored, bytes)`; одна `insertMany('files')` (строка раздела «Модель данных», `size: bytes.length`, `at: localDateTime(now)`); одна `updateMany('syllabi')` `{ fileId: <новый id>, updated: todayOf(platform), editedBy: user.id }`. Поле `data.fileId`, если есть, не читается.
 
@@ -220,7 +221,7 @@ export function fileMetaOf(store, version);   // version.fileId пуст -> null
 
 1. `files` нет — `files_unavailable`; `plainId` — `bad_request`; версии нет — `not_found`.
 2. **Студент** (`user.kind === 'student'`) может, только если: `version.status === 'approved'`; среди `subjects` есть предмет с `disciplineId`, `teacherId` версии и `groupId === user.row.groupId` (непустой); `versionsOf(syllabi, ключ версии).open` — не в статусе `review`. Иначе `not_found`.
-3. **Сотрудник:** открытая версия (`draft`, `review`, `returned`) — `rightsOn(...).see`; утверждённая — роль `admin`/`dean`/`prorector`, или `viewerOf(...).teaches && version.teacherId === user.id` с ролью `teacher`, или (только тогда читается `pairs`) он ведёт пару (`pair.teacherId === user.id`) предмета этой дисциплины этого преподавателя; архивная — нет. Иначе `forbidden`.
+3. **Сотрудник:** открытая версия (`draft`, `review`, `returned`) — `rightsOn(...).see`; утверждённая — роль `admin`/`dean`/`prorector`, или `viewerOf(...).teaches && version.teacherId === user.id` с ролью `teacher`, или (только тогда читается `pairs`) заменяющий: он **с ролью `teacher`** и ведёт пару (`pair.teacherId === user.id`) предмета этой дисциплины этого преподавателя (как `covers` в `backend/syllabusData.js:75-77`); архивная — нет. Иначе `forbidden`.
 4. `fileId` пуст — `not_found`. Строки нет, `state !== 'syllabus'`, `kind` не из `SYLLABUS_FILE_KINDS` или `!isStoredName(stored)` — `file_missing`; `files.read(stored) === null` — `file_missing`.
 5. Ответ `{ file: { name, kind, size, data: files.encode(bytes) } }`. Ничего не пишет.
 
@@ -264,7 +265,7 @@ assert.deepEqual(call('syllabus.form', { syllabusId: id }, teacher1).data.syllab
 - **«Изменить»:** `draft(sb1, 1, teacher1)` после утверждения — у нового черновика `fileId` равен `fileId` утверждённой; `attach` в черновике меняет только черновик; `dropFile` в черновике — у утверждённой `fileId` прежний, `s1` скачивает прежние байты. После отправки черновика (`review`) `s1` — `not_found` (утверждённая скрыта, как в `syllabus.get`), `dean` читает обе. Утверждение черновика: прежняя утверждённая — `archived` со своим `fileId`, `syllabus.file` у архивной для `dean` — `forbidden`, новая утверждённая отдаёт свой файл.
 - **«Заполнить из файла»:** у черновика с файлом `send('syllabus.apply', sb1, A, teacher1)` — `fileId` не изменился; у ключа только с утверждённой версией (с файлом) `syllabus.apply` создаёт черновик с тем же `fileId`.
 - **Номер не переносится:** id строки файла силлабуса в `work.file` у `teacher1`, `dean`, `s1` — `not_found`; в `work.dropFile` у `s1` — `not_found`. Версия, у которой `fileId` вручную (через `store.update`) указывает на строку с `state: 'attached'`, — `syllabus.file` → `file_missing`; на несуществующую строку — `file_missing`; строка есть, а в ящике файла нет — `file_missing`.
-- **Предел:** 20 строк `{ state: 'syllabus', ownerId: staff.teacher1, at: '2026-08-31 09:00:00', … }` прямо в хранилище — `attach` → `upload_limit`, ничего не записано; у `dean` в тот же день — можно.
+- **Предел:** `FILE_LIMITS.perDayCount` (60) строк `{ state: 'syllabus', ownerId: staff.teacher1, at: '2026-08-31 09:00:00', size: 1, … }` прямо в хранилище — `attach` → `upload_limit`, ничего не записано; у `dean` в тот же день — можно. Отдельно: 3 строки `size: 100 * 1024 * 1024` у `teacher1` на сегодня — `attach` файла 10 МиБ → `upload_limit` (сумма больше 200 МиБ), одна такая строка — можно; строки со вчерашней датой не считаются; строка задания (`state: 'attached'`) того же человека считается.
 - **Без ящика** (`setup()`): `attach`, `dropFile`, `syllabus.file` — `files_unavailable`; `syllabus.form` и `syllabus.get` работают, `file: null`.
 - **Страница:** `syllabus.get { subjectId: sb1 }` у `s1` — `syllabus.id` — id утверждённой версии, `syllabus.file` — `{ name, kind, size, at }`; JSON ответов `syllabus.get`, `syllabus.form`, `syllabus.attachFile` не содержит `stored` строки и строки `"ownerId"`.
 - **Чтения и записи:** `attach` — `lists` ровно `{ syllabi: 1, subjects: 1, files: 1 }`, `writes` ровно `{ 'insertMany:files': 1, 'updateMany:syllabi': 1 }`; `syllabus.file` у `s1` — `{ syllabi: 1, subjects: 1, files: 1 }`, без записей; у заменяющего `teacher2` — плюс `pairs: 1`; `syllabus.form` и `syllabus.get` версии с файлом — в прежних наборах плюс `files: 1`, без файла — прежние наборы без `files`.
@@ -276,7 +277,7 @@ assert.deepEqual(call('syllabus.form', { syllabusId: id }, teacher1).data.syllab
 
 ### Task 3 (С): уборка не трогает файлы версий; PDF-образец на стенде
 
-**Files:** Modify `backend/node/files.js` (`sweepFiles`), `dev/seed.js`, `tests/filesBox.test.js` (новые проверки), `tests/seedWork.test.js` (только тест «seedWork: one PNG picture on the disk…»: строки «Файлов» и имена ящика считать без строк `state: 'syllabus'`; другие прежние ожидания числа файлов стенда, если упадут, — так же, с перечнем в отчёте). **Проверка — строгая** (файлы удаляются с диска).
+**Files:** Modify `backend/node/files.js` (`sweepFiles`: живыми сейчас считаются только `pending|attached`, строка 62), `dev/seed.js`, `tests/filesBox.test.js` (новые проверки), `tests/seedWork.test.js` (только тест «seedWork: one PNG picture on the disk…»: строки «Файлов» и имена ящика считать без строк `state: 'syllabus'`; другие прежние ожидания числа файлов стенда, если упадут, — так же, с перечнем в отчёте), `tests/devServer.test.js` (тест «a fresh fictional stand has the assignments … one picture in its box», строки 440-450: стенд теперь кладёт в ящик **два** файла — `attached` png и `syllabus` pdf; сравнивать **отсортированные** списки `saved.list('files').map((f) => f.stored)` и `fs.readdirSync(srv.filesDir)` — иначе порядок вставки и алфавит hex-имён совпадают лишь примерно в половине прогонов; ожидание — 2 строки; название поправить на «…and two files in its box»). **Проверка — строгая** (файлы удаляются с диска).
 
 **Interfaces — Consumes:** `sweepFiles` (как есть), таблица `syllabi.fileId`, состояние `syllabus` (задача 1); `publishSyllabusDoc` уже утверждает силлабусы стенда.
 
@@ -312,7 +313,7 @@ export function seedSyllabusFile(store, platform, files);   // files нет -> �
 
 ### Task 4 (Э): экраны — блок «Файл силлабуса» в форме, кнопка на странице, студент на телефоне — блок приёмки
 
-**Files:** Create `site/js/views/syllabusAttach.js`. Modify `site/js/syllabusForm.js` (помощники), `site/js/views/syllabusFormTabs.js` (`titleTab`), `site/js/views/syllabusForm.js` (`context`, `leave`), `site/js/views/syllabus.js` (строка файла под заголовком), `site/js/views/fileView.js` (параметр `request`), `site/js/i18n/ru.js`, `ky.js`, `en.js`, `site/css/screens.css`, `tests/syllabusForm.test.js` (только новые проверки). Скриншоты — `.superpowers/sdd/plan-syllabus-file/task-4-shots/`. **Проверка ИИ — да** (sonnet): имя файла только текстом, тип `Blob` из своего списка, студент видит кнопку только у утверждённой версии; остальное владелец принимает по скриншотам.
+**Files:** Create `site/js/views/syllabusAttach.js`. Modify `site/js/syllabusForm.js` (помощники), `site/js/views/syllabusFormTabs.js` (`titleTab`), `site/js/views/syllabusForm.js` (`context`, `leave`), `site/js/views/syllabus.js` (строка файла под заголовком), `site/js/views/fileView.js` (параметр `request`), `site/js/i18n/ru.js`, `ky.js`, `en.js`, `site/css/screens.css`, `tests/syllabusForm.test.js` (только новые проверки), `tests/i18n.test.js` (тест «the syllabus form of task 42…», строка 225: в `CHECK_KEYS` + `'goals.empty'`; остальное не правится). Скриншоты — `.superpowers/sdd/plan-syllabus-file/task-4-shots/`. **Проверка ИИ — да** (sonnet): имя файла только текстом, тип `Blob` из своего списка, студент видит кнопку только у утверждённой версии; остальное владелец принимает по скриншотам.
 
 **Interfaces — Consumes:** ответы задачи 2 (`syllabus.form` → `syllabus.file`, `can.edit`; `syllabus.get` → `syllabus.id`, `syllabus.file`; действия `syllabus.attachFile`, `syllabus.dropFile`, `syllabus.file`); `upload`, `call`, `RETRYABLE` (`site/js/api.js`); `readAsBase64` (`site/js/photo.js`); `kindOfName`, `uploadErrorCode`, `sizeText`, `mayStillSend` (`site/js/work.js`); `modal`, `showModal`, `note`, `errorKey` (`site/js/ui.js`).
 
@@ -326,7 +327,8 @@ export function syllabusFileErrorKey(error);          // uploadErrorCode(error):
                                                       //   -> 'sform.file.error.<код>'; upload_slow -> 'work.upload.error.upload_slow'; иначе null (экран берёт errorKey)
 export function fileDownloadKey(kind);                // pdf -> 'syllabus.file.download.pdf'; docx, doc -> 'syllabus.file.download.word'; иначе null
 // site/js/views/fileView.js
-export function openFile({ fileId, name, kind, host = document.body, request = () => call('work.file', { fileId }) });   // прежние вызовы не меняются
+export function openFile({ fileId, name, kind, host = document.body, request = () => call('work.file', { fileId }), missingKey });   // прежние вызовы не меняются;
+                                                      // при ошибке file_missing и заданном missingKey окно показывает t(missingKey), иначе errorKey
 // site/js/views/syllabusAttach.js
 export function fileBlock({ syllabusId, file, canEdit, onChange });   // -> Element: блок «Файл силлабуса»; onChange(file | null) после успеха
 export function leaveAttach();                                         // уход с формы: ответ загрузки, пришедший позже, ничего не рисует
@@ -335,8 +337,8 @@ export function leaveAttach();                                         // ухо
 Что на экранах:
 
 1. **Форма, вкладка «Титул», первым блоком** (`section.sform-file`, id `sf-file`): заголовок «Файл силлабуса», подсказка; нет файла — «Файл не прикреплён»; есть — кнопка-имя файла (открывает `openFile` с `request: () => call('syllabus.file', { syllabusId })`), строка «PDF · 1,2 МБ · загружен 24.11.2026». При `can.edit` — «Прикрепить файл» (нет файла) или «Заменить» и «Убрать» (есть). Выбор: скрытый `input type=file`, `accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"`; `syllabusFileProblem` до чтения; затем `readAsBase64` → `upload('syllabus.attachFile', …, { onProgress })` с `<progress>` и «Загрузка… N%»; пока идёт загрузка, кнопки блока выключены (вторая загрузка не начинается). Ошибка — текст под блоком (`syllabusFileErrorKey` или `errorKey`), при `RETRYABLE`/`upload_slow` — «Повторить» без повторного выбора. «Убрать» — окно подтверждения, затем `call('syllabus.dropFile')`. Успех — `onChange` обновляет `state.form.syllabus.file`, короткая заметка «Файл прикреплён» / «Файл убран». Блок не участвует в «несохранённых изменениях» вкладки «Титул». Только чтение (проректор, версия «на утверждении», утверждённая) — имя файла и открытие, без кнопок правки.
-2. **Страница силлабуса** (`#/syllabus/…`, в том числе `/draft`, где деканат утверждает): если у показанной версии есть `syllabus.file` — под заголовком кнопка id `syllabus-file` с ключом `fileDownloadKey(kind)` и размером; нажатие — `openFile({ name, kind, request: () => call('syllabus.file', { syllabusId: view.syllabus.id }) })`. Для студента кнопка во всю ширину на экране до 600 px, высота не ниже 44 px, текст 16 px.
-3. **Отправка на утверждение:** пустая «Цель курса» попадает в окно «Не заполнено (необязательно)» вместе с вкладками 4–8 — уже делает прежний `submitDialog` по предупреждению `goals/empty`; проверить на стенде, кода не нужно.
+2. **Страница силлабуса** (`#/syllabus/…`, в том числе `/draft`, где деканат утверждает): если у показанной версии есть `syllabus.file` — под заголовком кнопка id `syllabus-file` с ключом `fileDownloadKey(kind)` и размером; нажатие — `openFile({ name, kind, request: () => call('syllabus.file', { syllabusId: view.syllabus.id }), missingKey: 'syllabus.file.missing' })` (прежний `error.file_missing` говорит «загрузите его снова» — студенту это не годится). То же `missingKey` в блоке формы. Для студента кнопка во всю ширину на экране до 600 px, высота не ниже 44 px, текст 16 px.
+3. **Отправка на утверждение:** пустая «Цель курса» приходит предупреждением `goals/empty`. Окно `submitDialog` и так показывает «Не заполнено: Цель и результаты, … Отправить всё равно?» (`sform.submit.empty`, названия вкладок), его не правим. Нужен только текст самого предупреждения: `checkLine` (`site/js/syllabusForm.js:267-272`) строит ключ `sform.checks.goals.empty`, которого нет, и `views/syllabusForm.js:271`, `views/syllabus.js:331` подставили бы «В этом разделе есть ошибка.» (`sform.checks.other`) — поэтому ключ заводится в словарях (таблица ниже) и в `CHECK_KEYS`.
 
 Словарь (ключи одинаковые в трёх словарях; русский текст — дословно; `ky` и `en` пишет агент, `ky` потом уходит на вычитку):
 
@@ -345,7 +347,9 @@ export function leaveAttach();                                         // ухо
 | `sform.file.title` | Файл силлабуса |
 | `sform.file.hint` | Полный силлабус колледжа: PDF или Word, до 10 МБ. Необязательно. |
 | `sform.file.none` | Файл не прикреплён |
-| `sform.file.meta` | {kind} · {size} · загружен {date} |
+| `sform.file.meta` | {kind} · {size} · загружен {date} (`{kind}` — текст ключа `sform.file.kind.*` по виду файла: `pdf` → PDF, `docx`/`doc` → Word) |
+| `sform.file.kind.pdf` | PDF |
+| `sform.file.kind.word` | Word |
 | `sform.file.attach` | Прикрепить файл |
 | `sform.file.replace` | Заменить |
 | `sform.file.remove` | Убрать |
@@ -354,7 +358,7 @@ export function leaveAttach();                                         // ухо
 | `sform.file.retry` | Повторить |
 | `sform.file.done` | Файл прикреплён |
 | `sform.file.removed` | Файл убран |
-| `sform.file.error.bad_type` | Подходит только PDF или Word (.pdf, .docx, .doc) |
+| `sform.file.error.bad_type` | Подходит только PDF или Word (.pdf, .docx, .doc). Шаблон Excel загружается кнопкой «Заполнить из файла». |
 | `sform.file.error.bad_file` | Файл повреждён, не того вида или с макросами. Сохраните его заново как PDF |
 | `sform.file.error.too_big` | Файл больше 10 МБ. Сохраните его как PDF поменьше |
 | `sform.file.error.empty` | Файл пустой |
@@ -363,6 +367,38 @@ export function leaveAttach();                                         // ухо
 | `sform.file.error.syllabus_locked` | Версия на утверждении или утверждена: файл менять нельзя |
 | `syllabus.file.download.pdf` | Скачать силлабус (PDF) |
 | `syllabus.file.download.word` | Скачать силлабус (Word) |
+| `syllabus.file.missing` | Файл силлабуса не найден. Сообщите в деканат. |
+| `sform.checks.goals.empty` | Не заполнена цель курса (необязательно). |
+
+Новые ключи и их тексты на кыргызском и английском (агент вносит дословно; кыргызские потом уходят на вычитку носителю):
+
+| Ключ | ky | en |
+| --- | --- | --- |
+| `sform.file.title` | Силлабус файлы | Syllabus file |
+| `sform.file.hint` | Колледждин толук силлабусу: PDF же Word, 10 МБга чейин. Милдеттүү эмес. | The full syllabus of the college: PDF or Word, up to 10 MB. Optional. |
+| `sform.file.none` | Файл тиркелген жок | No file attached |
+| `sform.file.meta` | {kind} · {size} · жүктөлгөн күнү {date} | {kind} · {size} · uploaded {date} |
+| `sform.file.kind.pdf` | PDF | PDF |
+| `sform.file.kind.word` | Word | Word |
+| `sform.file.attach` | Файл тиркөө | Attach a file |
+| `sform.file.replace` | Алмаштыруу | Replace |
+| `sform.file.remove` | Өчүрүү | Remove |
+| `sform.file.removeAsk` | Файлды бул версиядан өчүрөсүзбү? Бекитилген версиянын файлы калат. | Remove the file from this version? The file of the approved version stays. |
+| `sform.file.uploading` | Жүктөлүүдө… {n}% | Uploading… {n}% |
+| `sform.file.retry` | Кайталоо | Retry |
+| `sform.file.done` | Файл тиркелди | File attached |
+| `sform.file.removed` | Файл өчүрүлдү | File removed |
+| `sform.file.error.bad_type` | Жалаң PDF же Word ылайыктуу (.pdf, .docx, .doc). Excel үлгүсү «Файлдан толтуруу» баскычы менен жүктөлөт. | Only PDF or Word fits (.pdf, .docx, .doc). The Excel template is uploaded with the «Fill from file» button. |
+| `sform.file.error.bad_file` | Файл бузулган, башка түрдө же макростору бар. Аны PDF катары кайра сактаңыз | The file is damaged, of another kind or has macros. Save it again as a PDF |
+| `sform.file.error.too_big` | Файл 10 МБдан чоң. Аны кичирээк PDF катары сактаңыз | The file is larger than 10 MB. Save it as a smaller PDF |
+| `sform.file.error.empty` | Файл бош | The file is empty |
+| `sform.file.error.upload_limit` | Бүгүн өтө көп файл жүктөлдү, эртең аракет кылыңыз | Too many files were uploaded today, try again tomorrow |
+| `sform.file.error.files_unavailable` | Бул серверде файлдар кабыл алынбайт | This server does not accept files |
+| `sform.file.error.syllabus_locked` | Версия бекитүүдө же бекитилген: файлды өзгөртүүгө болбойт | The version is under review or approved: the file cannot be changed |
+| `syllabus.file.download.pdf` | Силлабусту жүктөп алуу (PDF) | Download the syllabus (PDF) |
+| `syllabus.file.download.word` | Силлабусту жүктөп алуу (Word) | Download the syllabus (Word) |
+| `syllabus.file.missing` | Силлабус файлы табылган жок. Деканатка кабарлаңыз. | The syllabus file was not found. Tell the deanery. |
+| `sform.checks.goals.empty` | Курстун максаты толтурулган жок (милдеттүү эмес). | The aim of the course is not filled in (optional). |
 
 - [ ] **Step 1: тесты** (`tests/syllabusForm.test.js`).
 
@@ -377,16 +413,17 @@ assert.deepEqual(['pdf', 'docx', 'doc', 'xlsx', undefined].map(fileDownloadKey),
 ```
 
 - [ ] **Step 2:** падает. **Step 3:** написать экраны и словари. **Step 4:** `npm test` зелёное (в том числе `tests/i18n.test.js`); `npm run build:gas` собирается.
-- [ ] **Step 5: стенд и скриншоты** (свой `npm run dev:reset`, headless Chrome, остановка только своих PID), в `task-4-shots/`: (1) `teacher1`, новый черновик, «Титул» без файла; (2) ход загрузки; (3) файл прикреплён — имя, размер, «Заменить», «Убрать» — тёмная и светлая темы; (4) ошибка `.xlsx`; (5) `dean`, страница версии «на утверждении» — кнопка «Файл силлабуса»; (6) `S1001`, 360 px — «Скачать силлабус (PDF)» и открытое окно файла — обе темы; (7) отправка с пустой целью — окно «необязательно» с «Цель курса». На каждом экране нет горизонтальной прокрутки (проверка `document.documentElement.scrollWidth <= innerWidth` в отчёте).
+- [ ] **Step 5: стенд и скриншоты** (свой `npm run dev:reset`, headless Chrome, остановка только своих PID), в `task-4-shots/`: (1) `teacher1`, новый черновик (2-е полугодие «Информатики» через «Изменить»), «Титул» без файла; (2) ход загрузки; (3) файл прикреплён — имя, размер, «Заменить», «Убрать» — тёмная и светлая темы; (4) ошибка `.xlsx`; (5) `dean`, страница версии «на утверждении» — кнопка «Файл силлабуса»; (6) `S1001`, 360 px — «Скачать силлабус (PDF)» и открытое окно файла — обе темы; (7) отправка с пустой целью — окно «Не заполнено: Цель и результаты, … Отправить всё равно?». Стенд: возвращённая v2 «Информатики» (1-е полугодие) создаётся `startDraft` в `seedSyllabi` (`dev/seed.js:168`) до `seedSyllabusFile`, у неё файла нет; `seedSyllabusFile` ставит один и тот же `fileId` утверждённой версии и её открытой копии (если такая есть), тест seed это проверяет. «Без файла» для (1) — «Изменить» у 2-го полугодия; для «на утверждении» с файлом (5) — прикрепить файл к возвращённой v2 и отправить («Анатомия» уже на утверждении, у неё файла нет). На каждом экране нет горизонтальной прокрутки (проверка `document.documentElement.scrollWidth <= innerWidth` в отчёте).
 - [ ] **Step 6:** коммит `feat: the syllabus file on the form, on the syllabus page and on the student's phone`.
 
-**Блок приёмки (владелец).** Координатор сам смотрит 1–2 скриншота, затем поднимает `journal-dev-reset`, входит за владельца и даёт список «что посмотреть»: (1) `teacher1` прикрепляет PDF на «Титуле», заменяет на Word, убирает; (2) отправляет без «Цели курса»; (3) `dean` открывает версию на утверждении, скачивает файл, утверждает; (4) студент `S1001` во второй вкладке на `127.0.0.1:5273` видит «Скачать силлабус (PDF)» и открывает его; (5) `teacher1` нажимает «Изменить», меняет файл в черновике — у студента прежний файл. Заметки — `aidlc-docs/construction/syllabus-file/замечания.md`; правки — тому же агенту, проверка — только правок.
+**Блок приёмки (владелец).** Координатор сам смотрит 1–2 скриншота, затем поднимает `journal-dev-reset`, входит за владельца и даёт список «что посмотреть»: (1) `teacher1` прикрепляет PDF на «Титуле», заменяет на Word, убирает; (2) отправляет без «Цели курса» — окно «Не заполнено: Цель и результаты, … Отправить всё равно?»; (3) `dean` открывает версию на утверждении, скачивает файл, утверждает; (4) студент `S1001` во второй вкладке на `127.0.0.1:5273` видит «Скачать силлабус (PDF)» и открывает его; (5) `teacher1` нажимает «Изменить», меняет файл в черновике — у студента прежний файл. Заметки — `aidlc-docs/construction/syllabus-file/замечания.md`; правки — тому же агенту, проверка — только правок.
 
 ---
 
 ### Task 5 (координатор и владелец): общая проверка, выкладка
 
-- [ ] Общая проверка (opus, строгая): `git diff bda6d52..HEAD`, пробные скрипты против настоящего кода по разделу Review Focus; находки — в `.superpowers/sdd/plan-syllabus-file/final-review-findings.md` (координатор сохраняет сам), копия — `aidlc-docs/construction/syllabus-file/sdd/final-review-findings.md`.
+- [ ] Общая проверка (opus, строгая): `git diff 454d0f7..HEAD`, пробные скрипты против настоящего кода по разделу Review Focus; находки — в `.superpowers/sdd/plan-syllabus-file/final-review-findings.md` (координатор сохраняет сам), копия — `aidlc-docs/construction/syllabus-file/sdd/final-review-findings.md`.
 - [ ] Одна волна исправлений одним агентом, повторная проверка тем же проверяющим (только правок); `npm test`, `npm run build:gas`.
 - [ ] Решения плана — в таблицу решений `aidlc-state.md`; новые ключи `ky` — в список на вычитку; известное ограничение: «на Apps Script файла силлабуса нет; Word скачивается, не показывается».
 - [ ] Выкладка — **только по просьбе владельца**, порядок из `CLAUDE.md` («Обновление сервера»): сервер (колонка `syllabi.fileId` добавится при запуске сама), затем `git push` сайта; выложенный коммит — в `aidlc-state.md`. Проверка с телефона: студент скачивает PDF утверждённого силлабуса.
+- [ ] **Откат сервера на прежний коммит (72fb36b) — без нужды не делать.** Старая уборка считает живыми только `pending|attached` (`backend/node/files.js:62`) и удалит файлы силлабусов с диска как сирот (через час после запуска; уборка идёт при запуске и после копии — `backend/node/server.js:182-205`), строки «Файлов» останутся. Копии файлов лежат в `C:\JournalBackups\files` (зеркало пишется до уборки, `backend/node/backup.js:78`, и ничего не удаляет). При возврате вперёд — `serve:restore` последней копии или ручное копирование недостающих `.bin` из зеркала. Это записать в раздел «Выкладка» `aidlc-state.md` вместе с выложенным коммитом.
