@@ -7,7 +7,7 @@ import { REASON_MAX } from './scoring.js';
 export function markState(pair, now, scheme) {
   if (pair.status === 'cancelled') return 'cancelled';
   if (pair.status === 'missed') return 'missed';
-  if (now.date < pair.date || (now.date === pair.date && now.time < pair.startTime)) return 'future';
+  if (pair.status === 'planned' && (now.date < pair.date || (now.date === pair.date && now.time < pair.startTime))) return 'future';
   return now.date <= addDays(pair.date, scheme.editDays) ? 'open' : 'late';
 }
 

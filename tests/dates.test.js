@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { localDate, isDate, addDays, daysBetween, weekday, mondayOf, isTime, minutesOf, addMinutes } from '../core/dates.js';
+import { localDate, isDate, addDays, daysBetween, weekday, mondayOf, isTime, minutesOf, addMinutes, parseLocalDateTime, localDateTime } from '../core/dates.js';
 
 test('localDate: Bishkek midnight is 18:00 UTC of the day before', () => {
   assert.equal(localDate(Date.UTC(2026, 10, 20, 18, 0)), '2026-11-21');
@@ -29,4 +29,10 @@ test('localTime and localDateTime: Bishkek clock', async () => {
   const { localTime, localDateTime } = await import('../core/dates.js');
   assert.equal(localTime(Date.UTC(2026, 8, 7, 18, 30)), '00:30');
   assert.equal(localDateTime(Date.UTC(2026, 8, 7, 18, 30, 5)), '2026-09-08 00:30:05');
+});
+
+test('parseLocalDateTime: Bishkek date-time to UTC ms, or NaN', () => {
+  assert.equal(parseLocalDateTime('2026-09-08 00:30:05'), Date.UTC(2026, 8, 7, 18, 30, 5));
+  assert.equal(localDateTime(parseLocalDateTime('2026-09-22 07:55:10')), '2026-09-22 07:55:10');
+  for (const bad of ['', '2026-09-22', '2026-09-22 7:55:10', '2026-02-30 08:00:00', '2026-09-22T07:55:10', null, 5]) assert.ok(Number.isNaN(parseLocalDateTime(bad)), String(bad));
 });

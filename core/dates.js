@@ -58,3 +58,10 @@ export function localTime(ms) {
 export function localDateTime(ms) {
   return new Date(ms + TZ_OFFSET_MS).toISOString().slice(0, 19).replace('T', ' ');
 }
+
+// 'YYYY-MM-DD HH:MM:SS' in Bishkek to a timestamp (ms); NaN for anything else.
+export function parseLocalDateTime(text) {
+  if (typeof text !== 'string' || !/^\d{4}-\d{2}-\d{2} ([01]\d|2[0-3]):[0-5]\d:[0-5]\d$/.test(text)) return NaN;
+  if (!isDate(text.slice(0, 10))) return NaN;
+  return parseDate(text.slice(0, 10)) + (+text.slice(11, 13) * 3600 + +text.slice(14, 16) * 60 + +text.slice(17, 19)) * 1000 - TZ_OFFSET_MS;
+}

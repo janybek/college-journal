@@ -67,3 +67,8 @@ test('checkResultValue', () => {
   assert.deepEqual([checkResultValue('control', 40, S), checkResultValue('control', 41, S), checkResultValue('self', 20, S), checkResultValue('self', 21, S),
     checkResultValue('current', null, S), checkResultValue('control', '30', S), checkResultValue('control', 3.5, S)], [null, 'bad_value', null, 'bad_value', null, 'bad_value', 'bad_value']);
 });
+
+test('markState: the "future" check applies only to planned pairs', () => {
+  assert.equal(markState({ date: '2026-09-22', startTime: '08:00', status: 'running' }, { date: '2026-09-22', time: '07:55' }, S), 'open');
+  assert.equal(markState({ date: '2026-09-22', startTime: '08:00', status: 'planned' }, { date: '2026-09-22', time: '07:55' }, S), 'future');
+});
