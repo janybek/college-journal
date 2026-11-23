@@ -420,12 +420,12 @@ export function saveUnitResults(store, platform, data, user) {
 const LOG_LIMIT = 200;
 const LOG_LIMIT_MAX = 500;
 
-// 'journal.log': the change log, the newest first. A teacher reads only the log of his own subject.
+// 'journal.log': the change log, the newest first. Optional filters: subjectId, pairId, studentId, groupId (the group of the row's subject), from, to; they are applied before the limit. A teacher reads only the log of his own subject.
 export function changeLogView(store, platform, data, user) {
   const viewer = viewerOf(user);
   if (!viewer.manager && !viewer.reader && !viewer.teacher) throw new AppError('forbidden');
   const given = (key) => data[key] !== undefined && data[key] !== null;
-  for (const key of ['subjectId', 'pairId', 'studentId']) if (given(key) && typeof data[key] !== 'string') throw new AppError('bad_request');
+  for (const key of ['subjectId', 'pairId', 'studentId', 'groupId']) if (given(key) && typeof data[key] !== 'string') throw new AppError('bad_request');
   for (const key of ['from', 'to']) if (given(key) && !isDate(data[key])) throw new AppError('bad_request');
   if (given('limit') && !(Number.isInteger(data.limit) && data.limit >= 1 && data.limit <= LOG_LIMIT_MAX)) throw new AppError('bad_request');
   const limit = given('limit') ? data.limit : LOG_LIMIT;
@@ -453,6 +453,7 @@ export function changeLogView(store, platform, data, user) {
     if (given('subjectId') && r.subjectId !== data.subjectId) return false;
     if (given('pairId') && r.pairId !== data.pairId) return false;
     if (given('studentId') && r.studentId !== data.studentId) return false;
+    if (given('groupId') && (subjectOf.get(r.subjectId) || {}).groupId !== data.groupId) return false;
     const day = String(r.at || '').slice(0, 10);
     if (given('from') && day < data.from) return false;
     if (given('to') && day > data.to) return false;
