@@ -98,3 +98,4 @@ Task 10: complete (commits 6c3fd32..fcb6a58, review clean)
 - Task 11: fix round 1/5 (2 addressed, 0 open — очередь загрузки и сессия, «Убрать» при busy; commits 9c9d5c7..a49abbd). Повторная проверка: ADDRESSED, новых поломок нет. Проба scratchpad\task11-probes\token-swap2.mjs.
 Task 11: complete (commits 459bde4..a49abbd, review clean)
 - 23.11.2026 Блок 2 (задача 11) собран, 893 теста. Стоп: приёмка владельцем. На стенде возвращённое «Эссе» — у S1004 (у S1001 оно проверено 8 из 10).
+- 23.11.2026 Блок 2 принят владельцем («Принимаю блок 2»), без замечаний.
