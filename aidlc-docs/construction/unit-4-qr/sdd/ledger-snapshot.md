@@ -71,3 +71,5 @@ Task 11: complete (commits 1acc51c..2d0860b, review clean)
 - Task 12: fix round 1/5 (2 addressed, 0 open — false 'marked' on already+absent; generation counter; commits 7686178..be0c033). Re-review: no new breakage. out-of-scope (deferred → final review): a QR pass exchanged on a shared tab stays in sessionStorage by pairId and goes to whoever opens #/here first (device-bound, short-lived).
 Task 12: complete (commits f9b08b9..be0c033, review clean after 1 fix round; 4 minors deferred)
 - BLOCK 2 STOP: coordinator raises journal-dev-lesson; teacher1 on localhost:5273, student S1001 on 127.0.0.1:5273 (separate storage = separate phone).
+- OWNER 23.11: block 2 ACCEPTED («Принимаю блок 2»). QR read by phone still not confirmed — checked at task 13 step 6 (live site, mobile internet).
+- Coordinator stand stopped. Task 13 step 1: final review (journal-reviewer, opus) over 34ea381..HEAD with deferred list final-review-deferred.md.
