@@ -7,6 +7,7 @@ import { seedDemo } from '../../dev/seed.js';
 import { openBase } from './base.js';
 import { verifyCopy } from './backup.js';
 import { isOurSupervisor, answers } from './supervisor.js';
+import { FILES_DIR, createDiskFiles, mirrorFiles } from './files.js';
 
 // The demo data of the working base: the fictional people and data of the stand, with Cyrillic names and one random password
 // that goes only into a file in the alert folder. Node only: this file is not bundled for Apps Script.
@@ -119,6 +120,15 @@ export async function runDemo(config, { out = console.log, now, logger, wipe = f
       out(`Копия базы не сделана (${String(error?.message || error).replace(/[\r\n]+/g, ' ')}): ничего не изменено`);
       return { code: DEMO_EXIT.crash };
     }
+    // the wipe leaves the files of the erased rows on the disk for the sweep: the mirror keeps them before that
+    if (wipe && config.filesDir) {
+      try {
+        mirrorFiles(config.filesDir, path.join(config.backupDir, FILES_DIR));
+      } catch (error) {
+        out(`Копия файлов не сделана (${String(error?.message || error).replace(/[\r\n]+/g, ' ')}): ничего не изменено`);
+        return { code: DEMO_EXIT.crash };
+      }
+    }
     // two temporary passwords in a row: 16 letters and digits
     const password = `${generateTempPassword(base.platform)}-${generateTempPassword(base.platform)}`;
     try {
@@ -133,7 +143,7 @@ export async function runDemo(config, { out = console.log, now, logger, wipe = f
     let erased = [];
     const ok = base.store.transaction(() => {
       if (wipe) erased = wipeBase(base.db);
-      const done = seedDemo(base.store, base.platform, { password });
+      const done = seedDemo(base.store, base.platform, { password, files: config.filesDir ? createDiskFiles(config.filesDir) : null });
       if (wipe && !done) throw new Error('the demo data are not added after the wipe');       // rolls the wipe back too
       return done;
     });

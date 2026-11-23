@@ -56,7 +56,9 @@ test('--demo on an empty base: the administrator is kept, 5 staff and 66 student
   assert.equal(log.includes(password), false);
   assert.match(log, /demo data added/);
   base.close();
-  for (const name of fs.readdirSync(config.dataDir)) assert.equal(fs.readFileSync(path.join(config.dataDir, name)).includes(password), false, name);
+  for (const entry of fs.readdirSync(config.dataDir, { recursive: true, withFileTypes: true })) {
+    if (entry.isFile()) assert.equal(fs.readFileSync(path.join(entry.parentPath, entry.name)).includes(password), false, entry.name);
+  }
   assert.match(fs.readFileSync(passwordFile(config), 'utf8'), /удалите файл после очистки базы/);
 });
 
@@ -257,4 +259,24 @@ test('the real process: node server.js --demo --wipe ends with 0', async (t) => 
   assert.equal(result.code, 0, result.text);
   assert.match(result.text, /Пробные данные залиты/);
   assert.equal(result.text.includes(passwordOf(config)), false);
+});
+
+test('--demo: the assignments, their works and one picture come with the people; --wipe erases them with everything else and keeps the old picture in the mirror', async (t) => {
+  const config = emptyBase(t);
+  assert.equal((await run(config, [])).code, EXIT.ok);
+  const first = open(t, config);
+  assert.deepEqual([first.store.list('assignments').length, first.store.list('submissions').length, first.store.list('files').length], [3, 7, 1]);
+  const logRows = first.store.list('changeLog').length;
+  const oldName = first.store.list('files')[0].stored;
+  first.close();
+  assert.deepEqual(fs.readdirSync(config.filesDir), [oldName]);
+  fs.rmSync(passwordFile(config));
+  assert.equal((await runWipe(config, [])).code, EXIT.ok);
+  const second = open(t, config);
+  assert.deepEqual([second.store.list('assignments').length, second.store.list('submissions').length, second.store.list('files').length, second.store.list('changeLog').length], [3, 7, 1, logRows]);
+  const newName = second.store.list('files')[0].stored;
+  second.close();
+  assert.notEqual(newName, oldName);
+  assert.equal(fs.existsSync(path.join(config.backupDir, 'files', oldName)), true);
+  assert.equal(fs.existsSync(path.join(config.filesDir, newName)), true);
 });

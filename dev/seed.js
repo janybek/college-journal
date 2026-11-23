@@ -1,5 +1,5 @@
 import { hashPassword } from '../core/auth.js';
-import { addDays, addMinutes, localDate, localTime, minutesOf, mondayOf } from '../core/dates.js';
+import { addDays, addMinutes, localDate, localTime, minutesOf, mondayOf, parseLocalDateTime } from '../core/dates.js';
 import { DEFAULT_BELLS, settingsToRows } from '../core/settings.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { generateSchedule, relayout, todayOf } from '../backend/scheduleData.js';
@@ -7,6 +7,11 @@ import { publishSyllabusDoc, uploadSyllabus } from '../backend/syllabusUpload.js
 import { draftForm, saveSection, startDraft } from '../backend/syllabusDraft.js';
 import { journalView, readJournalRows, savePairMarks, saveUnitResults, writeMarks } from '../backend/journalData.js';
 import { approveSyllabus, returnSyllabus, submitSyllabus } from '../backend/syllabusFlow.js';
+import { saveAssignment } from '../backend/workData.js';
+import { submitWork } from '../backend/workStudent.js';
+import { uploadFile } from '../backend/workFiles.js';
+import { gradeWork } from '../backend/workGrade.js';
+import { currentAttempt } from '../core/work.js';
 
 // One password for every fictional person of the dev stand.
 export const DEV_PASSWORD = 'journal2026';
@@ -181,7 +186,7 @@ function seedSyllabi(store, platform, subjects, teacherName, adminRow) {
 
 // The common filling: groups, students, disciplines, subjects, the week, syllabi, pairs. The staff of the stand
 // (everyone except the administrator) is made here; the administrator is made by the caller or already is in the store.
-function fill(store, platform, { passwordHash, names, studentsMustChange, admin }) {
+function fill(store, platform, { passwordHash, names, studentsMustChange, admin, files }) {
   const common = { passwordHash, mustChangePassword: false, active: true };
   const staff = STAFF.filter((person) => person.login !== 'admin')
     .map((person) => store.insert('staff', { ...person, fullName: names.staff[person.login], ...common, lang: 'ru' }));
@@ -228,26 +233,27 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin 
   seedSyllabi(store, platform, subjects, teacher1.fullName, admin);
   seedPairs(store, platform);
   seedMarks(store, platform);
+  seedWork(store, platform, files);
 }
 
 // Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
-export function seed(store, platform) {
+export function seed(store, platform, files = null) {
   if (store.list('staff').length > 0) return;
   // The stored hash carries its own salt, so one hash serves every person.
   const passwordHash = hashPassword(platform, DEV_PASSWORD);
   const admin = store.insert('staff', { ...STAFF[0], passwordHash, mustChangePassword: false, active: true, lang: 'ru' });
-  fill(store, platform, { passwordHash, names: NAMES.latin, studentsMustChange: true, admin });
+  fill(store, platform, { passwordHash, names: NAMES.latin, studentsMustChange: true, admin, files });
 }
 
 // The demo data for the working base (Cyrillic names, one password given by the caller): the same data set as the stand, but on a base
 // that already has its administrator. The administrator is not touched: no password, no roles, no name. Everything is one transaction
 // when the store has them. Does nothing but refuse (returns false) when the store has anyone besides one administrator.
-export function seedDemo(store, platform, { password }) {
+export function seedDemo(store, platform, { password, files = null }) {
   const staff = store.list('staff');
   const admin = staff.find((person) => person.login === 'admin');
   if (!admin || staff.length !== 1 || !String(admin.roles).split(',').includes('admin')) return false;
   const passwordHash = hashPassword(platform, password);
-  const run = () => fill(store, platform, { passwordHash, names: NAMES.cyrillic, studentsMustChange: false, admin });
+  const run = () => fill(store, platform, { passwordHash, names: NAMES.cyrillic, studentsMustChange: false, admin, files });
   if (typeof store.transaction === 'function') store.transaction(run);
   else run();
   return true;
@@ -350,6 +356,95 @@ function seedMarks(store, platform) {
   const view = journalView(readJournalRows(store), platform, first.id, teacher1);
   const calculated = view.results[group1[3].id].units[0].current;
   saveUnitResults(store, platform, { subjectId: first.id, unit: 1, field: 'current', items: [{ studentId: group1[3].id, value: Math.min(40, calculated + 2) }], reason: 'Участие в олимпиаде' }, teacher1);
+}
+
+// A small PNG built here (a blue field with a lighter diamond, 48 x 32): no file from outside, no photo of a person.
+function crc32(bytes) {
+  let c = 0xffffffff;
+  for (const b of bytes) {
+    c ^= b;
+    for (let k = 0; k < 8; k++) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return (c ^ 0xffffffff) >>> 0;
+}
+
+export function samplePng() {
+  const w = 48;
+  const h = 32;
+  const raw = [];
+  for (let y = 0; y < h; y++) {
+    raw.push(0);
+    for (let x = 0; x < w; x++) {
+      const inside = Math.abs(x - w / 2) / (w / 2) + Math.abs(y - h / 2) / (h / 2) < 0.8;
+      raw.push(...(inside ? [150, 190, 255] : [30, 70 + y, 160]));
+    }
+  }
+  let a = 1;
+  let b = 0;
+  for (const v of raw) {
+    a = (a + v) % 65521;
+    b = (b + a) % 65521;
+  }
+  const be = (n) => [(n >>> 24) & 255, (n >>> 16) & 255, (n >>> 8) & 255, n & 255];
+  const len = raw.length;
+  // zlib: the header, one stored block, the Adler-32 sum
+  const zlib = [0x78, 0x01, 0x01, len & 255, len >> 8, ~len & 255, (~len >> 8) & 255, ...raw, ...be(((b << 16) | a) >>> 0)];
+  const chunk = (type, data) => {
+    const body = [...type].map((ch) => ch.charCodeAt(0)).concat(data);
+    return [...be(data.length), ...body, ...be(crc32(body))];
+  };
+  return Uint8Array.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a,
+    ...chunk('IHDR', [...be(w), ...be(h), 8, 2, 0, 0, 0]), ...chunk('IDAT', zlib), ...chunk('IEND', [])]);
+}
+
+// The assignments of the stand (fictional): «Информатика» 01-1 of teacher1, unit 2 of the syllabus in force. Written through the very functions
+// the requests use, each at its own moment of the past (a clock that says the given date and time), so the rows, the late mark and the
+// change log are what the live requests would have made.
+//   «Эссе по теме юнита» (СРС, 10, due 5 days ago): 3 checked (8, 10, 6; the last one late), 1 returned with a remark, 1 not handed in;
+//   «Презентация» (СРС, 20, due in 5 days): 2 handed in and waiting, one with the picture when a box is given;
+//   «Задачи 1–5» (ДЗ, 5, due in 2 days): 1 handed in as text.
+export function seedWork(store, platform, files = null) {
+  const group = store.list('groups').find((g) => g.name === '01-1');
+  const teacherRow = store.list('staff').find((p) => p.login === 'teacher1');
+  const subject = group && teacherRow && store.list('subjects').find((s) => s.name === 'Информатика' && s.groupId === group.id && s.teacherId === teacherRow.id);
+  if (!subject) throw new Error('seed: no «Информатика» of teacher1 in 01-1 for the assignments');
+  const today = todayOf(platform);
+  const clock = (days, time) => {
+    const ms = parseLocalDateTime(`${addDays(today, days)} ${time}:00`);
+    return Object.assign(Object.create(platform), { now: () => ms });
+  };
+  const teacher = { id: teacherRow.id, roles: String(teacherRow.roles).split(','), kind: 'staff', row: teacherRow };
+  const [s1, s2, s3, s4] = store.list('students').filter((s) => s.groupId === group.id).sort((x, y) => x.cardNo.localeCompare(y.cardNo)).slice(0, 5)
+    .map((row) => ({ id: row.id, roles: ['student'], kind: 'student', row }));
+
+  const give = (data) => saveAssignment(store, clock(-10, '09:00'), { subjectId: subject.id, unit: 2, topicId: '', ...data }, teacher).assignment.id;
+  const essay = give({ kind: 'srs', title: 'Эссе по теме юнита', description: 'Эссе на одну страницу: как электронные таблицы помогают в работе медсестры.', dueDate: addDays(today, -5), dueTime: '23:59', maxPoints: 10 });
+  const slides = give({ kind: 'srs', title: 'Презентация', description: 'Презентация из пяти слайдов по теме юнита.', dueDate: addDays(today, 5), dueTime: '23:59', maxPoints: 20 });
+  const tasks = give({ kind: 'hw', title: 'Задачи 1–5', description: 'Решите задачи 1–5 из рабочей тетради.', dueDate: addDays(today, 2), dueTime: '23:59', maxPoints: 5 });
+
+  const hand = (at, student, assignmentId, text, fileIds = []) => submitWork(store, at, { assignmentId, text, fileIds }, student);
+  hand(clock(-6, '11:00'), s1, essay, 'Электронные таблицы помогают считать дозы и вести учёт назначений.');
+  hand(clock(-5, '20:00'), s2, essay, 'Таблица с формулами экономит время и снижает риск ошибки в расчётах.');
+  hand(clock(-4, '09:30'), s3, essay, 'Сдаю позже срока: перепроверял расчёты примеров.');
+  hand(clock(-6, '15:00'), s4, essay, 'Таблицы нужны для учёта.');
+
+  const grade = (student, assignmentId, data) => {
+    const attempt = currentAttempt(store.list('submissions').filter((r) => r.assignmentId === assignmentId && r.studentId === student.id));
+    return gradeWork(store, clock(-3, '10:00'), { assignmentId, studentId: student.id, attemptId: attempt.id, ...data }, teacher);
+  };
+  grade(s1, essay, { verdict: 'checked', points: 8, comment: 'Хорошо, добавьте пример формулы.' });
+  grade(s2, essay, { verdict: 'checked', points: 10, comment: '' });
+  grade(s3, essay, { verdict: 'checked', points: 6, comment: 'Сдано позже срока.' });
+  grade(s4, essay, { verdict: 'returned', points: null, comment: 'Слишком коротко: раскройте тему и перепишите.' });
+
+  let fileIds = [];
+  if (files) {
+    const picture = uploadFile(store, clock(-1, '14:00'), files, { assignmentId: slides, name: 'slide-1.png', data: files.encode(samplePng()) }, s1);
+    fileIds = [picture.file.id];
+  }
+  hand(clock(-1, '14:05'), s1, slides, files ? 'Презентация, первый слайд с картинкой во вложении.' : 'Презентация готова: пять слайдов, ссылка на файл будет у преподавателя.', fileIds);
+  hand(clock(-1, '15:00'), s2, slides, 'Презентация о защите данных пациентов, пять слайдов.');
+  hand(clock(-1, '16:00'), s2, tasks, 'Задачи 1–3 решены, 4 и 5 в тетради.');
 }
 
 // The stand of the QR screens: puts a pair of «Информатика» of 01-1 (teacher1) on the current time, so the screens can be tried at any hour.

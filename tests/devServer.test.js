@@ -433,3 +433,17 @@ test('the stand keeps its box beside the data file (files for the fictional, rea
     assert.deepEqual([path.dirname(srv.filesDir), path.basename(srv.filesDir), fs.existsSync(orphan)], [path.dirname(dataFile), folder, false], mode);
   }
 });
+
+test('a fresh fictional stand has the assignments of «Информатика» 01-1 and one picture in its box; the real one has neither', async (t) => {
+  for (const mode of ['demo', 'real']) {
+    const { dataFile, siteDir } = tempDirs(t);
+    const { srv } = await start(t, { dataFile, siteDir, mode });
+    const saved = createFileStore(SCHEMA, createNodePlatform(), dataFile);
+    const names = fs.existsSync(srv.filesDir) ? fs.readdirSync(srv.filesDir) : [];
+    if (mode === 'demo') {
+      assert.deepEqual([saved.list('assignments').length, saved.list('files').map((f) => f.stored)], [3, names], mode);
+    } else {
+      assert.deepEqual([saved.list('assignments').length, saved.list('files').length, names.length], [0, 0, 0], mode);
+    }
+  }
+});
