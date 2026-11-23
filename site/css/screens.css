@@ -7469,3 +7469,16 @@ a.gr-card:hover { border-color: var(--primary-line); }
 
 .student .attempt__text--none,
 .student .attempt__checked { font-size: 1rem; }
+
+/* Task 12: self-work counted by assignments in the journal, the grades button, the filters of the office list */
+.jg-unit-head__tag { color: var(--text-muted); font-size: 0.6875rem; font-weight: 500; }
+.jg-unit-head__tasks { display: block; margin-top: 2px; color: var(--primary-ink); font-size: 0.75rem; font-weight: 500; text-decoration: underline; text-underline-offset: 2px; }
+.jg-unit-head__tasks:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: 2px; }
+.jg-self { line-height: 1.2; }
+.jg-self__value,
+.jg-self__tag { display: block; }
+.jg-self__tag { color: var(--text-muted); font-size: 0.6875rem; font-weight: 500; }
+.journal-grid .jg-pts.is-provisional .jg-self__value { color: var(--text-muted); font-style: italic; }
+.gr-tasks { justify-self: stretch; min-height: 2.75rem; }
+.tasks-filter__empty { color: var(--text-muted); }
+.tasks-toolbar { align-items: flex-end; }

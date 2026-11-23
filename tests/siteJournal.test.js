@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, selfCell, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -310,4 +310,38 @@ test('viewColumns: missed and cancelled pairs stay in view; a partial journal sh
   assert.deepEqual(ids(viewColumns(J2, { mode: 'day', day: '2026-11-18' }).pairs), ['m', 'n']);
   assert.deepEqual(viewColumns({ ...VJ, partial: true, units: [] }, { mode: 'week', week: '2026-11-16' }).columns.map(name), ['b', 'c', 'd']);
   assert.deepEqual(viewColumns({ partial: false, units: [], pairs: [] }, { mode: 'all' }).columns.map(name), ['absences', 'percent', 'preliminary']);
+});
+
+test('selfCell: self-work of a unit without assignments stays as it was; by assignments it is counted by them, or provisional', () => {
+  assert.deepEqual(selfCell({ unit: 1, self: 12 }), { value: 12, key: null, params: {} });
+  assert.deepEqual(selfCell({ unit: 1, self: null }), { value: null, key: null, params: {} });
+  assert.deepEqual(selfCell({ unit: 2, self: 15, selfWork: { earned: 15, max: 20, pending: 0, value: 15 } }), { value: 15, key: 'journal.self.byWork', params: {} });
+  assert.deepEqual(selfCell({ unit: 2, self: null, selfWork: { earned: 5, max: 20, pending: 2, value: 5 } }), { value: 5, key: 'journal.self.pending', params: { n: 2 } });
+  assert.deepEqual(selfCell({ unit: 2, self: null, selfWork: { earned: 0, max: 0, pending: 0, value: null } }), { value: null, key: 'journal.self.byWork', params: {} });
+  assert.deepEqual(selfCell(null), { value: null, key: null, params: {} });
+});
+
+test('logLine: the lines of assignments (points, status, maximum, deadline) and the old mark line stays', () => {
+  const row = { entity: 'work', assignmentTitle: 'СРС А' };
+  assert.deepEqual(logLine({ ...row, field: 'points', before: '8', after: '9' }), { key: 'journal.log.work.points', params: { title: 'СРС А', before: '8', after: '9' }, keyParams: [] });
+  assert.deepEqual(logLine({ ...row, field: 'points', before: '', after: '8' }).params, { title: 'СРС А', before: '—', after: '8' });
+  assert.deepEqual(logLine({ ...row, field: 'status', before: 'submitted', after: 'checked' }),
+    { key: 'journal.log.work.status', params: { title: 'СРС А', before: 'work.state.submitted', after: 'work.state.checked' }, keyParams: ['before', 'after'] });
+  assert.deepEqual(logLine({ ...row, field: 'status', before: '', after: 'checked' }).params, { title: 'СРС А', before: '—', after: 'work.state.checked' });
+  assert.deepEqual(logLine({ ...row, field: 'maxPoints', before: '20', after: '15' }), { key: 'journal.log.work.maxPoints', params: { title: 'СРС А', before: '20', after: '15' }, keyParams: [] });
+  assert.deepEqual(logLine({ ...row, field: 'dueAt', before: '2026-09-27 23:59:00', after: '2026-10-04 23:59:00' }),
+    { key: 'journal.log.work.dueAt', params: { title: 'СРС А', before: '27.09.2026 23:59', after: '04.10.2026 23:59' }, keyParams: [] });
+  assert.equal(logLine({ ...row, assignmentTitle: '', field: 'points', before: '1', after: '2' }).params.title, '—');
+  assert.equal(logLine({ ...row, field: 'weird', before: 'a', after: 'b' }).key, 'journal.log.other');
+  assert.deepEqual(logLine({ entity: 'mark', field: 'status', before: 'absent', after: 'madeup' }).key, 'journal.log.mark.status');
+});
+
+test('unitLine: a unit with self-work by assignments says so, and says «provisional» while some assignments wait', () => {
+  const done = unitLine({ current: 20, self: 15, control: 25, total: 60, selfWork: { earned: 15, max: 20, pending: 0, value: 15 } });
+  assert.deepEqual(done.parts.map((p) => p.key), ['grades.unit.part.current', 'grades.unit.part.selfByWork', 'grades.unit.part.control', 'grades.unit.part.total']);
+  assert.equal(done.parts[1].params.self, 15);
+  const wait = unitLine({ current: 20, self: null, control: null, total: null, selfWork: { earned: 5, max: 20, pending: 1, value: 5 } });
+  assert.deepEqual(wait.parts.map((p) => p.key), ['grades.unit.part.current', 'grades.unit.part.selfPending']);
+  assert.deepEqual(wait.parts[1].params, { self: 5, n: 1 });
+  assert.equal(unitLine({ current: 1, self: 2, control: 3, total: 6 }).key, 'grades.unit.full');
 });

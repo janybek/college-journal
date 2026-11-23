@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FILE_MIME, mimeOf, viewWay, downloadName, sizeText, dueText, stateView, kindOfName, defaultDue, formProblems, gradeDraft, gradeNeedsReason, base64ToBytes, homeCardLines, pickProblem, uploadErrorCode, uploadErrorKey, dueOfWork, dueDateText, mayStillSend } from '../site/js/work.js';
+import { FILE_MIME, mimeOf, viewWay, downloadName, sizeText, dueText, stateView, kindOfName, defaultDue, formProblems, gradeDraft, gradeNeedsReason, base64ToBytes, homeCardLines, pickProblem, uploadErrorCode, uploadErrorKey, dueOfWork, dueDateText, mayStillSend, staffMay, overviewRows, overviewGroups } from '../site/js/work.js';
 import { fitSize, photoName } from '../site/js/photo.js';
 import { kindByName, FILE_KINDS } from '../core/files.js';
 
@@ -147,4 +147,28 @@ test('a queued upload is sent only on its own screen and under the token of the 
   assert.equal(mayStillSend(true, 'tok-a', 'tok-b'), false);    // another student signed in
   assert.equal(mayStillSend(true, 'tok-a', null), false);       // the session ended (unauthorized)
   assert.equal(mayStillSend(true, null, null), false);
+});
+
+test('the office reads, a teacher in the teacher role changes: the buttons follow the active role', () => {
+  assert.deepEqual(staffMay({ manage: true, grade: true }, 'teacher'), { manage: true, grade: true });
+  assert.deepEqual(staffMay({ manage: true, grade: true }, 'dean'), { manage: false, grade: false });
+  assert.deepEqual(staffMay({ manage: true, grade: true }, 'admin'), { manage: false, grade: false });
+  assert.deepEqual(staffMay({ manage: false, grade: false }, 'teacher'), { manage: false, grade: false });
+  assert.deepEqual(staffMay(undefined, 'teacher'), { manage: false, grade: false });
+});
+
+test('overviewRows: a teacher role sees only the own subjects; the office all; a group and a search narrow them', () => {
+  const list = [
+    { subjectId: 'a', name: 'Информатика', groupName: '01-1', teacherName: 'Иванова Н.', own: true },
+    { subjectId: 'b', name: 'Анатомия', groupName: '01-1', teacherName: 'Петров А.', own: false },
+    { subjectId: 'c', name: 'Информатика', groupName: '02-1', teacherName: 'Петров А.', own: false },
+  ];
+  const ids = (rows) => rows.map((r) => r.subjectId);
+  assert.deepEqual(ids(overviewRows(list, { role: 'teacher' })), ['a']);
+  assert.deepEqual(ids(overviewRows(list, { role: 'dean' })), ['a', 'b', 'c']);
+  assert.deepEqual(ids(overviewRows(list, { role: 'prorector', group: '02-1' })), ['c']);
+  assert.deepEqual(ids(overviewRows(list, { role: 'dean', query: ' информ ' })), ['a', 'c']);
+  assert.deepEqual(ids(overviewRows(list, { role: 'dean', query: 'петров', group: '01-1' })), ['b']);
+  assert.deepEqual(ids(overviewRows(undefined, { role: 'dean' })), []);
+  assert.deepEqual(overviewGroups(list), ['01-1', '02-1']);
 });

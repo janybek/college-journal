@@ -3,7 +3,7 @@ import { t } from '../i18n.js';
 import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '../ui.js';
 import {
   cellView, pairHead, canMark, pairHint, pairActions, VIEWS, DEFAULT_VIEW, addDays, isoWeekday, weekRange, pairDates,
-  nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns,
+  nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, selfCell,
 } from '../journal.js';
 import { openMarksDialog, openPairActionDialog } from './journalPair.js';
 import { openCellDialog } from './journalCell.js';
@@ -336,7 +336,8 @@ function head(column, journal) {
     const label = t('journal.col.' + column.field);
     const unit = journal.units.find((u) => u.unit === column.unit);
     const max = { current: journal.scheme.current, self: journal.scheme.self, control: journal.scheme.control, total: 100 }[column.field];
-    const open = journal.can.results && (column.field === 'control' || column.field === 'self');
+    const byWork = column.field === 'self' && !!unit && unit.byWork === true;
+    const open = journal.can.results && !byWork && (column.field === 'control' || column.field === 'self');
     return el('th', { scope: 'col', class: `jg-unit-head jg-unit-head--${column.field}${open ? ' is-open' : ''}`, tabindex: open ? null : '0' },
       open ? el('button', {
         type: 'button', class: 'jg-open jg-unit-open', id: unitOpenId(column), 'aria-haspopup': 'dialog',
@@ -345,7 +346,9 @@ function head(column, journal) {
       el('span', { class: 'jg-unit-head__unit' }, t('journal.col.unit', { n: column.unit })),
       el('span', { class: 'jg-unit-head__label' }, label),
       open ? el('span', { class: 'jg-unit-head__act', 'aria-hidden': 'true' }, icon('pencil')) : null,
-      tip([unit && unit.title ? unit.title + '. ' : '', t('journal.tip.' + column.field, { max })].join('')));
+      byWork ? el('span', { class: 'jg-unit-head__tag' }, t('journal.self.byWork')) : null,
+      byWork ? el('a', { class: 'jg-unit-head__tasks', id: 'journal-unit-tasks-' + column.unit, href: '#/tasks/' + encodeURIComponent(journal.subject.id) }, t('journal.self.tasks')) : null,
+      tip([unit && unit.title ? unit.title + '. ' : '', byWork ? t('journal.self.byWorkHint') : t('journal.tip.' + column.field, { max })].join('')));
   }
   const key = column.type === 'outside' ? 'journal.col.outside' : 'journal.col.' + column.field;
   const tipKey = column.type === 'outside' ? null : 'journal.tip.' + column.field;
@@ -547,10 +550,20 @@ function unitCell(field, row, scheme, journal, student) {
       }) : null,
       open ? el('span', { class: 'jg-pts__in' }, ...inner) : inner);
   }
-  if (field === 'self') return el('td', { class: 'jg-num jg-pts', title: t('journal.tip.self', { max: scheme.self }) }, pointText(row.self));
+  if (field === 'self') return selfTd(row, scheme);
   if (field === 'control') return el('td', { class: `jg-num jg-pts${row.controlLow ? ' is-low' : ''}`, title: t('journal.tip.control', { max: scheme.control }) }, pointText(row.control));
   const word = row.word ? ', ' + t('journal.grade.' + row.word) : '';
   return el('td', { class: `jg-num jg-pts jg-total${row.word === 'fail' ? ' is-low' : ''}`, title: t('journal.tip.total', { max: 100 }) + word }, pointText(row.total));
+}
+
+// The self-work cell: as entered, or counted by the assignments of the unit (the grey «предв.» while some are waiting).
+function selfTd(row, scheme) {
+  const cell = selfCell(row);
+  if (cell.key === null) return el('td', { class: 'jg-num jg-pts', title: t('journal.tip.self', { max: scheme.self }) }, pointText(cell.value));
+  const waiting = cell.key === 'journal.self.pending';
+  return el('td', { class: 'jg-num jg-pts jg-self' + (waiting ? ' is-provisional' : ''), title: waiting ? t(cell.key, cell.params) : t('journal.self.byWorkHint') },
+    el('span', { class: 'jg-self__value' }, pointText(cell.value)),
+    el('span', { class: 'jg-self__tag' }, t(waiting ? 'journal.self.provisional' : 'journal.self.byWork')));
 }
 
 const cellId = (pair, student) => `journal-cell-${pair.id}-${student.id}`;

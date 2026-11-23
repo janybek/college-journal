@@ -1,9 +1,10 @@
 import { call } from '../api.js';
 import { getUser } from '../session.js';
 import { t } from '../i18n.js';
-import { el, errorKey, avatarTone, badge, emptyState, pageHeader, note, iconButton, refresh } from '../ui.js';
+import { el, errorKey, avatarTone, badge, emptyState, pageHeader, note, iconButton, refresh, selectField, searchField } from '../ui.js';
 import { icon } from '../icons.js';
-import { dueText, dueOfWork, stateView } from '../work.js';
+import { dueText, dueOfWork, stateView, staffMay, overviewRows, overviewGroups } from '../work.js';
+import { activeRole } from '../shell.js';
 import { openTaskForm, confirmDialog } from './taskForm.js';
 
 // «Задания» (#/tasks): the subjects whose assignments the person sees (work.overview), and #/tasks/<subjectId>: the
@@ -11,7 +12,7 @@ import { openTaskForm, confirmDialog } from './taskForm.js';
 // (the buttons follow `can.manage` of the answer); the office only reads. A student's list comes with its own task.
 
 const blank = () => ({
-  subjectId: null, data: null, loading: false, loadErrorKey: null, ticket: 0, showPast: false, status: null, fresh: null,
+  subjectId: null, data: null, loading: false, loadErrorKey: null, ticket: 0, showPast: false, status: null, fresh: null, group: '', query: '',
 });
 let state = blank();
 
@@ -22,6 +23,9 @@ export function leave() {
   state = blank();
   mine = blankMine();
 }
+
+// What the person may do on a subject now: only in the role «teacher» (the office reads, even when it is also a teacher).
+const may = () => staffMay(state.data.can, activeRole(getUser()));
 
 const isStudent = () => {
   const permissions = getUser()?.permissions;
@@ -38,10 +42,10 @@ export function render(root, params) {
     subjectId === null
       ? pageHeader({ id: 'tasks-title', title: t('tasks.title'), lead: t('tasks.lead') })
       : pageHeader({
-        id: 'tasks-title', title: subject ? subject.name + ' · ' + subject.groupName : t('tasks.title'), lead: subject && !state.data.can.manage ? subject.teacherName : null,
+        id: 'tasks-title', title: subject ? subject.name + ' · ' + subject.groupName : t('tasks.title'), lead: subject && !may().manage ? subject.teacherName : null,
         actions: [
           el('a', { class: 'button button--secondary', id: 'tasks-back', href: '#/tasks' }, t('tasks.back')),
-          state.data && state.data.can.manage ? el('button', { type: 'button', class: 'button button--primary', id: 'tasks-new', onclick: () => giveNew() }, icon('plus'), t('tasks.new')) : null,
+          state.data && may().manage ? el('button', { type: 'button', class: 'button button--primary', id: 'tasks-new', onclick: () => giveNew() }, icon('plus'), t('tasks.new')) : null,
         ],
       }),
     state.status ? note('success', t(state.status), { id: 'tasks-status', role: 'status' }) : null,
@@ -95,8 +99,33 @@ function loadingBody() {
 // ---- The subjects ----
 
 function overview() {
-  const subjects = state.data.subjects;
-  if (subjects.length === 0) return emptyState('clipboard', el('p', { class: 'empty__title', id: 'tasks-empty' }, t('tasks.empty')));
+  const role = activeRole(getUser());
+  const all = state.data.subjects;
+  const office = role !== 'teacher';
+  const host = el('div', { class: 'task-subjects-host' });
+  const paint = () => {
+    const rows = overviewRows(all, { role, group: state.group, query: state.query });
+    if (rows.length === 0) {
+      const none = all.length === 0 || (role === 'teacher' && !all.some((s) => s.own === true));
+      host.replaceChildren(emptyState('clipboard', el('p', { class: 'empty__title', id: 'tasks-empty' }, t(none ? (office ? 'tasks.emptyOffice' : 'tasks.empty') : 'tasks.noMatch'))));
+      return;
+    }
+    host.replaceChildren(subjectList(rows));
+  };
+  paint();
+  if (!office) return host;
+  const groups = overviewGroups(all);
+  return el('div', { class: 'tasks-office' },
+    el('div', { class: 'toolbar tasks-toolbar' },
+      selectField({
+        id: 'tasks-group', label: t('tasks.filter.group'), value: state.group, placeholder: t('tasks.filter.allGroups'),
+        options: groups.map((name) => ({ value: name, label: name })), onChange: (value) => { state.group = value; paint(); },
+      }),
+      searchField({ id: 'tasks-search', label: t('tasks.filter.search'), value: state.query, onInput: (value) => { state.query = value; paint(); } })),
+    host);
+}
+
+function subjectList(subjects) {
   return el('ul', { class: 'task-subjects', 'aria-labelledby': 'tasks-title' }, subjects.map((s) => el('li', { class: 'task-subjects__item' },
     el('a', { class: 'task-subject', id: 'tasks-open-' + s.subjectId, href: '#/tasks/' + encodeURIComponent(s.subjectId), 'data-tone': avatarTone(s.name) },
       el('span', { class: 'task-subject__top' },
@@ -116,9 +145,9 @@ function subjectBody() {
   const current = data.assignments.filter((a) => a.current);
   const past = data.assignments.filter((a) => !a.current);
   const parts = [];
-  if (data.can.manage && !data.subject.hasSyllabus) parts.push(note('info', t('tasks.noSyllabus'), { id: 'tasks-no-syllabus' }));
+  if (may().manage && !data.subject.hasSyllabus) parts.push(note('info', t('tasks.noSyllabus'), { id: 'tasks-no-syllabus' }));
   if (current.length === 0) {
-    parts.push(emptyState('clipboard', el('p', { class: 'empty__title', id: 'tasks-none' }, t(data.can.manage ? 'tasks.noneManage' : 'tasks.none'))));
+    parts.push(emptyState('clipboard', el('p', { class: 'empty__title', id: 'tasks-none' }, t(may().manage ? 'tasks.noneManage' : 'tasks.none'))));
   } else {
     parts.push(table(current, 'tasks-table'));
   }
@@ -132,7 +161,7 @@ function subjectBody() {
 
 function table(rows, id) {
   const col = (text, className = null) => el('th', { scope: 'col', class: className }, text);
-  const can = state.data.can.manage;
+  const can = may().manage;
   return el('section', { class: 'card table-card' },
     el('div', { class: 'table-scroll' },
       el('table', { class: 'table tasks-table', id, 'aria-labelledby': 'tasks-title' },
@@ -160,7 +189,7 @@ function line(a) {
       a.topicName ? el('span', { class: 'tasks-table__sub' }, a.topicName) : null),
     el('td', { class: 'tasks-table__due' }, el('span', { class: 'task-due task-due--' + due.tone }, t(due.key, due.params))),
     el('td', {}, progress(a.counts)),
-    state.data.can.manage ? el('td', { class: 'tasks-table__actions' }, el('span', { class: 'row-actions' },
+    may().manage ? el('td', { class: 'tasks-table__actions' }, el('span', { class: 'row-actions' },
       iconButton({ id: 'task-edit-' + a.id, iconName: 'pencil', label: t('common.edit'), onClick: () => edit(a) }),
       iconButton({
         id: 'task-remove-' + a.id, iconName: 'trash', label: a.locked ? t('tasks.locked') : t('common.remove'), className: 'icon-button--danger',

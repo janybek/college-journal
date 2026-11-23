@@ -3,7 +3,8 @@ import { getUser, getToken } from '../session.js';
 import { t } from '../i18n.js';
 import { el, errorKey, avatar, badge, emptyState, pageHeader, note, field, markBusy, focusFirstInvalid, holdOnLeave, modal, showModal, refresh } from '../ui.js';
 import { icon } from '../icons.js';
-import { dueText, dueOfWork, stateView, sizeText, formProblems, currentOf, gradeDraft, gradeNeedsReason, kindOfName, isPhoto, pickProblem, uploadErrorCode, uploadErrorKey, mayStillSend } from '../work.js';
+import { dueText, dueOfWork, stateView, sizeText, formProblems, currentOf, gradeDraft, gradeNeedsReason, kindOfName, isPhoto, pickProblem, uploadErrorCode, uploadErrorKey, mayStillSend, staffMay } from '../work.js';
+import { activeRole } from '../shell.js';
 import { preparePhoto, readAsBase64 } from '../photo.js';
 import { openTaskForm } from './taskForm.js';
 import { openFile } from './fileView.js';
@@ -56,7 +57,7 @@ export function render(root, params) {
       id: 'task-title', title: assignment ? assignment.title : t('tasks.title'),
       actions: assignment ? [
         el('a', { class: 'button button--secondary', id: 'task-back', href: '#/tasks/' + encodeURIComponent(assignment.subjectId) }, t('work.back')),
-        data.can.manage ? el('button', { type: 'button', class: 'button button--primary', id: 'task-edit', onclick: () => edit() }, icon('pencil'), t('work.edit')) : null,
+        staffMay(data.can, activeRole(getUser())).manage ? el('button', { type: 'button', class: 'button button--primary', id: 'task-edit', onclick: () => edit() }, icon('pencil'), t('work.edit')) : null,
       ] : el('a', { class: 'button button--secondary', id: 'task-back', href: '#/tasks' }, t('tasks.back')),
     }),
     data === null ? loadingBody() : body(),
@@ -310,7 +311,7 @@ function workPanel(student, assignment) {
     state.status ? note('success', t(state.status), { id: 'grade-status', role: 'status' }) : null,
     state.problemKey ? note('error', t(state.problemKey), { id: 'grade-problem', role: 'alert' }) : null,
     current ? attemptBlock(current, assignment, true) : el('p', { class: 'check-work__none', id: 'check-none' }, t('work.state.none')),
-    can.grade ? gradeBlock(student, current, assignment) : readOnlyGrade(current, assignment),
+    staffMay(can, activeRole(getUser())).grade ? gradeBlock(student, current, assignment) : readOnlyGrade(current, assignment),
     earlier.length > 0 ? previous(student, earlier, assignment) : null);
 }
 

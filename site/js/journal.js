@@ -156,6 +156,10 @@ export function pairScore(mark, pair, scheme) {
 const STATUS_VALUES = ['present', 'late', 'absent', 'excused', 'madeup'];
 const PAIR_STATUS_VALUES = ['planned', 'running', 'closed', 'missed', 'cancelled'];
 const RESULT_VALUES = ['control', 'self', 'current'];
+const WORK_FIELDS = ['points', 'status', 'maxPoints', 'dueAt'];
+const WORK_STATES = ['submitted', 'checked', 'returned'];
+// 'YYYY-MM-DD HH:MM:SS' -> 'DD.MM.YYYY HH:MM'; anything else stays as it is.
+const dueText = (text) => { const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(text); return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}` : text; };
 
 // One line of the history (a row of journal.log) -> { key, params, keyParams }. keyParams names the params whose
 // value is a dictionary key; the screen translates them before filling the text in.
@@ -165,7 +169,7 @@ export function logLine(row) {
   const after = r.after === undefined || r.after === null ? '' : String(r.after);
   const line = (key, params = {}, keyParams = []) => ({ key, params, keyParams });
   const value = (text, known, prefix) => (known.includes(text) ? prefix + text : text);
-  const keyed = (params) => Object.keys(params).filter((name) => typeof params[name] === 'string' && params[name].startsWith('journal.'));
+  const keyed = (params) => Object.keys(params).filter((name) => typeof params[name] === 'string' && (params[name].startsWith('journal.') || params[name].startsWith('work.')));
   if (r.entity === 'mark') {
     if (r.field === 'status') {
       const p = { before: value(before, STATUS_VALUES, 'journal.marks.status.'), after: value(after, STATUS_VALUES, 'journal.marks.status.') };
@@ -186,11 +190,33 @@ export function logLine(row) {
   if (r.entity === 'unit' && RESULT_VALUES.includes(r.field)) {
     return line('journal.log.unit', { what: 'journal.log.field.' + r.field, unit: r.unit, before: before === '' ? '—' : before, after: after === '' ? '—' : after }, ['what']);
   }
+  if (r.entity === 'work' && WORK_FIELDS.includes(r.field)) {
+    const dash = (text) => (text === '' ? '—' : text);
+    const title = typeof r.assignmentTitle === 'string' && r.assignmentTitle !== '' ? r.assignmentTitle : '—';
+    let p;
+    if (r.field === 'status') p = { title, before: before === '' ? '—' : value(before, WORK_STATES, 'work.state.'), after: after === '' ? '—' : value(after, WORK_STATES, 'work.state.') };
+    else if (r.field === 'dueAt') p = { title, before: dash(dueText(before)), after: dash(dueText(after)) };
+    else p = { title, before: dash(before), after: dash(after) };
+    return line('journal.log.work.' + r.field, p, keyed(p));
+  }
   if (r.entity === 'pair' && r.field === 'status') {
     const p = { before: value(before, PAIR_STATUS_VALUES, 'journal.log.pairStatus.'), after: value(after, PAIR_STATUS_VALUES, 'journal.log.pairStatus.') };
     return line('journal.log.pair.status', p, keyed(p));
   }
   return line('journal.log.other', { field: r.field || '', before, after });
+}
+
+// ---- The self-work cell of a unit: counted by the assignments or entered by hand ----
+
+// -> { value, key, params }. A unit without assignments: the value as entered (no key). With assignments: the counted
+// value with the key «по заданиям»; while some are waiting (checking, or not yet due) there is no total, only the
+// provisional value of what is checked and the key with the number of those waiting.
+export function selfCell(unitResult) {
+  const u = unitResult || {};
+  const sw = u.selfWork;
+  if (!sw) return { value: u.self ?? null, key: null, params: {} };
+  if (sw.pending > 0) return { value: sw.value ?? null, key: 'journal.self.pending', params: { n: sw.pending } };
+  return { value: u.self ?? sw.value ?? null, key: 'journal.self.byWork', params: {} };
 }
 
 // ---- The results of a unit (windows «Рубежный контроль», «СРС», «Текущий контроль») ----
@@ -239,6 +265,16 @@ const ABSENCE_STATUSES = ['absent', 'excused', 'madeup'];
 export function unitLine(unit) {
   const { current, self, control, total } = unit;
   const has = (v) => v !== null && v !== undefined;
+  if (unit.selfWork) {
+    // self-work counted by assignments: its own wording («по заданиям», or provisional while some wait), always in parts
+    const cell = selfCell(unit);
+    const parts = [];
+    if (has(current)) parts.push({ key: 'grades.unit.part.current', params: { current } });
+    parts.push({ key: cell.key === 'journal.self.pending' ? 'grades.unit.part.selfPending' : 'grades.unit.part.selfByWork', params: { self: has(cell.value) ? cell.value : '—', n: cell.params.n } });
+    if (has(control)) parts.push({ key: 'grades.unit.part.control', params: { control } });
+    if (has(total)) parts.push({ key: 'grades.unit.part.total', params: { total } });
+    return { key: 'grades.unit.parts', params: {}, parts };
+  }
   if (has(current) && has(self) && has(control)) return { key: 'grades.unit.full', params: { current, self, control, total } };
   const parts = [];
   if (has(current)) parts.push({ key: 'grades.unit.part.current', params: { current } });

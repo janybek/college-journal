@@ -73,6 +73,7 @@ function listScreen(subjects, scheme) {
             subject.teacherName ? el('p', { class: 'gr-card__teacher' }, subject.teacherName) : null),
           icon('chevron', 'gr-card__go')),
         summary(subject, scheme))))),
+    subjects.some((subject) => subject.units.some((unit) => unit.selfWork)) ? el('a', { class: 'button button--secondary gr-tasks', id: 'gr-tasks', href: '#/tasks' }, t('grades.myTasks')) : null,
     howBlock(scheme));
 }
 
@@ -90,6 +91,7 @@ function detailScreen(subject, scheme) {
       el('h2', { class: 'gr-section__title', id: 'gr-all' }, t('grades.allPairs')),
       subject.pairs.length === 0 ? el('p', { class: 'muted gr-none' }, t('grades.noPairs'))
         : el('ul', { class: 'gr-pairs' }, subject.pairs.slice().reverse().map((pair) => pairRow(pair, true)))),
+    subject.units.some((unit) => unit.selfWork) ? el('a', { class: 'button button--secondary gr-tasks', id: 'gr-tasks', href: '#/tasks' }, t('grades.myTasks')) : null,
     howBlock(scheme),
     el('a', { class: 'button button--secondary gr-back', href: '#/grades' }, t('grades.back')));
 }

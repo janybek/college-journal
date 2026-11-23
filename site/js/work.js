@@ -184,3 +184,29 @@ export const uploadErrorKey = (code) => (UPLOAD_ERRORS.includes(code) ? 'work.up
 
 // May a queued upload still be sent: its screen is still the open one and the person who chose the files is still signed in.
 export const mayStillSend = (sameScreen, ownerToken, token) => sameScreen === true && typeof token === 'string' && token !== '' && token === ownerToken;
+
+// ---- The office reads, the teacher works ----
+
+// The buttons of a staff screen: giving, changing and grading only in the role «teacher» (the server answers `can` for
+// the person; a man with the roles dean and teacher in the role «Деканат» only reads).
+export function staffMay(can, role) {
+  const teacher = role === 'teacher' && !!can;
+  return { manage: teacher && can.manage === true, grade: teacher && can.grade === true };
+}
+
+// The subjects of work.overview for the active role: the teacher role keeps the own subjects; a group (its name) and a
+// search by the name of the subject or of the teacher narrow them further.
+export function overviewRows(subjects, { role, group = '', query = '' }) {
+  const words = String(query).toLowerCase().split(/\s+/).filter(Boolean);
+  return (Array.isArray(subjects) ? subjects : []).filter((s) => {
+    if (role === 'teacher' && s.own !== true) return false;
+    if (group !== '' && s.groupName !== group) return false;
+    const hay = `${s.name || ''} ${s.teacherName || ''}`.toLowerCase();
+    return words.every((word) => hay.includes(word));
+  });
+}
+
+// The names of the groups of the subjects, sorted, each once.
+export function overviewGroups(subjects) {
+  return [...new Set((Array.isArray(subjects) ? subjects : []).map((s) => s.groupName).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ru', { numeric: true }));
+}
