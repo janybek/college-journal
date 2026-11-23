@@ -24,3 +24,8 @@ test('lessonClock: phases, steps and time left', () => {
   assert.deepEqual([lessonClock(P, B('08:00:00')).phase, lessonClock(P, B('08:00:00')).step], ['none', null]);
   assert.equal(lessonClock({ ...R, status: 'closed' }, B('08:30:00')).phase, 'over');
 });
+
+test('lessonClock: a closed pair with an unreadable checkinUntil has no NaN', () => {
+  const c = lessonClock({ ...R, status: 'closed', checkinUntil: '' }, B('08:30:00'));
+  assert.deepEqual([c.checkinEndMs, c.checkinLeftMs, c.phase], [null, 0, 'over']);
+});

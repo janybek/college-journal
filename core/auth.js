@@ -14,7 +14,7 @@ const COMMON_PASSWORDS = [
 ];
 
 // Compares whole strings without an early exit on the first difference.
-function constantTimeEqual(a, b) {
+export function constantTimeEqual(a, b) {
   const left = String(a);
   const right = String(b);
   let diff = left.length ^ right.length;
