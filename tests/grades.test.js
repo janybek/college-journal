@@ -129,3 +129,15 @@ test('half-up rounding is exact: no float error at the .5 boundary', () => {
   assert.equal(currentControl([{ earned: 58, possible: 200 }], { ...S, current: 50 }), 15);
   assert.equal(currentControl([{ earned: 114, possible: 200 }], { ...S, current: 50 }), 29);
 });
+
+test('student results: self-work counted from assignments replaces the manual self', () => {
+  const unitRows = new Map([[1, { unit: 1, self: 16, control: 30, currentManual: 29 }], [2, { unit: 2, self: 16, control: 30, currentManual: 30 }]]);
+  const done = { earned: 23, max: 30, pending: 0, value: 15 };
+  const r = studentResults({ pairs, marks: marks(), unitRows, units: [1, 2], scheme: S, selfWork: new Map([[2, done]]) });
+  assert.deepEqual([r.units[1].self, r.units[1].total, r.units[1].selfWork], [15, 75, done]);
+  assert.deepEqual(r.units[0], studentResults({ pairs, marks: marks(), unitRows, units: [1, 2], scheme: S }).units[0]);
+  assert.equal('selfWork' in r.units[0], false);
+  const wait = { earned: 8, max: 30, pending: 1, value: 5 };
+  const p = studentResults({ pairs, marks: marks(), unitRows, units: [1, 2], scheme: S, selfWork: new Map([[2, wait]]) });
+  assert.deepEqual([p.units[1].self, p.units[1].total, p.units[1].selfWork], [null, null, wait]);
+});

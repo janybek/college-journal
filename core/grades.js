@@ -62,7 +62,7 @@ export function attendanceStats(items) {
 const sumPoints = (list) => list.reduce((acc, p) => ({ earned: acc.earned + p.earned, possible: acc.possible + p.possible }), { earned: 0, possible: 0 });
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
-export function studentResults({ pairs, marks, unitRows, units, scheme }) {
+export function studentResults({ pairs, marks, unitRows, units, scheme, selfWork = new Map() }) {
   const held = pairs.filter(isFixed);
   const pointsOf = (list) => list.map((p) => pairPoints(marks.get(p.id) || null, p, scheme)).filter((x) => x !== null);
   const totals = [];
@@ -73,15 +73,18 @@ export function studentResults({ pairs, marks, unitRows, units, scheme }) {
     const auto = currentControl(points, scheme);
     const manual = cap(num(row && row.currentManual), scheme.current);
     const current = manual !== null ? manual : auto;
-    const self = cap(num(row && row.self), scheme.self);
+    const sw = selfWork.get(unit) || null;
+    const self = sw ? (sw.pending === 0 ? cap(sw.value, scheme.self) : null) : cap(num(row && row.self), scheme.self);
     const control = cap(num(row && row.control), scheme.control);
     const total = unitTotal({ current, self, control });
     if (total !== null) totals.push(total);
-    return {
+    const item = {
       unit, earned, possible, auto, manual, current, self, control, total, word: gradeWord(total, scheme),
       currentLow: current !== null && current < scheme.minimum,
       controlLow: control !== null && control < scheme.minimum,
     };
+    if (sw) item.selfWork = sw;
+    return item;
   });
   const outside = sumPoints(pointsOf(held.filter((p) => p.unit === null || p.unit === undefined)));
   const preliminary = totals.length ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : null;
