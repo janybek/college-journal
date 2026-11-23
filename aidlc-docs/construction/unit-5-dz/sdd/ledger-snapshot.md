@@ -88,3 +88,13 @@ Task 10: complete (commits 6c3fd32..fcb6a58, review clean)
 - 23.11.2026 Блок 1 экранов (задачи 9, 10) собран, 883 теста. Стоп: приёмка владельцем на стенде. На стенде в «Эссе» нет ждущих работ — ждущие в «Презентации».
 - 23.11.2026 Блок 1 принят владельцем («Принимаю блок 1»), без замечаний.
 - Task 11: base (после docs-коммита)
+- Task 11: base 459bde4; implementer agent ae23a2691e5b80970 (journal-screens, sonnet); после — строгая проверка (данные студента, загрузка)
+- Task 11: implementer DONE_WITH_CONCERNS 9c9d5c7 (892 tests, RED записан). Возвращённое «Эссе» у S1004 (у S1001 проверено 8 из 10); «Сдать» неактивна, пока в списке файл с ошибкой; текст при «Сдать заново» пустой; новый ключ work.mine.retry; срок сданной работы — датой (dueOfWork, dueDateText); набранный текст теряется при уходе.
+- Task 11: review (sonnet, strict) agent a3b305812cc7f0aa3
+- Task 11: review (sonnet, strict) Needs fixes: Important 1 — очередь загрузки (task.js:1004, sendItem, retryItem) не привязана к сессии/экрану: после выхода файлы A уходят под токеном B; после unauthorized шлёт с token null. Проба: scratchpad\task11-probes\token-swap.mjs.
+- Task 11: minor (deferred): task.js:1011-1017 возврат на задание до конца загрузки — файл виден только после перезагрузки; task.js:358 maxlength в UTF-16, сервер в знаках; дубль ожидающего файла при повторе после обрыва (server_down).
+- Task 11: Ruling: Minor 2 (removeItem не блокируется при owner.busy) — в тот же круг, одна строка в том же месте (практика проекта: мелочь тому же агенту).
+- Task 11: fix round 1 → implementer ae23a2691e5b80970, задание task-11-fix-1.md (FIX_BASE 9c9d5c7)
+- Task 11: fix round 1/5 (2 addressed, 0 open — очередь загрузки и сессия, «Убрать» при busy; commits 9c9d5c7..a49abbd). Повторная проверка: ADDRESSED, новых поломок нет. Проба scratchpad\task11-probes\token-swap2.mjs.
+Task 11: complete (commits 459bde4..a49abbd, review clean)
+- 23.11.2026 Блок 2 (задача 11) собран, 893 теста. Стоп: приёмка владельцем. На стенде возвращённое «Эссе» — у S1004 (у S1001 оно проверено 8 из 10).
