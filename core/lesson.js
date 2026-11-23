@@ -1,4 +1,4 @@
-import { localDate, localTime, minutesOf, addMinutes, parseLocalDateTime } from './dates.js';
+import { localDate, localTime, minutesOf, addMinutes, parseLocalDateTime, localDateTime } from './dates.js';
 import { PAIR_MINUTES } from './settings.js';
 import { constantTimeEqual } from './auth.js';
 
@@ -110,4 +110,55 @@ export function readPass(platform, pass, nowMs) {
   } catch (error) {
     return null;
   }
+}
+
+// What to write when a check-in window has ended or a pair is closing. Pure: reads nothing, writes nothing.
+// -> { marks: rows for insertMany('attendance'), patches: [{ id, patch }] }, one patch per changed pair.
+export function settlePlan({ pairs, students, attendance, nowMs, endCheckin = [], finish = [], actorId = '' }) {
+  const marks = [];
+  const patches = [];
+  const rowCount = new Map();
+  const markedBy = new Map();
+  for (const row of attendance) {
+    rowCount.set(row.pairId, (rowCount.get(row.pairId) || 0) + 1);
+    if (!markedBy.has(row.pairId)) markedBy.set(row.pairId, new Set());
+    markedBy.get(row.pairId).add(row.studentId);
+  }
+  const active = students.filter((s) => s.active === true).sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
+  for (const pair of pairs) {
+    if (pair.status !== 'running') continue;
+    const startedMs = pair.startedAt ? parseLocalDateTime(pair.startedAt) : NaN;
+    if (Number.isNaN(startedMs)) continue;
+    const ending = endCheckin.includes(pair.id) || finish.includes(pair.id);
+    const parsedUntil = parseLocalDateTime(pair.checkinUntil);
+    const plannedUntil = Number.isNaN(parsedUntil) ? startedMs + LESSON.checkinMinutes * MIN_MS : parsedUntil;
+    const untilMs = ending ? Math.min(plannedUntil, nowMs) : plannedUntil;
+    const patch = {};
+    let rows = rowCount.get(pair.id) || 0;
+    if (!pair.checkinClosed && nowMs >= untilMs) {
+      patch.checkinClosed = true;
+      if (untilMs < plannedUntil) patch.checkinUntil = localDateTime(untilMs);
+      if (rows > 0) {
+        const have = markedBy.get(pair.id);
+        for (const s of active) {
+          if (s.groupId !== pair.groupId || have.has(s.id)) continue;
+          marks.push({ pairId: pair.id, studentId: s.id, status: 'absent', noCoat: false, activity: null, source: 'auto', markedBy: '', markedAt: localDateTime(untilMs) });
+          rows += 1;
+        }
+      }
+    }
+    const closeMs = startedMs + LESSON.autoCloseMinutes * MIN_MS;
+    const finishing = finish.includes(pair.id);
+    if (nowMs >= closeMs || finishing) {
+      if (rows > 0) {
+        Object.assign(patch, nowMs >= closeMs
+          ? { status: 'closed', finishedAt: localDateTime(closeMs), finishedBy: '' }
+          : { status: 'closed', finishedAt: localDateTime(nowMs), finishedBy: actorId });
+      } else {
+        Object.assign(patch, { status: 'planned', ...LESSON_CLEAR });
+      }
+    }
+    if (Object.keys(patch).length > 0) patches.push({ id: pair.id, patch });
+  }
+  return { marks, patches };
 }
