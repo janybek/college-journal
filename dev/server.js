@@ -7,6 +7,7 @@ import { createFileStore } from '../backend/store/fileStore.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { handleRequest } from '../backend/api.js';
 import { createLoginGuard } from '../core/loginGuard.js';
+import { createDiskFiles, sweepFiles, FILES_DIR } from '../backend/node/files.js';
 import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from '../backend/node/http.js';
 import { seed, seedAdmin, prepareLessonNow } from './seed.js';
 import { upgradeFile } from './upgrade.js';
@@ -63,7 +64,10 @@ export function standArgs(argv, root = ROOT) {
   const lessonNow = argv.includes('--lesson-now');
   if (real && reset) return { error: 'reset_refused' };
   if (real && lessonNow) return { error: 'lesson_refused' };
-  if (reset) fs.rmSync(path.resolve(root, DATA_FILES.demo), { force: true });
+  if (reset) {
+    fs.rmSync(path.resolve(root, DATA_FILES.demo), { force: true });
+    fs.rmSync(path.resolve(root, 'dev/data', FILES_DIR), { recursive: true, force: true });       // the box of the fictional stand only: real-files is never touched
+  }
   if (real) return { mode: 'real', dataFile: DATA_FILES.real };
   return lessonNow ? { mode: 'demo', dataFile: DATA_FILES.demo, lessonNow: true } : { mode: 'demo', dataFile: DATA_FILES.demo };
 }
@@ -88,7 +92,11 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   const store = createFileStore(SCHEMA, platform, dataPath);
   if (fresh) seederFor(dataPath, mode)(store, platform);
   if (lessonNow && fresh && mode !== 'real' && seederFor(dataPath, mode) === seed) prepareLessonNow(store, platform);
-  const ctx = { store, platform, loginGuard: createLoginGuard(), log: (error) => console.error(error) };
+  // the box of the files lies beside the data file: files for the fictional stand, real-files for the real one
+  const filesDir = path.join(path.dirname(dataPath), seederFor(dataPath, mode) === seedAdmin ? 'real-files' : FILES_DIR);
+  const files = createDiskFiles(filesDir);
+  sweepFiles({ store, dir: filesDir, nowMs: platform.now() });
+  const ctx = { store, platform, files, loginGuard: createLoginGuard(), log: (error) => console.error(error) };
 
   const server = http.createServer(async (req, res) => {
     try {
@@ -118,6 +126,7 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   });
   return {
     url: `http://localhost:${server.address().port}`,
+    filesDir,
     close: () => new Promise((resolve) => {
       server.close(() => resolve());
       server.closeAllConnections();

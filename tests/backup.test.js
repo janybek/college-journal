@@ -166,3 +166,36 @@ test('main --backup makes a copy while the server is running', async (t) => {
   const copy = path.join(config.backupDir, 'journal-2026-11-22.sqlite');
   assert.deepEqual([said.some((line) => line.startsWith('Копия сделана: ')), roomsIn({ ...config, dbFile: copy }).length], [true, 1]);
 });
+
+test('a copy takes the files of students beside it; a folder of file copies that cannot be made is the alarm "copy not made" with the reason', async (t) => {
+  const { config } = tempBase(t);
+  const base = open(t, config);
+  const name = 'ab'.repeat(16) + '.bin';
+  fs.mkdirSync(config.filesDir, { recursive: true });
+  fs.writeFileSync(path.join(config.filesDir, name), 'PDF');
+  fs.writeFileSync(path.join(config.filesDir, 'notes.txt'), 'foreign');
+  const res = await backupNow({ db: base.db, config, now: at(22), logger: quiet() });
+  assert.deepEqual([res.ok, fs.readdirSync(path.join(config.backupDir, 'files')), fs.readFileSync(path.join(config.backupDir, 'files', name), 'utf8')], [true, [name], 'PDF']);
+  const other = tempBase(t);
+  const broken = { ...other.config };
+  fs.mkdirSync(broken.filesDir, { recursive: true });
+  fs.writeFileSync(path.join(broken.filesDir, name), 'PDF');
+  fs.mkdirSync(broken.backupDir, { recursive: true });
+  fs.writeFileSync(path.join(broken.backupDir, 'files'), 'a file stands where the folder of copies should be');
+  const log = quiet();
+  const bad = await backupNow({ db: open(t, broken).db, config: broken, now: at(22), logger: log });
+  assert.deepEqual([bad.ok, typeof bad.error, log.lines.some((l) => /ERROR BACKUP FAILED/.test(l)), fs.existsSync(path.join(broken.alertDir, ALERT_FILE))], [false, 'string', true, true]);
+});
+
+test('startBackups: afterRun follows the copies made by the timer, not the first one; its error is only a line in the log', async (t) => {
+  const { config } = tempBase(t);
+  const base = open(t, config);
+  let runs = 0;
+  const log = quiet();
+  const b = keep(t, startBackups({ db: base.db, config, now: at(2), logger: log, everyMs: 20, afterRun: () => { runs += 1; throw new Error('after broke'); } }));
+  await b.first;
+  assert.equal(runs, 0);
+  fs.rmSync(path.join(config.backupDir, 'journal-2026-11-02.sqlite'));
+  await until(() => runs > 0);
+  assert.equal(log.lines.some((l) => /ERROR after-backup work failed: after broke/.test(l)), true);
+});

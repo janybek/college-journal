@@ -403,3 +403,33 @@ test('the stand moves a pair with --lesson-now only: without the flag every pair
   assert.equal(store.list('pairs').filter((x) => !bells.has(x.startTime)).length <= 1, true);
   assert.equal(store.list('pairs').some((x) => x.startedAt !== ''), false);
 });
+
+test('--reset clears the box of the fictional stand and never real-files', (t) => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'journal-args-'));
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const data = path.join(root, 'dev', 'data');
+  for (const dir of ['files', 'real-files']) {
+    fs.mkdirSync(path.join(data, dir), { recursive: true });
+    fs.writeFileSync(path.join(data, dir, 'ab'.repeat(16) + '.bin'), 'x');
+  }
+  standArgs(['--real'], root);
+  assert.deepEqual([fs.readdirSync(path.join(data, 'files')).length, fs.readdirSync(path.join(data, 'real-files')).length], [1, 1]);
+  assert.deepEqual(standArgs(['--real', '--reset'], root), { error: 'reset_refused' });
+  assert.deepEqual([fs.readdirSync(path.join(data, 'files')).length, fs.readdirSync(path.join(data, 'real-files')).length], [1, 1]);
+  standArgs(['--reset'], root);
+  assert.deepEqual([fs.existsSync(path.join(data, 'files')), fs.readdirSync(path.join(data, 'real-files')).length], [false, 1]);
+});
+
+test('the stand keeps its box beside the data file (files for the fictional, real-files for the real one) and sweeps an old orphan at the start', async (t) => {
+  for (const [mode, folder] of [['demo', 'files'], ['real', 'real-files']]) {
+    const { dataFile, siteDir } = tempDirs(t);
+    const box = path.join(path.dirname(dataFile), folder);
+    fs.mkdirSync(box, { recursive: true });
+    const orphan = path.join(box, 'ab'.repeat(16) + '.bin');
+    fs.writeFileSync(orphan, 'x');
+    const old = new Date(Date.now() - 5 * 3600000);
+    fs.utimesSync(orphan, old, old);
+    const { srv } = await start(t, { dataFile, siteDir, mode });
+    assert.deepEqual([path.dirname(srv.filesDir), path.basename(srv.filesDir), fs.existsSync(orphan)], [path.dirname(dataFile), folder, false], mode);
+  }
+});

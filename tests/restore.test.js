@@ -102,3 +102,27 @@ test('serve:restore refuses while the server runs, works when it is stopped, say
   const again = keep(t, await main([], { env, root: config.root, out: () => {}, stopCheckMs: 60000 }));
   assert.deepEqual(again.base.store.list('rooms').map((r) => r.name), ['Ауд. 1']);
 });
+
+test('restoreBase brings the files back from the copies beside the base, keeps the ones already there, and a copy of an older base (no table of files) comes back too', async (t) => {
+  const { crashed, copy } = await crashedBase(t);
+  const name = 'ab'.repeat(16) + '.bin';
+  const keptName = 'cd'.repeat(16) + '.bin';
+  const mirror = path.join(crashed.backupDir, 'files');
+  fs.mkdirSync(mirror, { recursive: true });
+  fs.writeFileSync(path.join(mirror, name), 'FROM-COPY');
+  fs.writeFileSync(path.join(mirror, keptName), 'FROM-COPY');
+  fs.mkdirSync(crashed.filesDir, { recursive: true });
+  fs.writeFileSync(path.join(crashed.filesDir, keptName), 'ON-DISK');
+  const made = restoreBase(crashed, copy, { now: at(23, 8) });
+  assert.deepEqual([made.files, fs.readFileSync(path.join(crashed.filesDir, name), 'utf8'), fs.readFileSync(path.join(crashed.filesDir, keptName), 'utf8')], [1, 'FROM-COPY', 'ON-DISK']);
+  // the copy of unit 4 has no table of files: it is a copy with the table of staff only, and it is taken as it is
+  const old = tempBase(t);
+  const oldBase = open(t, old.config);
+  oldBase.db.exec('DROP TABLE "files"');
+  const { file } = await backupNow({ db: oldBase.db, config: old.config, now: at(22), logger: quiet() });
+  const target = tempConfig(t);
+  fs.mkdirSync(target.dataDir, { recursive: true });
+  fs.copyFileSync(old.config.secretFile, target.secretFile);
+  assert.equal(restoreBase(target, file, { now: at(23, 8) }).files, 0);
+  assert.equal(fs.existsSync(target.dbFile), true);
+});

@@ -84,7 +84,7 @@ test('a huge body and a broken request are answered and the process lives on', a
 
 test('/api answers 405 to other methods and 413 to an oversized body, as the stand does', async (t) => {
   const { raw, post } = await start(t, { maxBodyBytes: 1000 });
-  for (const method of ['GET', 'PUT', 'DELETE', 'OPTIONS']) {
+  for (const method of ['GET', 'PUT', 'DELETE']) {
     const res = await raw(method, '/api', { Origin: ORIGIN });
     assert.deepEqual([res.status, res.headers.allow, res.headers['access-control-allow-origin']], [405, 'POST', undefined], method);
   }
@@ -154,4 +154,33 @@ test('main --init shows the temporary password in the window only; then the serv
   assert.equal((await main(['--admin-password'], { env, root: config.root, out })).code, 0);
   assert.equal(said.some((l) => l.startsWith('Временный пароль: ') && !l.endsWith(password)), true);
   assert.equal(fs.readFileSync(config.logFile, 'utf8').includes(said.find((l) => l.startsWith('Временный пароль: ')).slice(18)), false);
+});
+
+test('OPTIONS /api: our own site gets 204 and the CORS headers, a stranger or no Origin gets 403, GET is still 405', async (t) => {
+  const { raw } = await start(t);
+  const ok = await raw('OPTIONS', '/api', { Origin: ORIGIN, 'Access-Control-Request-Method': 'POST', 'Access-Control-Request-Headers': 'content-type' });
+  assert.deepEqual([ok.status, ok.body, ok.headers['access-control-allow-origin'], ok.headers['access-control-allow-methods'], ok.headers['access-control-allow-headers'],
+    ok.headers['access-control-max-age'], ok.headers.vary], [204, '', ORIGIN, 'POST', 'Content-Type', '600', 'Origin']);
+  for (const origin of ['https://evil.example', 'https://janybek.github.io.evil.example', 'null', undefined]) {
+    const res = await raw('OPTIONS', '/api', origin === undefined ? {} : { Origin: origin });
+    assert.deepEqual([res.status, res.headers['access-control-allow-origin'], JSON.parse(res.body).error.code], [403, undefined, 'forbidden_origin'], String(origin));
+  }
+  const get = await raw('GET', '/api', { Origin: ORIGIN });
+  assert.deepEqual([get.status, get.headers.allow], [405, 'POST']);
+});
+
+test('main: at the start the sweep removes an old orphan file, also on a base of unit 4 that has no table of files', async (t) => {
+  const config = tempConfig(t);
+  const env = { JOURNAL_DATA_DIR: config.dataDir, JOURNAL_BACKUP_DIR: config.backupDir, JOURNAL_ALERT_DIR: config.alertDir, JOURNAL_PORT: '0' };
+  assert.equal((await main(['--init'], { env, root: config.root, out: () => {} })).code, 0);
+  dropTable(config, 'files');
+  const orphan = path.join(config.filesDir, 'ab'.repeat(16) + '.bin');
+  const fresh = path.join(config.filesDir, 'cd'.repeat(16) + '.bin');
+  fs.mkdirSync(config.filesDir, { recursive: true });
+  for (const file of [orphan, fresh]) fs.writeFileSync(file, 'x');
+  const old = new Date(Date.now() - 5 * 3600000);
+  fs.utimesSync(orphan, old, old);
+  const run = keep(t, await main([], { env, root: config.root, out: () => {} }));
+  assert.deepEqual([run.code, fs.existsSync(orphan), fs.existsSync(fresh), run.base.store.list('files')], [0, false, true, []]);
+  assert.match(fs.readFileSync(config.logFile, 'utf8'), /files swept: 0 rows, 1 files/);
 });

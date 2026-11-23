@@ -11,6 +11,7 @@ import { initBase, openBase, resetAdminPassword, BaseError } from './base.js';
 import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from './http.js';
 import { createLogger } from './log.js';
 import { backupNow, startBackups } from './backup.js';
+import { createDiskFiles, sweepFiles, spaceAlarm } from './files.js';
 import { runDemo } from './demo.js';
 import { EXIT } from './exit.js';
 
@@ -19,6 +20,7 @@ import { EXIT } from './exit.js';
 export { EXIT };
 
 const MIN_NODE = 24;
+const oneLine = (error) => String(error?.message || error).replace(/[\r\n]+/g, ' ');
 const SERVER_ERROR = { ok: false, error: { code: 'internal' } };
 
 function actionOf(body) {
@@ -30,22 +32,34 @@ function actionOf(body) {
   }
 }
 
-export async function startServer({ config, base, logger, guard = createLoginGuard(), maxBodyBytes = MAX_BODY_BYTES }) {
+export async function startServer({ config, base, logger, guard = createLoginGuard(), maxBodyBytes = MAX_BODY_BYTES, files }) {
   const { platform, store } = base;
-  const ctx = { store, platform, loginGuard: guard, log: (e) => logger.error('handler', e) };
+  const ctx = { store, platform, files, loginGuard: guard, log: (e) => logger.error('handler', e) };
   const notFound = (res) => {
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end('Not found');
   };
 
   async function handleApi(req, res) {
-    if (req.method !== 'POST') {
+    if (req.method !== 'POST' && req.method !== 'OPTIONS') {
       return sendJson(res, 405, { ok: false, error: { code: 'method_not_allowed' }, serverTime: platform.now() }, { Allow: 'POST' });
     }
     const origin = req.headers.origin;
     if (typeof origin !== 'string' || !config.origins.includes(origin)) {
       req.resume();
       return sendJson(res, 403, { ok: false, error: { code: 'forbidden_origin' }, serverTime: platform.now() }, { Connection: 'close' });
+    }
+    if (req.method === 'OPTIONS') {
+      // the preflight of an upload with a progress bar: only our own site is let through
+      res.writeHead(204, {
+        'Access-Control-Allow-Origin': origin,
+        'Access-Control-Allow-Methods': 'POST',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Access-Control-Max-Age': '600',
+        Vary: 'Origin',
+        'Cache-Control': 'no-store',
+      });
+      return res.end();
     }
     const cors = { 'Access-Control-Allow-Origin': origin, Vary: 'Origin', 'X-Content-Type-Options': 'nosniff' };
     const started = platform.now();
@@ -163,17 +177,33 @@ export async function main(argv, { env = process.env, root, out = console.log, n
     }
 
     const base = openBase(config, { now });
+    const files = createDiskFiles(config.filesDir);
+    // the sweep of the files and the look at the free space: a failure is a line in the log, never a stop
+    const upkeep = () => {
+      try {
+        const swept = sweepFiles({ store: base.store, dir: config.filesDir, nowMs: clock() });
+        if (swept.rows > 0 || swept.files > 0) logger.info(`files swept: ${swept.rows} rows, ${swept.files} files`);
+      } catch (error) {
+        logger.error(`files sweep failed: ${oneLine(error)}`);
+      }
+      try {
+        spaceAlarm({ config, logger });
+      } catch (error) {
+        logger.error(`space check failed: ${oneLine(error)}`);
+      }
+    };
     let server;
     let backups;
     try {
       // the copy of the base as it was, before new sheets are added to it; a failed copy does not stop the start
-      backups = startBackups({ db: base.db, config, now: clock, logger });
+      backups = startBackups({ db: base.db, config, now: clock, logger, afterRun: upkeep });
       await backups.first;
       const upgraded = base.upgrade();
       if (upgraded.created.length > 0 || upgraded.added.length > 0) {
         logger.info(`base upgraded: ${upgraded.created.length} tables made, ${upgraded.added.length} columns added`);
       }
-      server = await startServer({ config, base, logger });
+      upkeep();
+      server = await startServer({ config, base, logger, files });
     } catch (error) {
       backups?.stop();
       base.close();

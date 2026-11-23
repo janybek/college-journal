@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { TZ_OFFSET_MS } from '../../core/dates.js';
 import { verifyCopy, SECRET_COPY } from './backup.js';
+import { FILES_DIR, restoreFiles } from './files.js';
 import { SCHEMA } from '../../core/schema.js';
 import { hashPassword, generateTempPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { normalizeRow } from '../../core/validate.js';
@@ -178,5 +179,14 @@ export function restoreBase(config, copyFile, { now = clock } = {}) {
       secret = 'new';
     }
   }
-  return { before, secret };
+  // the files of students come back beside the base; what is already on disk is not overwritten
+  let files = 0;
+  if (config.filesDir) {
+    try {
+      files = restoreFiles(path.join(config.backupDir, FILES_DIR), config.filesDir).copied;
+    } catch (error) {
+      throw new BaseError('cannot_restore_files', String(error?.message || error));
+    }
+  }
+  return { before, secret, files };
 }

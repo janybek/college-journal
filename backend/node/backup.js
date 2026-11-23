@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
 import { localDate } from '../../core/dates.js';
+import { FILES_DIR, mirrorFiles } from './files.js';
 
 // A checked daily copy of the base. Node only: this file is not bundled for Apps Script.
 // The copy is made by VACUUM INTO: one synchronous statement, so it never meets a request half way,
@@ -73,6 +74,8 @@ export async function backupNow({ db, config, now = clock, logger }) {
     verifyCopy(tmp, tables);
     fs.renameSync(tmp, file);
     tmp = null;
+    // the files of students are copied after the base is: a failed copy of files is the same alarm as a failed copy of the base
+    const mirrored = config.filesDir ? mirrorFiles(config.filesDir, path.join(config.backupDir, FILES_DIR)) : { copied: 0 };
     try {
       // the folder of copies is meant for the day the disk of the base is lost, and the secret is lost with it: it lies beside the copies
       if (fs.existsSync(config.secretFile)) fs.copyFileSync(config.secretFile, path.join(config.backupDir, SECRET_COPY));
@@ -85,7 +88,7 @@ export async function backupNow({ db, config, now = clock, logger }) {
     } catch (error) {
       logger.error(`backup pruning failed: ${reason(error)}`);
     }
-    logger.info(`backup ok ${path.basename(file)} ${fs.statSync(file).size}`);
+    logger.info(`backup ok ${path.basename(file)} ${fs.statSync(file).size} files ${mirrored.copied}`);
     if (config.alertDir) fs.rmSync(path.join(config.alertDir, ALERT_FILE), { force: true });
     return { ok: true, file, removed };
   } catch (error) {
@@ -99,7 +102,8 @@ export async function backupNow({ db, config, now = clock, logger }) {
   }
 }
 
-export function startBackups({ db, config, now = clock, logger, everyMs = CHECK_EVERY_MS }) {
+// afterRun runs after the copies made by the timer, never after the first one: the first is made before the base is upgraded.
+export function startBackups({ db, config, now = clock, logger, everyMs = CHECK_EVERY_MS, afterRun }) {
   let running = null;
   let lastFailed = false;
   const run = () => {
@@ -114,7 +118,14 @@ export function startBackups({ db, config, now = clock, logger, everyMs = CHECK_
   const first = run();
   const timer = setInterval(() => {
     if (running) return;
-    if (lastFailed || !fs.existsSync(path.join(config.backupDir, copyName(localDate(now()))))) run();
+    if (!(lastFailed || !fs.existsSync(path.join(config.backupDir, copyName(localDate(now())))))) return;
+    run().then(() => {
+      try {
+        afterRun?.();
+      } catch (error) {
+        logger.error(`after-backup work failed: ${reason(error)}`);
+      }
+    });
   }, everyMs);
   timer.unref();
   return { first, stop: () => clearInterval(timer) };

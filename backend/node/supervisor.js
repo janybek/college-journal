@@ -224,6 +224,7 @@ export async function readStatus(config, { now = clock } = {}) {
 const RESTORE_WORDS = {
   no_copy: 'Файла копии нет по этому пути',
   bad_copy: 'Копия не прошла проверку, база не тронута',
+  cannot_restore_files: 'База возвращена, но файлы из копии вернуть не удалось: повторите команду',
   cannot_replace: 'Не удалось заменить базу (файл занят другой программой?), всё осталось как было',
 };
 
@@ -241,6 +242,7 @@ async function restore(config, file, out) {
     out(made.secret === 'kept' ? 'Файл secret.key прежний'
       : made.secret === 'copies' ? 'Файл secret.key взят из папки копий'
         : 'Файла secret.key не было нигде: создан новый, все войдут в журнал заново');
+    out(`Файлов возвращено из копии: ${made.files}`);
     out('Запустите сервер: npm run serve:start');
     return { code: EXIT.ok };
   } catch (error) {

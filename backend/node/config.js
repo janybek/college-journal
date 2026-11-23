@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import { FILES_DIR } from './files.js';
 
 // Settings of the working server. Node only: this file is not bundled for Apps Script.
 // One source, never mixed: the JOURNAL_* variables when JOURNAL_DATA_DIR is set, otherwise the settings file.
@@ -91,6 +92,7 @@ export function readConfig({ env = process.env, root = REPO_ROOT, file } = {}) {
 
   return {
     dataDir, backupDir, alertDir, port, origins,
+    filesDir: path.join(dataDir, FILES_DIR),
     dbFile: path.join(dataDir, 'journal.sqlite'),
     secretFile: path.join(dataDir, 'secret.key'),
     logFile: path.join(dataDir, 'server.log'),

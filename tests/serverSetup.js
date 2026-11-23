@@ -72,6 +72,7 @@ export function tempConfig(t, extra = {}) {
     alertDir: path.join(base, 'alert'),
     port: 0,
     origins: [ORIGIN],
+    filesDir: path.join(dataDir, 'files'),
     dbFile: path.join(dataDir, 'journal.sqlite'),
     secretFile: path.join(dataDir, 'secret.key'),
     logFile: path.join(dataDir, 'server.log'),
