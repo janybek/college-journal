@@ -9,6 +9,7 @@ import { DEFAULT_BELLS } from '../core/settings.js';
 import { localDateTime, parseLocalDateTime } from '../core/dates.js';
 import { hashPassword } from '../core/auth.js';
 import { handleRequest } from '../backend/api.js';
+import { createMemoryFiles } from './fakes/memoryFiles.js';
 
 export const PASSWORD = 'secret12';
 const SEMESTER = { semesterStart: '2026-09-01', semesterEnd: '2026-12-20', holidays: [], bells: DEFAULT_BELLS, semester: 1 };
@@ -37,12 +38,12 @@ function spyOn(store) {
   return { spy, lists, writes, reset };
 }
 
-export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform) } = {}) {
+export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform), files = createMemoryFiles() } = {}) {
   let now = bishkek('2026-08-31');
   const platform = createNodePlatform({ now: () => now, secret: 'test-secret' });
   const store = makeStore(SCHEMA, platform);
   const spied = spyOn(store);
-  const ctx = { store: spied.spy, platform, log: () => {} };
+  const ctx = { store: spied.spy, platform, files, log: () => {} };
   const call = (action, data, token) => handleRequest(JSON.stringify({ action, data, token }), ctx);
   const hash = hashPassword(platform, PASSWORD);
 
@@ -116,7 +117,20 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   };
   const snapshot = () => JSON.parse(JSON.stringify({
     attendance: store.list('attendance'), checkins: store.list('checkins'), changeLog: store.list('changeLog'), pairs: store.list('pairs'),
+    assignments: store.list('assignments'), submissions: store.list('submissions'), files: store.list('files'), unitResults: store.list('unitResults'),
+    disk: files ? files.names() : [],
   }));
+
+  // an assignment of sb1 written straight into the store; `over` replaces fields
+  const task = (over = {}) => store.insert('assignments', {
+    subjectId: sb1, kind: 'srs', planSemester: 1, unit: 2, topicId: '', pairId: '', title: 'СРС А', description: '', dueAt: '2026-09-20 23:59:00',
+    maxPoints: 10, createdBy: ids.teacher1, createdAt: '2026-09-10 12:00:00', updatedBy: '', updatedAt: '', ...over,
+  }).id;
+  // an attempt of student `key` written straight into the store
+  const attempt = (assignmentId, key, over = {}) => store.insert('submissions', {
+    assignmentId, studentId: ids[key], n: 1, text: 'ответ', paper: false, submittedAt: '2026-09-18 10:00:00', status: 'submitted',
+    points: null, comment: '', checkedBy: '', checkedAt: '', ...over,
+  }).id;
 
   const mark = (pairId, key, status, activity, markedAt, extra = {}) => store.insert('attendance', {
     pairId, studentId: ids[key], status, noCoat: false, activity, source: 'teacher', markedBy: ids.teacher1, markedAt, ...extra,
@@ -131,7 +145,7 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   mark(q0911, 'b1', 'present', 3, '2026-09-11 08:10:00', { markedBy: ids.teacher2 });
 
   return {
-    store, spy: { lists: spied.lists, writes: spied.writes, reset: spied.reset }, platform, call, t, at, tick, running, snapshot, ids, mark, pairOf,
+    store, spy: { lists: spied.lists, writes: spied.writes, reset: spied.reset }, platform, call, t, at, tick, running, snapshot, ids, mark, pairOf, files, task, attempt,
     a1: ids.a1, a2: ids.a2, a3: ids.a3, a4: ids.a4, b1: ids.b1, g1, g2, ds1, ds2, sb1, sb2, p0901, p0908, p0915, p0922, q0904, q0911, syllabusId,
   };
 }

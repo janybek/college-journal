@@ -157,8 +157,8 @@ test('lesson: the shape of the answer, the marks and the check-ins of the studen
   store.insert('checkins', { pairId: p0922, studentId: a2, device: '2'.repeat(32), way: 'code', result: 'wrong', at: '2026-09-22 07:58:40' });
   store.insert('attendance', { pairId: p0922, studentId: a4, status: 'late', noCoat: true, activity: 4, source: 'teacher', markedBy: ids.teacher1, markedAt: '2026-09-22 07:59:00' });
   const lesson = call('lesson.get', { pairId: p0922 }, t.teacher1).data.lesson;
-  assert.deepEqual(Object.keys(lesson), ['now', 'pair', 'phase', 'startedAt', 'checkinLeftMs', 'lessonLeftMs', 'code', 'attended', 'total', 'students', 'scheme']);
-  assert.deepEqual(Object.keys(lesson.pair), ['id', 'date', 'slot', 'startTime', 'endTime', 'status', 'subjectId', 'subjectName', 'groupName', 'roomName', 'topicName', 'number', 'lessonType', 'first', 'mode']);
+  assert.deepEqual(Object.keys(lesson), ['now', 'pair', 'phase', 'startedAt', 'checkinLeftMs', 'lessonLeftMs', 'code', 'attended', 'total', 'students', 'scheme', 'assign']);
+  assert.deepEqual(Object.keys(lesson.pair), ['id', 'date', 'slot', 'startTime', 'endTime', 'status', 'subjectId', 'subjectName', 'groupName', 'roomName', 'topicName', 'number', 'lessonType', 'first', 'mode', 'topicId', 'unit']);
   assert.deepEqual([lesson.pair.id, lesson.pair.endTime, lesson.pair.status, lesson.pair.subjectName, lesson.pair.groupName, lesson.pair.mode], [p0922, '09:30', 'running', 'Информатика', '01-1', 'free']);
   assert.equal(lesson.now, '07:58:00');
   assert.deepEqual(lesson.students.map((x) => [x.id, x.left]), [[a1, false], [a3, false], [a2, false], [a4, true]]);

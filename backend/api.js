@@ -12,6 +12,7 @@ import { subjectHandlers } from './handlers/subjects.js';
 import { syllabusHandlers } from './handlers/syllabus.js';
 import { journalHandlers } from './handlers/journal.js';
 import { lessonHandlers } from './handlers/lesson.js';
+import { workHandlers } from './handlers/work.js';
 
 // Single entry point of the server. No Node-only APIs: this file is bundled for Apps Script.
 export { publicUser } from './users.js';
@@ -32,6 +33,7 @@ registerHandlers(subjectHandlers);
 registerHandlers(syllabusHandlers);
 registerHandlers(journalHandlers);
 registerHandlers(lessonHandlers);
+registerHandlers(workHandlers);
 
 // Test seam: runs `fn` with `map` applied (a null value removes that action), then restores the registry.
 export function withHandlers(map, fn) {

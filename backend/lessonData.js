@@ -116,6 +116,7 @@ export function lessonView(rows, platform, pair, user) {
       subjectId: pair.subjectId, subjectName: subject ? subject.name : '', groupName: group ? group.name : '', roomName: room ? room.name : '',
       topicName: topic ? topic.name : '', number: number ?? '', lessonType: pair.lessonType, first: pair.id === first,
       mode: markMode({ state, held: FIXED_STATUSES.includes(pair.status), teacher, manager: viewer.manager }),
+      topicId: pair.topicId ?? '', unit: topic ? topic.unit : null,
     },
     phase: clock.phase, startedAt: pair.startedAt || '', checkinLeftMs: clock.checkinLeftMs, lessonLeftMs: clock.lessonLeftMs,
     code,
@@ -123,6 +124,7 @@ export function lessonView(rows, platform, pair, user) {
     total: listed.length,
     students,
     scheme: { activity: scheme.activity },
+    assign: !!subject && subject.teacherId === user.id,
   };
 }
 

@@ -155,3 +155,28 @@ test('remove: marks, unit results and the change log keep students, staff and su
   const clean = mk('c3');
   assert.deepEqual(call('dir.remove', { table: 'students', id: clean.id }, admin).data, {});
 });
+
+test('remove: assignments, submissions and files keep students, staff and subjects', () => {
+  const { call, store, group, admin, teacherRow } = setup();
+  const mkStudent = (n) => store.insert('students', { fullName: n, cardNo: n, groupId: group.id, passwordHash: 'x', active: true });
+  const mkStaff = (n) => store.insert('staff', { fullName: n, login: n, passwordHash: 'x', roles: 'dean', active: true });
+  const gone = (table, row) => call('dir.remove', { table, id: row.id }, admin);
+  const bySubmission = mkStudent('w1');
+  store.insert('submissions', { assignmentId: 'as_x', studentId: bySubmission.id, n: 1, status: 'submitted' });
+  assert.equal(gone('students', bySubmission).error.code, 'in_use');
+  const byFile = mkStudent('w2');
+  store.insert('files', { assignmentId: 'as_x', ownerId: byFile.id, state: 'pending', name: 'a.pdf', kind: 'pdf', size: 1, stored: 'a'.repeat(32) + '.bin' });
+  assert.equal(gone('students', byFile).error.code, 'in_use');
+  const author = mkStaff('w3');
+  store.insert('assignments', { subjectId: 'sb_x', kind: 'hw', title: 'T', dueAt: '2026-09-20 23:59:00', maxPoints: 5, createdBy: author.id });
+  assert.equal(gone('staff', author).error.code, 'in_use');
+  const editor = mkStaff('w4');
+  store.insert('assignments', { subjectId: 'sb_x', kind: 'hw', title: 'T', dueAt: '2026-09-20 23:59:00', maxPoints: 5, createdBy: teacherRow.id, updatedBy: editor.id });
+  assert.equal(gone('staff', editor).error.code, 'in_use');
+  const checker = mkStaff('w5');
+  store.insert('submissions', { assignmentId: 'as_x', studentId: 'st_x', n: 1, status: 'checked', checkedBy: checker.id });
+  assert.equal(gone('staff', checker).error.code, 'in_use');
+  const subject = store.insert('subjects', { name: 'Free', teacherId: 'nobody', groupId: 'nogroup', scheme: 'A' });
+  store.insert('assignments', { subjectId: subject.id, kind: 'srs', title: 'T', dueAt: '2026-09-20 23:59:00', maxPoints: 5, createdBy: 'st_y' });
+  assert.equal(gone('subjects', subject).error.code, 'in_use');
+});

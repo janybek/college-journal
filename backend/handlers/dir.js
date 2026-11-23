@@ -115,12 +115,16 @@ function save(data, ctx) {
 const BLOCKERS = {
   disciplines: (id) => [['subjects', (r) => r.disciplineId === id], ['syllabi', (r) => r.disciplineId === id]],
   groups: (id) => [['students', (r) => r.groupId === id], ['subjects', (r) => r.groupId === id], ['pairs', (r) => r.groupId === id]],
-  students: (id) => [['attendance', (r) => r.studentId === id], ['checkins', (r) => r.studentId === id], ['unitResults', (r) => r.studentId === id], ['changeLog', (r) => r.studentId === id]],
+  students: (id) => [
+    ['attendance', (r) => r.studentId === id], ['checkins', (r) => r.studentId === id], ['unitResults', (r) => r.studentId === id], ['changeLog', (r) => r.studentId === id],
+    ['submissions', (r) => r.studentId === id], ['files', (r) => r.ownerId === id],
+  ],
   staff: (id) => [
     ['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id], ['syllabi', (r) => r.teacherId === id],
     ['attendance', (r) => r.markedBy === id], ['unitResults', (r) => r.updatedBy === id], ['changeLog', (r) => r.actorId === id],
+    ['assignments', (r) => r.createdBy === id], ['assignments', (r) => r.updatedBy === id], ['submissions', (r) => r.checkedBy === id],
   ],
-  subjects: (id) => [['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id], ['unitResults', (r) => r.subjectId === id]],
+  subjects: (id) => [['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id], ['unitResults', (r) => r.subjectId === id], ['assignments', (r) => r.subjectId === id]],
   rooms: (id) => [['weekTemplate', (r) => r.roomId === id], ['pairs', (r) => r.roomId === id]],
 };
 
