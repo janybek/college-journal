@@ -154,3 +154,12 @@ test('navFor: the group «Журнал» of the office has «Журнал изм
   assert.equal(navFor(['journal.list', 'journal.log'], 'teacher').flatMap((g) => g.items).some((i) => i.name === 'journalLog'), false);
   assert.equal(navFor(['journal.list'], 'dean').find((g) => g.titleKey === 'nav.journal').items.length, 1);
 });
+
+test('scrollToShow: the menu moves only when the current item is out of view', async () => {
+  const { scrollToShow } = await import('../site/js/shell.js');
+  assert.equal(scrollToShow(120, 300, 150, 190), 120);
+  assert.equal(scrollToShow(120, 300, 50, 90), 50);
+  assert.equal(scrollToShow(0, 300, 380, 420), 120);
+  assert.equal(scrollToShow(0, 300, 380, 420, 48), 168);
+  assert.equal(scrollToShow(100, 300, 40, 80, 48), 0);
+});

@@ -136,8 +136,29 @@ export function renderShell(host, { user, view, params }, handlers) {
   if (view === 'login' || view === 'changePassword') frame = authFrame(user, main, handlers);
   else if (user.kind === 'student') frame = studentFrame(main, handlers);
   else frame = staffFrame(user, view, params, main, handlers);
+  const savedScroll = host.querySelector('.sidebar__nav')?.scrollTop ?? 0;
   host.replaceChildren(frame);
+  keepMenuScroll(frame.querySelector('.sidebar__nav'), savedScroll);
   return main;
+}
+
+// The menu is drawn again with every screen: put it back where it was scrolled, and only if the current item is then
+// out of view (a direct link, a reload) move the menu just far enough to show it.
+// `margin` leaves some room beside the item, as the menu may still grow a little (a count arrives later).
+export function scrollToShow(scrollTop, viewHeight, itemTop, itemBottom, margin = 0) {
+  if (itemTop < scrollTop) return Math.max(0, itemTop - margin);
+  if (itemBottom > scrollTop + viewHeight) return itemBottom - viewHeight + margin;
+  return scrollTop;
+}
+
+function keepMenuScroll(nav, saved) {
+  if (!nav) return;
+  nav.scrollTop = saved;
+  const link = nav.querySelector('.nav-link[aria-current="page"]');
+  if (!link || nav.clientHeight === 0) return;
+  const navTop = nav.getBoundingClientRect().top;
+  const box = link.getBoundingClientRect();
+  nav.scrollTop = scrollToShow(nav.scrollTop, nav.clientHeight, box.top - navTop + nav.scrollTop, box.bottom - navTop + nav.scrollTop, 48);
 }
 
 // Pieces shared by every frame

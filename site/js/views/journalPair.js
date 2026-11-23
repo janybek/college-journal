@@ -33,7 +33,7 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
   const rows = draft.map((mark, index) => buildRow(mark, index));
   const problem = el('div', { class: 'mk-problem' });
   const reasonArea = el('textarea', {
-    id: 'journal-marks-reason', name: 'reason', class: 'field__input field__textarea', rows: '3', maxlength: String(REASON_MAX),
+    id: 'journal-marks-reason', name: 'reason', class: 'field__input field__textarea', rows: '2', maxlength: String(REASON_MAX),
     'aria-describedby': 'journal-marks-reason-hint journal-marks-reason-count', 'aria-required': 'true',
   });
   const reasonCount = el('span', { class: 'return-count', id: 'journal-marks-reason-count', 'aria-live': 'polite' }, t('journal.marks.reason.count', { n: 0, max: REASON_MAX }));
@@ -262,10 +262,12 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
     ? el('p', { class: 'mk-empty' }, t('journal.emptyStudents'))
     : el('ul', { class: 'mk-list', 'aria-label': t('journal.marks.list') }, rows.map((row) => row.li)),
   reasonMode ? el('div', { class: 'field mk-reason' },
-    el('label', { class: 'field__label', for: 'journal-marks-reason' }, t('journal.marks.reason.label')),
-    el('p', { class: 'field__hint', id: 'journal-marks-reason-hint' }, t('journal.marks.reason.hint')),
+    el('div', { class: 'mk-reason__head' },
+      el('label', { class: 'field__label', for: 'journal-marks-reason' }, t('journal.marks.reason.label')),
+      el('p', { class: 'field__hint', id: 'journal-marks-reason-hint' }, t('journal.marks.reason.hint')),
+      reasonCount),
     el('div', { class: 'field__control' }, reasonArea),
-    el('div', { class: 'return-under' }, reasonError, reasonCount)) : null,
+    reasonError) : null,
   problem,
   actions,
   asking);

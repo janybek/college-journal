@@ -6665,3 +6665,43 @@ a.gr-card:hover { border-color: var(--primary-line); }
   .jv-unit { width: 100%; }
   .jv-today__act { width: 100%; }
 }
+
+/* The window of marks and of a cell, compact: from a tablet's width the head is one line, the hint a slim strip, the
+   rows low and the reason block short, so a laptop screen shows many students. On a phone the controls stay 44 px. */
+.mk-reason__head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); }
+.mk-reason__head .field__hint { flex: 1 1 14rem; margin: 0; font-size: 1rem; }
+.mk-reason__head .return-count { margin-left: auto; font-size: 1rem; }
+
+@media (min-width: 48rem) {
+  .dialog--marks .dialog__body,
+  .dialog--cell .dialog__body { gap: var(--space-3); padding: var(--space-4) var(--space-5); }
+
+  .dialog--marks .mk-head,
+  .dialog--cell .mk-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); }
+
+  .dialog--marks .mk-head .dialog__title,
+  .dialog--cell .mk-head .dialog__title { order: -1; font-size: 1rem; }
+
+  .dialog--marks .mk-head .mk-topic,
+  .dialog--cell .mk-head .mk-topic { flex: 1 1 18rem; }
+
+  .mk-hint { gap: var(--space-2); padding: var(--space-1) var(--space-3); }
+  .dialog--marks .mk-hint .button { min-height: 32px; padding-block: 0; }
+
+  .mk-list { flex: 1 1 auto; min-height: 9rem; }
+  .mk-empty { flex: none; }
+
+  .mk-row { padding: 2px var(--space-3); gap: 0 var(--space-3); }
+  .mk-status__btn { min-height: 32px; }
+  .mk-coat,
+  .mk-act { min-height: 32px; }
+  .mk-act__input { min-height: 32px; padding-block: 0; }
+
+  .mk-reason { gap: var(--space-1); }
+  .mk-reason .field__textarea { min-height: 3.25rem; }
+
+  .dialog--marks .dialog__actions,
+  .dialog--cell .dialog__actions { margin-top: 0; }
+  .dialog--marks .button,
+  .dialog--cell .button { min-height: 40px; }
+}
