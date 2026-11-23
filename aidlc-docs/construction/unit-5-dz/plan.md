@@ -10,7 +10,7 @@
 
 **Spec:** `aidlc-docs/inception/design-v1.md` (раздел 6 «ДЗ и СРС», «Ведомость (вариант А)», раздел 7 — кабинет студента «Оценки · ДЗ · Пропуски»), `aidlc-docs/inception/ТЗ.md` (ДЗ и СРС, кабинет студента, таблицы «Задания» и «Сдачи»), таблица решений `aidlc-docs/aidlc-state.md` — 20.11.2026 «ДЗ … в итог не входит», 22.11.2026 «Новые правила (приняты все 12)» и «Порядок юнитов меняется», 22.11.2026 «План юнита 3 … СРС за юнит одним числом», **23.11.2026 «Юнит 5 „ДЗ и СРС“ — вопросы до плана»**; план юнита 3 `aidlc-docs/construction/unit-3-zhurnal/plan.md` (модель журнала, «Правила расчёта», журнал изменений — действуют без изменений, кроме СРС юнита с заданиями). `design-v1.md` писался под Google («файл уходит в папку на Google Диске»): сервер теперь Node + SQLite на компьютере владельца за Tailscale Funnel, файлы — в папке данных рядом с базой. Где `design-v1.md` расходится с таблицей решений или с этим планом, действуют они.
 
-**Исходное состояние:** `HEAD 63fa74c`, **787 тестов** (`npm test` 23.11.2026), `npm run build:gas` собирается. Юниты 1–4 приняты и выложены (сервер и сайт `47a5089`). Ответы владельца до плана (23.11.2026, все по умолчанию): с телефона — текст и до 5 файлов по 10 МБ (фото, PDF, Word, Excel, PowerPoint), фото уменьшается на телефоне; СРС юнита = по заданиям СРС юнита (набрано / максимум × 20), без заданий — число рукой, как в юните 3; задание выдаётся на этапе «Итог» идущей пары и на экране «Задания»; деканат и проректор видят всё (задания, работы с файлами, баллы, комментарии), но не оценивают. Из дизайна: ДЗ в итог не входит; сдать после срока можно, с пометкой «с опозданием», баллы решает преподаватель; статусы «сдано / проверено / возвращено» и комментарий.
+**Исходное состояние:** `HEAD adc6e6b` (после `63fa74c` только документы), **787 тестов** (`npm test` 23.11.2026), `npm run build:gas` собирается. Юниты 1–4 приняты и выложены (сервер и сайт `47a5089`). Ответы владельца до плана (23.11.2026, все по умолчанию): с телефона — текст и до 5 файлов по 10 МБ (фото, PDF, Word, Excel, PowerPoint), фото уменьшается на телефоне; СРС юнита = по заданиям СРС юнита (набрано / максимум × 20), без заданий — число рукой, как в юните 3; задание выдаётся на этапе «Итог» идущей пары и на экране «Задания»; деканат и проректор видят всё (задания, работы с файлами, баллы, комментарии), но не оценивают. Из дизайна: ДЗ в итог не входит; сдать после срока можно, с пометкой «с опозданием», баллы решает преподаватель; статусы «сдано / проверено / возвращено» и комментарий.
 
 **Порядок.** Сначала сверка плана (opus) с готовым кодом — находки правит отдельный агент в этом файле. Затем задачи 1 → 13 строго по одной; после каждой `npm test` зелёное и `npm run build:gas` собирается. Задачи 1–8 (правила, хранилище файлов, сервер, стенд) идут без остановок. Экраны — **три блока с остановкой после каждого** (как в юнитах 3–4): блок 1 — задачи 9–10 (преподаватель), блок 2 — задача 11 (студент), блок 3 — задача 12 (деканат, журнал, «Оценки», «Журнал изменений»). После блока координатор поднимает стенд `journal-dev-reset`, входит за владельца и даёт список «что посмотреть»; заметки — в `aidlc-docs/construction/unit-5-dz/замечания.md`; правки блока — одному агенту, проверка — только этого блока. После блока 3 — одна строгая общая проверка (opus), одна волна исправлений, повторная проверка, выкладка (задача 13).
 
@@ -22,6 +22,7 @@
 - Сайт: без сборки, без фреймворков, ничего не загружает с чужих адресов (ни CDN, ни внешних шрифтов).
 - Все обработчики сервера синхронные. `handleRequest` никогда не бросает исключение и всегда возвращает объект ответа. Ошибки — `AppError(code, { fields })` из `core/errors.js`.
 - Запрос сайта: `POST`, `Content-Type: text/plain;charset=utf-8`, тело — JSON `{action, token, data}`. Своих заголовков нет.
+- Исключение — `work.upload` с полосой хода: `XMLHttpRequest` с обработчиком `xhr.upload.onprogress` по стандарту всегда делает предварительный запрос `OPTIONS` (CORS preflight), даже при `text/plain`. Рабочий сервер на него отвечает (задача 4). Стенду не нужно: сайт и `/api` у него на одном адресе.
 - `passwordHash` никогда не попадает в ответ сервера. Ответы собираются по полям; строки сотрудников и студентов в ответ целиком не копируются.
 - Время берётся только из `platform.now()`. `Date.now()` и `new Date()` без аргумента в `core/` и `backend/` запрещены. «Сегодня» — `localDate(platform.now())` по Бишкеку (UTC+6 круглый год). Сайт часам устройства не доверяет: «сегодня» и «сейчас» он берёт из ответа сервера (срок «просрочено» и «осталось» — тоже).
 - Дата — строка `'YYYY-MM-DD'`, время — `'HH:MM'`, дата со временем — `'YYYY-MM-DD HH:MM:SS'` (`localDateTime`). Объектов `Date` в строках хранилища нет.
@@ -56,9 +57,9 @@
 - **Диск чистит только уборка.** Ни один запрос не удаляет файлы с диска (отказ откатывает запись в базе, а файл уже записан — его подберёт уборка). `sweepFiles` (Node, задача 4) удаляет строки незакреплённых и убранных файлов старше 24 часов и файлы на диске без живой строки старше 1 часа. Таймеров в `core/` и `backend/` (кроме `backend/node/`) нет.
 - **Таблицы «Задания», «Сдачи», «Файлы»** пишут только `backend/workData.js`, `backend/workStudent.js`, `backend/workFiles.js`, `backend/workGrade.js` и `dev/seed.js` через их правила; `dir.*` и импорт этих таблиц не знают.
 - **Кто что может.** Задания создаёт, меняет, удаляет и оценивает только преподаватель предмета — `subject.teacherId` сейчас (после смены преподавателя — новый; заменяющий на паре — нет). Деканат, проректор и администратор читают всё (задания, сдачи, файлы, баллы, комментарии) и не оценивают. Студент видит задания предметов **своей нынешней** группы и только свои сдачи и файлы.
-- **Баллы и журнал изменений.** Каждое изменение баллов и статуса проверки пишет строку «Журнала изменений» (`entity: 'work'`) в том же запросе. Первая оценка — без причины; изменение уже поставленных баллов и возврат проверенной работы — с причиной (вопрос 3, по умолчанию).
+- **Баллы и журнал изменений.** Каждое изменение баллов и статуса проверки пишет строку «Журнала изменений» (`entity: 'work'`) в том же запросе. Первая оценка — без причины; изменение уже поставленных баллов и возврат проверенной работы — с причиной (вопрос 3, по умолчанию). Смена `maxPoints` или `dueAt` у задания с попытками тоже пишет строку (без причины; вопрос 8).
 - **Запасной Apps Script:** в нём нет ящика файлов — `work.upload`, `work.dropFile`, `work.file` отвечают `files_unavailable`; задания, сдача только текстом, проверка и СРС по заданиям работают. `npm run build:gas` собирается; живьём на Apps Script юнит 5 не проверяется.
-- **Юниты 3–4 не меняются.** Все прежние тесты остаются зелёными без правок, кроме прямо названных в задаче 3 проверок списков таблиц, колонок и прав. СРС юнита без заданий СРС — как в юните 3.
+- **Юниты 3–4 не меняются.** Все прежние тесты остаются зелёными без правок, кроме прямо названных в задачах 3 и 5 проверок списков таблиц, колонок и прав. СРС юнита без заданий СРС — как в юните 3.
 - **Проверка задач** (правило 12 и правило экономии от 22.11.2026): после каждой задачи 1–8 — облегчённая проверка (sonnet, короткий отчёт); пробы на права, данные студентов и файлы — **строгие** для задач 1, 3, 4, 5, 6, 7 (обход, снимок таблиц, поиск в JSON, подложные файлы). Экранные задачи: проверка ИИ — только задачи 10, 11, 12 (оценки, данные студентов, файлы); задачу 9 владелец принимает блоком. Общая проверка юнита — одна, в конце, строгая, opus, с пробными скриптами против настоящего кода.
 - **Модели.** «Логика», «Сервер», «Экраны», проверяющий — sonnet; сверка плана и общая проверка — opus. Модель указывается явно в каждом поручении.
 
@@ -69,7 +70,7 @@
 3. **Подложный файл.** `.exe`, переименованный в `.jpg`; SVG и HTML со `<script>` под именем `.png`/`.pdf`; ZIP без `word/document.xml` под именем `.docx`; `.docx` с `vbaProject.bin`; `.doc` с `_VBA_PROJECT`; расширение не совпадает с содержимым; 10 МиБ + 1 байт; пустой файл; base64 с пробелом или переводом строки; имя `..\..\x/evil.pdf`, имя с NUL, с символами смены направления текста, 300 знаков. Отказ или чистое имя, на диске — только случайное имя. Тесты — задачи 1, 6.
 4. **Много файлов.** Шестой файл в одной сдаче; чужой `fileId` в `work.submit` (другого студента, другого задания, уже закреплённый, убранный, старше 24 часов); 61-я загрузка за день и 200 МиБ за день — отказ, ничего не записано. Тесты — задача 6.
 5. **Удалённое задание и закрытая работа.** Задание со сдачами не удаляется (`in_use`); после удаления задания без сдач его загрузки и сдача — `not_found`, незакреплённые файлы убраны; проверенную работу студент не пересдаёт (`already_checked`). Тесты — задачи 5, 6.
-6. **Баллы.** Больше максимума, меньше нуля, дробь, строка, баллы при возврате, возврат без комментария, возврат без сдачи, повтор тех же значений (ничего не пишется), изменение баллов без причины — отказ; каждая запись — строки «Журнала изменений» с верными «было», «стало», автором, заданием и причиной. Тесты — задача 7.
+6. **Баллы.** Больше максимума, меньше нуля, дробь, строка, баллы при возврате, возврат без комментария, возврат без сдачи, повтор тех же значений (ничего не пишется), изменение баллов без причины — отказ; оценка на попытку, которой преподаватель не видел (`attempt_changed`, ничего не записано); смена `maxPoints`/`dueAt` у задания с попытками — строка журнала без причины; каждая запись — строки «Журнала изменений» с верными «было», «стало», автором, заданием и причиной. Тесты — задача 7.
 7. **СРС по заданиям.** Числа раздела «Правила расчёта»; юнит без заданий СРС — как в юните 3; ручной СРС на юните с заданиями — `self_by_work`, сохранённое число не действует; итог юнита — только когда по всем заданиям СРС решено; уменьшение схемы; ДЗ в итог не входит; студент в «Оценках» видит то же число, что преподаватель в журнале. Тесты — задачи 2, 7.
 8. **Просмотр файла безопасен.** `work.file` отдаёт только `kind` из 9 видов; сайт берёт тип `Blob` из своего списка; имя файла показывается текстом; HTML, SVG и неизвестный вид не открываются на странице. Тесты — задачи 6, 10.
 9. **Диск и копии.** Отказ после записи файла на диск оставляет «сироту», которую убирает уборка; уборка не трогает файлы живых строк и свежие файлы; копия дописывает только новые файлы; восстановление копии возвращает недостающие файлы; мало места — файл тревоги на Рабочем столе. Тесты — задача 4.
@@ -92,7 +93,7 @@
 
 ## Решения плана, которые видят пользователи или которые меняют базу
 
-Семь строк помечены «вопрос N» — это вопросы `owner-summary.md`; в плане стоит вариант по умолчанию. Остальное — решения плана; координатор переносит их в таблицу решений `aidlc-state.md` после согласия владельца.
+Семь строк помечены «вопрос N» — это вопросы `owner-summary.md`; в плане стоит вариант по умолчанию. Восьмая такая строка («вопрос 8») появилась по сверке плана; владелец решил её по умолчанию 23.11.2026. Остальное — решения плана; координатор переносит их в таблицу решений `aidlc-state.md` после согласия владельца.
 
 | Вопрос | Решение | Почему |
 | --- | --- | --- |
@@ -104,6 +105,7 @@
 | Фото | Уменьшается на телефоне до 1600 px по длинной стороне, JPEG; обычно 200–600 КБ. Фото iPhone (HEIC) телефон сам отдаёт как JPEG; фото, которое браузер не открыл, — «Не удалось открыть фото, сфотографируйте ещё раз или пришлите PDF» | ответ владельца 1 |
 | Пересдача (вопрос 2) | Пока работа не проверена, студент может сдать заново (прежняя попытка — «заменена»); после «возвращено» — тоже. Проверенную пересдать нельзя. Все попытки с файлами и комментариями хранятся, преподаватель видит историю | студент ошибся фото — не ждать возврата |
 | Срок | Сдать после срока можно всегда (пока юнит не закрыт — юнит 6); работа помечена «с опозданием» (время сдачи позже срока; считается при чтении — перенос срока меняет пометку). Баллы решает преподаватель | `design-v1.md` |
+| Смена максимума или срока у задания с попытками (вопрос 8, по сверке) | Смена `maxPoints` или `dueAt` у задания с попытками пишет строку «Журнала изменений» без причины (владелец, 23.11.2026, по сверке) | смена максимума или срока молча пересчитывает СРС; след должен остаться |
 | Проверка | «Проверено» с баллами 0…максимум и комментарием или «Вернуть на доработку» с обязательным комментарием (баллов нет). Изменить баллы или вернуть проверенную — можно, с причиной (вопрос 3) | статусы «сдано / проверено / возвращено» |
 | Сдано на бумаге (вопрос 1) | Преподаватель ставит баллы студенту без сдачи на сайте — появляется попытка «на бумаге» (без текста и файлов) | иначе СРС по заданиям заставит всех сдавать только с телефона |
 | СРС юнита | Есть хоть одно задание СРС юнита — балл считается: набрано / максимум × СРС схемы (20), округление половины вверх. Нет — число рукой, как в юните 3 (ручное число на юните с заданиями не действует, но не стирается) | ответ владельца 2 |
@@ -156,7 +158,7 @@ files: {
 - **Задание:** `planSemester` — семестр по плану утверждённого силлабуса предмета на момент выдачи (`syllabusFor(subject, syllabi, settings.semester).planSemester`), `null`, если силлабуса нет (тогда только ДЗ без юнита). `unit` — `null` у ДЗ без юнита. `topicId`, `pairId` — `''`, если не заданы. `dueAt` — `'YYYY-MM-DD HH:MM:00'`.
 - **Сдача (попытка):** одна строка на попытку; `n` — 1, 2, 3… у пары «задание + студент»; **текущая** — с наибольшим `n` (при равенстве — больший id). `status`: `submitted` → `checked` или `returned`; при новой попытке поверх `submitted` прежняя становится `replaced`. `points` — `null`, пока не `checked`. `paper: true` — попытка «на бумаге»: создаёт преподаватель, `text: ''`, `submittedAt` — время записи. «С опозданием» = `!paper && submittedAt > dueAt` (сравнение строк), не хранится.
 - **Файл:** `state: 'pending'` — загружен, `submissionId: ''`; `attached` — в попытке `submissionId`; `dropped` — убран студентом до сдачи (строка нужна для дневного предела). `stored` — имя на диске `<32 hex>.bin`. `name` — чистое имя (`cleanFileName`), только текст.
-- **Журнал изменений:** `entity: 'work'`, `assignmentId`, `subjectId`, `studentId`, `unit` (юнит задания или `null`), `field`: `points` или `status`; `before`/`after` — число текстом или код статуса (`''` — не было). `late: false`.
+- **Журнал изменений:** `entity: 'work'`, `assignmentId`, `subjectId`, `studentId`, `unit` (юнит задания или `null`), `field`: `points` или `status`; `before`/`after` — число текстом или код статуса (`''` — не было). `late: false`. Смена `maxPoints` или `dueAt` у задания с попытками (задача 5) — строка с `studentId: ''`, `field: 'maxPoints' | 'dueAt'`, `before`/`after` — число или `'YYYY-MM-DD HH:MM:SS'` текстом, `reason: ''`.
 
 ## Правила расчёта (с числами)
 
@@ -257,7 +259,7 @@ tests/workGradeApi.test.js  seedWork.test.js  siteWork.test.js  tests/fakes/memo
 
 - `tests/fakes/sampleFiles.js` (задача 1): `bytesOf(...parts)` — `Uint8Array` из чисел и строк (строки — побайтно `latin1`); `utf16(text)` — байты UTF-16LE; образцы `SAMPLE.jpg`, `png`, `pdf`, `docx`, `xlsx`, `pptx`, `doc` (начало файла с верной сигнатурой и нужными внутренними именами, 64–300 байт) и подлоги `FAKE.exe` (`MZ…`), `FAKE.svg` (`<svg … <script>`), `FAKE.html`, `FAKE.zip` (ZIP без частей Office), `FAKE.docm` (ZIP с `word/document.xml` и `word/vbaProject.bin`), `FAKE.docMacro` (OLE с `utf16('_VBA_PROJECT')`); `b64(bytes)` — base64 (`Buffer`, только в тестах).
 - `tests/fakes/memoryFiles.js` (задача 4): `createMemoryFiles()` — ящик в памяти с тем же устройством, что у дискового (раздел задачи 4), плюс `names()` — отсортированные имена.
-- `tests/journalSetup.js` (задача 5): `setup({ makeStore, files })` — `files` по умолчанию `createMemoryFiles()`, кладётся в `ctx.files` и возвращается; `setup({ files: null })` — без ящика (как Apps Script). `snapshot()` дополнительно копирует `assignments`, `submissions`, `files`, `unitResults` и `files.names()` (ключ `disk`). `task(over)` — пишет задание прямо в хранилище: `{ subjectId: sb1, kind: 'srs', planSemester: 1, unit: 2, topicId: '', pairId: '', title: 'СРС А', description: '', dueAt: '2026-09-20 23:59:00', maxPoints: 10, createdBy: ids.teacher1, createdAt: '2026-09-10 12:00:00', updatedBy: '', updatedAt: '', ...over }` → id. `attempt(assignmentId, key, over)` — пишет попытку: `{ n: 1, text: 'ответ', paper: false, submittedAt: '2026-09-18 10:00:00', status: 'submitted', points: null, comment: '', checkedBy: '', checkedAt: '', ...over }` → id.
+- `tests/journalSetup.js` (задача 5): `setup({ makeStore, files })` — `files` по умолчанию `createMemoryFiles()`, кладётся в `ctx.files` и возвращается; `setup({ files: null })` — без ящика (как Apps Script). `snapshot()` дополнительно копирует `assignments`, `submissions`, `files`, `unitResults` и `files.names()` (ключ `disk`: `disk: files ? files.names() : []` — для `setup({ files: null })`). `task(over)` — пишет задание прямо в хранилище: `{ subjectId: sb1, kind: 'srs', planSemester: 1, unit: 2, topicId: '', pairId: '', title: 'СРС А', description: '', dueAt: '2026-09-20 23:59:00', maxPoints: 10, createdBy: ids.teacher1, createdAt: '2026-09-10 12:00:00', updatedBy: '', updatedAt: '', ...over }` → id. `attempt(assignmentId, key, over)` — пишет попытку: `{ n: 1, text: 'ответ', paper: false, submittedAt: '2026-09-18 10:00:00', status: 'submitted', points: null, comment: '', checkedBy: '', checkedAt: '', ...over }` → id.
 
 ---
 
@@ -271,14 +273,14 @@ tests/workGradeApi.test.js  seedWork.test.js  siteWork.test.js  tests/fakes/memo
 export const FILE_LIMITS = Object.freeze({ maxBytes: 10485760, perWork: 5, perDayCount: 60, perDayBytes: 209715200, nameMax: 120, keepPendingMs: 86400000 });
 export const FILE_KINDS = ['jpg', 'png', 'pdf', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'];
 export function cleanFileName(raw);   // -> string: последняя часть после '/' или '\'; без знаков U+0000–U+001F, U+007F, U+202A–U+202E, U+2066–U+2069;
-                                      // пробелы по краям сняты; длиннее 120 — обрезается основа, расширение сохраняется; пусто или не строка -> 'file'
+                                      // пробелы по краям сняты; длиннее 120 — обрезается основа по символам (`Array.from`), а не по единицам UTF-16, расширение сохраняется; пусто или не строка -> 'file'
 export function kindByName(name);     // -> вид | null: последнее расширение без учёта регистра; jpg, jpeg -> 'jpg'; png, pdf, docx, xlsx, pptx, doc, xls, ppt; иначе null
 export function base64Bytes(text);    // -> число байт | null: строка только из [A-Za-z0-9+/], длина кратна 4, '=' только в конце (0–2); '' -> 0; иначе null
 export function sniffKind(bytes, kind);   // bytes: Uint8Array; -> kind | null (см. ниже); не бросает
 export function isStoredName(name);   // /^[0-9a-f]{32}\.bin$/
 ```
 
-`sniffKind`: `jpg` — `FF D8 FF`; `png` — `89 50 4E 47 0D 0A 1A 0A`; `pdf` — `%PDF-` в начале; `docx`/`xlsx`/`pptx` — `PK 03 04` в начале и в байтах есть `word/document.xml` / `xl/workbook.xml` / `ppt/presentation.xml` соответственно, и нет `vbaProject.bin`; `doc`/`xls`/`ppt` — `D0 CF 11 E0 A1 B1 1A E1` в начале и нет `_VBA_PROJECT` в UTF-16LE. Ответ — `kind`, только если содержимое подходит именно под этот `kind` (`kind` берётся из имени); иначе `null`. Пустой массив, не `Uint8Array`, неизвестный `kind` — `null`. Поиск подстроки — по байтам, без перевода в строку всего файла.
+`sniffKind`: `jpg` — `FF D8 FF`; `png` — `89 50 4E 47 0D 0A 1A 0A`; `pdf` — `%PDF-` в начале; `docx`/`xlsx`/`pptx` — `PK 03 04` в начале и в байтах есть `word/document.xml` / `xl/workbook.xml` / `ppt/presentation.xml` соответственно, и нет `vbaProject.bin` и `macrosheets/`; `doc`/`xls`/`ppt` — `D0 CF 11 E0 A1 B1 1A E1` в начале и нет `_VBA_PROJECT` в UTF-16LE. Ответ — `kind`, только если содержимое подходит именно под этот `kind` (`kind` берётся из имени); иначе `null`. Пустой массив, не `Uint8Array`, неизвестный `kind` — `null`. Поиск подстроки — по байтам, без перевода в строку всего файла.
 
 - [ ] **Step 1: тесты.**
 
@@ -322,7 +324,7 @@ export function checkAssignment(input, { units, topics, nowMs, old = null, locke
 export function currentAttempt(list);          // попытки одной пары «задание + студент» -> строка с наибольшим n (при равенстве — больший id) | null
 export function workState(assignment, attempt, nowMs);
 // -> { state: 'none' | 'submitted' | 'checked' | 'returned', late, overdue }; late = attempt && !attempt.paper && attempt.submittedAt > assignment.dueAt;
-//    overdue = state 'none' и nowMs > parseLocalDateTime(dueAt)
+//    overdue = state 'none' и nowMs > parseLocalDateTime(dueAt); late = !!attempt && !attempt.paper && attempt.submittedAt > assignment.dueAt (без попытки — `false`, не `null`)
 export function checkGrade({ verdict, points, comment }, { maxPoints });   // -> [{ field, code }]
 export function selfByWork({ assignments, attemptOf, nowMs, self });
 // assignments: задания СРС одного юнита; attemptOf: Map(id задания -> текущая попытка студента | null); self: максимум СРС схемы
@@ -339,12 +341,13 @@ export function taskCounts(tasks, nowMs);      // tasks: [{ dueAt, state }] -> {
 - `dueDate` не `isDate` или `dueTime` не `isTime` — `due/bad_value`; `dueAt = dueDate + ' ' + dueTime + ':00'`; если задание новое или `dueAt !== old.dueAt`: `parseLocalDateTime(dueAt) <= nowMs` — `due/due_past`; больше `nowMs + WORK.farMs` — `due/too_far`.
 - `maxPoints` не целое 1…100 — `maxPoints/bad_value`; `maxGiven !== null && maxPoints < maxGiven` — `maxPoints/below_points`.
 - `locked` и `kind`, `unit` или `topicId` отличаются от `old` — `kind|unit|topicId/locked`.
+- При изменении (`old` задан), если `kind`, `unit` и `topicId` равны `old`, `unit` и `topicId` по `units`/`topics` не проверяются: задание остаётся в своём юните, даже если силлабус сменился.
 
 `checkGrade`: `verdict` не `'checked'`/`'returned'` — `verdict/bad_value`; `checked` — `points` целое 0…`maxPoints`, иначе `points/bad_value`; `returned` — `points` не `null`/нет — `points/bad_value`, комментарий пуст после обрезки — `comment/empty`; `comment` не строка (и не нет) или длиннее 2000 — `comment/too_long`.
 
 `selfByWork` — по таблице раздела «Правила расчёта»: `value = max > 0 ? Math.round(earned * self / max) : null`.
 
-`taskCounts`: `fresh` — `none` и срок не прошёл; `soon` — `none` и до срока не больше 48 ч (срок не прошёл); `overdue` — `none` и срок прошёл; `returned` — `returned`.
+`taskCounts`: `fresh` — `none` и срок не прошёл; `soon` — `none`, срок не прошёл и дата срока не позже завтрашней по Бишкеку; `overdue` — `none` и срок прошёл; `returned` — `returned`.
 
 `core/grades.js` — `studentResults({ …, selfWork = new Map() })`: для юнита, который есть в `selfWork` (значение — ответ `selfByWork`, не `null`): `self = sw.pending === 0 ? sw.value : null`, ручной `row.self` не читается, в объект юнита добавляется `selfWork: sw`. Юнит, которого нет в `selfWork`, считается и выглядит **ровно как раньше** (без новых ключей) — так прежние `deepEqual` остаются верными.
 
@@ -370,6 +373,7 @@ const old = { kind: 'srs', unit: 2, topicId: '', dueAt: '2026-09-20 23:59:00' };
 assert.deepEqual(bad({ dueDate: '2026-09-20', dueTime: '23:59' }, { old }), []);                         // прежний прошедший срок не мешает
 assert.deepEqual(bad({ unit: 1 }, { old, locked: true }), [{ field: 'unit', code: 'locked' }]);
 assert.deepEqual(bad({ maxPoints: 12 }, { old, locked: true, maxGiven: 15 }), [{ field: 'maxPoints', code: 'below_points' }]);
+assert.deepEqual(bad({ title: 'Новое' }, { units: [], topics: [], old: { ...old, dueAt: '2026-09-27 23:59:00' } }), []);   // силлабус сменился — задание всё равно меняется
 // попытки и состояние
 const A = { dueAt: '2026-09-20 23:59:00' };
 assert.equal(currentAttempt([{ id: 'x1', n: 1 }, { id: 'x3', n: 2 }, { id: 'x2', n: 2 }]).id, 'x3');
@@ -409,7 +413,7 @@ assert.deepEqual(taskCounts([{ dueAt: '2026-09-25 10:00:00', state: 'none' }, { 
 
 ### Task 3 (Л): таблицы «Задания», «Сдачи», «Файлы» и права
 
-**Files:** Modify `core/schema.js`, `core/permissions.js`, `core/work.js` (константа видов — импортом из схемы), `tests/schema.test.js`, `tests/permissions.test.js`, `tests/api.test.js`, `tests/sheetsStore.test.js`, `tests/gasBundle.test.js`, `tests/sqliteStore.test.js`. В прежних тестах правятся только: список и хвост таблиц в `schema.test.js` (`tableNames()` целиком, `slice(-4)` → `slice(-7)` с новыми именами, «последняя таблица»), число созданных листов в `sheetsStore.test.js` (22 → 25), число листов в `gasBundle.test.js` (23 → 26, и в названии теста; плюс слово `Buffer` в списке запрещённых в сборке — сейчас его там нет ни в одном файле), списки `listPermissions` преподавателя и студента в `permissions.test.js`, список прав преподавателя в `api.test.js` (строка с `permissions: ['journal.get', …]`); в `sqliteStore.test.js` — одна новая проверка. Других прежних проверок не трогать; правки перечислить в отчёте. **Проверка — строгая** (права).
+**Files:** Modify `core/schema.js`, `core/permissions.js`, `core/work.js` (константа видов — импортом из схемы), `tests/schema.test.js`, `tests/permissions.test.js`, `tests/api.test.js`, `tests/sheetsStore.test.js`, `tests/gasBundle.test.js`, `tests/sqliteStore.test.js`. В прежних тестах правятся только: список и хвост таблиц в `schema.test.js` (`tableNames()` целиком, `slice(-4)` → `slice(-7)` с новыми именами, «последняя таблица», список колонок `changeLog` (строка 16, + `'assignmentId'` в конце) и `LOG_ENTITIES` (строка 28, + `'work'`)), число созданных листов в `sheetsStore.test.js` (22 → 25), число листов в `gasBundle.test.js` (23 → 26, и в названии теста; плюс слово `Buffer` в списке запрещённых в сборке — сейчас его там нет ни в одном файле), списки `listPermissions` преподавателя и студента в `permissions.test.js`, список прав преподавателя в `api.test.js` (строка с `permissions: ['journal.get', …]`); в `sqliteStore.test.js` — одна новая проверка. Других прежних проверок не трогать; правки перечислить в отчёте. **Проверка — строгая** (права).
 
 **Produces:** константы, таблицы и колонка раздела «Модель данных» — дословно (`LOG_ENTITIES` уже есть — заменить, не объявлять второй раз). В `permissions.js` (`ROLE_ACTIONS`):
 
@@ -480,22 +484,24 @@ export function createDiskFiles(dir);                 // put: mkdir -p, запи
 export function sweepFiles({ store, dir, nowMs, keepMs = FILE_LIMITS.keepPendingMs, graceMs = 3600000 });
 // 1) строки «Файлов» в состоянии pending или dropped с at старше keepMs — одна removeMany;
 // 2) файлы в dir с именем isStoredName, которых нет среди stored живых строк (pending, attached) и mtime старше graceMs — удалить;
-//    файлы с другими именами не трогаются. -> { rows, files }
+//    файлы с другими именами не трогаются; свои `*.bin.tmp` старше graceMs тоже удаляются. -> { rows, files }
+//    sweepFiles, mirrorFiles, restoreFiles при отсутствующей папке -> { …: 0 }; mirrorFiles и restoreFiles пишут через временное имя и rename
 export function mirrorFiles(dir, mirrorDir);          // копирует в mirrorDir файлы dir, которых там нет (только isStoredName); ничего не удаляет -> { copied }
 export function restoreFiles(mirrorDir, dir);         // обратное: недостающие в dir -> { copied }
-export function spaceAlarm({ config, minFreeBytes = MIN_FREE_BYTES, statfs = fs.statfsSync });
+export function spaceAlarm({ config, logger, minFreeBytes = MIN_FREE_BYTES, statfs = fs.statfsSync });
 // свободное место на дисках dataDir и backupDir (bavail × bsize); меньше порога хоть на одном — файл SPACE_ALERT_FILE в alertDir
 // (дата, где мало, сколько свободно, «Откройте проект „Журнал колледжа“ в Claude и скажите: мало места на диске»); иначе файл убирается.
-// -> { low: ['data' | 'backup'] }; без alertDir ничего не пишет; ошибка statfs — запись в журнал работы, не падение.
+// -> { low: ['data' | 'backup'] }; без alertDir ничего не пишет; ошибка statfs (`statfsSync` на несуществующей папке — `ENOENT`) — запись в журнал работы через `logger`, не падение.
 ```
 
 Что меняется:
 
 1. `readConfig` возвращает ещё `filesDir: path.join(dataDir, FILES_DIR)` (папка копий файлов — `path.join(backupDir, FILES_DIR)`).
-2. `startServer({ config, base, logger, guard, maxBodyBytes, files })` кладёт `files` в `ctx`. `main` создаёт `createDiskFiles(config.filesDir)`; после `base.upgrade()` — `sweepFiles` и `spaceAlarm` (ошибка уборки — строка в журнале работы, сервер всё равно стартует).
-3. `backupNow`: после проверенной копии базы — `mirrorFiles(config.filesDir, <backupDir>/files)`; ошибка копии файлов — `ok: false` и прежняя тревога «копия не сделана» с причиной. `startBackups({ …, afterRun })` — после каждого запуска копии (удачного или нет) вызывает `afterRun()`; `main` передаёт уборку и `spaceAlarm`.
+2. `startServer({ config, base, logger, guard, maxBodyBytes, files })` кладёт `files` в `ctx`. `main` создаёт `createDiskFiles(config.filesDir)`; после `base.upgrade()` — `sweepFiles` и `spaceAlarm` (ошибка уборки — строка в журнале работы, сервер всё равно стартует). Уборка и `spaceAlarm` при запуске — один раз в `main`, после `base.upgrade()`.
+2а. `startServer`, путь `/api`, метод `OPTIONS`. `Origin` из `config.origins` — ответ `204` без тела с заголовками `Access-Control-Allow-Origin: <origin>`, `Access-Control-Allow-Methods: POST`, `Access-Control-Allow-Headers: Content-Type`, `Access-Control-Max-Age: 600`, `Vary: Origin`. Другой `Origin` или его нет — `403` `forbidden_origin`, как у `POST`. Остальные методы, кроме `POST`, — `405`, как сейчас.
+3. `backupNow`: после проверенной копии базы — `mirrorFiles(config.filesDir, <backupDir>/files)`; ошибка копии файлов — `ok: false` и прежняя тревога «копия не сделана» с причиной. `startBackups({ …, afterRun })` вызывает `afterRun()` только после копий по таймеру. После первой копии `first` — нет: она делается до `base.upgrade()`, когда в старой базе ещё нет таблицы «Файлы». `afterRun` ничего не бросает: его ошибка — только строка в журнале работы. `main` передаёт в `afterRun` уборку и `spaceAlarm`.
 4. `restoreBase`: после восстановления базы — `restoreFiles(<backupDir>/files, config.filesDir)`; число возвращённых файлов — в выводе `serve:restore`. `COPY_TABLES` не меняется (копия без новых таблиц восстанавливается).
-5. Стенд: `startDevServer` создаёт `createDiskFiles('dev/data/files')` (режим `real` — `'dev/data/real-files'`) и кладёт в `ctx`; при запуске — `sweepFiles`. `standArgs` с `--reset` удаляет и `dev/data/files` (рекурсивно), **никогда** `dev/data/real-files`.
+5. Стенд: папка ящика лежит рядом с файлом данных: `filesDir = path.join(path.dirname(dataPath), seederFor(dataPath, mode) === seedAdmin ? 'real-files' : 'files')`. Для `dev/data/db.json` это `dev/data/files`, для `dev/data/real.json` — `dev/data/real-files`, для временного файла теста — папка во временной папке теста. `startDevServer` создаёт `createDiskFiles(filesDir)`, кладёт ящик в `ctx`, при запуске делает `sweepFiles` по этой папке и возвращает ещё `filesDir`. `standArgs` с `--reset` удаляет `path.resolve(root, 'dev/data/files')` рекурсивно и никогда — `real-files`.
 6. Апп Скрипт: ящика нет — ничего не меняется.
 
 - [ ] **Step 1: тесты** (`tests/filesBox.test.js`; временная папка `fs.mkdtempSync`).
@@ -516,8 +522,12 @@ assert.equal(box.encode(box.decode(b64(SAMPLE.jpg))), b64(SAMPLE.jpg));
 // spaceAlarm: statfs-заглушка 4 ГБ на диске данных -> файл тревоги с «мало места»; 6 ГБ -> файл тревоги убран; без alertDir -> ничего не пишет
 // tests/backup.test.js: backupNow копирует файлы в <backupDir>/files; при недоступной папке копий файлов -> ok false и тревога
 // tests/restore.test.js: restoreBase возвращает файлы из <backupDir>/files; копия базы юнита 4 (без новых таблиц) восстанавливается
-// tests/devServer.test.js: standArgs(['--reset']) удаляет dev/data/files внутри временного root, а dev/data/real-files не трогает
-// tests/server.test.js: сервер на временной базе принимает ctx.files: work.* ещё нет, поэтому проверка — уборка при запуске удалила старую сироту
+// tests/devServer.test.js: standArgs(['--reset']) удаляет dev/data/files внутри временного root, а dev/data/real-files не трогает;
+//   startDevServer с временным файлом данных, в режимах demo и real: path.dirname(srv.filesDir) === path.dirname(dataFile); заранее положенная там старая сирота удалена
+// tests/server.test.js: сервер на временной базе принимает ctx.files: work.* ещё нет, поэтому проверка — уборка при запуске удалила старую сироту;
+//   база юнита 4 без таблицы «Файлы» — main стартует, уборка прошла после upgrade;
+//   OPTIONS /api с Origin: https://janybek.github.io и Access-Control-Request-Method: POST -> 204 и заголовки пункта 2а;
+//   с Origin: https://evil.example -> 403; GET /api -> 405, как раньше
 ```
 
 - [ ] **Step 2:** падает. **Step 3:** написать; комментарии-ожидания — настоящими `assert`. **Step 4:** `npm test` зелёное; `npm run build:gas` собирается (в сборку `backend/node/` не входит).
@@ -527,7 +537,7 @@ assert.equal(box.encode(box.decode(b64(SAMPLE.jpg))), b64(SAMPLE.jpg));
 
 ### Task 5 (С): задания у сотрудника — обзор, список, выдача, изменение, удаление, просмотр
 
-**Files:** Create `backend/workData.js`, `backend/handlers/work.js`, `tests/workApi.test.js`. Modify `backend/api.js` (регистрация), `backend/lessonData.js` (`assign`, `pair.unit`, `pair.topicId`), `backend/handlers/dir.js` (запрет удаления), `tests/journalSetup.js` (помощники раздела «Общие помощники»), `tests/dir.test.js`, `tests/lessonApi.test.js` (только новые проверки). **Проверка — строгая** (права).
+**Files:** Create `backend/workData.js`, `backend/handlers/work.js`, `tests/workApi.test.js`. Modify `backend/api.js` (регистрация), `backend/lessonData.js` (`assign`, `pair.unit`, `pair.topicId`), `backend/handlers/dir.js` (запрет удаления), `tests/journalSetup.js` (помощники раздела «Общие помощники»), `tests/dir.test.js`, `tests/lessonApi.test.js` (строки 160–161: дописать `'assign'` в ключи ответа после `'scheme'` и `'topicId', 'unit'` в ключи `pair` после `'mode'`; остальное — только новые проверки). **Проверка — строгая** (права).
 
 **Interfaces — Consumes:** `checkAssignment`, `currentAttempt`, `workState`, `WORK` (задача 2); `viewerOf`, `lastOf` (`backend/journalData.js`); `readSettings`, `syllabusFor`, `lessonNumbers`, `compareNames`, `localDateTime`.
 
@@ -552,7 +562,7 @@ export const workHandlers;   // 'work.overview', 'work.list', 'work.save', 'work
 
 ```js
 // work.overview -> { today, subjects: [{ subjectId, name, groupName, teacherName, own, assignments, toCheck }] }
-//   преподаватель — только свои (own: true); контора — все; assignments — текущие (isCurrent); toCheck — текущие попытки 'submitted' текущих заданий
+//   преподаватель — только свои (own: true); контора — все; у `dean,teacher` — все предметы, `own` истинно только у своих; assignments — текущие (isCurrent); toCheck — текущие попытки 'submitted' текущих заданий
 //   сортировка — compareNames по группе, затем по названию
 // work.list -> { today, now: 'YYYY-MM-DD HH:MM:SS', subject: { id, name, groupName, teacherName, planSemester, hasSyllabus }, can: { manage },
 //   units: [{ unit, title }], topics: [{ id, unit, name, number }],     // нынешнего силлабуса; number — из lessonNumbers ('Л3', 'П2')
@@ -571,11 +581,11 @@ export const workHandlers;   // 'work.overview', 'work.list', 'work.save', 'work
 
 - `subjectId`, `assignmentId`, `id`, `pairId` не строка или не найдено — `not_found`. Нет права `read` — `forbidden`; `work.save`/`work.remove` без `manage` — `forbidden` (в том числе деканат `dean,teacher` на чужом предмете, заменяющий, прежний преподаватель).
 - `work.save` новое задание: `planSemester`, `units`, `topics` — по `syllabusFor(subject, syllabi, settings.semester)`; силлабуса нет — `units: []` (СРС не выдать: `unit/bad_value`). С `pairId`: пара этого предмета (иначе `not_found`), `topicId` = `pair.topicId`, юнит — юнит темы (данные запроса для них не читаются; у пары без темы — `unit` из данных). `createdBy`, `createdAt`, `updatedBy: ''`, `updatedAt: ''`.
-- `work.save` с `id`: задание этого же предмета (`subjectId` не меняется — другой `subjectId` — `bad_request`); `locked` — есть попытки; `maxGiven` — наибольшие баллы попыток; `checkAssignment(..., { old, locked, maxGiven })`; записывает `updatedBy`, `updatedAt`. Пустые изменения — без записи. `planSemester` и `pairId` не меняются.
+- `work.save` с `id`: задание этого же предмета (`subjectId` не меняется — другой `subjectId` — `bad_request`); `locked` — есть попытки; `maxGiven` — наибольшие баллы попыток; `checkAssignment(..., { old, locked, maxGiven })`; записывает `updatedBy`, `updatedAt`. Пустые изменения — без записи. `planSemester` и `pairId` не меняются. У задания с попытками при смене `maxPoints` или `dueAt` тем же запросом пишется строка «Журнала изменений» `{ entity: 'work', assignmentId, subjectId, studentId: '', unit, field: 'maxPoints' | 'dueAt', before, after, reason: '', late: false, pairId: '' }` (одна строка на каждое изменившееся поле; без причины — решение владельца 23.11.2026, вопрос 8).
 - Ошибки `checkAssignment` — `AppError('invalid', { fields: problems })`.
 - `work.remove`: есть попытки — `in_use`; иначе `removeMany('assignments')` и одна `updateMany('files')`: его файлы `pending` → `dropped`.
-- `backend/lessonData.js` — в `lessonView`: `pair.topicId`, `pair.unit` (юнит темы или `null`) и `assign: subject.teacherId === user.id` (кнопка «Дать задание» на этапе «Итог»).
-- `backend/handlers/dir.js`, `BLOCKERS`: `students` — `['submissions', (r) => r.studentId === id]`, `['files', (r) => r.ownerId === id]`; `staff` — `['assignments', (r) => r.createdBy === id]`, `['submissions', (r) => r.checkedBy === id]`; `subjects` — `['assignments', (r) => r.subjectId === id]`.
+- `backend/lessonData.js` — в `lessonView`: `pair.topicId`, `pair.unit` (юнит темы или `null`) и `assign: subject.teacherId === user.id` (кнопка «Дать задание» на этапе «Итог»). `assign` — ключ верхнего уровня ответа, последним; `topicId`, `unit` — последними ключами `pair`.
+- `backend/handlers/dir.js`, `BLOCKERS`: `students` — `['submissions', (r) => r.studentId === id]`, `['files', (r) => r.ownerId === id]`; `staff` — `['assignments', (r) => r.createdBy === id]`, `['assignments', (r) => r.updatedBy === id]`, `['submissions', (r) => r.checkedBy === id]`; `subjects` — `['assignments', (r) => r.subjectId === id]`.
 
 - [ ] **Step 1: тесты** (`tests/workApi.test.js`; `at('2026-09-22', '10:00')`).
 
@@ -605,14 +615,21 @@ attempt(id, 'a1', { status: 'checked', points: 15 });
 assert.deepEqual(save({ id, unit: 1 }).error.fields, [{ field: 'unit', code: 'locked' }]);
 assert.deepEqual(save({ id, maxPoints: 12 }).error.fields, [{ field: 'maxPoints', code: 'below_points' }]);
 assert.equal(save({ id, title: 'СРС А (эссе)', maxPoints: 15 }).ok, true);
+// смена максимума у задания с попытками — одна строка changeLog entity 'work': field 'maxPoints', before '20', after '15', studentId '', reason ''
+assert.deepEqual(store.list('changeLog').filter((r) => r.entity === 'work').map((r) => [r.assignmentId, r.field, r.before, r.after, r.studentId, r.reason]), [[id, 'maxPoints', '20', '15', '', '']]);
+assert.equal(save({ id, title: 'СРС А (эссе)', maxPoints: 15, dueDate: '2026-09-28' }).ok, true);   // смена срока — ещё одна строка field 'dueAt' ('2026-09-27 23:59:00' -> '2026-09-28 23:59:00'), без причины
+assert.equal(store.list('changeLog').filter((r) => r.entity === 'work' && r.field === 'dueAt').length, 1);
+assert.equal(save({ id, title: 'Только название', maxPoints: 15, dueDate: '2026-09-28' }).ok, true);   // название — без строки журнала
+assert.equal(store.list('changeLog').filter((r) => r.entity === 'work').length, 2);
 assert.equal(call('work.remove', { assignmentId: id }, t.teacher1).error.code, 'in_use');
-// ещё (настоящими assert): удаление задания без сдач -> строка пропала, его pending-файл стал dropped; удаление чужим -> forbidden, снимок тот же;
+// ещё (настоящими assert): удаление задания без сдач -> строка пропала, его pending-файл (строка «Файлов» прямо в хранилище) стал dropped; удаление чужим -> forbidden, снимок тот же;
 //   смена преподавателя предмета (subjects.teacherId -> teacher2): teacher2 видит и меняет задания sb1, teacher1 — forbidden;
+//   teacher2 меняет у задания sb1 название и срок — ok (у teacher2 в journalSetup `units: []`: unit и topicId не проверяются, пока не менялись);
 //   work.get сотруднику: студент без попыток — state 'none', overdue по сроку; переведённый a1 (groupId -> g2) с попыткой — в конце, left: true;
-//   pending-файл студента в ответе work.get сотруднику не виден (поиск его id в JSON);
+//   pending-файл студента (строка «Файлов» прямо в хранилище: work.upload появится только в задаче 6) в ответе work.get сотруднику не виден (поиск его id в JSON);
 //   lesson.get идущей пары sb1 (running от teacher1) -> assign true, pair.unit 2; пара замены teacher3 -> assign false;
 //   dir.remove студента с попыткой, сотрудника-автора задания, предмета с заданием -> in_use;
-//   work.list и work.get читают каждую из WORK_TABLES один раз; work.save пишет одну insertMany или updateMany
+//   work.list и work.get читают каждую из WORK_TABLES один раз; work.save пишет одну insertMany или updateMany на «Задания» (и, если у задания с попытками менялись максимум или срок, одну insertMany на «Журнал изменений»)
 ```
 
 - [ ] **Step 2:** падает. **Step 3:** написать; комментарии-ожидания — настоящими `assert`. **Step 4:** `npm test` зелёное; `npm run build:gas` собирается.
@@ -656,7 +673,7 @@ export function readFile(store, platform, files, data, user);     // 'work.file'
 - **Студент и задание:** задание найдено и `subject.groupId === user.row.groupId` (нынешняя группа), иначе `not_found` (и для чужой группы, и для переведённого). Выключенный студент сюда не доходит (`unauthorized` при входе).
 - **`work.upload`** — порядок, первая сработавшая отвечает, до шага 8 ничего не пишется: 1) `ctx.files` нет — `files_unavailable`; 2) задание (выше); 3) текущая попытка `checked` — `already_checked`; 4) `kindByName(cleanFileName(name))` — `null` → `invalid` `[{ field: 'name', code: 'bad_type' }]`; 5) `base64Bytes(data)` — `null` → `bad_request`; `0` → `invalid` `data/empty`; больше `maxBytes` → `invalid` `data/too_big`; 6) свои `pending` этого задания моложе 24 ч — уже 5 → `invalid` `files/too_many`; 7) свои строки «Файлов» (любое состояние) с датой `at` сегодня по Бишкеку: 60 штук или сумма `size` + новый больше 200 МиБ → `upload_limit`; 8) `bytes = files.decode(data)`; `sniffKind(bytes, kind)` — `null` → `invalid` `data/bad_file`; 9) `stored = platform.randomHex(16) + '.bin'`, `files.put(stored, bytes)`, одна `insertMany('files')` `{ assignmentId, submissionId: '', ownerId: user.id, state: 'pending', name, kind, size, stored, at }`.
 - **`work.dropFile`:** свой `pending` — `state: 'dropped'`; иначе (чужой, закреплённый, нет) — `not_found`. С диска не удаляет.
-- **`work.submit`:** задание (выше); `text` — строка (после обрезки по краям) до 5000 знаков, `fileIds` — массив до 5 разных строк, иначе `bad_request`; текущая попытка `checked` — `already_checked`; каждый `fileId` — свой `pending` этого задания моложе 24 ч, иначе `invalid` `[{ field: 'fileIds', index, code: 'bad_ref' }]`; текст пуст и файлов нет — `invalid` `text/empty`. Запись: текущая `submitted` → `replaced` (одна `updateMany('submissions')`), новая попытка `{ n: max + 1, text, paper: false, submittedAt: now, status: 'submitted', points: null, comment: '', checkedBy: '', checkedAt: '' }` (одна `insertMany`), файлы → `attached` с `submissionId` (одна `updateMany('files')`). Работает и без ящика (только текст).
+- **`work.submit`:** задание (выше); `text` — строка (после обрезки по краям) до 5000 знаков, `fileIds` — массив до 5 разных строк, иначе `bad_request`; текущая попытка `checked` — `already_checked`; каждый `fileId` — свой `pending` этого задания моложе 24 ч, иначе `invalid` `[{ field: 'fileIds', index, code: 'bad_ref' }]`; текст пуст и файлов нет — `invalid` `text/empty`. Запись: текущая `submitted` → `replaced` (одна `updateMany('submissions')`), новая попытка `{ n: max + 1, text, paper: false, submittedAt: now, status: 'submitted', points: null, comment: '', checkedBy: '', checkedAt: '' }` (одна `insertMany`), файлы → `attached` с `submissionId` (одна `updateMany('files')`). Новая попытка содержит только новые файлы; файлы прежней остаются в прежней попытке («Сдать заново» начинается с пустого списка файлов). Ответ `work.submit` собирается из прочитанных строк с учётом записанного, без второго чтения (как `journalView` после записи). Работает и без ящика (только текст).
 - Файлы в ответах — по `at`, затем по id.
 - **`work.file`:** `ctx.files` нет — `files_unavailable`; `fileId` не строка или строки нет — `not_found`. Студент: `ownerId === user.id`, состояние `pending` или `attached`, предмет задания — его нынешней группы; иначе `not_found`. Сотрудник: только `attached`; право `read` предмета (задача 5), иначе `forbidden`; `pending`/`dropped` — `not_found`. `files.read(stored)` — `null` → `file_missing`. Ответ: `{ file: { id, name, kind, size, data: files.encode(bytes) } }`; `kind` — только из `FILE_KINDS` (строка с другим видом — `file_missing`).
 - Каждая таблица — один раз за запрос (`readWorkRows`).
@@ -686,7 +703,7 @@ const row = store.get('files', f.id);
 assert.match(row.stored, /^[0-9a-f]{32}\.bin$/);
 assert.deepEqual([row.state, row.ownerId, files.names()], ['pending', a1, [row.stored]]);
 // пять, шестой — too_many; без ящика — files_unavailable
-// 60 загрузок за день и 200 МиБ за день -> upload_limit (строки — прямо в хранилище с at сегодня); завтра снова можно
+// 60 загрузок за день (60 строк — прямо в хранилище, `state: 'dropped'`, `at` сегодня; и одна строка `dropped` размером 200 МиБ) и 200 МиБ за день -> upload_limit; завтра снова можно
 // work.file: свой pending — да; a2 по id файла a1 — not_found; teacher1 — pending не видит (not_found); после сдачи teacher1, dean, prorector, admin — да;
 //   teacher2 — forbidden; a1 после перевода в 02-1 — not_found; файл пропал с диска -> file_missing; ответ — base64 тех же байт
 // work.dropFile чужого — not_found; своего — dropped, файл на диске остался
@@ -700,12 +717,13 @@ const submit = (data, token = t.a1) => call('work.submit', { assignmentId: id, t
 assert.deepEqual(submit({}).error.fields, [{ field: 'text', code: 'empty' }]);
 const f9 = call('work.upload', { assignmentId: id, name: 'x.jpg', data: b64(SAMPLE.jpg) }, t.a2).data.file.id;
 assert.deepEqual(submit({ fileIds: [f1, f9] }).error.fields, [{ field: 'fileIds', index: 1, code: 'bad_ref' }]);  // чужой файл
+// и `bad_ref` для `fileId` другого задания, уже `attached`, `dropped`, `pending` старше 24 ч
 for (const bad of [[f1, f1], 'f1', [f1, 2], Array(6).fill(f1)]) assert.equal(submit({ fileIds: bad }).error.code, 'bad_request');
 const w = submit({ text: '  Ответ  ', fileIds: [f1, f2] }).data.work;
 assert.deepEqual([w.mine.state, w.mine.attempts[0].text, w.mine.attempts[0].files.map((x) => x.id).sort(), w.mine.pending], ['submitted', 'Ответ', [f1, f2].sort(), []]);
 // пересдача до проверки: прежняя — replaced, новая n 2; после checked — already_checked (и upload тоже)
 // после срока: попытка late true; work.mine — counts по taskCounts; returned первой в списке
-// данные студента: JSON ответов work.mine и work.get у a1 не содержит id и ФИО a2, a3, b1, слов 'counts' и 'checkedBy'; work.mine у b1 без заданий sb1
+// данные студента: JSON ответов work.mine и work.get у a1 не содержит id и ФИО a2, a3, b1; в work.get нет "counts", "students", "checkedBy"; Object.keys(work.mine.data) — ровно ['today', 'now', 'counts', 'tasks'], ключи каждого tasks[i] — ровно список плана; work.mine у b1 без заданий sb1
 // задание удалено (без сдач) -> work.submit, work.upload, work.get -> not_found
 // work.get студенту задания другой группы — not_found; ответ одинаков для несуществующего id
 // без ящика (setup({ files: null })): submit только текстом — ok; upload — files_unavailable
@@ -727,7 +745,7 @@ assert.deepEqual([w.mine.state, w.mine.attempts[0].text, w.mine.attempts[0].file
 
 ```js
 // backend/workGrade.js
-export function gradeWork(store, platform, data, user);   // 'work.grade' { assignmentId, studentId, verdict, points, comment, reason } -> { work: staffWorkView }
+export function gradeWork(store, platform, data, user);   // 'work.grade' { assignmentId, studentId, attemptId, verdict, points, comment, reason } -> { work: staffWorkView }
 // backend/journalData.js
 export const JOURNAL_TABLES = [ …прежние…, 'assignments', 'submissions' ];
 export function selfWorkOf(rows, subject, planSemester, studentId, nowMs, self);   // -> Map(unit -> selfByWork(...)) только юнитов с заданиями СРС
@@ -738,28 +756,30 @@ export function selfWorkOf(rows, subject, planSemester, studentId, nowMs, self);
 1. Задание не найдено — `not_found`; не `manage` (задача 5) — `forbidden`.
 2. `studentId` — активный студент группы предмета или студент с попытками этого задания (иначе `invalid` `[{ field: 'studentId', code: 'bad_ref' }]`).
 3. `checkGrade` — ошибки `invalid`.
+3а. `attemptId` — строка: id текущей попытки, которую видел преподаватель, или `''`, если попытки не было. Не совпадает с нынешней текущей (в том числе `''`, а попытка уже есть) — `attempt_changed`, ничего не записано.
 4. Текущая попытка `c`. Нет попытки: `verdict 'checked'` — новая попытка «на бумаге» `{ n: 1, text: '', paper: true, submittedAt: now, status: 'checked', points, comment, checkedBy, checkedAt }`; `verdict 'returned'` — `nothing_to_return`.
 5. Есть: новое `{ status: verdict, points: verdict === 'checked' ? points : null, comment }`. Ничего не изменилось — ответ без записи. Причина обязательна (`checkReason`, `invalid` `[{ field: 'reason', code: 'required' | 'too_long' }]`), если у `c` уже были баллы и они меняются, или `c.status === 'checked'` и `verdict === 'returned'`; иначе причина `''`.
-6. Запись одной пачкой на таблицу; «Журнал изменений» — строки `{ at, actorId, entity: 'work', subjectId, assignmentId, studentId, unit: задание.unit, field, before, after, reason, late: false, pairId: '' }`: `points` — если баллы изменились (`'' → '15'`, `'15' → '12'`, `'15' → ''`), `status` — если статус изменился (`'submitted' → 'checked'`; у попытки «на бумаге» `'' → 'checked'`). Комментарий в журнал изменений не пишется.
+6. Запись одной пачкой на таблицу; «Журнал изменений» — строки `{ at, actorId, entity: 'work', subjectId, assignmentId, studentId, unit: задание.unit, field, before, after, reason, late: false, pairId: '' }`: `points` — если баллы изменились (`'' → '15'`, `'15' → '12'`, `'15' → ''`), `status` — если статус изменился (`'submitted' → 'checked'`; у попытки «на бумаге» `'' → 'checked'`). Комментарий в журнал изменений не пишется. Ответ `work.grade` собирается из прочитанных строк с учётом записанного, без второго чтения (как `journalView` после записи).
 
 Журнал и «Оценки»:
 
 - `journalView`: для каждого студента `selfWork = selfWorkOf(rows, subject, planSemester, s.id, nowMs, scheme.self)` → в `studentResults`. Юниты списка `units` с заданиями СРС получают `byWork: true` (у остальных ключа нет). Только для `!partial`.
-- `saveUnitResults` с `field: 'self'` на юните с заданиями СРС — `invalid` `[{ field: 'unit', code: 'self_by_work' }]`, ничего не записано. Рубежный и ручной текущий — как раньше.
+- `saveUnitResults` с `field: 'self'` на юните с заданиями СРС — `invalid` `[{ field: 'unit', code: 'self_by_work' }]`, ничего не записано; проверка `self_by_work` — сразу после проверки юнита, до проверки строк и до «ничего не изменилось». Рубежный и ручной текущий — как раньше.
 - `studentGrades`: тот же `selfWorkOf` для себя; юнит с заданиями получает `selfWork: { earned, max, pending, value }` (у остальных ключа нет).
-- `changeLogView`: строки получают `assignmentId` и `assignmentTitle` (название задания или `''`); `assignments` читается один раз.
+- `changeLogView`: строки `entity: 'work'` получают ещё `assignmentId` и `assignmentTitle` (название задания или `''`); у прочих строк новых ключей нет — прежние проверки остаются верными. `assignments` читается один раз.
 - Задания для `selfWorkOf`: `kind 'srs'`, этого предмета, `planSemester` нынешнего силлабуса; текущая попытка — `currentAttempt` по строкам «Сдач» студента.
 
 - [ ] **Step 1: тесты** (`tests/workGradeApi.test.js`; задания А и Б раздела «Правила расчёта» через `task()`, юнит 2; попытки через `attempt()`; рубежный юнита 2 у a1 — 30 через `journal.saveResults`).
 
 ```js
-const grade = (data, token = t.teacher1) => call('work.grade', { assignmentId: A, studentId: a1, verdict: 'checked', points: 8, comment: '', ...data }, token);
+const cur = (key) => (currentAttempt(store.list('submissions').filter((r) => r.assignmentId === A && r.studentId === ids[key])) || { id: '' }).id;   // id текущей попытки, которую «видел» преподаватель, или ''
+const grade = (data, token = t.teacher1) => call('work.grade', { assignmentId: A, studentId: a1, attemptId: cur('a1'), verdict: 'checked', points: 8, comment: '', ...data }, token);
 at('2026-09-24', '12:00');
 const before = snapshot();
 for (const token of [t.teacher2, t.teacher3, t.dean, t.prorector, t.admin, t.a1]) assert.notEqual(grade({}, token).ok, true);
 for (const data of [{ points: 11 }, { points: -1 }, { points: 2.5 }, { points: '8' }, { verdict: 'returned', points: 3, comment: 'x' }, { verdict: 'returned', points: null, comment: ' ' }, { studentId: b1 }])
   assert.equal(grade(data).ok, false, JSON.stringify(data));
-assert.equal(grade({ studentId: a3, verdict: 'returned', points: null, comment: 'x' }).error.code, 'nothing_to_return');   // у a3 по А сдачи нет
+assert.equal(grade({ studentId: a3, attemptId: '', verdict: 'returned', points: null, comment: 'x' }).error.code, 'nothing_to_return');   // у a3 по А сдачи нет
 assert.deepEqual(snapshot(), before);
 grade({});                                                                                           // a1 сдал А — проверено 8
 assert.deepEqual(store.list('changeLog').filter((r) => r.entity === 'work').map((r) => [r.field, r.before, r.after, r.assignmentId, r.unit, r.reason]),
@@ -770,8 +790,9 @@ assert.deepEqual(grade({ points: 9 }).error.fields, [{ field: 'reason', code: 'r
 // СРС в журнале — числа раздела «Правила расчёта» на 24.09 и 28.09 (a1 5 предварительно -> 15; a2 7; a3 0 -> 8):
 const unit2 = (key) => call('journal.get', { subjectId: sb1 }, t.teacher1).data.journal.results[ids[key]].units.find((u) => u.unit === 2);
 assert.deepEqual((({ self, total, selfWork }) => ({ self, total, selfWork }))(unit2('a1')), { self: null, total: null, selfWork: { earned: 8, max: 30, pending: 1, value: 5 } });
-// ... at('2026-09-28', '12:00'); grade Б a1 15 -> unit2('a1').self 15, total = current + 15 + 30
-// «на бумаге»: grade a3 Б 12 без попытки -> попытка paper true, status checked; changeLog status '' -> 'checked'
+// at('2026-09-28', '12:00'); текущий юнита 2 у a1 — вручную 26 (`journal.saveResults` field `current` с причиной); grade Б a1 15 → `unit2('a1')` `{ self: 15, total: 71 }` (26 + 15 + 30, «удовлетворительно»); a3: его возвращённая попытка по Б → `checked` 12 (журнал: points `''`→`'12'`, status `'returned'`→`'checked'`, без причины) → СРС 8
+// «на бумаге» — после проверки чисел: ДЗ В (`task({ kind: 'hw', title: 'ДЗ В', maxPoints: 5 })`), grade a2 4 без попытки → попытка `paper: true`, `status: 'checked'`; changeLog status `''`→`'checked'`, points `''`→`'4'`; СРС a2 по-прежнему 7 (ДЗ не входит)
+// a1 пересдал Б между work.get и work.grade (attemptId — id прежней попытки, а текущая уже новая) -> attempt_changed, снимок тот же; attemptId '' при уже существующей попытке -> attempt_changed
 // student.grades a1: units[юнит 2].selfWork равен journal; JSON без a2, a3
 // journal.saveResults field self на юните 2 -> invalid unit/self_by_work, снимок тот же; на юните 1 (без заданий) — как раньше
 // ручной self 16 юнита 2 (записан до заданий) не действует; после удаления заданий без сдач (новый предмет-сценарий) — действует снова
@@ -801,7 +822,9 @@ export function seedWork(store, platform, files = null);
 //   первые 5 студентов группы: по «Эссе» — 3 проверены (8, 10, 6; один «с опозданием»), 1 возвращён с комментарием, 1 не сдал;
 //   по «Презентации» — 2 сданы и ждут проверки (одна с картинкой PNG, если files передан; иначе только текст);
 //   по ДЗ — 1 сдано текстом. Строки «Журнала изменений» по проверенным — как от work.grade. Юнит 1 не трогается (там ручной СРС юнита 3).
-// seed(store, platform, files) вызывает seedWork в конце; startDevServer передаёт ящик стенда; runDemo (serve:demo) — createDiskFiles(config.filesDir).
+// `seedWork` вызывается в конце `fill` — общей части `seed` и `seedDemo`. Сигнатуры: `seed(store, platform, files = null)`, `seedDemo(store, platform, { password, files = null })`.
+// `startDevServer` передаёт ящик стенда, `runDemo` — `createDiskFiles(config.filesDir)`. У стенда и у пробных данных одинаковое число строк «Журнала изменений».
+// `runDemo` с `--wipe`: перед стиранием `mirrorFiles(config.filesDir, <backupDir>/files)`.
 // Картинка стенда — маленький PNG, созданный в коде (не файл из интернета, не фото человека).
 ```
 
@@ -850,7 +873,7 @@ export function dueText(dueAt, now);      // { key, params, tone }: срок п�
 export function stateView(state, late);   // { key: 'work.state.<state>', tone } + late -> lateKey 'work.state.late'
 export function kindOfName(name);         // как kindByName в core/files.js (копия; тест сверяет оба на одном списке имён)
 export function defaultDue(today);        // { dueDate: today + 7 дней, dueTime: '23:59' }
-export function formProblems(fields);     // ошибки сервера [{ field, code }] -> Map(поле формы -> ключ словаря 'work.form.error.<code>')
+export function formProblems(fields);     // ошибки сервера [{ field, code }] -> Map(поле формы -> ключ словаря 'work.form.error.<code>'; коды — список в тесте ниже)
 ```
 
 Экраны:
@@ -876,7 +899,8 @@ assert.equal(dueText('2026-09-28 08:00:00', '2026-09-27 10:00:00').key, 'work.du
 assert.deepEqual(defaultDue('2026-09-27'), { dueDate: '2026-10-04', dueTime: '23:59' });
 // kindOfName и kindByName (core/files.js) дают одно и то же на 12 именах задачи 1
 // router: '#/tasks' у преподавателя и у студента -> tasks; '#/tasks/sb_1' у студента -> home; '#/task/as_1' у всех ролей -> task; '#/task/%E0%A4%A' -> home
-// i18n: ключи work.*, error.in_use, error.files_unavailable … в трёх словарях
+// i18n: ключи work.* и коды ответа — `error.in_use`, `error.files_unavailable`, `error.already_checked`, `error.upload_limit`, `error.file_missing`, `error.nothing_to_return`, `error.attempt_changed` — в трёх словарях;
+//   коды полей для `work.form.error.*` и ошибок загрузки: `bad_value`, `bad_ref`, `empty`, `too_long`, `due_past`, `too_far`, `below_points`, `locked`, `bad_type`, `bad_file`, `too_big`, `too_many`, `self_by_work`, `required` — по ключу на каждый код, во всех трёх словарях
 ```
 
 - [ ] **Step 2:** падает. **Step 3:** написать.
@@ -913,10 +937,10 @@ export async function openFile({ fileId, name, kind });
 - Шапка: «СРС · юнит 2 · Сети», название, срок (`dueText`), «максимум 20», описание (текстом, переносы строк сохраняются); «Изменить» (при `can.manage`).
 - Слева — список студентов: ФИО, состояние (`stateView`: «не сдано», «просрочено», «сдано», «с опозданием», «проверено 15», «возвращено»), выбывшие — в конце с меткой «выбыл»; фильтр «Все · Ждут проверки · Не сдали».
 - Справа — работа выбранного студента: текущая попытка (время сдачи, «с опозданием», текст, файлы: значок вида, имя текстом, размер; нажатие — `openFile`), блок оценки (при `can.grade`): «Баллы» (0…максимум), «Комментарий», кнопки «Проверено» и «Вернуть на доработку» (комментарий обязателен), поле «Причина» — появляется, когда `gradeNeedsReason`; без попытки — «Не сдано» и «Поставить баллы за работу на бумаге». Ниже — «Прежние попытки (N)»: раскрываются, с файлами и комментариями.
-- Сохранение — `work.grade`; ошибки — у поля; кнопки заняты до ответа; переход к следующему студенту, ждущему проверки, — кнопка «Следующая работа». Несохранённая оценка и переход к другому студенту или уход — вопрос «Оценка не сохранена. Сохранить?» («Сохранить» / «Не сохранять» / «Отмена»).
+- Сохранение — `work.grade` с `attemptId` (id текущей попытки студента из последнего `work.get` или `''`, если попытки не было); `attempt_changed` — «Студент сдал новую попытку — откройте её» и перечитать `work.get`; ошибки — у поля; кнопки заняты до ответа; переход к следующему студенту, ждущему проверки, — кнопка «Следующая работа». Несохранённая оценка и переход к другому студенту или уход — вопрос «Оценка не сохранена. Сохранить?» («Сохранить» / «Не сохранять» / «Отмена»).
 - На телефоне (меньше 768 px) список и работа — друг под другом.
 
-- [ ] **Step 1: тесты:** `gradeDraft` — без попытки `{ verdict: 'checked', points: null, comment: '' }`, с проверенной 15 — её баллы и комментарий; `gradeNeedsReason` — первая оценка `false`, 15 → 12 `true`, 15 → 15 с новым комментарием `false`, проверенная → «вернуть» `true`, сданная → «вернуть» `false`; `base64ToBytes('QUJD')` — `[65, 66, 67]`; ключи `work.*` в трёх словарях.
+- [ ] **Step 1: тесты:** `gradeDraft` — без попытки `{ verdict: 'checked', points: null, comment: '' }`, с проверенной 15 — её баллы и комментарий; `gradeNeedsReason` — первая оценка `false`, 15 → 12 `true`, 15 → 15 с новым комментарием `false`, проверенная → «вернуть» `true`, сданная → «вернуть» `false`; `base64ToBytes('QUJD')` — `[65, 66, 67]`; ключи `work.*` и `error.attempt_changed` в трёх словарях.
 - [ ] **Step 2:** падает. **Step 3:** написать.
 - [ ] **Step 4: проверка на стенде** (`npm run dev:reset`): `teacher1` открывает «Презентацию»: у сдавшего с картинкой — нажатие на файл открывает окно с картинкой; «Эссе» — проверить ждущего (8 баллов) — в списке «проверено 8»; изменить на 9 без причины — поле причины подсвечено; с причиной — сохранено; «Вернуть на доработку» без комментария — ошибка у поля; студенту без сдачи — «на бумаге» 6 баллов; у вернувшего — «Прежние попытки». `dean` открывает то же задание — оценки нет, файлы открываются. Имя файла `<img src=x onerror=alert(1)>.png` (подложить строкой в `dev/data/db.json` стенда на время проверки, потом `dev:reset`) — показано текстом, ничего не выполнилось. `npm test` зелёное.
 - [ ] **Step 5:** скриншоты в `task-10-shots/`: список и работа с файлами (1366); окно картинки; ошибка «нужна причина»; телефонная ширина 360.
@@ -939,7 +963,7 @@ export async function openFile({ fileId, name, kind });
 ```js
 // site/js/api.js
 export function upload(action, data, { onProgress = () => {}, makeXhr = () => new XMLHttpRequest() } = {});
-// тот же запрос, что call (POST text/plain, {action, token, data}), через XMLHttpRequest; onProgress(доля 0…1) по xhr.upload.onprogress;
+// тот же запрос, что call (POST text/plain, {action, token, data}), через XMLHttpRequest (с xhr.upload.onprogress браузер сначала шлёт OPTIONS — сервер отвечает, задача 4); onProgress(доля 0…1) по xhr.upload.onprogress;
 // ответ и ошибки — как у call (ApiError, unauthorized -> clearSession и onSessionEnd); 413 -> ApiError('too_big')
 // site/js/photo.js
 export function fitSize(width, height, max = 1600);   // -> { width, height } целые, длинная сторона не больше max, пропорции сохранены; меньшее не увеличивается
@@ -951,17 +975,18 @@ export async function readAsBase64(file);            // FileReader.readAsDataURL
 export function homeCardLines(counts);               // -> [{ key, params, tone }] только ненулевые: новые, срок до завтра, просрочены, возвращены
 export function pickProblem(file, kind, count);      // выбор файла до загрузки: вид не принят -> 'work.pick.badType'; больше 10 МиБ (не фото) -> 'work.pick.tooBig';
                                                      // уже 5 -> 'work.pick.tooMany'; иначе null (фото уменьшаются, их размер не проверяется до уменьшения)
+                                                     // фото — файл с `file.type`, начинающимся на `image/` (в том числе HEIC): `preparePhoto`, имя `photoName`; `pickProblem` вид фото не проверяет
 ```
 
 Экраны (телефон 360 px, текст не мельче 16 px, кнопки не ниже 44 px, обе темы):
 
 - **Главная студента** (ключи `work.home.*`): карточка «Задания» под «Я на паре», над «Сегодня»: строки `homeCardLines` («Новых: 2», «Срок до завтра: 1», «Просрочено: 1», «Вернули на доработку: 1» — красным и жёлтым по тону) и ссылка-кнопка «Все задания» (`#/tasks`). Все нули — «Новых заданий нет» и та же ссылка. Один запрос `work.mine` при открытии главной.
 - **`#/tasks` (студент):** задания из `work.mine`, сгруппированные по предметам; у задания — тип, название, срок (`dueText`), состояние (`stateView`, баллы «15 из 20»). Сначала возвращённые и новые.
-- **`#/task/<id>` (студент):** предмет, тип, юнит и тема, название, описание, срок, максимум. Блок «Моя работа»: состояние; комментарий преподавателя (если есть) крупно; баллы. Если `canSubmit`: поле «Текст ответа» (до 5000, счётчик), «Добавить файлы» (`<input type=file multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*">` — без `image/heic`, чтобы iPhone отдал JPEG), список файлов: имя, размер, ход загрузки (полоса), «Убрать» (`work.dropFile`), ошибка и «Повторить» у одного файла; уже загруженные (`mine.pending`) видны после перезагрузки страницы. Каждый выбранный файл сразу: фото — `preparePhoto`, остальное — `readAsBase64`, затем `upload('work.upload', …)` по одному. «Сдать» активна, когда есть текст или файл и ничего не грузится; занята до ответа (двойное нажатие — одна сдача). После `work.submit` — «Работа сдана в 14:05» (время из ответа). После срока над кнопкой — «Срок прошёл — работа будет отмечена „с опозданием“». Пересдача (`submitted` или `returned`) — «Сдать заново». «Прежние попытки» — свёрнуты.
+- **`#/task/<id>` (студент):** предмет, тип, юнит и тема, название, описание, срок, максимум. Блок «Моя работа»: состояние; комментарий преподавателя (если есть) крупно; баллы. Если `canSubmit`: поле «Текст ответа» (до 5000, счётчик), «Добавить файлы» (`<input type=file multiple accept=".jpg,.jpeg,.png,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,image/*">` — без `image/heic`, чтобы iPhone отдал JPEG), список файлов: имя, размер, ход загрузки (полоса), «Убрать» (`work.dropFile`), ошибка и «Повторить» у одного файла; уже загруженные (`mine.pending`) видны после перезагрузки страницы. Каждый выбранный файл сразу: фото — `preparePhoto`, остальное — `readAsBase64`, затем `upload('work.upload', …)` по одному. «Сдать» активна, когда есть текст или файл и ничего не грузится; занята до ответа (двойное нажатие — одна сдача). После `work.submit` — «Работа сдана в 14:05» (время из ответа). После срока над кнопкой — «Срок прошёл — работа будет отмечена „с опозданием“». Пересдача (`submitted` или `returned`) — «Сдать заново»: новая попытка содержит только новые файлы, файлы прежней остаются в прежней попытке, список файлов при «Сдать заново» начинается пустым. «Прежние попытки» — свёрнуты.
 - **Ошибки** (текстом из словаря): `bad_type` — «Такой файл не принимается: фото, PDF, Word, Excel, PowerPoint»; `bad_file` — «Файл не похож на свой тип или повреждён»; `too_big` — «Файл больше 10 МБ»; `too_many` — «Не больше 5 файлов»; `upload_limit` — «На сегодня загружено слишком много, попробуйте завтра»; `photo_unreadable`; `already_checked` — «Работа уже проверена»; `files_unavailable`; нет связи — «Нет связи» и «Повторить».
 - Свои файлы открываются `openFile`.
 
-- [ ] **Step 1: тесты:** `fitSize(4000, 3000)` → `{ width: 1600, height: 1200 }`; `fitSize(3000, 4000)` → `{ width: 1200, height: 1600 }`; `fitSize(800, 600)` → `{ width: 800, height: 600 }`; `fitSize(1601, 1)` → `{ width: 1600, height: 1 }`; `photoName('IMG_1.HEIC')` → `'IMG_1.jpg'`; `homeCardLines({ fresh: 2, soon: 1, overdue: 0, returned: 1 })` — три строки в порядке «новые, срок до завтра, возвращены»; `pickProblem` — `.exe`, 11 МиБ PDF, шестой файл, фото 15 МиБ (`null`); `upload` с поддельным `makeXhr`: тело запроса — тот же JSON, что у `call`, `onProgress(0.5)` доходит, ответ `{ ok: false, error: { code: 'unauthorized' } }` очищает сессию, статус 413 — `too_big`, обрыв — `network`/`server_down`; ключи в трёх словарях.
+- [ ] **Step 1: тесты:** `fitSize(4000, 3000)` → `{ width: 1600, height: 1200 }`; `fitSize(3000, 4000)` → `{ width: 1200, height: 1600 }`; `fitSize(800, 600)` → `{ width: 800, height: 600 }`; `fitSize(1601, 1)` → `{ width: 1600, height: 1 }`; `photoName('IMG_1.HEIC')` → `'IMG_1.jpg'`; `homeCardLines({ fresh: 2, soon: 1, overdue: 0, returned: 1 })` — три строки в порядке «новые, срок до завтра, возвращены»; `pickProblem` — `.exe`, 11 МиБ PDF, шестой файл, фото 15 МиБ (`null`); `upload` с поддельным `makeXhr`: тело запроса — тот же JSON, что у `call`, `onProgress(0.5)` доходит, ответ `{ ok: false, error: { code: 'unauthorized' } }` очищает сессию, статус 413 — `too_big`, обрыв — `network`/`server_down`; ключи в трёх словарях: коды ответа `error.files_unavailable`, `error.already_checked`, `error.upload_limit`, `error.file_missing`, `error.nothing_to_return`, `error.attempt_changed` и коды полей и ошибок загрузки `bad_value`, `bad_ref`, `empty`, `too_long`, `due_past`, `too_far`, `below_points`, `locked`, `bad_type`, `bad_file`, `too_big`, `too_many`, `self_by_work`, `required` (по ключу на каждый, как в задаче 9).
 - [ ] **Step 2:** падает. **Step 3:** написать.
 - [ ] **Step 4: проверка на стенде** (`npm run dev:reset`; headless Chrome 360×740, обе темы): `S1001` — карточка «Задания» с числами; «Все задания» — список по предмету; «Презентация» — текст и два файла (фото 4000×3000 JPEG, созданное в тесте на canvas, и PDF из `tests/fakes/sampleFiles.js`, записанный во временный файл) — полоса хода, фото ушло ≤ 1600 px (видно по `size` в ответе и по картинке в окне); «Убрать» один; «Сдать» двойным нажатием — одна попытка в `work.get`; `.exe` — отказ до загрузки; подложный `.jpg` с `MZ` — ошибка сервера «не похож на свой тип»; «Эссе» (возвращено) — комментарий преподавателя и «Сдать заново»; проверенная работа — баллы, без кнопки. `S2001` (другая группа) — заданий «Информатики» 01-1 нет. Страница не прокручивается по горизонтали. `npm test` зелёное.
 - [ ] **Step 5:** скриншоты в `task-11-shots/` (360 px): главная с карточкой; список; задание с загрузкой (полоса); «Работа сдана»; возвращённая с комментарием; ошибка вида файла.
@@ -986,18 +1011,19 @@ export function pickProblem(file, kind, count);      // выбор файла д
 export function selfCell(unitResult);   // -> { value, key, params }: без selfWork — как раньше (value = self);
                                         //   selfWork и pending 0 — value, key 'journal.self.byWork';
                                         //   selfWork и pending > 0 — value = selfWork.value, key 'journal.self.pending' { n: pending } (итога нет)
-export function logLine(row);           // строка журнала изменений -> { key, params }; для entity 'work': 'journalLog.work.points' / 'journalLog.work.status'
-                                        //   { title: assignmentTitle, before, after } (статусы — словарём work.state.*); прочие — как раньше
+export function logLine(row);           // строка журнала изменений -> { key, params, keyParams }; для entity 'work': ключи `journal.log.work.points` / `journal.log.work.status`
+                                        //   / `journal.log.work.maxPoints` / `journal.log.work.dueAt` { title: assignmentTitle, before, after };
+                                        //   статусы — ключи `work.state.*` в `keyParams` (функция `keyed` принимает и приставку `work.`); прочие — как раньше
 ```
 
 Экраны:
 
-- **«Задания» деканата, проректора, администратора:** `#/tasks` — все предметы (`work.overview`) с фильтром «Группа» и поиском по названию: «Информатика · 01-1 · Иванова Н.», «Заданий: 3 · ждут проверки: 2»; дальше `#/tasks/<id>` и `#/task/<id>` — как у преподавателя, но без «Новое задание», «Изменить», «Удалить» и без блока оценки; файлы открываются. Сотрудник `dean,teacher` в роли «Преподаватель» видит свои предметы и оценивает, в роли «Деканат» — все и только читает.
+- **«Задания» деканата, проректора, администратора:** `#/tasks` — все предметы (`work.overview`) с фильтром «Группа» и поиском по названию: «Информатика · 01-1 · Иванова Н.», «Заданий: 3 · ждут проверки: 2»; дальше `#/tasks/<id>` и `#/task/<id>` — как у преподавателя, но без «Новое задание», «Изменить», «Удалить» и без блока оценки; файлы открываются. Сотрудник `dean,teacher` в роли «Преподаватель» видит свои предметы и оценивает, в роли «Деканат» — все и только читает. `work.overview` у `dean,teacher` отдаёт все предметы с `own`; сайт в роли «Преподаватель» показывает только `own`, в роли «Деканат» прячет «Новое задание», «Изменить», «Удалить» и оценку даже при `can.manage`.
 - **Журнал, вид «Юнит» и итоги:** клетка СРС юнита с заданиями — число и пометка «по заданиям» (`selfCell`); при ожидании — серым «предв.» и подсказка «Ждут проверки или срока: 2»; кнопка ручного ввода СРС для такого юнита не показывается (подсказка «СРС считается по заданиям СРС юнита»); под ней ссылка «Задания предмета» (`#/tasks/<subjectId>`). Юнит без заданий — как в юните 3.
 - **«Оценки» студента:** у юнита с заданиями — «СРС 15 из 20 · по заданиям» или «СРС 5 из 20 · предварительно, ждут проверки: 1»; ссылка «Мои задания» (`#/tasks`).
-- **«Журнал изменений»:** строки заданий — «Задание „СРС А“: баллы 8 → 9», «статус: сдано → проверено», с причиной, если есть.
+- **«Журнал изменений»:** строки заданий — «Задание „СРС А“: баллы 8 → 9», «статус: сдано → проверено», с причиной, если есть; смена максимума и срока задания — «Задание „СРС А“: максимум 20 → 15», «срок … → …» (без причины).
 
-- [ ] **Step 1: тесты:** `selfCell` — три случая выше и юнит без `selfWork` (тот же ответ, что был у прежнего расчёта клетки); `logLine` для `points`, `status` и прежней строки `mark`; ключи в трёх словарях.
+- [ ] **Step 1: тесты:** `selfCell` — три случая выше и юнит без `selfWork` (тот же ответ, что был у прежнего расчёта клетки); `logLine` для `points`, `status`, `maxPoints`, `dueAt` и прежней строки `mark`; ключи в трёх словарях.
 - [ ] **Step 2:** падает. **Step 3:** написать.
 - [ ] **Step 4: проверка на стенде** (`npm run dev:reset`): `dean` (роль «Деканат») — «Задания» все предметы, фильтр группы, задание — без оценки, картинка открывается; `prorector` — то же; журнал «Информатика · 01-1», вид «Юнит» 2 — СРС «по заданиям», у ожидающего — «предв.»; ручного ввода СРС у юнита 2 нет, у юнита 1 — есть; «Журнал изменений» — строки заданий; `S1001` «Оценки» — СРС юнита 2 «по заданиям»; в «Оценках» нет чужих имён. `npm test` зелёное.
 - [ ] **Step 5:** скриншоты в `task-12-shots/`: «Задания» деканата; задание в режиме чтения; журнал с СРС по заданиям; «Оценки» студента 360 px; строки в «Журнале изменений».
@@ -1009,10 +1035,10 @@ export function logLine(row);           // строка журнала изме�
 
 ### Task 13 (координатор и владелец): общая проверка, выкладка, проверка с телефона
 
-- [ ] **Step 1: общая проверка юнита** — opus, диапазон от коммита плана до `HEAD`, по Review Focus 1–11, с пробными скриптами во временной папке сессии. Обязательные пробы: каждое действие `work.*` каждой ролью и без входа; поиск чужих id и ФИО во всех ответах студенту; снимок таблиц и имён ящика до и после каждого отказа; подложные файлы (раздел Review Focus 3) через настоящий сервер Node на временной базе (`startServer` с временной папкой данных) — тело 13,98 МБ проходит, 20 МБ — `payload_too_large`; уборка и копия файлов на временной папке; СРС — числа раздела «Правила расчёта»; прежние тесты юнитов 3–4 без правок; `npm run build:gas`. Находки — в `.superpowers/sdd/plan-unit-5-dz/final-fix-brief.md` (если проверяющий не может писать файлы — сохраняет координатор).
+- [ ] **Step 1: общая проверка юнита** — opus, диапазон от коммита плана до `HEAD`, по Review Focus 1–11, с пробными скриптами во временной папке сессии. Обязательные пробы: каждое действие `work.*` каждой ролью и без входа; поиск чужих id и ФИО во всех ответах студенту; снимок таблиц и имён ящика до и после каждого отказа; подложные файлы (раздел Review Focus 3) через настоящий сервер Node на временной базе (`startServer` с временной папкой данных) — тело 13,98 МБ проходит, 20 МБ — `payload_too_large`; `OPTIONS /api` с разрешённым и чужим `Origin` на сервере с временной базой; уборка и копия файлов на временной папке; СРС — числа раздела «Правила расчёта»; прежние тесты юнитов 3–4 без правок; `npm run build:gas`. Находки — в `.superpowers/sdd/plan-unit-5-dz/final-fix-brief.md` (если проверяющий не может писать файлы — сохраняет координатор).
 - [ ] **Step 2:** одна волна исправлений **одним** агентом; повторная проверка тем же проверяющим — только этих правок.
-- [ ] **Step 3:** короткий показ владельцу того, что изменила волна (если экраны). Новые кыргызские ключи (`work.*`, `work.home.*`, `journal.self.*`, `journalLog.work.*`, новые `error.*`) — в список на вычитку. Стенд остановить.
+- [ ] **Step 3:** короткий показ владельцу того, что изменила волна (если экраны). Новые кыргызские ключи (`work.*`, `work.home.*`, `journal.self.*`, `journal.log.work.*`, новые `error.*`) — в список на вычитку. Стенд остановить.
 - [ ] **Step 4:** решения раздела «Решения плана» (с ответами владельца на вопросы 1–7) — в таблицу решений `aidlc-state.md`. `design-v1.md`: раздел 6 «ДЗ и СРС» (файлы в папке данных, выдача через сервер; до 5 файлов по 10 МБ; попытки и пересдача; «на бумаге»; когда СРС выставлен), раздел 8 (таблицы «Задания», «Сдачи», «Файлы», колонка «задание» в «Журнале изменений»). `CLAUDE.md`: «Главные правила предметной области» — ДЗ и СРС; «Выкладка» — папка `files` в папке данных и `C:\JournalBackups\files`, тревога «мало места».
 - [ ] **Step 5 (только по прямой просьбе владельца): выкладка.** В папке сервера: `npm run serve:stop` → `git -C "D:\Журнал колледжа — сервер" checkout --detach <принятый коммит>` → `npm run serve:start` (сервер сам сделает копию базы, допишет три таблицы и колонку, создаст папку `files` при первой загрузке) → `npm run serve:status` («работает») → `git push`. Записать выложенный и прежний коммит в `aidlc-state.md`, раздел «Выкладка». Назад — тем же порядком на `47a5089` (старый код не знает новых таблиц и не трогает их; файлы остаются в папке `files`). Пробные данные: по желанию владельца `serve:demo-wipe` (с копией `journal-before-demo-…`), чтобы на живом сайте были пробные задания.
-- [ ] **Step 6: проверка на живом сайте** (пробные данные): владелец под пробным преподавателем выдаёт задание; **телефон с мобильным интернетом (без Wi-Fi)**: пробный студент фотографирует лист и сдаёт (фото камерой телефона) — время загрузки фото и ответ «Работа сдана»; преподаватель на ноутбуке открывает фото и ставит баллы; студент видит баллы. Загрузка фото дольше 15 секунд на нормальном мобильном интернете — находка.
-- [ ] **Step 7:** обновить `aidlc-state.md`: юнит 5 принят и выложен; в «Что перенести»: **известные ограничения** — на запасном Apps Script файлов нет; Word, Excel, PowerPoint не просматриваются внутри сайта (скачиваются); фото, которое браузер телефона не открыл, не уменьшается (только JPEG/PNG до 10 МБ уходят как есть); поворот фото на очень старых телефонах может сохраниться неверным (EXIF); файлы хранятся, пока есть база (архив — позже); уборка удаляет «сирот» раз в сутки, поэтому после отказов место освобождается не сразу. **Сразу после юнита 5** (если владелец ответил на вопрос 7 по умолчанию): прикреплённый файл силлабуса и необязательные вкладки 4–8 на том же ящике файлов.
+- [ ] **Step 6: проверка на живом сайте** (пробные данные): владелец под пробным преподавателем выдаёт задание; **телефон с мобильным интернетом (без Wi-Fi)**: пробный студент фотографирует лист и сдаёт (фото камерой телефона) — время загрузки фото и ответ «Работа сдана»; преподаватель на ноутбуке открывает фото и ставит баллы; студент видит баллы. Загрузка фото дольше 15 секунд на нормальном мобильном интернете — находка. Отдельно: PDF 9–10 МБ с телефона по мобильному интернету — дошёл или понятная ошибка с «Повторить».
+- [ ] **Step 7:** обновить `aidlc-state.md`: юнит 5 принят и выложен; в «Что перенести»: **известные ограничения** — на запасном Apps Script файлов нет; Word, Excel, PowerPoint не просматриваются внутри сайта (скачиваются); фото, которое браузер телефона не открыл, не уменьшается (только JPEG/PNG до 10 МБ уходят как есть); поворот фото на очень старых телефонах может сохраниться неверным (EXIF); файлы хранятся, пока есть база (архив — позже); уборка удаляет «сирот» раз в сутки, поэтому после отказов место освобождается не сразу; макросы в старых `.ppt` и макросы Excel 4.0 в `.xls` не распознаются, как и вложенные объекты Word (файлы только скачиваются, Office открывает файлы из интернета в защищённом просмотре и макросы в них блокирует); файл, который грузится дольше 5 минут, сервер обрывает. **Сразу после юнита 5** (если владелец ответил на вопрос 7 по умолчанию): прикреплённый файл силлабуса и необязательные вкладки 4–8 на том же ящике файлов.
