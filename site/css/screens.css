@@ -7029,3 +7029,130 @@ a.gr-card:hover { border-color: var(--primary-line); }
 }
 
 .here__tick .icon { width: 2.75rem; height: 2.75rem; stroke-width: 3; }
+
+/* «Задания» of the teacher (unit 5): the subjects, the assignments of a subject, the window of an assignment */
+
+.task-subjects {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.task-subject {
+  position: relative;
+  display: grid;
+  gap: var(--space-3);
+  height: 100%;
+  padding: var(--space-5) var(--space-5) var(--space-5) calc(var(--space-5) + 4px);
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  color: var(--text);
+  text-decoration: none;
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+}
+
+.task-subject::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  background: var(--lesson, var(--primary));
+}
+
+.task-subject[data-tone="0"] { --lesson: var(--tone-0); }
+.task-subject[data-tone="1"] { --lesson: var(--tone-1); }
+.task-subject[data-tone="2"] { --lesson: var(--tone-2); }
+.task-subject[data-tone="3"] { --lesson: var(--tone-3); }
+.task-subject[data-tone="4"] { --lesson: var(--tone-4); }
+.task-subject[data-tone="5"] { --lesson: var(--tone-5); }
+
+.task-subject:hover { border-color: var(--primary-line); background: var(--surface-raised); }
+
+.task-subject:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.task-subject__top { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+
+.task-subject__name { padding-right: 1.5rem; font-size: 1.125rem; font-weight: 600; letter-spacing: -0.015em; line-height: 1.3; overflow-wrap: anywhere; }
+
+.task-subject__meta { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); color: var(--text-muted); font-size: var(--control-fs); }
+
+.task-subject__chevron { position: absolute; right: var(--space-4); bottom: var(--space-5); width: 1.25rem; height: 1.25rem; color: var(--text-muted); }
+
+.tasks-body { display: grid; gap: var(--space-4); }
+
+.task-past-toggle { justify-self: start; }
+
+.tasks-table td { vertical-align: top; }
+
+.tasks-table__title { position: relative; min-width: 12rem; max-width: 26rem; font-weight: 600; }
+
+.tasks-table__link { color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+
+.tasks-table__link::after { content: ""; position: absolute; inset: 0; }
+
+.tasks-table__link:focus-visible { outline: none; }
+
+.tasks-table__link:focus-visible::after { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--radius-inner); }
+
+.tasks-row:hover .tasks-table__link { text-decoration: underline; }
+
+.tasks-table__sub { display: block; margin-top: 2px; color: var(--text-muted); font-size: var(--hint-fs); font-weight: 400; }
+
+.tasks-table__unit { white-space: nowrap; }
+
+.tasks-table__due { white-space: nowrap; }
+
+.tasks-table__actions { position: relative; width: 1%; text-align: right; white-space: nowrap; }
+
+.tasks-table .row-actions { display: inline-flex; gap: var(--space-1); }
+
+.task-due--danger { color: var(--danger); font-weight: 600; }
+
+.task-due--warning { color: var(--warning); font-weight: 600; }
+
+.task-progress { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1) var(--space-2); }
+
+.task-progress__main { font-variant-numeric: tabular-nums; }
+
+.icon-button--danger:hover { background: var(--danger-wash); color: var(--danger); }
+
+.icon-button[aria-disabled="true"] { cursor: not-allowed; opacity: 0.4; }
+
+.icon-button[aria-disabled="true"]:hover { background: transparent; color: var(--text-muted); }
+
+.dialog--task { width: min(calc(100% - 1rem), 40rem); }
+
+.task-form { display: grid; gap: var(--space-4); }
+
+.task-form__row { align-items: start; display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--space-4); }
+
+.task-form__pair,
+.task-form__fixed-place {
+  display: grid;
+  gap: var(--space-1);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--primary-line);
+  border-radius: var(--radius-inner);
+  background: var(--primary-wash);
+}
+
+.task-form__pair p,
+.task-form__fixed-place p { margin: 0; }
+
+.task-form__pair-subject { font-weight: 600; }
+
+.task-form__fixed-label { margin-right: var(--space-2); color: var(--text-muted); }
+
+.task-form__fixed { margin: 0; font-weight: 600; }
+
+.lp-sum__link { color: var(--primary-ink); font-weight: 600; }
+
+@media (max-width: 599px) {
+  .tasks-table__title { min-width: 10rem; }
+}

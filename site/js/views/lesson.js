@@ -7,6 +7,7 @@ import { applyTheme, pickTheme } from '../theme.js';
 import { qrMatrix } from '../qr.js';
 import { clockText, qrLink, arrivedList, stageOf, lessonDraft, lessonChanges, sourceKey, qrCell } from '../lesson.js';
 import { activityAllowed, coatAllowed } from '../journal.js';
+import { openTaskForm } from './taskForm.js';
 
 // The screen of a started pair for the projector (#/lesson/<pairId>). Always light, whatever theme the teacher chose.
 // Stage «Отметка»: the QR and the four digits that change every 15 seconds, the time left and who has arrived.
@@ -26,7 +27,7 @@ const S = {
   pairId: null, lesson: null, at: 0, chosen: null, errorCode: null, busy: null,
   gen: 0, inflight: false, ticker: null, pollTimer: null, listening: false,
   root: null, sig: '', dialogOpen: false, rolled: false, due: false, seen: null, fresh: new Set(),
-  seq: 0, edits: new Map(), saving: false, saved: false, done: false, rows: [], sent: [], problem: null,
+  seq: 0, edits: new Map(), saving: false, saved: false, done: false, rows: [], sent: [], problem: null, given: false,
 };
 
 export function render(root, params) {
@@ -65,7 +66,7 @@ function resetFor(pairId) {
   Object.assign(S, {
     pairId, lesson: null, chosen: null, errorCode: null, busy: null, inflight: false, pollTimer: null,
     dialogOpen: false, rolled: false, due: false, seen: null, fresh: new Set(),
-    seq: 0, edits: new Map(), saving: false, saved: false, done: false, rows: [], sent: [], problem: null,
+    seq: 0, edits: new Map(), saving: false, saved: false, done: false, rows: [], sent: [], problem: null, given: false,
   });
   holdOnLeave(null);
 }
@@ -370,7 +371,28 @@ function summaryStage(lesson) {
     el('div', { class: 'lp-sum__actions' },
       editable ? saveButton() : null,
       S.saved ? el('p', { class: 'lp-sum__saved', id: 'lesson-saved', role: 'status' }, icon('check'), t('lesson.summary.saved')) : null,
+      lesson.assign ? giveButton() : null,
+      lesson.assign && S.given ? el('p', { class: 'lp-sum__saved', id: 'lesson-given', role: 'status' }, icon('check'), t('work.given'),
+        ' ', el('a', { class: 'lp-sum__link', id: 'lesson-given-open', href: '#/tasks/' + encodeURIComponent(lesson.pair.subjectId) }, t('work.givenOpen'))) : null,
       running(lesson) ? finishButton() : null));
+}
+
+// «Дать задание»: the window of an assignment over the screen of the pair; it carries the topic and the unit of the pair.
+function giveButton() {
+  return el('button', { type: 'button', id: 'lesson-give', class: 'button button--secondary lp-big', onclick: giveTask }, icon('clipboard'), t('work.give'));
+}
+
+function giveTask() {
+  if (S.dialogOpen || !S.root || !S.lesson) return;
+  const pair = S.lesson.pair;
+  S.dialogOpen = true;
+  const gen = S.gen;
+  openTaskForm({
+    subjectId: pair.subjectId, host: S.root,
+    pair: { id: pair.id, subjectName: pair.subjectName, groupName: pair.groupName, topicId: pair.topicId, topicName: pair.topicName, unit: pair.unit },
+    onSaved: () => { if (gen === S.gen) S.given = true; },
+    onClosed: () => { if (gen !== S.gen) return; S.dialogOpen = false; S.sig = ''; draw(); },
+  });
 }
 
 function saveButton() {

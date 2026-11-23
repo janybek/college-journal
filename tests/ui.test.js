@@ -163,3 +163,14 @@ test('scrollToShow: the menu moves only when the current item is out of view', a
   assert.equal(scrollToShow(0, 300, 380, 420, 48), 168);
   assert.equal(scrollToShow(100, 300, 40, 80, 48), 0);
 });
+
+test('navFor: «Задания» follows «Журнал» for the teacher and sits in the group «Журнал» of the office, with the right to the overview', () => {
+  const teacher = navFor([...DEAN, 'schedule.mine', 'journal.list', 'work.overview'], 'teacher')[0].items;
+  assert.deepEqual(teacher.map((i) => i.name), ['home', 'mySchedule', 'journalList', 'tasks']);
+  assert.deepEqual(teacher[3], { name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard' });
+  assert.equal(navFor([...DEAN, 'journal.list'], 'teacher')[0].items.some((i) => i.name === 'tasks'), false);
+  const office = navFor(['journal.list', 'journal.log', 'work.overview'], 'dean').find((g) => g.titleKey === 'nav.journal');
+  assert.deepEqual(office.items.map((i) => i.name), ['journalList', 'tasks', 'journalLog']);
+  assert.equal(office.items[1].href, '#/tasks');
+  assert.equal(navFor(['work.mine', 'schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'tasks'), false);
+});

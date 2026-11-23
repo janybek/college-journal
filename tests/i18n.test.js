@@ -435,3 +435,15 @@ test('the student check-in: its keys exist in all three dictionaries, with the s
     assert.equal(holders(en[key]), holders(ru[key]), 'en ' + key);
   }
 });
+
+test('the assignments screens and the codes of the work answers have texts in all three languages', () => {
+  const codes = ['bad_value', 'bad_ref', 'empty', 'too_long', 'due_past', 'too_far', 'below_points', 'locked', 'bad_type', 'bad_file', 'too_big', 'too_many', 'self_by_work', 'required'];
+  const keys = [
+    'error.in_use', 'error.files_unavailable', 'error.already_checked', 'error.upload_limit', 'error.file_missing', 'error.nothing_to_return', 'error.attempt_changed',
+    ...codes.map((code) => 'work.form.error.' + code),
+    'tasks.title', 'tasks.new', 'work.give', 'work.given', 'work.size.kb', 'work.size.mb', 'work.due.overdue', 'work.due.today', 'work.due.tomorrow', 'work.due.date',
+    'work.state.none', 'work.state.submitted', 'work.state.checked', 'work.state.returned', 'work.state.late', 'work.kind.hw', 'work.kind.srs', 'work.form.unsaved',
+  ];
+  for (const [lang, dict] of [['ru', ru], ['ky', ky], ['en', en]]) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) assert.ok(dict['work.due.today'].includes('{time}') && dict['work.due.date'].includes('{date}'));
+});

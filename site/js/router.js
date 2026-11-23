@@ -46,6 +46,13 @@ export function resolveRoute(hash, user) {
   if (path === '/journal' && permissions.includes('journal.list')) return { view: 'journalList', params: {} };
   const journal = /^\/journal\/([^/]+)$/.exec(path);
   if (journal && permissions.includes('journal.get') && idOf(journal[1]) !== null) return { view: 'journal', params: { subjectId: idOf(journal[1]) } };
+  // «Задания»: the subjects with their assignments (teacher, office) or the student's own list; #/tasks/<subjectId>: the
+  // assignments of a subject; #/task/<assignmentId>: one assignment. The server checks every right itself.
+  if (path === '/tasks' && (permissions.includes('work.overview') || permissions.includes('work.mine'))) return { view: 'tasks', params: {} };
+  const tasks = /^\/tasks\/([^/]+)$/.exec(path);
+  if (tasks && permissions.includes('work.list') && idOf(tasks[1]) !== null) return { view: 'tasks', params: { subjectId: idOf(tasks[1]) } };
+  const task = /^\/task\/([^/]+)$/.exec(path);
+  if (task && permissions.includes('work.get') && idOf(task[1]) !== null) return { view: 'task', params: { assignmentId: idOf(task[1]) } };
   // #/lesson/<pairId>: the screen of a started pair for the projector (the server lets in only its teacher).
   const lesson = /^\/lesson\/([^/]+)$/.exec(path);
   if (lesson && permissions.includes('lesson.get') && idOf(lesson[1]) !== null) return { view: 'lesson', params: { pairId: idOf(lesson[1]) } };

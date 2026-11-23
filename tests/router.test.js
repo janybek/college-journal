@@ -169,3 +169,18 @@ test('resolveRoute: «#/here» is the check-in of a student; staff go home, a vi
   assert.equal(resolveRoute('#/here', null).view, 'login');
   assert.equal(resolveRoute('#/here', { mustChangePassword: true, permissions: ['checkin.mark'] }).view, 'changePassword');
 });
+
+test('resolveRoute: the assignments screens', () => {
+  const teacher = { mustChangePassword: false, permissions: ['work.overview', 'work.list', 'work.get', 'work.save', 'work.remove'] };
+  const student = { mustChangePassword: false, permissions: ['work.mine', 'work.get', 'work.upload'] };
+  assert.deepEqual(resolveRoute('#/tasks', teacher), { view: 'tasks', params: {} });
+  assert.deepEqual(resolveRoute('#/tasks', student), { view: 'tasks', params: {} });
+  assert.equal(resolveRoute('#/tasks', { mustChangePassword: false, permissions: [] }).view, 'home');
+  assert.deepEqual(resolveRoute('#/tasks/sb_1', teacher), { view: 'tasks', params: { subjectId: 'sb_1' } });
+  assert.equal(resolveRoute('#/tasks/sb_1', student).view, 'home');
+  assert.equal(resolveRoute('#/tasks/sb_1/x', teacher).view, 'home');
+  for (const user of [teacher, student]) assert.deepEqual(resolveRoute('#/task/as_1', user), { view: 'task', params: { assignmentId: 'as_1' } });
+  assert.equal(resolveRoute('#/task/as_1', { mustChangePassword: false, permissions: [] }).view, 'home');
+  assert.equal(resolveRoute('#/task/%E0%A4%A', teacher).view, 'home');
+  assert.equal(resolveRoute('#/tasks/%E0%A4%A', teacher).view, 'home');
+});

@@ -43,12 +43,14 @@ export function navFor(permissionList, role) {
     const items = [{ ...HOME, textKey: 'home.mySubjects', icon: 'book' }];
     if (list.includes('schedule.mine')) items.push({ name: 'mySchedule', href: '#/my', textKey: 'my.title', icon: 'calendar' });
     if (list.includes('journal.list')) items.push({ name: 'journalList', href: '#/journal', textKey: 'journal.title', icon: 'table' });
+    if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard' });
     return [{ titleKey: 'nav.teaching', items }];
   }
   const groups = [{ titleKey: null, items: [HOME] }];
   if (!parts.includes('office')) return groups;
   if (list.includes('journal.list')) {
     const items = [{ name: 'journalList', href: '#/journal', textKey: 'journal.list.title', icon: 'table', hintKey: 'journal.hint' }];
+    if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard', hintKey: 'tasks.hint' });
     if (list.includes('journal.log')) items.push({ name: 'journalLog', href: '#/journal-log', textKey: 'journalLog.title', icon: 'clipboard', hintKey: 'journalLog.hint' });
     groups.push({ titleKey: 'nav.journal', items });
   }
@@ -212,6 +214,7 @@ function currentName(view, params, role) {
   if (view === 'directory') return params.table;
   // A journal of a subject belongs to the list of journals.
   if (view === 'journal') return 'journalList';
+  if (view === 'task') return 'tasks';
   if (view === 'journalLog') return menuParts(role).includes('office') ? 'journalLog' : 'journalList';
   if (view === 'syllabus' || view === 'syllabusForm') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;
