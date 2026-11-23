@@ -167,6 +167,9 @@ test('draftVersion: a copy of the approved title and goal, or an empty version w
   assert.deepEqual([fromApproved.status, fromApproved.version, fromApproved.editedBy, fromApproved.updated, fromApproved.department, fromApproved.goal, fromApproved.manualOrder,
     fromApproved.planSemester, fromApproved.course, fromApproved.remark, fromApproved.decidedBy, fromApproved.id], ['draft', 2, 'sf_t', '2026-09-10', 'Кафедра', 'Цель', true, 1, 1, '', '', undefined]);
   assert.deepEqual([fromApproved.disciplineId, fromApproved.teacherId, fromApproved.semester], ['ds_1', 'sf_t', 1]);
+  assert.equal(draftVersion({ ...args, approved: { ...version, status: 'approved', fileId: 'fl_9' }, planSemester: 5, course: 3 }).fileId, 'fl_9');
+  assert.equal(draftVersion({ ...args, approved: { ...version, status: 'approved' }, planSemester: 5, course: 3 }).fileId, '');
+  assert.equal(draftVersion({ ...args, approved: null, number: 1, planSemester: 3, course: 2 }).fileId, '');
   const empty = draftVersion({ ...args, approved: null, number: 1, planSemester: 3, course: 2 });
   assert.deepEqual([empty.status, empty.version, empty.planSemester, empty.course, empty.manualOrder, empty.department, empty.goal, empty.credits], ['draft', 1, 3, 2, false, '', '', null]);
 });

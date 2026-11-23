@@ -39,7 +39,7 @@ test('actionKind', () => {
 });
 
 test('listPermissions', () => {
-  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
+  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
   const dean = listPermissions(['dean']);
   assert.ok(dean.includes('import.apply:students'));
   assert.ok(!dean.includes('dir.save:staff'));
@@ -67,6 +67,11 @@ test('can: schedule actions', () => {
   assert.ok(listPermissions(['dean']).includes('settings.save'));
 });
 
+test('the syllabus file: attach and drop for the deanery, the administrator and a teacher; reading for everybody', () => {
+  for (const action of ['syllabus.attachFile', 'syllabus.dropFile']) assert.deepEqual(['admin', 'dean', 'prorector', 'teacher', 'student'].map((r) => can([r], action)), [true, true, false, true, false], action);
+  assert.deepEqual(['admin', 'dean', 'prorector', 'teacher', 'student'].map((r) => can([r], 'syllabus.file')), [true, true, true, true, true]);
+});
+
 test('a file fills the draft: the deanery, the administrator and a teacher (of his own subject: the server checks); topics have no directory', () => {
   for (const role of ['admin', 'dean', 'teacher']) assert.equal(can([role], 'syllabus.apply'), true);
   for (const role of ['admin', 'dean', 'teacher']) assert.equal(can([role], 'syllabus.preview'), true);
@@ -77,9 +82,9 @@ test('a file fills the draft: the deanery, the administrator and a teacher (of h
   assert.deepEqual(listPermissions(['teacher']),
     ['journal.get', 'journal.list', 'journal.log', 'journal.saveResults', 'journal.savePair',
       'lesson.mine', 'lesson.get', 'lesson.start', 'lesson.endCheckin', 'lesson.finish',
-      'schedule.mine', 'syllabus.apply', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects',
+      'schedule.mine', 'syllabus.apply', 'syllabus.attachFile', 'syllabus.dropFile', 'syllabus.file', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects',
       'work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save'].sort());
-  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
+  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
   assert.equal(can(['dean'], 'topics.plan'), false);
   assert.equal(can(['student'], 'student.subjects'), true);
   assert.equal(can(['teacher'], 'student.subjects'), false);

@@ -89,8 +89,17 @@ test('submit with gaps writes nothing and names every gap', () => {
   const before = snapshotAll();
   const answer = call('syllabus.submit', { syllabusId: empty }, teacher2).data;
   assert.deepEqual([answer.submitted, answer.checks.errors.map((e) => [e.section, e.field ?? e.code])],
-    [false, [['title', 'department'], ['title', 'academicYear'], ['title', 'credits'], ['goals', 'goal'], ['plan', 'empty']]]);
+    [false, [['title', 'department'], ['title', 'academicYear'], ['title', 'credits'], ['plan', 'empty']]]);
   assert.equal(snapshotAll(), before);
+});
+
+test('a version with an empty goal is submitted; the empty goal is only a warning', () => {
+  const { call, save, draft, fill, teacher2, sb2 } = ready();
+  const id = draft(sb2, 1, teacher2);
+  fill(id, teacher2);
+  assert.equal(save(id, 'goals', { goal: '' }, teacher2).error, undefined);
+  const answer = call('syllabus.submit', { syllabusId: id }, teacher2).data;
+  assert.deepEqual([answer.submitted, answer.checks.warnings.some((w) => w.section === 'goals' && w.code === 'empty')], [true, true]);
 });
 
 test('who may do what: a teacher never approves; return needs a remark and a version under review', () => {

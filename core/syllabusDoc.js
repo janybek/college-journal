@@ -226,6 +226,7 @@ export function draftVersion({ key, approved, planSemester, course, userId, toda
   const source = approved || {};
   for (const f of COPIED) row[f] = TITLE_NUMBERS.includes(f) ? orNull(source[f]) : text(source[f]);
   row.manualOrder = approved ? approved.manualOrder === true : false;
+  row.fileId = approved ? (approved.fileId || '') : '';
   if (!approved) {
     row.planSemester = planSemester ?? null;
     row.course = course ?? null;

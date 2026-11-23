@@ -114,7 +114,6 @@ export function checkSubmit(doc, held = [], groups = []) {
   if (Number.isInteger(course) && Number.isInteger(planSemester) && courseOf(planSemester) !== course) {
     errors.push({ section: 'title', field: 'planSemester', code: 'course_semester', course });
   }
-  if (blank(doc?.goals?.goal)) errors.push({ section: 'goals', field: 'goal', code: 'required' });
 
   const units = doc?.plan?.units || [];
   const lessonsOf = (u) => LESSON_LISTS.flatMap((k) => u[k] || []);
@@ -145,6 +144,7 @@ export function checkSubmit(doc, held = [], groups = []) {
   });
   errors.push(...held);
 
+  if (blank(doc?.goals?.goal)) warnings.push({ section: 'goals', code: 'empty' });
   if (!(doc?.literature?.main?.length || doc?.literature?.extra?.length)) warnings.push({ section: 'literature', code: 'empty' });
   if (!doc?.software?.items?.length) warnings.push({ section: 'software', code: 'empty' });
   const pol = doc?.policies || {};

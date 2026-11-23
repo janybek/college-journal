@@ -79,13 +79,16 @@ const fullDoc = { title: { department: 'Кафедра', academicYear: '2026–2
 
 test('checkSubmit: an empty document and a full one', () => {
   assert.deepEqual(checkSubmit(emptyDoc).errors, [...['department', 'academicYear', 'course', 'planSemester', 'credits'].map((field) => ({ section: 'title', field, code: 'required' })),
-    { section: 'goals', field: 'goal', code: 'required' }, { section: 'plan', code: 'empty' }]);
-  assert.deepEqual(checkSubmit(emptyDoc).warnings, ['literature', 'software', 'policies', 'units'].map((section) => ({ section, code: 'empty' })));
+    { section: 'plan', code: 'empty' }]);
+  assert.deepEqual(checkSubmit(emptyDoc).warnings, ['goals', 'literature', 'software', 'policies', 'units'].map((section) => ({ section, code: 'empty' })));
   const second = structuredClone(fullDoc);
   second.plan.units.push({ unit: 2, title: '', lecture: [], practice: [], seminar: [], lab: [], control: [row('М2')] });
   second.selfWork.items[0].unit = 5;
   assert.deepEqual(checkSubmit(second).errors, [{ section: 'plan', unit: 2, code: 'unit_empty' }, { section: 'selfWork', index: 0, code: 'bad_unit' }]);
   assert.deepEqual(checkSubmit(fullDoc), { errors: [], warnings: [] });
+  const noGoal = structuredClone(fullDoc);
+  noGoal.goals.goal = '   ';
+  assert.deepEqual(checkSubmit(noGoal), { errors: [], warnings: [{ section: 'goals', code: 'empty' }] });
   // пробелы вместо значения — не заполнено
   const blank = structuredClone(fullDoc);
   blank.title.department = '   ';

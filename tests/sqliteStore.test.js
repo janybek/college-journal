@@ -191,6 +191,18 @@ test('a process killed in the middle of a request: the base opens, is whole and 
   assert.deepEqual([store.list('rooms').map((r) => r.name), store.list('groups'), after.prepare('PRAGMA integrity_check').get().integrity_check], [['до'], [], 'ok']);
 });
 
+test('ensureTables adds syllabi.fileId to a base without it; an old row reads it as empty', (t) => {
+  const { db } = tmpBase(t, { empty: true });
+  ensureTables(SCHEMA, db);
+  db.exec('DROP TABLE "syllabi"');
+  const oldColumns = SCHEMA.syllabi.columns.slice(0, -1);
+  db.exec(`CREATE TABLE "syllabi" (${oldColumns.map((c) => `"${c.key}" TEXT`).join(', ')}); INSERT INTO "syllabi" ("id", "goal") VALUES ('sy_1', 'Цель')`);
+  assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [['syllabi', 'fileId']] });
+  const store = createSqliteStore(SCHEMA, platform, db);
+  assert.equal(store.get('syllabi', 'sy_1').fileId, '');
+  assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
+});
+
 test('ensureTables on a unit 4 base adds the work tables and changeLog.assignmentId; old log rows read assignmentId as empty', (t) => {
   const { db } = tmpBase(t, { empty: true });
   const oldColumns = SCHEMA.changeLog.columns.slice(0, -1);

@@ -8,6 +8,7 @@ export const FILE_LIMITS = Object.freeze({
   keepPendingMs: 86400000,
 });
 
+export const SYLLABUS_FILE_KINDS = ['pdf', 'docx', 'doc'];
 export const FILE_KINDS = ['jpg', 'png', 'pdf', 'docx', 'xlsx', 'pptx', 'doc', 'xls', 'ppt'];
 
 const BAD_CHARS = /[\u0000-\u001F\u007F\u202A-\u202E\u2066-\u2069]/g;

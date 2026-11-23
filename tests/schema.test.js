@@ -70,7 +70,7 @@ test('syllabi sheet, pair lesson columns and kinds', () => {
 
 test('syllabus version fields and section sheets', () => {
   assert.deepEqual(SCHEMA.syllabi.columns.map((c) => c.key).slice(11), ['department', 'faculty', 'academicYear', 'course', 'contacts', 'place', 'goal',
-    'status', 'version', 'remark', 'submittedBy', 'submittedAt', 'decidedBy', 'decidedAt', 'editedBy', 'manualOrder']);
+    'status', 'version', 'remark', 'submittedBy', 'submittedAt', 'decidedBy', 'decidedAt', 'editedBy', 'manualOrder', 'fileId']);
   assert.deepEqual(SCHEMA.syllabi.columns.filter((c) => c.type !== 'string').map((c) => c.key),
     ['semester', 'planSemester', 'credits', 'totalHours', 'classHours', 'selfHours', 'course', 'version', 'manualOrder']);
   const sheet = (t) => [SCHEMA[t].sheet, SCHEMA[t].prefix, SCHEMA[t].columns.map((c) => c.key)];
@@ -96,5 +96,5 @@ test('unit 5 tables: assignments, submissions, files, the work log column and th
   assert.deepEqual([SCHEMA.assignments.sheet, SCHEMA.submissions.sheet, SCHEMA.files.sheet, SCHEMA.assignments.prefix, SCHEMA.submissions.prefix, SCHEMA.files.prefix],
     ['Задания', 'Сдачи', 'Файлы', 'as', 'su', 'fl']);
   assert.equal(SCHEMA.changeLog.columns.at(-1).key, 'assignmentId');
-  assert.deepEqual([WORK_KINDS, WORK_STATUSES, FILE_STATES, LOG_ENTITIES], [['hw', 'srs'], ['submitted', 'replaced', 'checked', 'returned'], ['pending', 'attached', 'dropped'], ['mark', 'unit', 'pair', 'work']]);
+  assert.deepEqual([WORK_KINDS, WORK_STATUSES, FILE_STATES, LOG_ENTITIES], [['hw', 'srs'], ['submitted', 'replaced', 'checked', 'returned'], ['pending', 'attached', 'dropped', 'syllabus'], ['mark', 'unit', 'pair', 'work']]);
 });

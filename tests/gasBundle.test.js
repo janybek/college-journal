@@ -186,7 +186,7 @@ test('hashes made inside the Apps Script bundle verify with the Node platform', 
 
 const SECTION_SHEETS = ['Юниты', 'Результаты обучения', 'СРС', 'Литература', 'Программное обеспечение', 'Оценивание', 'Правила'];
 
-test('setup creates all 26 sheets, adds sixteen columns to an old syllabus sheet and a second setup changes nothing', () => {
+test('setup creates all 26 sheets, adds seventeen columns to an old syllabus sheet and a second setup changes nothing', () => {
   const { gas, sandbox } = load();
   sandbox.setup();
   const [fresh] = gas.spreadsheets.values();
@@ -204,7 +204,7 @@ test('setup creates all 26 sheets, adds sixteen columns to an old syllabus sheet
   for (const name of SECTION_SHEETS) assert.ok(old.getSheetByName(name), name);
   const rows = old.dump('Силлабусы');
   assert.deepEqual(rows[0], SCHEMA.syllabi.columns.map((c) => c.title));
-  assert.equal(rows[0].length, 27);
+  assert.equal(rows[0].length, 28);
   assert.deepEqual(rows[1].slice(0, 11), ['sy_old', 'ds_1', 'sf_1', 1, 1, 'ИС', 3, 90, 60, 30, 'вчера']);
   assert.equal(rows[1].slice(11).every((v) => v === ''), true);
   const names = old.getSheets().map((s) => s.getName());

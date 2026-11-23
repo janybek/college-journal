@@ -20,7 +20,7 @@ export const CHECKIN_RESULTS = ['ok', 'wrong'];
 export const RESULT_FIELDS = ['control', 'self', 'current'];
 export const WORK_KINDS = ['hw', 'srs'];                                   // ДЗ, СРС
 export const WORK_STATUSES = ['submitted', 'replaced', 'checked', 'returned']; // сдано, заменено новой попыткой, проверено, возвращено
-export const FILE_STATES = ['pending', 'attached', 'dropped'];             // загружен и ждёт «Сдать», в сдаче, убран студентом
+export const FILE_STATES = ['pending', 'attached', 'dropped', 'syllabus'];             // загружен и ждёт «Сдать», в сдаче, убран студентом
 export const LOG_ENTITIES = ['mark', 'unit', 'pair', 'work'];
 
 const col =(key, title, type = 'string') => ({ key, title, type });
@@ -90,7 +90,7 @@ export const SCHEMA = {
       col('contacts', 'контакты преподавателя'), col('place', 'место проведения'), col('goal', 'цель курса'), col('status', 'статус'),
       col('version', 'версия', 'int'), col('remark', 'замечание деканата'), col('submittedBy', 'отправил'), col('submittedAt', 'отправлен'),
       col('decidedBy', 'решение принял'), col('decidedAt', 'дата решения'), col('editedBy', 'правил'),
-      col('manualOrder', 'порядок задан вручную', 'bool'),
+      col('manualOrder', 'порядок задан вручную', 'bool'), col('fileId', 'файл силлабуса'),
     ],
   },
   topics: {
@@ -194,6 +194,7 @@ export const SCHEMA = {
   },
   files: {
     sheet: 'Файлы', prefix: 'fl',
+    // ownerId: id студента; у строки состояния 'syllabus' — id сотрудника, прикрепившего файл (id sf… и st… не пересекаются)
     columns: [col('id', 'id'), col('assignmentId', 'задание'), col('submissionId', 'сдача'), col('ownerId', 'студент'),
       col('state', 'состояние'), col('name', 'имя файла'), col('kind', 'вид'), col('size', 'размер, байт', 'int'),
       col('stored', 'имя на диске'), col('at', 'когда загружен')],
