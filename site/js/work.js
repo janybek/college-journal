@@ -96,3 +96,37 @@ export function formProblems(fields) {
   }
   return map;
 }
+
+// ---- Checking of the works ----
+
+// The attempt with the biggest n of a student of work.get (the server lists them from the newest; the site does not rely on it).
+export function currentOf(student) {
+  let best = null;
+  for (const a of student && Array.isArray(student.attempts) ? student.attempts : []) if (!best || a.n > best.n) best = a;
+  return best;
+}
+
+// What the grade form starts with: the points and the comment of the current attempt, or nothing for a student who handed nothing in.
+export function gradeDraft(student) {
+  const current = currentOf(student);
+  return { verdict: 'checked', points: current && Number.isInteger(current.points) ? current.points : null, comment: current && typeof current.comment === 'string' ? current.comment : '' };
+}
+
+const pointsOf = (value) => (value === null || value === undefined || value === '' ? null : /^\d+$/.test(String(value).trim()) ? Number(String(value).trim()) : NaN);
+
+// The same rule as the server's: points that were already given and change, or a checked work that is returned, need a reason.
+// A comment alone changes nothing that needs one. (The server decides; this only shows the field.)
+export function gradeNeedsReason(student, draft) {
+  const current = currentOf(student);
+  if (!current) return false;
+  if (current.status === 'checked' && draft.verdict === 'returned') return true;
+  if (!Number.isInteger(current.points)) return false;
+  return (draft.verdict === 'checked' ? pointsOf(draft.points) : null) !== current.points;
+}
+
+export function base64ToBytes(text) {
+  const raw = atob(text);
+  const bytes = new Uint8Array(raw.length);
+  for (let i = 0; i < raw.length; i += 1) bytes[i] = raw.charCodeAt(i);
+  return bytes;
+}

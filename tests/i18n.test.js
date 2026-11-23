@@ -436,6 +436,8 @@ test('the student check-in: its keys exist in all three dictionaries, with the s
   }
 });
 
+const WORK_CHECK_KEYS = ['work.state.checkedPoints', 'work.filter.all', 'work.filter.wait', 'work.filter.none', 'work.students', 'work.left', 'work.max', 'work.edit', 'work.back', 'work.attempt', 'work.sentAt', 'work.paper', 'work.noText', 'work.files', 'work.file.open', 'work.file.download', 'work.file.loading', 'work.file.broken', 'work.grade.title', 'work.grade.points', 'work.grade.comment', 'work.grade.reason', 'work.grade.reasonHint', 'work.grade.check', 'work.grade.return', 'work.grade.returnHint', 'work.grade.next', 'work.grade.nextNone', 'work.grade.saved', 'work.grade.attemptChanged', 'work.grade.paper', 'work.grade.paperHint', 'work.grade.checkedBy', 'work.grade.given', 'work.prev', 'work.unsaved.title', 'work.unsaved.save', 'work.unsaved.discard', 'work.noStudents', 'work.noneShown'];
+
 test('the assignments screens and the codes of the work answers have texts in all three languages', () => {
   const codes = ['bad_value', 'bad_ref', 'empty', 'too_long', 'due_past', 'too_far', 'below_points', 'locked', 'bad_type', 'bad_file', 'too_big', 'too_many', 'self_by_work', 'required'];
   const keys = [
@@ -443,6 +445,7 @@ test('the assignments screens and the codes of the work answers have texts in al
     ...codes.map((code) => 'work.form.error.' + code),
     'tasks.title', 'tasks.new', 'work.give', 'work.given', 'work.size.kb', 'work.size.mb', 'work.due.overdue', 'work.due.today', 'work.due.tomorrow', 'work.due.date',
     'work.state.none', 'work.state.submitted', 'work.state.checked', 'work.state.returned', 'work.state.late', 'work.kind.hw', 'work.kind.srs', 'work.form.unsaved',
+    ...WORK_CHECK_KEYS,
   ];
   for (const [lang, dict] of [['ru', ru], ['ky', ky], ['en', en]]) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
   for (const dict of [ru, ky, en]) assert.ok(dict['work.due.today'].includes('{time}') && dict['work.due.date'].includes('{date}'));

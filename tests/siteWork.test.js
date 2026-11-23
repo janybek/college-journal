@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { FILE_MIME, mimeOf, viewWay, downloadName, sizeText, dueText, stateView, kindOfName, defaultDue, formProblems } from '../site/js/work.js';
+import { FILE_MIME, mimeOf, viewWay, downloadName, sizeText, dueText, stateView, kindOfName, defaultDue, formProblems, gradeDraft, gradeNeedsReason, base64ToBytes } from '../site/js/work.js';
 import { kindByName, FILE_KINDS } from '../core/files.js';
 
 test('how a file is shown: by its kind only', () => {
@@ -50,4 +50,32 @@ test('errors of the fields become keys of the form', () => {
   const map = formProblems([{ field: 'due', code: 'due_past' }, { field: 'title', code: 'empty' }, { field: 'due', code: 'bad_value' }]);
   assert.deepEqual([...map], [['due', 'work.form.error.due_past'], ['title', 'work.form.error.empty']]);
   assert.equal(formProblems(undefined).size, 0);
+});
+
+const attempt = (over) => ({ id: 'a1', n: 1, status: 'submitted', points: null, comment: '', paper: false, ...over });
+
+test('the draft of a grade: nothing yet, or what the current attempt has', () => {
+  assert.deepEqual(gradeDraft({ attempts: [] }), { verdict: 'checked', points: null, comment: '' });
+  assert.deepEqual(gradeDraft({ attempts: [attempt({ id: 'a2', n: 2, status: 'checked', points: 15, comment: 'Хорошо' }), attempt({ n: 1, status: 'returned', comment: 'Старое' })] }),
+    { verdict: 'checked', points: 15, comment: 'Хорошо' });
+  assert.deepEqual(gradeDraft({ attempts: [attempt({ comment: 'Замечание' })] }), { verdict: 'checked', points: null, comment: 'Замечание' });
+});
+
+test('when a change of the grade needs a reason', () => {
+  const none = { attempts: [] };
+  const sent = { attempts: [attempt()] };
+  const checked = { attempts: [attempt({ status: 'checked', points: 15, comment: 'ok' })] };
+  assert.equal(gradeNeedsReason(none, { verdict: 'checked', points: 6, comment: '' }), false);
+  assert.equal(gradeNeedsReason(sent, { verdict: 'checked', points: 8, comment: '' }), false);
+  assert.equal(gradeNeedsReason(checked, { verdict: 'checked', points: 12, comment: 'ok' }), true);
+  assert.equal(gradeNeedsReason(checked, { verdict: 'checked', points: '12', comment: 'ok' }), true);
+  assert.equal(gradeNeedsReason(checked, { verdict: 'checked', points: 15, comment: 'новый' }), false);
+  assert.equal(gradeNeedsReason(checked, { verdict: 'checked', points: '15', comment: 'новый' }), false);
+  assert.equal(gradeNeedsReason(checked, { verdict: 'returned', points: null, comment: 'переделать' }), true);
+  assert.equal(gradeNeedsReason(sent, { verdict: 'returned', points: null, comment: 'переделать' }), false);
+});
+
+test('base64 becomes bytes', () => {
+  assert.deepEqual([...base64ToBytes('QUJD')], [65, 66, 67]);
+  assert.ok(base64ToBytes('QUJD') instanceof Uint8Array);
 });
