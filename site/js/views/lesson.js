@@ -599,14 +599,14 @@ function checkinStage(lesson) {
   const left = lesson.checkinLeftMs === null ? null : lesson.checkinLeftMs - elapsed();
   return el('div', { class: 'lp-checkin' },
     el('div', { class: 'lp-qr' },
-      shown ? el('canvas', { class: 'lp-qr__canvas', role: 'img', 'aria-label': t('lesson.qr.alt'), 'data-qr': shown.qr }) : null,
+      shown ? el('canvas', { class: 'lp-qr__canvas', role: 'img', 'aria-label': t('lesson.qr.alt'), 'data-qr': shown.qr }) : null),
+    el('div', { class: 'lp-side' },
+      el('p', { class: 'lp-side__stage', id: 'lesson-timer' }, t('lesson.checkin.head', { time: clockText(left) })),
       shown ? el('div', { class: 'lp-code' },
         el('p', { class: 'lp-code__label' }, t('lesson.code')),
         el('div', { class: 'lp-code__digits', role: 'img', 'aria-label': t('lesson.code.aria', { digits: shown.digits.split('').join(' ') }) },
           shown.digits.split('').map((digit) => el('span', { class: 'lp-code__digit', 'aria-hidden': 'true' }, digit))),
-        el('p', { class: 'lp-code__hint' }, t('lesson.code.change'))) : null),
-    el('div', { class: 'lp-side' },
-      el('p', { class: 'lp-side__stage', id: 'lesson-timer' }, t('lesson.checkin.head', { time: clockText(left) })),
+        el('p', { class: 'lp-code__hint' }, t('lesson.code.change'))) : null,
       el('p', { class: 'lp-side__count', id: 'lesson-count' }, t('lesson.arrived', { n: lesson.attended, total: lesson.total })),
       arrived.length === 0
         ? el('p', { class: 'lp-side__none' }, t('lesson.arrived.none'))

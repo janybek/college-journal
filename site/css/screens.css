@@ -6816,7 +6816,7 @@ a.gr-card:hover { border-color: var(--primary-line); }
   image-rendering: pixelated;
 }
 
-.lp-code { display: grid; gap: var(--space-2); justify-items: center; }
+.lp-code { display: grid; gap: var(--space-2); justify-items: start; }
 .lp-code__label { margin: 0; font-size: 1rem; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--text-muted); }
 .lp-code__digits { display: flex; gap: var(--space-3); }
 
