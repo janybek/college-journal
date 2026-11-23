@@ -7,7 +7,7 @@ import { lessonNumbers } from '../core/syllabusPlan.js';
 import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
 import { rightsOn, versionsOf } from '../core/syllabusFlow.js';
 import { loadSettings, todayOf } from './scheduleData.js';
-import { readTables, viewerOf } from './syllabusDraft.js';
+import { fileMetaOf, readTables, viewerOf } from './syllabusDraft.js';
 
 const MANAGER_ROLES = ['admin', 'dean', 'prorector'];
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -39,17 +39,18 @@ function pageRow(row, own, marks, numbers) {
 }
 
 // The page of one version: the earlier summary fields stay for the screens that still read them; the sections come from the document.
-function shownVersion(version, rows, own, settings, subject, index, current) {
+function shownVersion(store, version, rows, own, settings, subject, index, current) {
   const marks = controlMarks(rows.topics);
   const numbers = lessonNumbers(rows.topics);
   const doc = buildDoc(version, rows);
   return {
-    planSemester: version.planSemester, audience: version.audience, credits: version.credits, totalHours: version.totalHours,
+    id: version.id, planSemester: version.planSemester, audience: version.audience, credits: version.credits, totalHours: version.totalHours,
     classHours: version.classHours, selfHours: version.selfHours, updated: version.updated,
     rows: rows.topics.map((r) => pageRow(r, own, marks, numbers)),
     totals: syllabusTotals(rows.topics),
     schedule: current ? scheduleFit(rows.topics, own, settings, subjectScope(subject, own, index, settings).skip) : null,
     title: doc.title, goals: doc.goals, selfWork: doc.selfWork, literature: doc.literature, software: doc.software, policies: doc.policies, units: doc.units,
+    file: fileMetaOf(store, version),
   };
 }
 
@@ -121,7 +122,7 @@ export function syllabusPage(store, platform, data, user) {
   let syllabus = null;
   if (version) {
     const own = shown === 'open' ? [] : pairs.filter((p) => p.subjectId === subject.id);
-    syllabus = shownVersion(version, rowsOfVersion(tables, version.id), own, settings, subject, index, shown === 'approved' && semester === settings.semester);
+    syllabus = shownVersion(store, version, rowsOfVersion(tables, version.id), own, settings, subject, index, shown === 'approved' && semester === settings.semester);
   }
   const rights = halves[semester].rights || { edit: false, submit: false, approve: false, giveBack: false };
   const can = {

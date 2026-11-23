@@ -17,6 +17,13 @@ export function readTables(store, names) {
   return out;
 }
 
+// The file of a version for the screen: { name, kind, size, at } or null. An empty fileId reads nothing; else the sheet «Файлы» once.
+export function fileMetaOf(store, version) {
+  if (typeof version.fileId !== 'string' || version.fileId === '') return null;
+  const row = store.list('files').find((f) => f.id === version.fileId && f.state === 'syllabus');
+  return row ? { name: row.name, kind: row.kind, size: row.size, at: row.at } : null;
+}
+
 // What rightsOn needs to know about the person: the id, the roles and whether they teach the discipline of the version now.
 export function viewerOf(user, version, subjects) {
   const teaches = subjects.some((s) => s.disciplineId === version.disciplineId && s.teacherId === user.id);
@@ -112,7 +119,7 @@ export function draftForm(store, platform, data, user) {
     syllabus: {
       id: version.id, status: version.status, version: version.version, semester: version.semester, planSemester: version.planSemester ?? null,
       remark: version.remark ?? '', updated: version.updated ?? '', submittedAt: version.submittedAt ?? '', decidedAt: version.decidedAt ?? '',
-      copyOfApproved: approved !== null,
+      copyOfApproved: approved !== null, file: fileMetaOf(store, version),
     },
     subject: {
       id: mine.length > 0 ? mine[0].subjectId : '', name: named ? named.name : '', disciplineId: version.disciplineId, teacherId: version.teacherId,

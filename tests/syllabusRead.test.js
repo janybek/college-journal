@@ -17,8 +17,9 @@ test('syllabus.get: the page of a subject', () => {
   assert.deepEqual([d.today, d.currentSemester, d.semesters, d.semester], ['2026-08-31', 1, [{ semester: 1, planSemester: 1 }], 1]);
   assert.deepEqual(d.subject, { id: sb1, name: 'Информатика', disciplineId: ds1, groupId: g1, groupName: '01-1', course: 1, teacherId: staff.teacher1, teacherName: 'teacher1' });
   assert.deepEqual(d.groups, [{ subjectId: sb1, groupName: '01-1' }, { subjectId: sb3, groupName: '02-1' }]);
-  const { rows, totals, schedule, title, goals, selfWork, literature, software, policies, units, ...info } = d.syllabus;
-  assert.deepEqual(info, { planSemester: 1, audience: 'Сестринское дело', credits: 1, totalHours: 10, classHours: 6, selfHours: 4, updated: '2026-08-31' });
+  const { id: versionId, rows, totals, schedule, title, goals, selfWork, literature, software, policies, units, ...info } = d.syllabus;
+  assert.equal(typeof versionId, 'string');
+  assert.deepEqual(info, { planSemester: 1, audience: 'Сестринское дело', credits: 1, totalHours: 10, classHours: 6, selfHours: 4, updated: '2026-08-31', file: null });
   // a row is one lesson: its kind, the number of the kind (Л1, П1, П2), the hours
   assert.deepEqual(rows.map((r) => [r.lessonKind, r.number, r.name, r.hours]),
     [['lecture', 1, 'Введение', 2], ['practice', 1, 'Введение', 2], ['practice', 2, 'Практикум', 2], ['control', 1, '', 0]]);

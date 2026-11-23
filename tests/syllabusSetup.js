@@ -46,11 +46,11 @@ function spyOn(store) {
 // A fresh store for every test: dean, prorector, teacher1, teacher2; students s1 (01-1) and s2 (02-1); disciplines «Информатика» (ds1) and «Анатомия» (ds2);
 // sb1 = ds1 + 01-1 + teacher1 (Tuesday, pair 1: 2026-09-01 and 09-08), sb3 = ds1 + 02-1 + teacher1 (Wednesday: 09-02 and 09-09),
 // sb2 = ds2 + 02-1 + teacher2 (Friday); semester 1, the schedule is made.
-export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform) } = {}) {
+export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform), files } = {}) {
   const platform = createNodePlatform({ now: () => Date.UTC(2026, 7, 31, 6), secret: 'test-secret' });
   const store = makeStore(SCHEMA, platform);
   const spied = spyOn(store);
-  const ctx = { store: spied.spy, platform, log: () => {} };
+  const ctx = { store: spied.spy, platform, log: () => {}, files };
   const call = (action, data, token) => handleRequest(JSON.stringify({ action, data, token }), ctx);
   const tokens = {};
   const staff = {};
@@ -116,7 +116,7 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   // every sheet of the syllabi and the pairs as one text: a failed request must leave it as it was
   const snapshotAll = () => JSON.stringify([store.list('syllabi'), ...DOC_TABLES.map((name) => store.list(name)), store.list('pairs')]);
   return {
-    store, spy: spied.spy, platform, call, send, publish, draft, save, fill, snapshotAll, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, order: spied.order, reset: spied.reset,
+    store, files, spy: spied.spy, platform, call, send, publish, draft, save, fill, snapshotAll, pairOf, lessons, snapshot, lists: spied.lists, calls: spied.calls, writes: spied.writes, order: spied.order, reset: spied.reset,
     ...tokens, staff, ds1, ds2, g1, g2, sb1, sb2, sb3, S,
   };
 }
