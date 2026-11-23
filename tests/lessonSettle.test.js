@@ -56,3 +56,17 @@ test('settlePlan: students in id order, pairs in input order', () => {
   assert.deepEqual(out.marks.map((m) => m.pairId + m.studentId), ['p1c', 'p1m', 'p1z', 'p2c', 'p2m', 'p2z']);
   assert.deepEqual(out.patches.map((p) => p.id), ['p1', 'p2']);
 });
+
+test('settlePlan: a running pair with an unreadable startedAt is skipped', () => {
+  for (const startedAt of ['', 'not a time']) {
+    assert.deepEqual(plan({ nowMs: B('11:00:00'), pairs: [{ ...R, startedAt }] }), { marks: [], patches: [] });
+  }
+});
+
+test('settlePlan: an unreadable checkinUntil counts as startedAt + 5 minutes', () => {
+  const bad = { ...R, checkinUntil: 'not a time' };
+  assert.deepEqual(plan({ nowMs: B('08:02:59'), pairs: [bad] }), { marks: [], patches: [] });
+  const end = plan({ nowMs: B('08:03:00'), pairs: [bad] });
+  assert.deepEqual(end.marks.map((m) => [m.studentId, m.status, m.markedAt]), [['a2', 'absent', '2026-09-22 08:03:00'], ['a3', 'absent', '2026-09-22 08:03:00']]);
+  assert.deepEqual(end.patches, [{ id: 'p1', patch: { checkinClosed: true } }]);
+});
