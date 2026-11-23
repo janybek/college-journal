@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, absenceList, pointsText } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -229,4 +229,84 @@ test('pointsText: the points of a pair, or «not counted»', () => {
   assert.deepEqual(pointsText({ earned: 27, possible: 30 }), { key: 'grades.points', params: { earned: 27, possible: 30 } });
   assert.deepEqual(pointsText({ earned: 0, possible: 30 }), { key: 'grades.points', params: { earned: 0, possible: 30 } });
   assert.deepEqual(pointsText({ earned: null, possible: null }), { key: 'grades.notCounted', params: {} });
+});
+
+// ---- The views: day, week, unit, the whole term ----
+
+const V = (id, date, unit, extra = {}) => ({ id, date, unit, status: 'closed', lessonType: 'lecture', ...extra });
+const VJ = {
+  partial: false,
+  units: [{ unit: 1, title: '' }, { unit: 2, title: '' }, { unit: 3, title: '' }],
+  pairs: [V('a', '2026-11-09', 1), V('b', '2026-11-16', 1), V('c', '2026-11-18', 1), V('d', '2026-11-18', 2), V('e', '2026-11-30', 2), V('f', '2026-12-02', null)],
+};
+const ids = (rows) => rows.map((p) => p.id);
+
+test('weekRange and addDays: Monday to Sunday, across months and years', () => {
+  assert.deepEqual(weekRange('2026-11-18'), { from: '2026-11-16', to: '2026-11-22' });
+  assert.deepEqual(weekRange('2026-11-22'), { from: '2026-11-16', to: '2026-11-22' });
+  assert.deepEqual(weekRange('2026-11-16'), { from: '2026-11-16', to: '2026-11-22' });
+  assert.deepEqual(weekRange('2026-12-02'), { from: '2026-11-30', to: '2026-12-06' });
+  assert.deepEqual(weekRange('2026-12-31'), { from: '2026-12-28', to: '2027-01-03' });
+  assert.equal(addDays('2026-02-28', 1), '2026-03-01');
+  assert.equal(addDays('2026-01-01', -1), '2025-12-31');
+  assert.deepEqual([isoWeekday('2026-11-16'), isoWeekday('2026-11-22')], [1, 7]);
+});
+
+test('pairsOfDay, pairsOfWeek, pairsOfUnit pick the pairs; nothing for a day or week without pairs', () => {
+  assert.deepEqual(ids(pairsOfDay(VJ.pairs, '2026-11-18')), ['c', 'd']);
+  assert.deepEqual(ids(pairsOfDay(VJ.pairs, '2026-11-17')), []);
+  assert.deepEqual(ids(pairsOfWeek(VJ.pairs, '2026-11-22')), ['b', 'c', 'd']);
+  assert.deepEqual(ids(pairsOfWeek(VJ.pairs, '2026-12-01')), ['e', 'f']);
+  assert.deepEqual(ids(pairsOfWeek(VJ.pairs, '2026-11-25')), []);
+  assert.deepEqual(ids(pairsOfUnit(VJ.pairs, 2)), ['d', 'e']);
+  assert.deepEqual([pairsOfDay(undefined, 'x'), pairsOfWeek(null, '2026-11-18')], [[], []]);
+});
+
+test('nearestPairDate: today, else the next pair date, else the last; null without pairs', () => {
+  assert.deepEqual(nearestPairDate(VJ.pairs, '2026-11-18'), { date: '2026-11-18', exact: true });
+  assert.deepEqual(nearestPairDate(VJ.pairs, '2026-11-17'), { date: '2026-11-18', exact: false });
+  assert.deepEqual(nearestPairDate(VJ.pairs, '2026-11-22'), { date: '2026-11-30', exact: false });   // Sunday
+  assert.deepEqual(nearestPairDate(VJ.pairs, '2026-08-01'), { date: '2026-11-09', exact: false });   // all pairs in the future
+  assert.deepEqual(nearestPairDate(VJ.pairs, '2027-01-01'), { date: '2026-12-02', exact: false });   // all pairs past
+  assert.equal(nearestPairDate([], '2026-11-18'), null);
+});
+
+test('stepPairDate: the previous and the next date that has a pair', () => {
+  assert.equal(stepPairDate(VJ.pairs, '2026-11-18', -1), '2026-11-16');
+  assert.equal(stepPairDate(VJ.pairs, '2026-11-18', 1), '2026-11-30');
+  assert.equal(stepPairDate(VJ.pairs, '2026-11-09', -1), null);
+  assert.equal(stepPairDate(VJ.pairs, '2026-12-02', 1), null);
+  assert.equal(stepPairDate(VJ.pairs, '2026-11-20', 1), '2026-11-30');
+});
+
+test('unitOptions and currentUnit: the units of the half; the unit of the nearest pair and whether it runs now', () => {
+  assert.deepEqual(unitOptions(VJ), [1, 2, 3]);
+  assert.deepEqual(unitOptions({ pairs: [V('x', '2026-11-18', 4)], units: [] }), [4]);
+  assert.deepEqual(unitOptions({ pairs: [], units: [] }), []);
+  assert.deepEqual(currentUnit(VJ.pairs, '2026-11-18'), { unit: 1, running: true });
+  assert.deepEqual(currentUnit(VJ.pairs, '2026-11-25'), { unit: 2, running: true });
+  assert.deepEqual(currentUnit(VJ.pairs, '2026-11-01'), { unit: 1, running: false });
+  assert.equal(currentUnit([], '2026-11-18'), null);
+  assert.equal(currentUnit([V('z', '2026-11-18', null)], '2026-11-18'), null);
+});
+
+test('viewColumns: the totals of the units of the visible pairs only, after the last visible pair of the unit', () => {
+  const names = (r) => r.columns.map(name);
+  assert.deepEqual(names(viewColumns(VJ, { mode: 'day', day: '2026-11-18' })),
+    ['c', 'u1.current', 'u1.self', 'u1.control', 'u1.total', 'd', 'u2.current', 'u2.self', 'u2.control', 'u2.total', 'absences', 'percent', 'preliminary']);
+  assert.deepEqual(names(viewColumns(VJ, { mode: 'week', week: '2026-11-16' })).slice(0, 2), ['b', 'c']);
+  assert.deepEqual(names(viewColumns(VJ, { mode: 'week', week: '2026-12-01' })),
+    ['e', 'u2.current', 'u2.self', 'u2.control', 'u2.total', 'f', 'outside', 'absences', 'percent', 'preliminary']);
+  assert.deepEqual(names(viewColumns(VJ, { mode: 'unit', unit: 2 })),
+    ['d', 'e', 'u2.current', 'u2.self', 'u2.control', 'u2.total', 'absences', 'percent', 'preliminary']);
+  assert.deepEqual(names(viewColumns(VJ, { mode: 'unit', unit: 3 })), ['u3.current', 'u3.self', 'u3.control', 'u3.total', 'absences', 'percent', 'preliminary']);
+  assert.deepEqual(names(viewColumns(VJ, { mode: 'week', week: '2026-11-25' })), ['absences', 'percent', 'preliminary']);
+  assert.deepEqual(names(viewColumns(VJ, { mode: 'all' })), names({ columns: journalColumns(VJ) }));
+});
+
+test('viewColumns: missed and cancelled pairs stay in view; a partial journal shows pairs only; no pairs at all', () => {
+  const J2 = { partial: false, units: [{ unit: 1, title: '' }], pairs: [V('m', '2026-11-18', 1, { status: 'missed' }), V('n', '2026-11-18', 1, { status: 'cancelled' })] };
+  assert.deepEqual(ids(viewColumns(J2, { mode: 'day', day: '2026-11-18' }).pairs), ['m', 'n']);
+  assert.deepEqual(viewColumns({ ...VJ, partial: true, units: [] }, { mode: 'week', week: '2026-11-16' }).columns.map(name), ['b', 'c', 'd']);
+  assert.deepEqual(viewColumns({ partial: false, units: [], pairs: [] }, { mode: 'all' }).columns.map(name), ['absences', 'percent', 'preliminary']);
 });

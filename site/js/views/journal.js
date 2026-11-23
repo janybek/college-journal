@@ -1,12 +1,15 @@
 import { call } from '../api.js';
 import { t } from '../i18n.js';
 import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '../ui.js';
-import { journalColumns, cellView, pairHead, canMark, pairHint, pairActions } from '../journal.js';
+import {
+  cellView, pairHead, canMark, pairHint, pairActions, VIEWS, DEFAULT_VIEW, addDays, isoWeekday, weekRange, pairDates,
+  nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns,
+} from '../journal.js';
 import { openMarksDialog, openPairActionDialog } from './journalPair.js';
 import { openCellDialog } from './journalCell.js';
 import { openUnitDialog, openCurrentDialog } from './journalUnit.js';
 import { icon } from '../icons.js';
-import { getUser } from '../session.js';
+import { getUser, getPref, setPref } from '../session.js';
 import { activeRole } from '../shell.js';
 
 // The journal of a subject (#/journal/<subjectId>): the grid of students and pairs, read only (journal.get).
@@ -22,6 +25,8 @@ const blank = (subjectId = null) => ({
   loading: false,
   errorCode: null,
   ticket: 0,
+  view: null,          // what the grid shows: { mode, day, week, unit, dayNote }; made when the answer comes
+  scrollLeft: null,    // where the person scrolled the whole journal to; null: show the nearest pair
 });
 let state = blank();
 
@@ -89,13 +94,167 @@ function body(journal) {
   if (journal.pairs.length === 0) {
     return el('div', { class: 'journal' }, notes, emptyState('table', el('p', { class: 'empty__title' }, t('journal.emptyPairs'))));
   }
+  const view = currentView(journal);
+  const shown = viewColumns(journal, view);
+  const emptyKey = { day: 'journal.view.emptyDay', week: 'journal.view.emptyWeek', unit: 'journal.view.unitEmpty' }[view.mode];
   return el('div', { class: 'journal' },
     notes,
     el('p', { class: 'journal__scheme', id: 'journal-scheme' }, t('journal.scheme', { attendance: journal.scheme.attendance, activity: journal.scheme.activity })),
+    viewBar(journal, view),
+    view.mode === 'day' && view.dayNote ? note('info', t('journal.view.noToday'), { id: 'journal-view-note' }) : null,
+    todayCard(journal),
     legend(journal.pairs.some(canMark)),
     journal.students.length === 0
       ? emptyState('table', el('p', { class: 'empty__title' }, t('journal.emptyStudents')))
-      : grid(journal));
+      : shown.pairs.length === 0 && emptyKey
+        ? emptyState('table', el('p', { class: 'empty__title', id: 'journal-view-empty' }, t(emptyKey)))
+        : grid(journal, shown));
+}
+
+// ---- The views: day, week, unit, the whole term ----
+
+const VIEW_PREF = 'view';
+
+// Where each view opens: around «today» of the server, or, when today has no pair, around the nearest pair.
+function freshView(journal, mode) {
+  const near = nearestPairDate(journal.pairs, journal.today);
+  const unit = currentUnit(journal.pairs, journal.today);
+  return {
+    mode,
+    day: near ? near.date : journal.today,
+    dayNote: near !== null && !near.exact,
+    week: weekRange(near ? near.date : journal.today).from,
+    unit: unit ? unit.unit : (unitOptions(journal)[0] ?? null),
+  };
+}
+
+// The mode is remembered in this browser; the position never: it is always made from «today» again.
+function currentView(journal) {
+  if (state.view === null) {
+    const saved = getPref(VIEW_PREF);
+    let mode = VIEWS.includes(saved) ? saved : DEFAULT_VIEW;
+    if (mode === 'unit' && unitOptions(journal).length === 0) mode = DEFAULT_VIEW;
+    state.view = freshView(journal, mode);
+  }
+  return state.view;
+}
+
+function chooseMode(journal, mode) {
+  setPref(VIEW_PREF, mode);
+  state.scrollLeft = null;
+  state.view = freshView(journal, mode);
+  refresh();
+  focusById('journal-view-' + mode);
+}
+
+function moveView(changes, focusId) {
+  Object.assign(state.view, changes);
+  refresh();
+  focusById(focusId);
+}
+
+const dateText = (date) => t('date.dayMonth', { day: Number(date.slice(8, 10)), month: t('date.month.' + Number(date.slice(5, 7))) });
+const dayLabel = (date) => t('date.weekdayDate', { weekday: t('date.weekday.' + isoWeekday(date)), date: dateText(date) });
+
+// «16 – 22 ноября», or «30 ноября – 6 декабря» when the week spans two months.
+function weekLabel(week) {
+  const { from, to } = weekRange(week);
+  const a = { day: Number(from.slice(8, 10)), month: Number(from.slice(5, 7)) };
+  const b = { day: Number(to.slice(8, 10)), month: Number(to.slice(5, 7)) };
+  return a.month === b.month
+    ? t('journal.view.rangeSame', { from: a.day, to: b.day, month: t('date.month.' + a.month) })
+    : t('journal.view.rangeDiff', { from: a.day, fromMonth: t('date.month.' + a.month), to: b.day, toMonth: t('date.month.' + b.month) });
+}
+
+function stepButton(dir, kind, disabled, onclick) {
+  return el('button', {
+    type: 'button', class: `jv-step jv-step--${dir < 0 ? 'prev' : 'next'}`, id: `journal-view-${dir < 0 ? 'prev' : 'next'}`, disabled,
+    'aria-label': t(`journal.view.${dir < 0 ? 'prev' : 'next'}.${kind}`), onclick,
+  }, icon('chevron'));
+}
+
+// The switch above the grid and what goes with the chosen mode: arrows and «Сегодня», or the list of units.
+function viewBar(journal, view) {
+  const hasUnits = unitOptions(journal).length > 0;
+  const switcher = el('div', { class: 'segmented jv-modes', role: 'group', 'aria-label': t('journal.view.label') },
+    VIEWS.map((mode) => el('button', {
+      type: 'button', id: 'journal-view-' + mode, class: 'segmented__button', 'aria-pressed': String(mode === view.mode),
+      disabled: mode === 'unit' && !hasUnits, onclick: () => { if (mode !== view.mode) chooseMode(journal, mode); },
+    }, t('journal.view.' + mode))));
+  return el('div', { class: 'jv-bar' }, switcher, view.mode === 'day' ? dayNav(journal, view) : view.mode === 'week' ? weekNav(journal, view) : view.mode === 'unit' ? unitNav(journal, view) : null);
+}
+
+function todayButton(journal, mode) {
+  return el('button', {
+    type: 'button', class: 'button button--secondary jv-today-btn', id: 'journal-view-today',
+    onclick: () => { state.view = freshView(journal, mode); refresh(); focusById('journal-view-today'); },
+  }, t('journal.view.today'));
+}
+
+function dayNav(journal, view) {
+  const prev = stepPairDate(journal.pairs, view.day, -1);
+  const next = stepPairDate(journal.pairs, view.day, 1);
+  return el('div', { class: 'jv-nav' },
+    stepButton(-1, 'day', prev === null, () => moveView({ day: prev, dayNote: false }, 'journal-view-prev')),
+    el('span', { class: 'jv-nav__label', id: 'journal-view-label', 'aria-live': 'polite' }, dayLabel(view.day)),
+    stepButton(1, 'day', next === null, () => moveView({ day: next, dayNote: false }, 'journal-view-next')),
+    todayButton(journal, 'day'));
+}
+
+function weekNav(journal, view) {
+  const dates = pairDates(journal.pairs);
+  const { from } = weekRange(view.week);
+  const hasPrev = weekRange(dates[0]).from < from;
+  const hasNext = weekRange(dates[dates.length - 1]).from > from;
+  return el('div', { class: 'jv-nav' },
+    stepButton(-1, 'week', !hasPrev, () => moveView({ week: addDays(from, -7) }, 'journal-view-prev')),
+    el('span', { class: 'jv-nav__label', id: 'journal-view-label', 'aria-live': 'polite' }, weekLabel(from)),
+    stepButton(1, 'week', !hasNext, () => moveView({ week: addDays(from, 7) }, 'journal-view-next')),
+    todayButton(journal, 'week'));
+}
+
+function unitNav(journal, view) {
+  const going = currentUnit(journal.pairs, journal.today);
+  const select = el('select', {
+    class: 'field__input jv-unit', id: 'journal-view-unit-select', 'aria-label': t('journal.view.unitSelect'),
+    onchange: (event) => { state.view.unit = Number(event.target.value); refresh(); focusById('journal-view-unit-select'); },
+  }, unitOptions(journal).map((unit) => {
+    const row = journal.units.find((u) => u.unit === unit);
+    const text = [t('journal.view.unitOption', { n: unit }), row && row.title ? row.title : null, going && going.running && going.unit === unit ? t('journal.view.unitNow') : null]
+      .filter(Boolean).join(' · ');
+    return el('option', { value: String(unit), selected: unit === view.unit }, text);
+  }));
+  return el('div', { class: 'jv-nav' }, select);
+}
+
+// ---- The card «Сегодня» ----
+
+// The pairs of today with the same action as the head of the pair: only for whoever may mark them.
+function todayCard(journal) {
+  const pairs = journal.pairs.filter((pair) => pair.date === journal.today);
+  if (pairs.length === 0) return null;
+  return el('section', { class: 'jv-today-card', id: 'journal-today', 'aria-label': t('journal.today.title') }, pairs.map((pair) => todayRow(pair)));
+}
+
+const todayOpenId = (pair) => `journal-today-open-${pair.id}`;
+
+function todayRow(pair) {
+  const { stateKey } = pairHead(pair);
+  const hint = pairHint(pair, activeRole(getUser()));
+  const topic = pair.topicName ? t('journal.topic', { n: pair.number === '' ? '' : pair.number, name: pair.topicName }) : t('journal.topicNone');
+  const details = [
+    t('journal.today.pair', { n: pair.slot }), pair.startTime, pair.lessonType ? t('lessonType.' + pair.lessonType) : null,
+    topic, stateKey ? t(stateKey) : null,
+  ].filter(Boolean).join(' · ');
+  return el('div', { class: 'jv-today' },
+    el('p', { class: 'jv-today__text' },
+      el('strong', { class: 'jv-today__title' }, t('journal.today.title')),
+      el('span', { class: 'jv-today__details' }, details),
+      !canMark(pair) && hint ? el('span', { class: 'jv-today__hint' }, t(hint)) : null),
+    canMark(pair) ? el('button', {
+      type: 'button', class: 'button button--primary jv-today__act', id: todayOpenId(pair), 'aria-haspopup': 'dialog',
+      onclick: () => openMarks(pair, todayOpenId(pair)),
+    }, icon('pencil'), t(pair.status === 'planned' ? 'journal.markAction' : 'journal.today.edit')) : null);
 }
 
 // The key to the marks of the grid.
@@ -111,16 +270,33 @@ function legend(withOpen) {
     withOpen ? item(t('journal.legend.open'), el('span', { class: 'jg-open-sample', 'aria-hidden': 'true' }, icon('pencil'))) : null);
 }
 
-function grid(journal) {
-  const columns = journalColumns(journal);
+function grid(journal, shown) {
+  const { columns } = shown;
   const { scheme } = journal;
-  return el('section', { class: 'card journal-card', 'aria-labelledby': 'journal-title' },
-    el('div', { class: 'table-scroll journal-scroll', tabindex: '0', role: 'region', 'aria-labelledby': 'journal-title' },
+  const scroller = el('div', {
+    class: 'table-scroll journal-scroll', tabindex: '0', role: 'region', 'aria-labelledby': 'journal-title',
+    onscroll: state.view.mode === 'all' ? (event) => { state.scrollLeft = event.currentTarget.scrollLeft; } : null,
+  },
       el('table', { class: 'journal-grid', id: 'journal-grid' },
         el('thead', {}, el('tr', {},
           el('th', { scope: 'col', class: 'jg-name' }, t('journal.col.student')),
           columns.map((column) => head(column, journal)))),
-        el('tbody', {}, journal.students.map((student, index) => studentRow(student, index + 1, columns, journal, scheme))))));
+        el('tbody', {}, journal.students.map((student, index) => studentRow(student, index + 1, columns, journal, scheme)))));
+  if (state.view.mode === 'all') requestAnimationFrame(() => placeScroll(scroller, shown.pairs, journal.today));
+  return el('section', { class: 'card journal-card', 'aria-labelledby': 'journal-title' }, scroller);
+}
+
+// The whole journal opens scrolled so that the pair of today (or the nearest one) stands near the right edge, not at the far left.
+function placeScroll(scroller, pairs, today) {
+  if (!scroller.isConnected) return;
+  if (state.scrollLeft !== null) { scroller.scrollLeft = state.scrollLeft; return; }
+  const near = nearestPairDate(pairs, today);
+  const pair = near && pairs.find((p) => p.date === near.date);
+  const head = pair && scroller.querySelector(`[data-pair="${CSS.escape(pair.id)}"]`);
+  if (!head) return;
+  const edge = head.getBoundingClientRect().right - scroller.getBoundingClientRect().right;
+  scroller.scrollLeft += edge + scroller.clientWidth * 0.2;
+  state.scrollLeft = scroller.scrollLeft;
 }
 
 // A tooltip that opens on hover and on keyboard focus of the head; the head is focusable for that.
@@ -129,7 +305,7 @@ function tip(text) {
 }
 
 function head(column, journal) {
-  if (column.type === 'pair') return pairHeadCell(column.pair, journal.can);
+  if (column.type === 'pair') return pairHeadCell(column.pair, journal.can, journal.today);
   if (column.type === 'unit') {
     const label = t('journal.col.' + column.field);
     const unit = journal.units.find((u) => u.unit === column.unit);
@@ -152,7 +328,7 @@ function head(column, journal) {
     tipKey ? tip(t(tipKey)) : null);
 }
 
-function pairHeadCell(pair, can) {
+function pairHeadCell(pair, can, today) {
   const { kindKey, stateKey } = pairHead(pair);
   const narrow = pair.status === 'cancelled' || pair.status === 'missed';
   const topic = pair.topicName ? t('journal.topic', { n: pair.number === '' ? '' : pair.number, name: pair.topicName }) : t('journal.topicNone');
@@ -160,7 +336,7 @@ function pairHeadCell(pair, can) {
   const tipText = [topic, stateKey ? t(stateKey) : null, pair.substitution ? t('journal.sub', { name: pair.teacherName }) : null, hint ? t(hint) : null].filter(Boolean).join(' · ');
   const open = canMark(pair);
   const menu = pairActions(pair, can);
-  return el('th', { scope: 'col', class: `jg-pair-head${menu.length > 0 ? ' has-menu' : ''}${narrow ? ' is-narrow' : ''}${pair.status === 'planned' ? ' is-planned' : ''}${open ? ' is-open' : ''}`, tabindex: open ? null : '0', 'data-pair': pair.id },
+  return el('th', { scope: 'col', class: `jg-pair-head${menu.length > 0 ? ' has-menu' : ''}${narrow ? ' is-narrow' : ''}${pair.status === 'planned' ? ' is-planned' : ''}${open ? ' is-open' : ''}${pair.date === today ? ' is-today' : ''}`, tabindex: open ? null : '0', 'data-pair': pair.id },
     open ? el('button', {
       type: 'button', class: 'jg-open', id: openId(pair), 'aria-haspopup': 'dialog',
       'aria-label': t('journal.marks.open', { date: dayMonth(pair.date), kind: t(kindKey) }), onclick: () => openMarks(pair),
@@ -290,7 +466,7 @@ function openCurrent(unit, student) {
 }
 
 // The window of the marks of a pair; the grid is drawn again from the answer to the save.
-function openMarks(pair) {
+function openMarks(pair, backId = openId(pair)) {
   const owner = state;
   openMarksDialog({
     journal: owner.data.journal,
@@ -300,7 +476,7 @@ function openMarks(pair) {
       owner.data = data;
       refresh();
     },
-    onClosed: () => focusById(openId(pair)),
+    onClosed: () => focusById(backId, openId(pair)),
   });
 }
 

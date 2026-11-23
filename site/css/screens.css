@@ -6599,3 +6599,69 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .gr-back { justify-self: stretch; min-height: 2.75rem; }
 
 .soon--link .soon__icon { background: var(--primary-wash); color: var(--primary-ink); }
+
+/* The views of a journal: the switch «День · Неделя · Юнит · Весь журнал», its arrows, and the card «Сегодня». */
+.jv-bar { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3) var(--space-4); min-width: 0; }
+
+.jv-modes { flex-wrap: wrap; max-width: 100%; }
+
+.jv-nav { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); min-width: 0; }
+
+.jv-nav__label { min-width: 10rem; padding: 0 var(--space-2); font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
+
+.jv-step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  color: var(--text);
+}
+
+.jv-step:hover:not(:disabled) { background: var(--muted); }
+.jv-step:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.jv-step:disabled { cursor: not-allowed; opacity: 0.4; }
+.jv-step .icon { width: 18px; height: 18px; }
+.jv-step--prev .icon { transform: scaleX(-1); }
+
+.jv-today-btn { min-height: 2.75rem; }
+
+.jv-unit { width: auto; min-width: 12rem; max-width: 100%; min-height: 2.75rem; }
+
+.jv-today-card { display: grid; gap: var(--space-2); min-width: 0; }
+
+.jv-today {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--primary-line);
+  border-left: 4px solid var(--primary);
+  border-radius: var(--radius-control);
+  background: var(--primary-wash);
+}
+
+.jv-today__text { display: flex; flex-wrap: wrap; align-items: baseline; gap: var(--space-1) var(--space-3); margin: 0; min-width: 0; }
+.jv-today__title { color: var(--primary-ink); }
+.jv-today__details { min-width: 0; overflow-wrap: anywhere; }
+.jv-today__hint { color: var(--text-muted); }
+.jv-today__act { min-height: 2.75rem; }
+.jv-today__act .icon { width: 16px; height: 16px; }
+
+/* The head of the pair of today stands out in the grid. */
+.journal-grid thead .jg-pair-head.is-today { box-shadow: inset 0 -3px 0 var(--primary); }
+
+@media (max-width: 40rem) {
+  .jv-modes { width: 100%; }
+  .jv-modes .segmented__button { flex: 1 1 auto; min-height: 2.75rem; }
+  .jv-nav { width: 100%; }
+  .jv-nav__label { flex: 1 1 auto; min-width: 0; }
+  .jv-unit { width: 100%; }
+  .jv-today__act { width: 100%; }
+}

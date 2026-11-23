@@ -1,6 +1,6 @@
 // Session and device preferences in localStorage. Every access is guarded: a blocked storage
 // (private mode, disabled cookies) must not break the page, so values are mirrored in memory.
-const KEYS = { token: 'journal.token', user: 'journal.user', lang: 'journal.lang', role: 'journal.role', theme: 'journal.theme' };
+const KEYS = { token: 'journal.token', user: 'journal.user', lang: 'journal.lang', role: 'journal.role', theme: 'journal.theme', view: 'journal.view' };
 const memory = new Map();
 
 function read(key) {

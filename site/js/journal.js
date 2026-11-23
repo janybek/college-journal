@@ -258,3 +258,92 @@ export function pointsText(pair) {
   if (pair.earned === null || pair.earned === undefined) return { key: 'grades.notCounted', params: {} };
   return { key: 'grades.points', params: { earned: pair.earned, possible: pair.possible } };
 }
+
+// ---- The views of the grid: a day, a week, a unit or the whole term (the switch above the grid) ----
+
+export const VIEWS = ['day', 'week', 'unit', 'all'];
+export const DEFAULT_VIEW = 'week';
+
+const DAY_MS = 86400000;
+const toMs = (date) => Date.UTC(Number(date.slice(0, 4)), Number(date.slice(5, 7)) - 1, Number(date.slice(8, 10)));
+const fromMs = (ms) => new Date(ms).toISOString().slice(0, 10);
+
+// 'YYYY-MM-DD' plus n days (negative: back); plain calendar days, the clock of the device is never read.
+export function addDays(date, n) {
+  return fromMs(toMs(date) + n * DAY_MS);
+}
+
+// 1 = Monday ... 7 = Sunday.
+export function isoWeekday(date) {
+  const day = new Date(toMs(date)).getUTCDay();
+  return day === 0 ? 7 : day;
+}
+
+// The calendar week (Monday to Sunday) that holds the date.
+export function weekRange(date) {
+  const from = addDays(date, 1 - isoWeekday(date));
+  return { from, to: addDays(from, 6) };
+}
+
+const list = (pairs) => (Array.isArray(pairs) ? pairs : []);
+
+export const pairsOfDay = (pairs, date) => list(pairs).filter((pair) => pair.date === date);
+export const pairsOfWeek = (pairs, date) => {
+  const { from, to } = weekRange(date);
+  return list(pairs).filter((pair) => pair.date >= from && pair.date <= to);
+};
+export const pairsOfUnit = (pairs, unit) => list(pairs).filter((pair) => pair.unit === unit);
+
+// The dates that have a pair of this subject, oldest first, each once.
+export function pairDates(pairs) {
+  return [...new Set(list(pairs).map((pair) => pair.date))].sort();
+}
+
+// The date to open on: today if it has a pair, else the next pair date, else (all pairs are past) the last one.
+// -> { date, exact }, or null when there are no pairs at all.
+export function nearestPairDate(pairs, today) {
+  const dates = pairDates(pairs);
+  if (dates.length === 0) return null;
+  if (dates.includes(today)) return { date: today, exact: true };
+  return { date: dates.find((date) => date > today) || dates[dates.length - 1], exact: false };
+}
+
+// The previous (dir -1) or next (dir 1) date that has a pair; null at the end of the term.
+export function stepPairDate(pairs, date, dir) {
+  const dates = pairDates(pairs);
+  return (dir < 0 ? dates.filter((d) => d < date).pop() : dates.find((d) => d > date)) || null;
+}
+
+// The units of the syllabus half (those of the answer, then any unit only the pairs mention), numbers ascending.
+export function unitOptions(journal) {
+  const numbers = new Set((Array.isArray(journal.units) ? journal.units : []).map((u) => u.unit));
+  for (const pair of list(journal.pairs)) if (Number.isInteger(pair.unit)) numbers.add(pair.unit);
+  return [...numbers].sort((a, b) => a - b);
+}
+
+// The unit that goes now: the one of the pair of the nearest date; null when that date has no pair with a unit.
+// `running` is true when today lies between the first and the last pair of that unit.
+export function currentUnit(pairs, today) {
+  const near = nearestPairDate(pairs, today);
+  if (!near) return null;
+  const pair = list(pairs).find((p) => p.date === near.date && Number.isInteger(p.unit));
+  if (!pair) return null;
+  const dates = pairsOfUnit(pairs, pair.unit).map((p) => p.date).sort();
+  return { unit: pair.unit, running: dates[0] <= today && today <= dates[dates.length - 1] };
+}
+
+// What the grid shows in a mode. view: { mode, day, week (any date inside the week), unit }.
+// -> { pairs, columns }: the pairs in view and the columns for them. After the last visible pair of a unit stand its
+// four total columns, so «day» and «week» show the totals of the units of the visible pairs, «unit» those of that unit
+// (even one without pairs), «all» everything as before. The summary columns stay in every mode.
+export function viewColumns(journal, view) {
+  const all = list(journal.pairs);
+  let pairs = all;
+  let units = Array.isArray(journal.units) ? journal.units : [];
+  if (view.mode !== 'all') {
+    pairs = view.mode === 'day' ? pairsOfDay(all, view.day) : view.mode === 'week' ? pairsOfWeek(all, view.week) : pairsOfUnit(all, view.unit);
+    const shown = new Set(view.mode === 'unit' ? [view.unit] : pairs.map((pair) => pair.unit));
+    units = units.filter((u) => shown.has(u.unit));
+  }
+  return { pairs, columns: journalColumns({ ...journal, pairs, units }) };
+}
