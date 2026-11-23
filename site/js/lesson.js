@@ -57,3 +57,36 @@ export function stageOf(lesson, chosen) {
 export function todayAction(pair) {
   return pair && (pair.lesson === 'start' || pair.lesson === 'open') ? pair.lesson : null;
 }
+
+// ---- The stage «Итог»: the marks of the active students, edited on the pair itself ----
+
+// The active students of lesson.get: a student without a mark has status null (the teacher sets it); one who left is not listed.
+export function lessonDraft(lesson) {
+  const students = Array.isArray(lesson && lesson.students) ? lesson.students : [];
+  return students.filter((s) => !s.left).map((s) => ({
+    studentId: s.id, fullName: s.fullName, status: s.mark ? s.mark.status : null,
+    noCoat: s.mark ? s.mark.noCoat === true : false, activity: s.mark && s.mark.activity !== undefined ? s.mark.activity : null,
+    checkin: s.checkin || null,
+  }));
+}
+
+// What journal.savePair gets: the students whose status, coat or activity differ from the saved mark. A student still
+// without a status is not sent.
+export function lessonChanges(draft, lesson) {
+  const saved = new Map((Array.isArray(lesson && lesson.students) ? lesson.students : []).filter((s) => s.mark).map((s) => [s.id, s.mark]));
+  return draft
+    .filter((m) => {
+      if (m.status === null) return false;
+      const old = saved.get(m.studentId);
+      return !old || old.status !== m.status || (old.noCoat === true) !== (m.noCoat === true) || (old.activity ?? null) !== (m.activity ?? null);
+    })
+    .map((m) => ({ studentId: m.studentId, status: m.status, noCoat: m.noCoat === true, activity: m.activity ?? null }));
+}
+
+const SOURCES = { code: 'lesson.source.code', qr: 'lesson.source.qr', auto: 'lesson.source.auto', teacher: 'lesson.source.teacher' };
+
+// The dictionary key of how a student's mark came to be; null when there is no mark.
+export function sourceKey(student) {
+  const source = student && student.mark ? student.mark.source : null;
+  return Object.hasOwn(SOURCES, source) ? SOURCES[source] : null;
+}

@@ -62,6 +62,7 @@ export function pairHead(pair) {
   const kindKey = 'journal.kind.' + (KINDS.includes(pair.lessonType) ? pair.lessonType : 'none');
   let stateKey = null;
   if (pair.status === 'cancelled' || pair.status === 'missed') stateKey = STATES[pair.status];
+  else if (pair.status === 'running') stateKey = 'journal.state.running';
   else if (pair.status === 'planned') stateKey = pair.state === 'late' ? 'journal.state.overdue' : pair.state === 'future' ? STATES.future : 'journal.state.unfilled';
   return { kindKey, stateKey };
 }

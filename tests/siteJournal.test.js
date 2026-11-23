@@ -43,6 +43,7 @@ test('cellView and pairHead: the mark of a cell and the head of a pair', () => {
   assert.equal(pairHead({ lessonType: 'lecture', status: 'cancelled', state: 'cancelled' }).stateKey, 'journal.state.cancelled');
   assert.equal(pairHead({ lessonType: 'lecture', status: 'missed', state: 'missed' }).stateKey, 'journal.state.missed');
   assert.equal(pairHead({ lessonType: 'lecture', status: 'planned', state: 'future' }).stateKey, 'journal.state.future');
+  assert.deepEqual(pairHead({ status: 'running', lessonType: 'practice', state: 'open' }), { kindKey: 'journal.kind.practice', stateKey: 'journal.state.running' });
 });
 
 // ---- Task 19: the marks of a pair ----

@@ -301,7 +301,7 @@ test('task 18: the grid of a journal has its texts in every language', () => {
   const keys = [];
   for (const s of ['present', 'late', 'absent', 'excused', 'madeup']) keys.push('journal.short.' + s, 'journal.legend.' + s);
   for (const k of ['lecture', 'practice', 'control', 'none']) keys.push('journal.kind.' + k);
-  for (const k of ['unfilled', 'overdue', 'missed', 'cancelled', 'future']) keys.push('journal.state.' + k);
+  for (const k of ['unfilled', 'overdue', 'missed', 'cancelled', 'future', 'running']) keys.push('journal.state.' + k);
   for (const k of ['student', 'unit', 'current', 'self', 'control', 'total', 'outside', 'absences', 'percent', 'preliminary']) keys.push('journal.col.' + k);
   for (const k of ['current', 'self', 'control', 'total', 'manual', 'absences', 'percent', 'preliminary', 'outside', 'activity']) keys.push('journal.tip.' + k);
   for (const k of ['excellent', 'good', 'fair', 'fail']) keys.push('journal.grade.' + k);
@@ -419,4 +419,8 @@ test('the pair screen and the list of today: their keys exist in all three dicti
     assert.equal(holders(en[key]), holders(ru[key]), 'en ' + key);
   }
   assert.equal(ru['lesson.end.ask'], 'Закончить отметку? Кто не отметился, получит «не был».');
+  assert.equal(ru['lesson.unsaved'], 'Правки не сохранены. Сохранить?');
+  assert.equal(ru['lesson.finish.ask'], 'Завершить пару? Отметки можно будет поправить в журнале по обычным правилам.');
+  assert.equal(ru['lesson.done.empty'], 'Отметок нет — пара осталась незаполненной');
+  for (const dict of [ru, ky, en]) assert.equal('lesson.soon' in dict, false);
 });
