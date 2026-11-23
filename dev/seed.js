@@ -1,5 +1,5 @@
 import { hashPassword } from '../core/auth.js';
-import { addDays, addMinutes, localDate, localTime, minutesOf, mondayOf, parseLocalDateTime } from '../core/dates.js';
+import { addDays, addMinutes, localDate, localDateTime, localTime, minutesOf, mondayOf, parseLocalDateTime } from '../core/dates.js';
 import { DEFAULT_BELLS, settingsToRows } from '../core/settings.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { generateSchedule, relayout, todayOf } from '../backend/scheduleData.js';
@@ -236,6 +236,46 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin,
   seedWork(store, platform, files);
 }
 
+// A small real PDF (one page, the text «Syllabus sample»), with a proper cross-reference table.
+export function sampleSyllabusPdf() {
+  const stream = 'BT /F1 24 Tf 72 700 Td (Syllabus sample) Tj ET';
+  const objects = [
+    '<< /Type /Catalog /Pages 2 0 R >>',
+    '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Contents 4 0 R /Resources << /Font << /F1 5 0 R >> >> >>',
+    `<< /Length ${stream.length} >>\nstream\n${stream}\nendstream`,
+    '<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>',
+  ];
+  let text = '%PDF-1.4\n';
+  const offsets = [];
+  objects.forEach((body, i) => {
+    offsets.push(text.length);
+    text += `${i + 1} 0 obj\n${body}\nendobj\n`;
+  });
+  const xref = text.length;
+  text += `xref\n0 ${objects.length + 1}\n0000000000 65535 f \n${offsets.map((o) => `${String(o).padStart(10, '0')} 00000 n \n`).join('')}`;
+  text += `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
+  return Uint8Array.from(text, (ch) => ch.charCodeAt(0) & 255);
+}
+
+// The sample PDF of the stand: the file of the approved «Информатика» of teacher1, 1st half, put by the deanery. Without a box nothing happens.
+export function seedSyllabusFile(store, platform, files) {
+  if (!files) return;
+  const teacher = store.list('staff').find((p) => p.login === 'teacher1');
+  const dean = store.list('staff').find((p) => p.login === 'dean');
+  const discipline = store.list('disciplines').find((d) => d.name === 'Информатика');
+  const version = teacher && discipline && store.list('syllabi').find((v) => v.disciplineId === discipline.id && v.teacherId === teacher.id && v.semester === 1 && v.status === 'approved');
+  if (!version || !dean) throw new Error('seed: no approved «Информатика» of teacher1 for the sample file');
+  const bytes = sampleSyllabusPdf();
+  const stored = platform.randomHex(16) + '.bin';
+  files.put(stored, bytes);
+  const [row] = store.insertMany('files', [{
+    assignmentId: '', submissionId: '', ownerId: dean.id, state: 'syllabus', name: 'Силлабус — Информатика.pdf', kind: 'pdf',
+    size: bytes.length, stored, at: localDateTime(platform.now()),
+  }]);
+  store.updateMany('syllabi', [{ id: version.id, patch: { fileId: row.id } }]);
+}
+
 // Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
 export function seed(store, platform, files = null) {
   if (store.list('staff').length > 0) return;
@@ -243,6 +283,7 @@ export function seed(store, platform, files = null) {
   const passwordHash = hashPassword(platform, DEV_PASSWORD);
   const admin = store.insert('staff', { ...STAFF[0], passwordHash, mustChangePassword: false, active: true, lang: 'ru' });
   fill(store, platform, { passwordHash, names: NAMES.latin, studentsMustChange: true, admin, files });
+  seedSyllabusFile(store, platform, files);
 }
 
 // The demo data for the working base (Cyrillic names, one password given by the caller): the same data set as the stand, but on a base

@@ -331,3 +331,26 @@ test('rights on a returned version, an archived one and the version of another t
   assert.equal(code(read(s1, other)), 'not_found');
   assert.equal(state(), before);
 });
+
+test('a student cannot hand in the id of a syllabus file as a work file; dropFile reads each table at most once', () => {
+  const { call, store, id, attach, state, reset, lists, writes, sb1, teacher1, s1 } = env();
+  attach({});
+  const fileId = store.get('syllabi', id).fileId;
+  const assignment = store.insert('assignments', { subjectId: sb1, kind: 'hw', title: 'Task', dueAt: '2026-12-01 23:59:00', maxPoints: 5 });
+  const before = state();
+  const rows = JSON.stringify(store.list('submissions'));
+  const answer = call('work.submit', { assignmentId: assignment.id, text: 'done', fileIds: [fileId] }, s1);
+  assert.equal(code(answer), 'invalid');
+  assert.deepEqual(answer.error.fields, [{ field: 'fileIds', index: 0, code: 'bad_ref' }]);
+  assert.equal(state(), before);
+  assert.equal(JSON.stringify(store.list('submissions')), rows);
+
+  reset();
+  assert.equal(call('syllabus.dropFile', { syllabusId: id }, teacher1).ok, true);
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1 });
+  assert.deepEqual(writes, { 'updateMany:syllabi': 1 });
+  reset();
+  assert.equal(call('syllabus.dropFile', { syllabusId: id }, teacher1).ok, true);
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1 });
+  assert.deepEqual(writes, {});
+});

@@ -434,14 +434,14 @@ test('the stand keeps its box beside the data file (files for the fictional, rea
   }
 });
 
-test('a fresh fictional stand has the assignments of «Информатика» 01-1 and one picture in its box; the real one has neither', async (t) => {
+test('a fresh fictional stand has the assignments of «Информатика» 01-1 and two files in its box; the real one has neither', async (t) => {
   for (const mode of ['demo', 'real']) {
     const { dataFile, siteDir } = tempDirs(t);
     const { srv } = await start(t, { dataFile, siteDir, mode });
     const saved = createFileStore(SCHEMA, createNodePlatform(), dataFile);
     const names = fs.existsSync(srv.filesDir) ? fs.readdirSync(srv.filesDir) : [];
     if (mode === 'demo') {
-      assert.deepEqual([saved.list('assignments').length, saved.list('files').map((f) => f.stored)], [3, names], mode);
+      assert.deepEqual([saved.list('assignments').length, saved.list('files').length, saved.list('files').map((f) => f.stored).sort()], [3, 2, [...names].sort()], mode);
     } else {
       assert.deepEqual([saved.list('assignments').length, saved.list('files').length, names.length], [0, 0, 0], mode);
     }

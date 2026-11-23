@@ -74,6 +74,39 @@ test('the sweep removes old unpinned rows and orphan files, and only those', (t)
   assert.deepEqual(fs.readdirSync(dir).sort(), [stored('a'), stored('b'), stored('f'), stored('8') + '.tmp', 'notes.txt'].sort());
 });
 
+test('the sweep keeps every file a syllabus version links, removes the loose syllabus rows and the files without a row', (t) => {
+  const dir = tempDir(t);
+  const store = createMemoryStore(SCHEMA, createNodePlatform());
+  const mk = (ch, hoursAgo) => ({ state: 'syllabus', stored: stored(ch), name: 's.pdf', kind: 'pdf', size: 3, ownerId: 'sf1', at: localDateTime(NOW - hoursAgo * HOUR) });
+  const [a, b] = store.insertMany('files', [mk('a', 25), mk('b', 25), mk('c', 25), mk('d', 1)]);
+  store.insertMany('syllabi', [
+    { disciplineId: 'd', teacherId: 't', semester: 1, status: 'approved', fileId: a.id },
+    { disciplineId: 'd', teacherId: 't', semester: 1, status: 'archived', fileId: b.id },
+    { disciplineId: 'd', teacherId: 't', semester: 1, status: 'draft', fileId: '' },
+  ]);
+  const box = createDiskFiles(dir);
+  for (const ch of 'abcde') box.put(stored(ch), SAMPLE.pdf);       // e: no row at all
+  for (const ch of 'abcde') age(path.join(dir, stored(ch)), 2 * HOUR);
+  const counts = {};
+  const spy = new Proxy(store, { get: (target, key) => (key === 'list' ? (name) => { counts[name] = (counts[name] || 0) + 1; return target.list(name); } : target[key]) });
+  assert.deepEqual(sweepFiles({ store: spy, dir, nowMs: NOW }), { rows: 1, files: 2 });
+  assert.deepEqual(counts, { files: 1, syllabi: 1 });
+  assert.deepEqual(store.list('files').map((r) => r.stored).sort(), [stored('a'), stored('b'), stored('d')]);
+  assert.deepEqual(fs.readdirSync(dir).sort(), [stored('a'), stored('b'), stored('d')]);
+  assert.deepEqual(sweepFiles({ store, dir, nowMs: NOW }), { rows: 0, files: 0 });
+});
+
+test('a draft copy of an approved version links the same file: the file stays while any version has it', (t) => {
+  const dir = tempDir(t);
+  const store = createMemoryStore(SCHEMA, createNodePlatform());
+  const [a] = store.insertMany('files', [{ state: 'syllabus', stored: stored('a'), name: 's.pdf', kind: 'pdf', size: 3, ownerId: 'sf1', at: localDateTime(NOW - 30 * HOUR) }]);
+  store.insertMany('syllabi', [{ disciplineId: 'd', teacherId: 't', semester: 1, status: 'draft', fileId: a.id }]);
+  createDiskFiles(dir).put(stored('a'), SAMPLE.pdf);
+  age(path.join(dir, stored('a')), 2 * HOUR);
+  assert.deepEqual(sweepFiles({ store, dir, nowMs: NOW }), { rows: 0, files: 0 });
+  assert.deepEqual(fs.readdirSync(dir), [stored('a')]);
+});
+
 test('the sweep, the mirror and the restore with a missing folder do nothing', (t) => {
   const dir = path.join(tempDir(t), 'none');
   const store = createMemoryStore(SCHEMA, createNodePlatform());

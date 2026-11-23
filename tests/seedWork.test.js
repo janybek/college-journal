@@ -4,7 +4,7 @@ import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { handleRequest } from '../backend/api.js';
 import { SCHEMA } from '../core/schema.js';
-import { seed, seedDemo, DEV_PASSWORD } from '../dev/seed.js';
+import { seed, seedDemo, seedSyllabusFile, DEV_PASSWORD } from '../dev/seed.js';
 import { sniffKind } from '../core/files.js';
 import { bishkek } from './journalSetup.js';
 import { createMemoryFiles } from './fakes/memoryFiles.js';
@@ -57,14 +57,14 @@ test('seedWork: three assignments of «Информатика» 01-1, the attemp
 test('seedWork: one PNG picture on the disk, attached to a submitted work; the box holds it', () => {
   const files = createMemoryFiles();
   const { store } = stand(files);
-  const rows = store.list('files');
+  const rows = store.list('files').filter((r) => r.state !== 'syllabus');
   assert.equal(rows.length, 1);
   assert.deepEqual([rows[0].state, rows[0].kind], ['attached', 'png']);
   const bytes = files.read(rows[0].stored);
   assert.equal(sniffKind(bytes, 'png'), 'png');
   assert.equal(bytes.length, rows[0].size);
   assert.equal(bytes.length < 5000, true);
-  assert.deepEqual(files.names(), [rows[0].stored]);
+  assert.deepEqual(files.names().filter((n) => store.list('files').some((r) => r.stored === n && r.state !== 'syllabus')), [rows[0].stored]);
   const sub = store.list('submissions').find((r) => r.id === rows[0].submissionId);
   assert.equal(sub.status, 'submitted');
   assert.equal(store.list('assignments').find((a) => a.id === sub.assignmentId).title, 'Презентация');
@@ -128,4 +128,32 @@ test('seedWork: seedDemo gives the same rows of the change log, the assignments 
   assert.equal(store.list('changeLog').length, a.store.list('changeLog').length);
   assert.equal(store.list('assignments').length, 3);
   assert.equal(store.list('files').length, 1);
+  assert.equal(store.list('files').some((r) => r.state === 'syllabus'), false);
+});
+
+test('seedSyllabusFile: one real PDF on the approved «Информатика» of teacher1; none without a box and none in the demo', () => {
+  const files = createMemoryFiles();
+  const { store } = stand(files);
+  const rows = store.list('files').filter((r) => r.state === 'syllabus');
+  assert.equal(rows.length, 1);
+  const [row] = rows;
+  assert.deepEqual([row.kind, row.name, row.assignmentId, row.submissionId], ['pdf', 'Силлабус — Информатика.pdf', '', '']);
+  assert.equal(row.ownerId, store.list('staff').find((p) => p.login === 'dean').id);
+  const bytes = files.read(row.stored);
+  assert.equal(sniffKind(bytes, 'pdf'), 'pdf');
+  assert.equal(bytes.length, row.size);
+  assert.equal(bytes.length < 2000, true);
+  assert.equal(Buffer.from(bytes).toString('latin1').includes('Syllabus sample'), true);
+  assert.equal(files.names().includes(row.stored), true);
+  const teacher1 = store.list('staff').find((p) => p.login === 'teacher1');
+  const discipline = store.list('disciplines').find((d) => d.name === 'Информатика');
+  const linked = store.list('syllabi').filter((v) => v.fileId !== '');
+  assert.deepEqual(linked.map((v) => [v.id, v.status, v.semester, v.teacherId, v.disciplineId]), [[linked[0].id, 'approved', 1, teacher1.id, discipline.id]]);
+  assert.equal(linked[0].fileId, row.id);
+
+  const bare = stand(null).store;
+  assert.equal(bare.list('files').some((r) => r.state === 'syllabus'), false);
+  assert.equal(bare.list('syllabi').every((v) => v.fileId === ''), true);
+  assert.equal(seedSyllabusFile(bare, createNodePlatform(), null), undefined);
+  assert.equal(bare.list('files').length, 0);
 });

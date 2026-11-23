@@ -56,10 +56,13 @@ export function createDiskFiles(dir) {
 // Only the sweep takes files off the disk: a request that fails after the file is written leaves it for the next pass.
 export function sweepFiles({ store, dir, nowMs, keepMs = FILE_LIMITS.keepPendingMs, graceMs = 3600000 }) {
   const rows = store.list('files');
-  const dead = rows.filter((r) => (r.state === 'pending' || r.state === 'dropped') && nowMs - parseLocalDateTime(r.at) > keepMs);
+  // a syllabus file is kept while any version (approved, archived, a draft copy) links it
+  const used = new Set(store.list('syllabi').map((v) => v.fileId).filter((id) => typeof id === 'string' && id !== ''));
+  const old = (r) => nowMs - parseLocalDateTime(r.at) > keepMs;
+  const dead = rows.filter((r) => ((r.state === 'pending' || r.state === 'dropped') || (r.state === 'syllabus' && !used.has(r.id))) && old(r));
   if (dead.length > 0) store.removeMany('files', dead.map((r) => r.id));
   const gone = new Set(dead.map((r) => r.id));
-  const live = new Set(rows.filter((r) => !gone.has(r.id) && (r.state === 'pending' || r.state === 'attached')).map((r) => r.stored));
+  const live = new Set(rows.filter((r) => !gone.has(r.id) && (r.state === 'pending' || r.state === 'attached' || r.state === 'syllabus')).map((r) => r.stored));
   let files = 0;
   for (const name of namesIn(dir)) {
     if (!(isStoredName(name) && !live.has(name)) && !TEMP_PATTERN.test(name)) continue;
