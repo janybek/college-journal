@@ -122,3 +122,10 @@ test('student results: a shrunk scheme caps stored values, total never above 100
   const auto = studentResults({ pairs: one, marks: new Map([['a', m('present')]]), unitRows: rows({ control: 40, self: 20 }), units: [1], scheme }).units[0];
   assert.deepEqual([auto.auto, auto.current, auto.total], [50, 50, 100]);
 });
+
+test('half-up rounding is exact: no float error at the .5 boundary', () => {
+  const items = Array.from({ length: 40 }, (_, i) => ({ status: i < 23 ? 'present' : 'absent' }));
+  assert.equal(attendanceStats(items).percent, 58);
+  assert.equal(currentControl([{ earned: 58, possible: 200 }], { ...S, current: 50 }), 15);
+  assert.equal(currentControl([{ earned: 114, possible: 200 }], { ...S, current: 50 }), 29);
+});

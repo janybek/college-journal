@@ -29,7 +29,7 @@ export function currentControl(points, scheme) {
     earned += p.earned;
     possible += p.possible;
   }
-  return possible > 0 ? Math.round((earned / possible) * scheme.current) : null;
+  return possible > 0 ? Math.round((earned * scheme.current) / possible) : null;
 }
 
 export function unitTotal({ current, self, control }) {
@@ -55,7 +55,7 @@ export function attendanceStats(items) {
     if (it.status === 'madeup') stats.madeup += 1;
     if (it.noCoat) stats.noCoat += 1;
   }
-  if (stats.marked > 0) stats.percent = Math.round((stats.attended / stats.marked) * 100);
+  if (stats.marked > 0) stats.percent = Math.round((stats.attended * 100) / stats.marked);
   return stats;
 }
 
