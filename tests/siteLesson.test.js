@@ -1,6 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { shortName, clockText, qrLink, arrivedList, stageOf, todayAction, lessonDraft, lessonChanges, sourceKey } from '../site/js/lesson.js';
+import { shortName, clockText, qrLink, arrivedList, stageOf, todayAction, lessonDraft, lessonChanges, sourceKey, readQrLink, cleanCode, checkinMessage, cameMark } from '../site/js/lesson.js';
+import { deviceId, keepPass, takePass } from '../site/js/device.js';
 
 test('shortName: surname and the first initial', () => {
   assert.deepEqual(['Асанов Айдар Бекович', ' Өмүров Канат ', 'Асанов', '  '].map(shortName), ['Асанов А.', 'Өмүров К.', 'Асанов', '']);
@@ -70,4 +71,42 @@ test('sourceKey: where the mark came from', () => {
   assert.deepEqual(['code', 'qr', 'auto', 'teacher'].map(key), ['lesson.source.code', 'lesson.source.qr', 'lesson.source.auto', 'lesson.source.teacher']);
   assert.equal(sourceKey({ mark: null }), null);
   assert.equal(sourceKey({}), null);
+});
+
+test('readQrLink: the pair and the key from the address of the QR; anything else is null', () => {
+  assert.deepEqual(readQrLink('#/q/p_1/' + 'ab'.repeat(8)), { pairId: 'p_1', qr: 'ab'.repeat(8) });
+  assert.deepEqual(readQrLink('#/q/p%2F1/' + 'ab'.repeat(8)), { pairId: 'p/1', qr: 'ab'.repeat(8) });
+  for (const bad of ['#/q/p_1/' + 'AB'.repeat(8), '#/q/p_1/abc', '#/q/p_1/' + 'ab'.repeat(8) + '/x', '#/q//' + 'ab'.repeat(8), '#/q/%E0%A4%A/' + 'ab'.repeat(8), '#/here', '', null]) assert.equal(readQrLink(bad), null, String(bad));
+});
+
+test('cleanCode: digits only, the first four', () => {
+  assert.deepEqual([' 4 8-2 7', '48271', 'abc', null].map(cleanCode), ['4827', '4827', '', '']);
+});
+
+test('checkinMessage: an answer or an error code becomes a text key, its values and a tone', () => {
+  assert.deepEqual(checkinMessage({ result: 'wrong_code', attemptsLeft: 3 }), { key: 'checkin.wrong', params: { n: 3 }, tone: 'danger' });
+  assert.deepEqual(checkinMessage({ result: 'ok', at: '08:03' }), { key: 'checkin.ok', params: { at: '08:03' }, tone: 'success' });
+  assert.deepEqual(checkinMessage({ result: 'already', at: '08:03' }), { key: 'checkin.already', params: { at: '08:03' }, tone: 'success' });
+  assert.equal(checkinMessage('device_used').key, 'error.device_used');
+  assert.equal(checkinMessage('device_used').tone, 'danger');
+  assert.equal(checkinMessage('code_expired').tone, 'warning');
+  for (const code of ['code_expired', 'too_many_codes', 'device_used', 'window_closed', 'not_running', 'bad_pass', 'bad_code', 'forbidden']) {
+    assert.equal(checkinMessage(code).key, 'error.' + code, code);
+    assert.deepEqual(['warning', 'danger'].includes(checkinMessage(code).tone), true, code);
+  }
+});
+
+test('deviceId: 32 hex characters, the same on every call; a pass is taken once', () => {
+  const first = deviceId();
+  assert.match(first, /^[0-9a-f]{32}$/);
+  assert.equal(deviceId(), first);
+  keepPass({ pairId: 'p_1', pass: 'pass1.x' });
+  assert.equal(takePass('p_2'), null);
+  assert.equal(takePass('p_1'), 'pass1.x');
+  assert.equal(takePass('p_1'), null);
+});
+
+test('cameMark: present, late and made-up marks count as a check-in; «не был» and no mark do not', () => {
+  assert.deepEqual(['present', 'late', 'madeup', 'absent', 'excused'].map((status) => cameMark({ status })), [true, true, true, false, false]);
+  assert.deepEqual([null, undefined].map(cameMark), [false, false]);
 });

@@ -23,11 +23,14 @@ import * as journal from './views/journal.js';
 import * as journalLog from './views/journalLog.js';
 import * as grades from './views/grades.js';
 import * as lesson from './views/lesson.js';
+import * as checkin from './views/checkin.js';
+import { readQrLink } from './lesson.js';
+import { deviceId, keepPass, keepPassNote } from './device.js';
 import { refreshReviewCount } from './reviewCount.js';
 
 // Puts the screen chosen by the router into its frame (shell.js: sign-in card, student bar or staff sidebar).
 // A screen may export leave(): it is called when another screen replaces it, to drop what it held.
-const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm, review, journalList, journal, journalLog, grades, lesson };
+const VIEWS = { login, changePassword, home, directory, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm, review, journalList, journal, journalLog, grades, lesson, checkin };
 const page = document.getElementById('page');
 let shownView = null;
 let shownHash = location.hash;
@@ -108,6 +111,7 @@ function sessionEnded() {
 // address goes back while it asks; after "leave" the person goes where they were heading. A screen that stays on
 // the same work at the new address (another tab of the same syllabus form: keepsHold) is not left.
 async function hashChanged() {
+  if (readQrLink(location.hash)) await takeQrLink();
   if (!isLeaveHeld() || location.hash === shownHash || staysOnWork()) {
     renderCurrent();
     return;
@@ -120,6 +124,25 @@ async function hashChanged() {
 function staysOnWork() {
   const next = resolveRoute(location.hash, currentUser());
   return next.view === shownView && typeof VIEWS[shownView].keepsHold === 'function' && VIEWS[shownView].keepsHold(next.params);
+}
+
+// A QR link (#/q/<pair>/<key>): the key is exchanged at once for a pass, with no sign-in needed, and the address
+// becomes #/here, so the key stays neither in the address bar nor in the history. The pass waits for the check-in
+// screen; why it was not given is remembered to be shown there. A staff member just goes home.
+async function takeQrLink() {
+  const link = readQrLink(location.hash);
+  if (!link) return;
+  const user = currentUser();
+  const student = Boolean(user) && Array.isArray(user.permissions) && user.permissions.includes('checkin.mark');
+  history.replaceState(null, '', user && !student ? '#/' : '#/here');
+  if (user && !student) return;
+  try {
+    const data = await call('checkin.pass', { pairId: link.pairId, qr: link.qr, device: deviceId() });
+    keepPass({ pairId: link.pairId, pass: data.pass });
+  } catch (error) {
+    keepPassNote(['network', 'server_down', 'internal', 'not_configured'].includes(error.code) ? 'checkin.qrOffline'
+      : error.code === 'window_closed' || error.code === 'not_running' ? 'error.window_closed' : 'checkin.qrStale');
+  }
 }
 
 async function logout() {
@@ -165,7 +188,8 @@ async function refreshUser() {
   }
 }
 
-function start() {
+async function start() {
+  await takeQrLink();
   const user = currentUser();
   setLang(pickLang({ deviceLang: getPref('lang'), userLang: user ? user.lang : null }).lang);
   onTextsChange(renderCurrent);

@@ -1,6 +1,6 @@
 // Session and device preferences in localStorage. Every access is guarded: a blocked storage
 // (private mode, disabled cookies) must not break the page, so values are mirrored in memory.
-const KEYS = { token: 'journal.token', user: 'journal.user', lang: 'journal.lang', role: 'journal.role', theme: 'journal.theme', view: 'journal.view' };
+const KEYS = { token: 'journal.token', user: 'journal.user', lang: 'journal.lang', role: 'journal.role', theme: 'journal.theme', view: 'journal.view', device: 'journal.device' };
 const memory = new Map();
 
 function read(key) {
@@ -43,7 +43,7 @@ export function clearSession() {
 }
 
 // Device preferences that outlive a session: 'lang' (language before login), 'role' (chosen staff role) and
-// 'theme' (light or dark look).
+// 'theme' (light or dark look), 'device' (the number of this phone for the check-in; it outlives sign-out on purpose).
 export function getPref(name) {
   return read(KEYS[name]);
 }

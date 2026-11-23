@@ -6,7 +6,7 @@ import { icon } from '../icons.js';
 import { activeRole, menuParts, navFor, countBadge } from '../shell.js';
 import { pairCard, weekdayDate, lessonPieces } from './pairParts.js';
 import { teacherBadge } from '../subjects.js';
-import { todayAction } from '../lesson.js';
+import { todayAction, clockText, cameMark } from '../lesson.js';
 
 // Sections later units fill in; for now the student sees what is coming.
 const STUDENT_SECTIONS = [
@@ -37,6 +37,7 @@ function renderStudent(root, user) {
         el('p', { class: 'profile__group' },
           el('span', { class: 'muted' }, t('home.group')),
           user.groupName ? badge(user.groupName, 'primary') : el('span', { class: 'muted' }, t('home.noGroup'))))),
+    hereSection(user),
     todaySection(user),
     studentSubjectsSection(user),
     el('a', { class: 'card soon soon--link', href: '#/grades' },
@@ -50,6 +51,65 @@ function renderStudent(root, user) {
       el('div', { class: 'soon__body' },
         el('h2', { class: 'soon__title' }, t(title)),
         el('p', { class: 'soon__text' }, t(text)))))));
+}
+
+// ---- «Я на паре»: a pair of the group whose check-in is open now ----
+
+const HERE_EVERY_MS = 15000;
+const here = { owner: null, pair: null, at: 0, pending: null, poll: null, clock: null };
+
+function hereLeft() {
+  return here.pair.checkinLeftMs - (performance.now() - here.at);
+}
+
+// Asks the server once when the home screen opens, then every 15 s while it is open and visible, but only if the
+// student's pairs of today include one that is planned or running. The clock of the device decides nothing.
+function hereSection(user) {
+  clearInterval(here.poll);
+  clearInterval(here.clock);
+  const host = el('div', { class: 'here-host', 'aria-live': 'polite' });
+  const draw = () => host.replaceChildren(...hereCard());
+  if (here.owner !== user.id) Object.assign(here, { owner: user.id, pair: null });
+  draw();
+  const load = () => {
+    if (!here.pending) {
+      const owner = user.id;
+      here.pending = call('checkin.current', {})
+        .then((data) => { if (here.owner === owner) Object.assign(here, { pair: data.pair, at: performance.now() }); }, () => {})
+        .finally(() => { here.pending = null; });
+    }
+    return here.pending.then(() => { if (host.isConnected) draw(); });
+  };
+  load();
+  here.poll = setInterval(() => {
+    const planned = today.owner === user.id && today.pairs && today.pairs.some((pair) => pair.date === today.date && ['planned', 'running'].includes(pair.status));
+    if (!document.hidden && host.isConnected && planned) load();
+  }, HERE_EVERY_MS);
+  here.clock = setInterval(() => {
+    const left = document.getElementById('home-here-left');
+    if (!left || !here.pair) return;
+    left.textContent = t('checkin.left', { time: clockText(hereLeft()) });
+    if (hereLeft() <= 0 && !here.pending) { here.pair = null; load(); }
+  }, 1000);
+  return host;
+}
+
+function hereCard() {
+  const pair = here.pair;
+  if (!pair || pair.phase !== 'checkin') return [];
+  const place = [pair.subjectName, pair.roomName ? t('lesson.room', { room: pair.roomName }) : null, pair.startTime].filter(Boolean).join(' · ');
+  if (cameMark(pair.mark)) {
+    return [el('section', { class: 'card here-card is-marked', 'aria-label': t('checkin.title') },
+      el('span', { class: 'here-card__tick' }, icon('check')),
+      el('div', { class: 'here-card__text' },
+        el('p', { class: 'here-card__now' }, t('checkin.now', { place })),
+        el('p', { class: 'here-card__done' }, t('checkin.marked', { at: pair.mark.at }))))];
+  }
+  return [el('section', { class: 'card here-card', 'aria-label': t('checkin.title') },
+    el('div', { class: 'here-card__text' },
+      el('p', { class: 'here-card__now' }, t('checkin.now', { place })),
+      el('p', { class: 'here-card__left', id: 'home-here-left' }, t('checkin.left', { time: clockText(hereLeft()) }))),
+    el('a', { class: 'button button--primary here-card__go', href: '#/here' }, icon('checkCircle'), t('checkin.go')))];
 }
 
 // «Сегодня»: the pairs of the student's group today, as on the week, and the way to the whole week.
@@ -188,6 +248,9 @@ const lessons = { owner: null, pairs: null, errorKey: null, pending: null, timer
 export function leave() {
   clearInterval(lessons.timer);
   lessons.timer = null;
+  clearInterval(here.poll);
+  clearInterval(here.clock);
+  here.pair = null;
 }
 
 // The section appears only when there are pairs today; it asks again every minute while the page is open and visible.

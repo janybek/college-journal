@@ -424,3 +424,14 @@ test('the pair screen and the list of today: their keys exist in all three dicti
   assert.equal(ru['lesson.done.empty'], 'Отметок нет — пара осталась незаполненной');
   for (const dict of [ru, ky, en]) assert.equal('lesson.soon' in dict, false);
 });
+
+test('the student check-in: its keys exist in all three dictionaries, with the same placeholders', () => {
+  const keys = [...Object.keys(ru).filter((key) => key.startsWith('checkin.')), 'error.code_expired', 'error.too_many_codes', 'error.device_used', 'error.window_closed', 'error.not_running', 'error.bad_pass', 'error.bad_code'];
+  assert.ok(keys.length > 15);
+  const holders = (text) => (text.match(/\{\w+\}/g) ?? []).sort().join();
+  for (const key of keys) {
+    for (const dict of [ru, ky, en]) assert.ok(dict[key], key);
+    assert.equal(holders(ky[key]), holders(ru[key]), 'ky ' + key);
+    assert.equal(holders(en[key]), holders(ru[key]), 'en ' + key);
+  }
+});

@@ -134,6 +134,8 @@ function accept(lesson) {
   S.fresh = S.seen === null ? new Set() : new Set(arrived.filter((id) => !S.seen.has(id)));
   S.seen = new Set(arrived);
   S.lesson = lesson;
+  // the pair closed by itself: edits that were never saved can no longer be saved (the table is read-only now)
+  if (lesson.phase !== 'lesson' && S.edits.size > 0) { S.edits = new Map(); syncHold(); }
   S.at = performance.now();
   S.errorCode = null;
   S.rolled = false;

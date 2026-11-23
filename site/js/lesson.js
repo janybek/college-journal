@@ -25,6 +25,9 @@ export function qrLink(pageUrl, pairId, qr) {
 
 const ARRIVED = ['present', 'late', 'madeup'];
 
+// True when the mark of checkin.current says the student came (a teacher's «не был» is not a check-in).
+export const cameMark = (mark) => Boolean(mark) && ARRIVED.includes(mark.status);
+
 // Students already marked (present, late, made up): by the time of the check-in (those without one last), then by name.
 export function arrivedList(lesson) {
   const students = Array.isArray(lesson && lesson.students) ? lesson.students : [];
@@ -81,6 +84,37 @@ export function lessonChanges(draft, lesson) {
       return !old || old.status !== m.status || (old.noCoat === true) !== (m.noCoat === true) || (old.activity ?? null) !== (m.activity ?? null);
     })
     .map((m) => ({ studentId: m.studentId, status: m.status, noCoat: m.noCoat === true, activity: m.activity ?? null }));
+}
+
+// ---- The check-in of a student ----
+
+// '#/q/<pairId>/<16 hex>' -> { pairId, qr }; anything else (more parts, not hex, a broken %-code) is null.
+export function readQrLink(hash) {
+  const match = /^#\/q\/([^/]+)\/([0-9a-f]{16})$/.exec(typeof hash === 'string' ? hash : '');
+  if (!match) return null;
+  try { return { pairId: decodeURIComponent(match[1]), qr: match[2] }; } catch (error) { return null; }
+}
+
+// What the code field keeps: digits only, the first four.
+export function cleanCode(text) {
+  return String(text ?? '').replace(/\D/g, '').slice(0, 4);
+}
+
+const REFUSALS = {
+  code_expired: 'warning', too_many_codes: 'danger', device_used: 'danger', window_closed: 'warning',
+  not_running: 'warning', bad_pass: 'warning', bad_code: 'warning', forbidden: 'danger',
+};
+
+// The answer of checkin.mark ({ result, ... }) or an error code -> the text to show: { key, params, tone }.
+export function checkinMessage(answer) {
+  if (answer !== null && typeof answer === 'object') {
+    if (answer.result === 'ok') return { key: 'checkin.ok', params: { at: answer.at }, tone: 'success' };
+    if (answer.result === 'already') return { key: 'checkin.already', params: { at: answer.at }, tone: 'success' };
+    if (answer.result === 'wrong_code') return { key: 'checkin.wrong', params: { n: answer.attemptsLeft }, tone: 'danger' };
+    return { key: 'error.internal', params: {}, tone: 'danger' };
+  }
+  const code = String(answer);
+  return { key: 'error.' + code, params: {}, tone: Object.hasOwn(REFUSALS, code) ? REFUSALS[code] : 'danger' };
 }
 
 const SOURCES = { code: 'lesson.source.code', qr: 'lesson.source.qr', auto: 'lesson.source.auto', teacher: 'lesson.source.teacher' };

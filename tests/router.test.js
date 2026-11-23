@@ -160,3 +160,12 @@ test('resolveRoute: the pair screen needs lesson.get', () => {
   assert.equal(resolveRoute('#/lesson/%E0%A4%A', teacher).view, 'home');
   assert.equal(resolveRoute('#/lesson/p_1/x', teacher).view, 'home');
 });
+
+test('resolveRoute: «#/here» is the check-in of a student; staff go home, a visitor to the sign-in with the address kept', () => {
+  const student = { mustChangePassword: false, permissions: ['checkin.mark', 'checkin.current'] };
+  assert.deepEqual(resolveRoute('#/here', student), { view: 'checkin', params: {} });
+  assert.equal(resolveRoute('#/here/x', student).view, 'home');
+  assert.equal(resolveRoute('#/here', { mustChangePassword: false, permissions: ['lesson.get'] }).view, 'home');
+  assert.equal(resolveRoute('#/here', null).view, 'login');
+  assert.equal(resolveRoute('#/here', { mustChangePassword: true, permissions: ['checkin.mark'] }).view, 'changePassword');
+});

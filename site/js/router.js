@@ -60,5 +60,7 @@ export function resolveRoute(hash, user) {
   if (grades && permissions.includes('student.grades') && idOf(grades[1]) !== null) return { view: 'grades', params: { subjectId: idOf(grades[1]) } };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
+  // «Я на паре»: the check-in of a student (a pass from a QR link also lands here).
+  if (path === '/here' && permissions.includes('checkin.mark')) return { view: 'checkin', params: {} };
   return { view: 'home', params: {} };
 }
