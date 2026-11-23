@@ -1189,6 +1189,7 @@ export default {
   'journal.marks.list': 'Students of the group',
   'journal.marks.kind.none': 'Type of class not set',
   'journal.marks.hint': 'Change only those who were absent or late.',
+  'journal.marks.noMark': 'No mark',
   'journal.marks.allPresent': 'All present',
   'journal.marks.status.present': 'Present',
   'journal.marks.status.late': 'Late',

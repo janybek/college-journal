@@ -5973,6 +5973,8 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 .mk-row.is-invalid { box-shadow: inset 3px 0 0 var(--danger); background: var(--danger-wash); }
 
 .mk-row__name { font-size: 1rem; font-weight: 500; overflow-wrap: anywhere; }
+.mk-row__nomark[hidden] { display: none; }
+.mk-row__nomark { display: block; font-size: 1rem; font-weight: 400; color: var(--warning, var(--text-muted)); }
 
 .mk-row__error { grid-column: 1 / -1; margin: 0; }
 

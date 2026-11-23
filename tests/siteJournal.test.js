@@ -203,11 +203,16 @@ test('unitLine: all three results, only the current control, nothing yet', () =>
   assert.deepEqual(unitLine({ unit: 3, current: null, self: null, control: null, total: null }), { key: 'grades.unit.empty', params: {} });
 });
 
-test('changedMarks: an active student without a saved mark on a held pair is sent with what the window shows', () => {
-  const journal = { pairs: [{ id: 'p1', status: 'closed' }], students: [{ id: 's1', fullName: 'A' }, { id: 's2', fullName: 'B' }], marks: { p1: { s1: { status: 'present', noCoat: false, activity: null } } } };
+test('a student without a saved mark: no status on a held pair and not sent until set; present by default on a pair not held', () => {
+  const journal = { pairs: [{ id: 'p1', status: 'closed' }, { id: 'p2', status: 'planned' }], students: [{ id: 's1', fullName: 'A' }, { id: 's2', fullName: 'B' }], marks: { p1: { s1: { status: 'present', noCoat: false, activity: null } } } };
   const draft = draftMarks(journal, 'p1');
-  const sent = changedMarks(draft, journal, 'p1');
-  assert.deepEqual(sent.map((m) => m.studentId + ':' + m.status), ['s2:present']);
+  assert.deepEqual(draft.map((m) => m.studentId + ':' + m.status), ['s1:present', 's2:null']);
+  assert.deepEqual(changedMarks(draft, journal, 'p1'), []);
+  draft[1].status = 'present';
+  assert.deepEqual(changedMarks(draft, journal, 'p1').map((m) => m.studentId + ':' + m.status), ['s2:present']);
+  assert.deepEqual(draftMarks(journal, 'p2').map((m) => m.status), ['present', 'present']);
+  assert.equal(changedMarks(draftMarks(journal, 'p2'), journal, 'p2').length, 2);
+  assert.equal(activityAllowed(null, {}), false);
 });
 
 test('absenceList: only absent, excused and madeup, the newest first', () => {

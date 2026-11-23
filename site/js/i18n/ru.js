@@ -1189,6 +1189,7 @@ export default {
   'journal.marks.list': 'Студенты группы',
   'journal.marks.kind.none': 'Вид занятия не указан',
   'journal.marks.hint': 'Измените только тех, кто не был или опоздал.',
+  'journal.marks.noMark': 'Нет отметки',
   'journal.marks.allPresent': 'Все были',
   'journal.marks.status.present': 'Был',
   'journal.marks.status.late': 'Опоздал',

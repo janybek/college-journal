@@ -315,7 +315,7 @@ test('task 18: the grid of a journal has its texts in every language', () => {
 });
 
 test('task 19: the window of the marks of a pair has its texts in every language', () => {
-  const keys = ['title', 'when', 'open', 'list', 'kind.none', 'hint', 'allPresent', 'coat', 'activity', 'activityPlaceholder', 'reason.label', 'reason.hint', 'reason.count',
+  const keys = ['title', 'when', 'open', 'list', 'kind.none', 'hint', 'allPresent', 'noMark', 'coat', 'activity', 'activityPlaceholder', 'reason.label', 'reason.hint', 'reason.count',
     'unsaved', 'stay', 'discard', 'notBegun', 'termPassed', 'error.reason.required', 'error.reason.too_long', 'error.activity.bad_value', 'error.studentId.bad_ref']
     .map((k) => 'journal.marks.' + k);
   for (const s of ['present', 'late', 'absent', 'excused', 'madeup']) keys.push('journal.marks.status.' + s);

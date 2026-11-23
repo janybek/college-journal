@@ -93,7 +93,7 @@ export function pairHint(pair, role) {
 
 // No points for activity: for those who were not there, on the first pair of the subject and on a unit control pair.
 export function activityAllowed(status, pair) {
-  return !NO_ACTIVITY.includes(status) && !(pair && (pair.first === true || pair.lessonType === 'control'));
+  return !!status && !NO_ACTIVITY.includes(status) && !(pair && (pair.first === true || pair.lessonType === 'control'));
 }
 
 // The lab coat is asked only on practice pairs and pairs without a topic.
@@ -101,19 +101,23 @@ export function coatAllowed(pair) {
   return !pair || pair.lessonType === 'practice' || !pair.lessonType;
 }
 
-// The list of the window: the active students with their marks; a student without a mark is «present».
+// The list of the window: the active students with their marks. A student without a mark starts «present» on a pair not
+// held yet; on a held pair (he joined later) he has no status (null) until the teacher sets one.
 export function draftMarks(journal, pairId) {
+  const pair = journal.pairs && journal.pairs.find((p) => p.id === pairId);
+  const held = !!pair && (pair.status === 'running' || pair.status === 'closed');
   const saved = (journal.marks && journal.marks[pairId]) || {};
   return journal.students.filter((student) => !student.left).map((student) => {
     const mark = saved[student.id];
     return {
       studentId: student.id, fullName: student.fullName,
-      status: mark ? mark.status : 'present', noCoat: mark ? mark.noCoat === true : false, activity: mark && mark.activity !== undefined ? mark.activity : null,
+      status: mark ? mark.status : (held ? null : 'present'), noCoat: mark ? mark.noCoat === true : false, activity: mark && mark.activity !== undefined ? mark.activity : null,
     };
   });
 }
 
 // The marks for journal.savePair: every mark of a pair not yet held; of a held one only those that differ from the saved.
+// A student still without a status (null) is not sent.
 export function changedMarks(draft, journal, pairId) {
   const pair = journal.pairs.find((p) => p.id === pairId);
   const held = pair && (pair.status === 'running' || pair.status === 'closed');
@@ -121,6 +125,7 @@ export function changedMarks(draft, journal, pairId) {
   const base = new Map(Object.keys(saved).map((id) => [id, { status: saved[id].status, noCoat: saved[id].noCoat === true, activity: saved[id].activity !== undefined ? saved[id].activity : null }]));
   return draft
     .filter((m) => {
+      if (m.status === null) return false;
       const old = base.get(m.studentId);
       return !held || !old || old.status !== m.status || old.noCoat !== m.noCoat || old.activity !== m.activity;
     })

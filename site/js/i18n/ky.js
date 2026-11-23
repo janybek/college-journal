@@ -1189,6 +1189,7 @@ export default {
   'journal.marks.list': 'Топтун студенттери',
   'journal.marks.kind.none': 'Сабактын түрү көрсөтүлгөн эмес',
   'journal.marks.hint': 'Келбегендерди же кечиккендерди гана өзгөртүңүз.',
+  'journal.marks.noMark': 'Белги коюлган эмес',
   'journal.marks.allPresent': 'Баары келди',
   'journal.marks.status.present': 'Келди',
   'journal.marks.status.late': 'Кечикти',

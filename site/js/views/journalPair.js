@@ -72,13 +72,14 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
       oninput: () => setActivity(index, activity.value, activity.validity.badInput),
     });
     const error = el('p', { class: 'field__error mk-row__error', role: 'alert', hidden: true });
+    const noMark = el('span', { class: 'mk-row__nomark', hidden: true }, t('journal.marks.noMark'));
     const li = el('li', { class: 'mk-row', 'data-student': mark.studentId },
-      el('span', { class: 'mk-row__name', id: nameId }, mark.fullName || '—'),
+      el('span', { class: 'mk-row__name', id: nameId }, mark.fullName || '—', noMark),
       el('div', { class: 'mk-status', role: 'group', 'aria-labelledby': nameId }, buttons),
       coat ? el('label', { class: 'mk-coat', for: coatBox.id }, coatBox, el('span', {}, t('journal.marks.coat'))) : null,
       el('label', { class: 'mk-act', for: activity.id }, el('span', { class: 'mk-act__label' }, t('journal.marks.activity')), activity),
       error);
-    return { li, buttons, coatBox, activity, error };
+    return { li, buttons, coatBox, activity, error, noMark };
   }
 
   // One row follows its mark: pressed button, the coat and the activity (both off for a student who was not there).
@@ -86,7 +87,8 @@ export function openMarksDialog({ journal, pair, onSaved, onClosed }) {
     const mark = draft[index];
     const row = rows[index];
     for (const button of row.buttons) button.setAttribute('aria-pressed', String(button.dataset.status === mark.status));
-    const was = !NOT_ATTENDED.includes(mark.status);
+    const was = mark.status !== null && !NOT_ATTENDED.includes(mark.status);
+    row.noMark.hidden = mark.status !== null;
     if (row.coatBox) {
       row.coatBox.checked = mark.noCoat;
       row.coatBox.disabled = !was;
