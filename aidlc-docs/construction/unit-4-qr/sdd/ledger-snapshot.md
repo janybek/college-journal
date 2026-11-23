@@ -55,3 +55,11 @@ Task 8: complete (commits c085339..348d273, review clean)
 - Task 9: implementer DONE 3ba2b5a (767 tests; dev:lesson checked, stopped by own PID 28848); task-8 minors done. Dispatching journal-reviewer (sonnet, light).
 - Task 9: review (sonnet) Approved, 0 critical/important. minor (deferred → final review): --lesson-now without --reset silently prepares nothing (unreachable via npm run dev:lesson); real-clock stand test is weak but honest.
 Task 9: complete (commits 348d273..3ba2b5a, review clean)
+- Task 10: BASE ef83210; dispatched journal-screens (sonnet); no AI review (owner block 1 after task 11)
+- Task 10: DONE_WITH_CONCERNS 1acc51c (775 tests). Concerns: real fullscreen not testable in headless (emulated: QR 61% of 1080); shell.js edited (lesson view without side menu/top bar) — accepted, needed for projector; home cards at 360px not checked; ky texts to proofread; empty space right of the names. Coordinator looked at 01-home-teacher.png and 04-lesson-checkin-after.png — OK. Ruling: accept into block 1 (owner checks real fullscreen + QR by phone) — cost if wrong: fixes in block 1 round.
+Task 10: complete (commits ef83210..1acc51c, owner block 1)
+- Task 11: BASE 1acc51c; dispatched journal-screens (sonnet); AI review after (student marks edit)
+- Task 11: DONE_WITH_CONCERNS 2d0860b (778 tests); summary editable only in phase lesson (read-only during checkin and after close); leave-question 'Сохранить'/'Не сохранять' not tested on stand; CK recalculation not checked by numbers. Dispatching journal-reviewer (sonnet).
+- Task 11: review (sonnet) Approved; 'summary editable only in phase lesson' accepted. minor (deferred → block 1 fixes): unsaved edits linger after the pair auto-closes (reset S.edits when phase leaves lesson); Back during saving reopens the question (harmless).
+Task 11: complete (commits 1acc51c..2d0860b, review clean)
+- BLOCK 1 STOP: coordinator raises journal-dev-lesson, logs in as teacher1, owner checks list (QR by phone camera). Student screen is task 12 — student check-in in block 1 is done by the coordinator by request (checkin.mark), not by the owner.
