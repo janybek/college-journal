@@ -109,7 +109,10 @@ const REFUSALS = {
 export function checkinMessage(answer) {
   if (answer !== null && typeof answer === 'object') {
     if (answer.result === 'ok') return { key: 'checkin.ok', params: { at: answer.at }, tone: 'success' };
-    if (answer.result === 'already') return { key: 'checkin.already', params: { at: answer.at }, tone: 'success' };
+    if (answer.result === 'already') {
+      return ARRIVED.includes(answer.status) ? { key: 'checkin.already', params: { at: answer.at }, tone: 'success' }
+        : { key: 'checkin.alreadyOther', params: {}, tone: 'warning' };
+    }
     if (answer.result === 'wrong_code') return { key: 'checkin.wrong', params: { n: answer.attemptsLeft }, tone: 'danger' };
     return { key: 'error.internal', params: {}, tone: 'danger' };
   }

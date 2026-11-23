@@ -86,7 +86,8 @@ test('cleanCode: digits only, the first four', () => {
 test('checkinMessage: an answer or an error code becomes a text key, its values and a tone', () => {
   assert.deepEqual(checkinMessage({ result: 'wrong_code', attemptsLeft: 3 }), { key: 'checkin.wrong', params: { n: 3 }, tone: 'danger' });
   assert.deepEqual(checkinMessage({ result: 'ok', at: '08:03' }), { key: 'checkin.ok', params: { at: '08:03' }, tone: 'success' });
-  assert.deepEqual(checkinMessage({ result: 'already', at: '08:03' }), { key: 'checkin.already', params: { at: '08:03' }, tone: 'success' });
+  assert.deepEqual(checkinMessage({ result: 'already', status: 'late', at: '08:03' }), { key: 'checkin.already', params: { at: '08:03' }, tone: 'success' });
+  for (const status of ['absent', 'excused']) assert.deepEqual(checkinMessage({ result: 'already', status, at: '08:03' }), { key: 'checkin.alreadyOther', params: {}, tone: 'warning' }, status);
   assert.equal(checkinMessage('device_used').key, 'error.device_used');
   assert.equal(checkinMessage('device_used').tone, 'danger');
   assert.equal(checkinMessage('code_expired').tone, 'warning');

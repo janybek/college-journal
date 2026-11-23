@@ -13,14 +13,18 @@ const TICK_MS = 500;
 const NOTE_TONES = { success: 'success', warning: 'warning', danger: 'error' };
 
 const blank = () => ({
-  owner: null, pair: undefined, at: 0, loadError: null, pending: false, gen: 0, busy: false, code: '', message: null,
+  owner: null, pair: undefined, at: 0, loadError: null, pending: false, busy: false, code: '', message: null,
   done: null, qrNote: null, refocus: false, due: false, timer: null, root: null,
 });
+// Counts the screens opened and left; it only grows and lives outside `S`, so an answer that comes after the
+// screen was left never draws on the next one (another student on the same phone).
+let generation = 0;
 let S = blank();
 
 export function render(root) {
   const user = getUser();
   if (S.owner !== user.id) {
+    generation += 1;
     S = Object.assign(blank(), { owner: user.id, qrNote: takePassNote() });
   }
   S.root = root;
@@ -37,28 +41,28 @@ export function render(root) {
 
 export function leave() {
   clearInterval(S.timer);
-  S.gen += 1;
+  generation += 1;
   S = blank();
 }
 
 async function load() {
-  const gen = S.gen;
+  const gen = generation;
   S.pending = true;
   try {
     const data = await call('checkin.current', {});
-    if (gen !== S.gen) return;
+    if (gen !== generation) return;
     S.pair = data.pair;
     S.at = performance.now();
     S.loadError = null;
     S.due = false;
   } catch (error) {
-    if (gen !== S.gen) return;
+    if (gen !== generation) return;
     S.loadError = errorKey(error.code);
   }
   S.pending = false;
   refresh();
   const pair = S.pair;
-  if (gen === S.gen && pair && pair.phase === 'checkin' && !cameMark(pair.mark) && !S.done) {
+  if (gen === generation && pair && pair.phase === 'checkin' && !cameMark(pair.mark) && !S.done) {
     const pass = takePass(pair.id);
     if (pass !== null) send({ pass }, pair, pass);
   }
@@ -80,7 +84,7 @@ function tick() {
 // One request to checkin.mark: with the digits or with a pass. Pressing twice sends one request.
 async function send(proof, pair, pass = null) {
   if (S.busy) return;
-  const gen = S.gen;
+  const gen = generation;
   S.busy = true;
   S.message = null;
   const button = document.getElementById('here-submit');
@@ -88,12 +92,12 @@ async function send(proof, pair, pass = null) {
   let message;
   try {
     const answer = await call('checkin.mark', { pairId: pair.id, device: deviceId(), ...proof });
-    if (gen !== S.gen) return;
+    if (gen !== generation) return;
     message = checkinMessage(answer);
-    if (answer.result === 'ok' || answer.result === 'already') S.done = { at: answer.at };
+    if (answer.result === 'ok' || (answer.result === 'already' && cameMark({ status: answer.status }))) S.done = { at: answer.at };
     if (answer.result === 'wrong_code') { S.code = ''; S.refocus = true; }
   } catch (error) {
-    if (gen !== S.gen) return;
+    if (gen !== generation) return;
     message = checkinMessage(error.code);
     if (!hasText(message.key)) message = { key: errorKey(error.code), params: {}, tone: 'danger' };
     if (pass !== null && ['network', 'server_down', 'internal'].includes(error.code)) keepPass({ pairId: pair.id, pass });

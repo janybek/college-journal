@@ -1467,6 +1467,7 @@ export default {
   'checkin.sending': 'Sending…',
   'checkin.ok': 'You are marked at {at}',
   'checkin.already': 'You were already marked at {at}',
+  'checkin.alreadyOther': 'The teacher has already given you a different mark.',
   'checkin.wrong': 'Wrong code. Attempts left: {n}.',
   'checkin.none': 'No class is checking in right now',
   'checkin.noneHint': 'When the teacher starts the check-in, you can enter the code here.',
