@@ -102,6 +102,40 @@ test('the mirror copies what is new, removes nothing; the restore brings back on
   assert.deepEqual(fs.readdirSync(dir).sort(), [stored('a'), stored('b'), 'notes.txt']);
 });
 
+test('the mirror skips a folder that is named like a stored file', (t) => {
+  const root = tempDir(t);
+  const dir = path.join(root, 'files');
+  const mirror = path.join(root, 'copies', 'files');
+  createDiskFiles(dir).put(stored('a'), SAMPLE.pdf);
+  fs.mkdirSync(path.join(dir, stored('f')));
+  fs.writeFileSync(path.join(dir, stored('f'), 'inner.txt'), 'x');
+  assert.deepEqual(mirrorFiles(dir, mirror), { copied: 1 });
+  assert.deepEqual(fs.readdirSync(mirror), [stored('a')]);
+  assert.deepEqual(restoreFiles(mirror, path.join(root, 'back')), { copied: 1 });
+});
+
+test('the low-space alarm keeps an existing alarm file when the check of a disk fails', (t) => {
+  const root = tempDir(t);
+  const config = { dataDir: path.join(root, 'data'), backupDir: path.join(root, 'copies'), alertDir: path.join(root, 'alert') };
+  fs.mkdirSync(config.alertDir);
+  const alert = path.join(config.alertDir, SPACE_ALERT_FILE);
+  fs.writeFileSync(alert, 'old alarm');
+  const log = quiet();
+  assert.deepEqual(spaceAlarm({ config, logger: log, statfs: () => { throw new Error('no disk'); } }), { low: [] });
+  assert.equal(fs.readFileSync(alert, 'utf8'), 'old alarm');
+  assert.equal(log.lines.filter((l) => l.startsWith('ERROR')).length, 2);
+  const GB = 1024 ** 3;
+  const oneFails = (dir) => {
+    if (dir === config.backupDir) throw new Error('no disk');
+    return { bsize: 4096, bavail: (6 * GB) / 4096 };
+  };
+  assert.deepEqual(spaceAlarm({ config, logger: quiet(), statfs: oneFails }), { low: [] });
+  assert.equal(fs.readFileSync(alert, 'utf8'), 'old alarm');
+  // both disks answer and have room: the alarm goes
+  assert.deepEqual(spaceAlarm({ config, logger: quiet(), statfs: () => ({ bsize: 4096, bavail: (6 * GB) / 4096 }) }), { low: [] });
+  assert.equal(fs.existsSync(alert), false);
+});
+
 test('the low-space alarm: under 5 GiB on either disk writes the file, enough removes it, no alertDir writes nothing, a statfs error is only logged', (t) => {
   const root = tempDir(t);
   const config = { dataDir: path.join(root, 'data'), backupDir: path.join(root, 'copies'), alertDir: path.join(root, 'alert') };

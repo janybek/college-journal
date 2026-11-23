@@ -73,9 +73,13 @@ export function sweepFiles({ store, dir, nowMs, keepMs = FILE_LIMITS.keepPending
   return { rows: dead.length, files };
 }
 
+function isFileAt(file) {
+  try { return fs.statSync(file).isFile(); } catch (error) { return false; }
+}
+
 function copyMissing(from, to) {
   let copied = 0;
-  const names = namesIn(from).filter((n) => isStoredName(n));
+  const names = namesIn(from).filter((n) => isStoredName(n) && isFileAt(path.join(from, n)));
   if (names.length === 0) return { copied };
   fs.mkdirSync(to, { recursive: true });
   const have = new Set(fs.readdirSync(to));
@@ -101,12 +105,14 @@ export function restoreFiles(mirrorDir, dir) {
 export function spaceAlarm({ config, logger, minFreeBytes = MIN_FREE_BYTES, statfs = fs.statfsSync }) {
   const low = [];
   const free = {};
+  let failed = false;
   for (const [label, dir] of [['data', config.dataDir], ['backup', config.backupDir]]) {
     try {
       const info = statfs(dir);
       free[label] = Number(info.bavail) * Number(info.bsize);
       if (free[label] < minFreeBytes) low.push(label);
     } catch (error) {
+      failed = true;
       logger.error(`space check failed (${label}): ${reason(error)}`);
     }
   }
@@ -114,7 +120,7 @@ export function spaceAlarm({ config, logger, minFreeBytes = MIN_FREE_BYTES, stat
   const file = path.join(config.alertDir, SPACE_ALERT_FILE);
   try {
     if (low.length === 0) {
-      fs.rmSync(file, { force: true });
+      if (!failed) fs.rmSync(file, { force: true });
     } else {
       const gib = (n) => (n / 1024 ** 3).toFixed(1);
       const words = { data: 'диск базы и файлов', backup: 'диск копий' };
