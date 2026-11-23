@@ -2,6 +2,7 @@ import { AppError } from '../../core/errors.js';
 import { addDays, daysBetween, isDate, mondayOf } from '../../core/dates.js';
 import { checkPairChange, pairLock } from '../../core/schedule.js';
 import { NO_LESSON } from '../../core/topics.js';
+import { settleLessons } from '../lessonSettle.js';
 import { generateSchedule, loadSettings, pairViews, relayout, todayOf } from '../scheduleData.js';
 
 const MAX_RANGE_DAYS = 30;
@@ -20,8 +21,9 @@ function list(data, ctx) {
   if (!isDate(to) || to < from || daysBetween(from, to) > MAX_RANGE_DAYS) throw new AppError('bad_request');
   const groupId = typeof data.groupId === 'string' && data.groupId !== '' ? data.groupId : null;
   const teacherId = typeof data.teacherId === 'string' && data.teacherId !== '' ? data.teacherId : null;
+  const { pairs: settled } = settleLessons(ctx.store, ctx.platform);
   const pairs = pairViews(ctx.store, (p) => p.date >= from && p.date <= to
-    && (groupId === null || p.groupId === groupId) && (teacherId === null || p.teacherId === teacherId));
+    && (groupId === null || p.groupId === groupId) && (teacherId === null || p.teacherId === teacherId), { pairs: settled });
   return { today, from, to, pairs };
 }
 
@@ -35,7 +37,8 @@ function mine(data, ctx, user) {
   const own = user.kind === 'student'
     ? (p) => p.groupId === user.row.groupId
     : (p) => p.teacherId === user.id;
-  return { today, from, to, pairs: pairViews(ctx.store, (p) => p.date >= from && p.date <= to && own(p)) };
+  const { pairs } = settleLessons(ctx.store, ctx.platform);
+  return { today, from, to, pairs: pairViews(ctx.store, (p) => p.date >= from && p.date <= to && own(p), { pairs }) };
 }
 
 function findPair(pairs, id) {
@@ -55,7 +58,7 @@ function saved(store, pairs, id, patch, rows, relay, settings) {
 
 function changePair(data, ctx) {
   const { store, platform } = ctx;
-  const pairs = store.list('pairs');
+  const { pairs } = settleLessons(store, platform);
   const pair = findPair(pairs, data.id);
   const today = todayOf(platform);
   const lock = pairLock(pair, today);
@@ -77,7 +80,7 @@ function changePair(data, ctx) {
 
 function cancelPair(data, ctx) {
   const { store, platform } = ctx;
-  const pairs = store.list('pairs');
+  const { pairs } = settleLessons(store, platform);
   const pair = findPair(pairs, data.id);
   const lock = pairLock(pair, todayOf(platform));
   if (lock) throw new AppError(lock);
@@ -93,7 +96,7 @@ function cancelPair(data, ctx) {
 
 function restorePair(data, ctx) {
   const { store, platform } = ctx;
-  const pairs = store.list('pairs');
+  const { pairs } = settleLessons(store, platform);
   const pair = findPair(pairs, data.id);
   const today = todayOf(platform);
   if (pair.status !== 'cancelled') throw new AppError('pair_locked');

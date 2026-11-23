@@ -10,8 +10,10 @@ import { lessonNumbers } from '../core/syllabusPlan.js';
 import { compareNames } from '../core/names.js';
 import { isSubstitution } from '../core/schedule.js';
 import { firstPairId, studentResults } from '../core/grades.js';
+import { LESSON_CLEAR, startProblem } from '../core/lesson.js';
 import { checkMark, checkReason, checkResultValue, markChanges, markMode, markState, normalizeMark } from '../core/journal.js';
 import { relayout } from './scheduleData.js';
+import { settleLessons } from './lessonSettle.js';
 
 export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'units', 'settings', 'attendance', 'unitResults'];
 
@@ -20,6 +22,11 @@ export function readJournalRows(store) {
   const rows = {};
   for (const table of JOURNAL_TABLES) rows[table] = store.list(table);
   return rows;
+}
+
+// The same rows with the started pairs settled (the window ended, the pair closed); written in the same request.
+export function readSettledRows(store, platform) {
+  return settleLessons(store, platform, readJournalRows(store));
 }
 
 // -> { id, teacher, manager (admin or dean), reader (prorector) }
@@ -80,8 +87,11 @@ export function journalView(rows, platform, subjectId, user) {
     const unit = unitOf(p);
     const state = markState(p, now, scheme);
     const teacher = viewer.teacher && (p.teacherId === viewer.id || subject.teacherId === viewer.id);
+    // 'open': the pair runs and this person leads it; 'start': this person may start it now; otherwise null
+    const leads = viewer.teacher && p.teacherId === viewer.id;
+    const lesson = leads && p.status === 'running' ? 'open' : leads && startProblem(p, nowMs) === null ? 'start' : null;
     return {
-      id: p.id, date: p.date, slot: p.slot, startTime: p.startTime, status: p.status, state,
+      id: p.id, date: p.date, slot: p.slot, startTime: p.startTime, startedAt: p.startedAt || '', lesson, status: p.status, state,
       mode: markMode({ state, held: held(p), teacher, manager: viewer.manager }),
       lessonType: p.lessonType, unit, topicName: topic ? topic.name : '', number: topic ? (numberOf(topic) ?? '') : '',
       first: p.id === first, counts: held(p) && p.lessonType !== 'control' && unit !== null,
@@ -241,7 +251,7 @@ const markOf = (row) => (row ? { status: row.status, noCoat: row.noCoat === true
 
 // 'journal.savePair': the marks of every student of a pair, all or nothing. Returns { journal }.
 export function savePairMarks(store, platform, data, user) {
-  const rows = readJournalRows(store);
+  const rows = readSettledRows(store, platform);
   const pair = typeof data.pairId === 'string' ? rows.pairs.find((p) => p.id === data.pairId) : undefined;
   if (!pair) throw new AppError('not_found');
   const marks = data.marks;
@@ -316,8 +326,17 @@ export function savePairMarks(store, platform, data, user) {
   const entry = { at, actorId: user.id, subjectId: subject.id, pairId: pair.id, reason, late: state === 'late' };
   const log = [];
   if (!held && mode === 'reason') log.push({ ...entry, entity: 'pair', field: 'status', before: 'planned', after: 'closed' });
-  // a first mark of a pair is not logged; the mark of a student on a held pair is, even a new one
-  if (held) for (const i of changed) for (const c of markChanges(i.old, i.next)) log.push({ ...entry, entity: 'mark', studentId: i.studentId, ...c });
+  // a first mark of a pair is not logged; the mark of a student on a held pair is, even a new one.
+  // During the pair the teacher's log keeps only a changed status of a student who already had a mark.
+  const during = pair.status === 'running' && mode === 'free';
+  if (held) {
+    for (const i of changed) {
+      for (const c of markChanges(i.old, i.next)) {
+        if (during && (c.field !== 'status' || i.old === null)) continue;
+        log.push({ ...entry, entity: 'mark', studentId: i.studentId, ...c });
+      }
+    }
+  }
   if (log.length > 0) store.insertMany('changeLog', log);
 
   // the answer is built from the rows as they are now, without a second read
@@ -336,7 +355,7 @@ const logText = (value) => (value === null || value === undefined ? '' : String(
 // 'journal.saveResults': the control, self-work or manual current points of one unit for several students, all or nothing.
 // Returns { journal }.
 export function saveUnitResults(store, platform, data, user) {
-  const rows = readJournalRows(store);
+  const rows = readSettledRows(store, platform);
   const subject = typeof data.subjectId === 'string' ? rows.subjects.find((s) => s.id === data.subjectId) : undefined;
   if (!subject) throw new AppError('not_found');
   const field = data.field;
@@ -492,7 +511,7 @@ function clearedMarkLog(rows, entry) {
 // The pair is written together with the lessons of its subject laid out again; the answer is the journal after the write.
 function changePairStatus(store, platform, data, user, reopen) {
   if (!viewerOf(user).manager) throw new AppError('forbidden');
-  const rows = readJournalRows(store);
+  const rows = readSettledRows(store, platform);
   const pair = typeof data.pairId === 'string' ? rows.pairs.find((p) => p.id === data.pairId) : undefined;
   const subject = pair && rows.subjects.find((s) => s.id === pair.subjectId);
   if (!pair || !subject) throw new AppError('not_found');
@@ -509,7 +528,7 @@ function changePairStatus(store, platform, data, user, reopen) {
     if (state === 'future') throw new AppError('too_early');
     if (marks.length > 0) throw new AppError('has_marks');
     patch = { status: 'missed', ...NO_LESSON };
-  } else if (pair.status === 'missed' || pair.status === 'closed') patch = { status: 'planned' };
+  } else if (pair.status === 'missed' || pair.status === 'closed') patch = pair.status === 'closed' && pair.startedAt ? { status: 'planned', ...LESSON_CLEAR } : { status: 'planned' };
   else throw new AppError('pair_locked');
 
   const at = localDateTime(nowMs);

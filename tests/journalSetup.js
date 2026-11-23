@@ -6,6 +6,7 @@ import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { SCHEMA } from '../core/schema.js';
 import { DEFAULT_BELLS } from '../core/settings.js';
+import { localDateTime, parseLocalDateTime } from '../core/dates.js';
 import { hashPassword } from '../core/auth.js';
 import { handleRequest } from '../backend/api.js';
 
@@ -13,7 +14,11 @@ export const PASSWORD = 'secret12';
 const SEMESTER = { semesterStart: '2026-09-01', semesterEnd: '2026-12-20', holidays: [], bells: DEFAULT_BELLS, semester: 1 };
 
 // UTC milliseconds of a Bishkek date and time (UTC+6).
-export const bishkek = (date, time = '12:00') => Date.parse(`${date}T${time}:00Z`) - 6 * 3600000;
+// `time` is 'HH:MM' or 'HH:MM:SS'.
+export const bishkek = (date, time = '12:00') => Date.parse(`${date}T${time.length === 5 ? time + ':00' : time}Z`) - 6 * 3600000;
+
+// A device number of the tests: 32 hex digits of one character.
+export const dev = (n) => String(n).repeat(32);
 
 // A spy over the store: lists[table] counts `list`, writes['method:table'] the batch and single writes. reset() clears them in place.
 function spyOn(store) {
@@ -32,10 +37,10 @@ function spyOn(store) {
   return { spy, lists, writes, reset };
 }
 
-export function setup() {
+export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform) } = {}) {
   let now = bishkek('2026-08-31');
   const platform = createNodePlatform({ now: () => now, secret: 'test-secret' });
-  const store = createMemoryStore(SCHEMA, platform);
+  const store = makeStore(SCHEMA, platform);
   const spied = spyOn(store);
   const ctx = { store: spied.spy, platform, log: () => {} };
   const call = (action, data, token) => handleRequest(JSON.stringify({ action, data, token }), ctx);
@@ -83,6 +88,7 @@ export function setup() {
     for (const [key, [name]] of Object.entries(logins)) t[key] = call('auth.login', { login: name, password: PASSWORD }).data.token;
   };
   const at = (date, time = '12:00') => { now = bishkek(date, time); login(); };
+  const tick = (ms) => { now += ms; };         // moves the clock without signing in again
 
   login();
   call('settings.save', { settings: SEMESTER }, t.dean);
@@ -99,6 +105,19 @@ export function setup() {
   for (const id of [p0901, p0908, q0904, q0911]) store.update('pairs', id, { status: 'closed' });
   store.update('pairs', p0915, { teacherId: ids.teacher3, substitute: true });
 
+  const p0922 = pairOf(sb1, '2026-09-22').id;
+  // a started pair written straight into the store (the start button comes later): the window of 5 minutes is open
+  const running = (pairId, startedAt, extra = {}) => {
+    const pair = store.get('pairs', pairId);
+    const until = localDateTime(parseLocalDateTime(startedAt) + 5 * 60000);
+    return store.update('pairs', pairId, {
+      status: 'running', startedAt, startedBy: pair.teacherId, checkinUntil: until, checkinClosed: false, finishedAt: '', finishedBy: '', ...extra,
+    });
+  };
+  const snapshot = () => JSON.parse(JSON.stringify({
+    attendance: store.list('attendance'), checkins: store.list('checkins'), changeLog: store.list('changeLog'), pairs: store.list('pairs'),
+  }));
+
   const mark = (pairId, key, status, activity, markedAt, extra = {}) => store.insert('attendance', {
     pairId, studentId: ids[key], status, noCoat: false, activity, source: 'teacher', markedBy: ids.teacher1, markedAt, ...extra,
   }).id;
@@ -112,7 +131,7 @@ export function setup() {
   mark(q0911, 'b1', 'present', 3, '2026-09-11 08:10:00', { markedBy: ids.teacher2 });
 
   return {
-    store, spy: { lists: spied.lists, writes: spied.writes, reset: spied.reset }, platform, call, t, at, ids, mark, pairOf,
-    a1: ids.a1, a2: ids.a2, a3: ids.a3, a4: ids.a4, b1: ids.b1, g1, g2, ds1, ds2, sb1, sb2, p0901, p0908, p0915, q0904, q0911, syllabusId,
+    store, spy: { lists: spied.lists, writes: spied.writes, reset: spied.reset }, platform, call, t, at, tick, running, snapshot, ids, mark, pairOf,
+    a1: ids.a1, a2: ids.a2, a3: ids.a3, a4: ids.a4, b1: ids.b1, g1, g2, ds1, ds2, sb1, sb2, p0901, p0908, p0915, p0922, q0904, q0911, syllabusId,
   };
 }
