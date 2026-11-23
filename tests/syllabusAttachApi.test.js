@@ -20,7 +20,7 @@ test('attach: every refusal writes nothing, the good one writes the row, the box
   const { call, store, files, staff, id, attach, state, teacher1, teacher2, prorector, s1 } = env();
   const before = state();
   assert.equal(attach({}, teacher2).error.code, 'forbidden');
-  for (const token of [prorector, s1, null]) assert.notEqual(attach({}, token).ok, true);
+  for (const [token, c] of [[prorector, 'forbidden'], [s1, 'forbidden'], [null, 'unauthorized']]) assert.equal(code(attach({}, token)), c);
   for (const bad of [[id], 7, ` ${id} `, null]) assert.equal(attach({ syllabusId: bad }).error.code, 'bad_request');
   assert.equal(attach({ syllabusId: 'sy_missing' }).error.code, 'not_found');
   for (const [name, bytes, c] of [['a.xlsx', SAMPLE.xlsx, 'bad_type'], ['a.pptx', SAMPLE.pptx, 'bad_type'], ['a.jpg', SAMPLE.jpg, 'bad_type'], ['a.exe', FAKE.exe, 'bad_type'],
@@ -284,4 +284,50 @@ test('reads of the form and the page grow only by files, and only with a file', 
   reset();
   call('syllabus.get', { subjectId: sb1 }, s1);
   assert.equal(lists.files, 1);
+});
+
+test('rights on a returned version, an archived one and the version of another teacher of the discipline', () => {
+  const { call, store, state, id, attach, read, fill, sb1, draft, dean, teacher1, teacher2, s1 } = env();
+  // returned: the student does not read it
+  attach({});
+  fill(id);
+  call('syllabus.submit', { syllabusId: id }, teacher1);
+  assert.equal(call('syllabus.return', { syllabusId: id, remark: 'Доработать' }, dean).ok, true);
+  let before = state();
+  assert.equal(code(read(s1)), 'not_found');
+  assert.equal(state(), before);
+  call('syllabus.submit', { syllabusId: id }, teacher1);
+  call('syllabus.approve', { syllabusId: id }, dean);
+
+  // archived: attach, drop and read are refused
+  const next = draft(sb1, 1, teacher1);
+  fill(next);
+  call('syllabus.submit', { syllabusId: next }, teacher1);
+  assert.equal(call('syllabus.approve', { syllabusId: next }, dean).ok, true);
+  assert.equal(store.get('syllabi', id).status, 'archived');
+  before = state();
+  for (const token of [teacher1, dean]) {
+    assert.equal(code(attach({ syllabusId: id }, token)), 'forbidden');
+    assert.equal(code(call('syllabus.dropFile', { syllabusId: id }, token)), 'forbidden');
+    assert.equal(code(read(token, id)), 'forbidden');
+  }
+  assert.equal(state(), before);
+
+  // another teacher of the same discipline: a student of a group led by the other one does not read this file
+  const ds1 = store.get('syllabi', id).disciplineId;
+  const g3 = store.insert('groups', { name: '03-1', course: 1 }).id;
+  const t2 = store.list('staff').find((x) => x.login === 'teacher2').id;
+  const sb4 = store.insert('subjects', { name: 'Информатика', disciplineId: ds1, groupId: g3, teacherId: t2, scheme: 'A' }).id;
+  store.insert('students', { fullName: 's3', groupId: g3, cardNo: 's3', passwordHash: store.get('students', store.list('students')[0].id).passwordHash, lang: 'ky', mustChangePassword: false, active: true });
+  const s3 = call('auth.login', { login: 's3', password: 'secret12' }, undefined).data.token;
+  const other = draft(sb4, 1, teacher2);
+  call('syllabus.attachFile', { syllabusId: other, name: 'o.pdf', data: b64(SAMPLE.pdf) }, teacher2);
+  fill(other);
+  call('syllabus.submit', { syllabusId: other }, teacher2);
+  assert.equal(call('syllabus.approve', { syllabusId: other }, dean).ok, true);
+  before = state();
+  assert.equal(read(s3, other).ok, true);
+  assert.equal(code(read(s3, next)), 'not_found');
+  assert.equal(code(read(s1, other)), 'not_found');
+  assert.equal(state(), before);
 });
