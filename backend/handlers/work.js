@@ -1,6 +1,7 @@
 import { AppError } from '../../core/errors.js';
 import { readWorkRows, removeAssignment, saveAssignment, staffWorkView, workList, workOverview } from '../workData.js';
 import { studentWorkView, submitWork, workMine } from '../workStudent.js';
+import { gradeWork } from '../workGrade.js';
 import { dropFile, readFile, uploadFile } from '../workFiles.js';
 
 // 'work.get': the staff reads the whole group, the student only his own work.
@@ -18,6 +19,7 @@ export const workHandlers = {
   'work.save': (data, ctx, user) => saveAssignment(ctx.store, ctx.platform, data, user),
   'work.remove': (data, ctx, user) => removeAssignment(ctx.store, ctx.platform, data, user),
   'work.get': (data, ctx, user) => getWork(ctx, data, user),
+  'work.grade': (data, ctx, user) => gradeWork(ctx.store, ctx.platform, data, user),
   'work.mine': (data, ctx, user) => workMine(ctx.store, ctx.platform, user),
   'work.upload': (data, ctx, user) => uploadFile(ctx.store, ctx.platform, ctx.files, data, user),
   'work.dropFile': (data, ctx, user) => dropFile(ctx.store, ctx.platform, ctx.files, data, user),

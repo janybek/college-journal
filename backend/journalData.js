@@ -11,11 +11,12 @@ import { compareNames } from '../core/names.js';
 import { isSubstitution } from '../core/schedule.js';
 import { firstPairId, studentResults } from '../core/grades.js';
 import { LESSON_CLEAR, startProblem } from '../core/lesson.js';
+import { currentAttempt, selfByWork } from '../core/work.js';
 import { checkMark, checkReason, checkResultValue, markChanges, markMode, markState, normalizeMark } from '../core/journal.js';
 import { relayout } from './scheduleData.js';
 import { settleLessons } from './lessonSettle.js';
 
-export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'units', 'settings', 'attendance', 'unitResults'];
+export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'units', 'settings', 'attendance', 'unitResults', 'assignments', 'submissions'];
 
 // Every table of the journal, each read once. `settings` stays the rows of the sheet.
 export function readJournalRows(store) {
@@ -41,6 +42,35 @@ export function viewerOf(user) {
 }
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
+
+// The self-work assignments of a subject in the plan half in force, by unit.
+function srsByUnit(rows, subject, planSemester) {
+  const byUnit = new Map();
+  for (const a of rows.assignments) {
+    if (a.kind !== 'srs' || a.subjectId !== subject.id || (a.planSemester ?? null) !== planSemester || !Number.isInteger(a.unit)) continue;
+    if (!byUnit.has(a.unit)) byUnit.set(a.unit, []);
+    byUnit.get(a.unit).push(a);
+  }
+  return byUnit;
+}
+
+// The self-work of one student counted from the assignments: Map(unit -> selfByWork(...)), only of the units that have assignments.
+export function selfWorkOf(rows, subject, planSemester, studentId, nowMs, self) {
+  const byUnit = srsByUnit(rows, subject, planSemester);
+  const result = new Map();
+  if (byUnit.size === 0) return result;
+  const ids = new Set([...byUnit.values()].flat().map((a) => a.id));
+  const lists = new Map();
+  for (const r of rows.submissions) {
+    if (r.studentId !== studentId || !ids.has(r.assignmentId)) continue;
+    if (!lists.has(r.assignmentId)) lists.set(r.assignmentId, []);
+    lists.get(r.assignmentId).push(r);
+  }
+  const attemptOf = new Map([...lists].map(([id, list]) => [id, currentAttempt(list)]));
+  for (const [unit, assignments] of byUnit) result.set(unit, selfByWork({ assignments, attemptOf, nowMs, self }));
+  return result;
+}
+
 const nameOf = (rows, id) => (rows.find((r) => r.id === id) || { fullName: '' }).fullName;
 
 // Of several rows of one key the last one wins: by `stamp`, then by id.
@@ -156,11 +186,13 @@ export function journalView(rows, platform, subjectId, user) {
   }
   const unitList = [...unitNumbers].sort((a, b) => a - b);
 
+  const byWork = partial ? new Map() : srsByUnit(rows, subject, planSemester);
   const results = {};
   if (!partial) {
     const forCount = all.map((p) => ({ id: p.id, status: p.status, lessonType: p.lessonType, unit: unitOf(p), first: p.id === first }));
     for (const s of students) {
-      results[s.id] = studentResults({ pairs: forCount, marks: rawMarks.get(s.id) || new Map(), unitRows: unitRows.get(s.id) || new Map(), units: unitList, scheme });
+      const selfWork = selfWorkOf(rows, subject, planSemester, s.id, nowMs, scheme.self);
+      results[s.id] = studentResults({ pairs: forCount, marks: rawMarks.get(s.id) || new Map(), unitRows: unitRows.get(s.id) || new Map(), units: unitList, scheme, selfWork });
     }
   }
 
@@ -173,7 +205,7 @@ export function journalView(rows, platform, subjectId, user) {
     },
     scheme, partial, can: { results: viewer.manager || owner, manage: viewer.manager },
     students, pairs, marks,
-    units: unitList.map((unit) => ({ unit, title: titles.get(unit) || '' })),
+    units: unitList.map((unit) => (byWork.has(unit) ? { unit, title: titles.get(unit) || '', byWork: true } : { unit, title: titles.get(unit) || '' })),
     results,
   };
 }
@@ -379,6 +411,7 @@ export function saveUnitResults(store, platform, data, user) {
 
   const view = journalView(rows, platform, subject.id, user);
   if (!Number.isInteger(data.unit) || !view.units.some((u) => u.unit === data.unit)) throw new AppError('invalid', { fields: [{ field: 'unit', code: 'bad_value' }] });
+  if (field === 'self' && view.units.find((u) => u.unit === data.unit).byWork === true) throw new AppError('invalid', { fields: [{ field: 'unit', code: 'self_by_work' }] });
 
   // the saved rows of this subject: of the rows of one student and unit the last one wins
   const grouped = new Map();
@@ -455,6 +488,7 @@ export function changeLogView(store, platform, data, user) {
   const subjects = store.list('subjects');
   const groups = store.list('groups');
   const pairs = store.list('pairs');
+  const assignments = store.list('assignments');
 
   if (!viewer.manager && !viewer.reader) {
     const own = given('subjectId') && subjects.some((s) => s.id === data.subjectId && s.teacherId === user.id);
@@ -467,6 +501,7 @@ export function changeLogView(store, platform, data, user) {
   const subjectOf = byId(subjects);
   const groupOf = byId(groups);
   const pairOf = byId(pairs);
+  const assignmentOf = byId(assignments);
 
   const picked = changeLog.filter((r) => {
     if (given('subjectId') && r.subjectId !== data.subjectId) return false;
@@ -484,13 +519,18 @@ export function changeLogView(store, platform, data, user) {
     const subject = subjectOf.get(r.subjectId);
     const pair = pairOf.get(r.pairId);
     const group = subject ? groupOf.get(subject.groupId) : undefined;
-    return {
+    const row = {
       id: r.id, at: r.at, actorName: nameIn(staffOf, r.actorId), entity: r.entity, field: r.field,
       before: r.before ?? '', after: r.after ?? '', reason: r.reason ?? '', late: r.late === true,
       subjectId: r.subjectId || '', subjectName: subject ? subject.name : '', groupName: group ? group.name : '',
       pairId: r.pairId || '', pairDate: pair ? pair.date : '', pairSlot: pair ? pair.slot : '',
       studentId: r.studentId || '', studentName: nameIn(studentOf, r.studentId), unit: r.unit ?? null,
     };
+    if (r.entity === 'work') {
+      row.assignmentId = r.assignmentId || '';
+      row.assignmentTitle = (assignmentOf.get(r.assignmentId) || {}).title || '';
+    }
+    return row;
   });
   return { today: localDate(platform.now()), rows: out, more: picked.length > limit };
 }

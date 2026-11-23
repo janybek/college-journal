@@ -7,6 +7,7 @@ import { inSemester } from '../core/topics.js';
 import { syllabusFor } from '../core/syllabus.js';
 import { compareNames } from '../core/names.js';
 import { firstPairId, pairPoints, studentResults } from '../core/grades.js';
+import { selfWorkOf } from './journalData.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -73,7 +74,8 @@ export function studentGrades(rows, platform, user) {
       }
 
       const forCount = all.map((p) => ({ id: p.id, status: p.status, lessonType: p.lessonType, unit: unitOf(p), first: p.id === first, date: p.date, slot: p.slot, topicId: p.topicId }));
-      const result = studentResults({ pairs: forCount, marks: markOf, unitRows, units: unitList, scheme });
+      const selfWork = selfWorkOf(rows, subject, planSemester, me, platform.now(), scheme.self);
+      const result = studentResults({ pairs: forCount, marks: markOf, unitRows, units: unitList, scheme, selfWork });
       const pairs = forCount.filter((p) => held(p) && markOf.has(p.id))
         .sort((a, b) => cmp(a.date, b.date) || a.slot - b.slot || cmp(a.id, b.id))
         .map((p) => {
@@ -92,6 +94,7 @@ export function studentGrades(rows, platform, user) {
         units: result.units.map((u) => ({
           unit: u.unit, title: titles.get(u.unit) || '', current: u.current, manual: u.manual !== null,
           self: u.self, control: u.control, total: u.total, word: u.word, currentLow: u.currentLow, controlLow: u.controlLow,
+          ...(u.selfWork ? { selfWork: u.selfWork } : {}),
         })),
         outside: result.outside, preliminary: result.preliminary, word: result.word, attendance: result.attendance, pairs,
       };
