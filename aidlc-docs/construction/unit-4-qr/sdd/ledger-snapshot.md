@@ -63,3 +63,5 @@ Task 10: complete (commits ef83210..1acc51c, owner block 1)
 - Task 11: review (sonnet) Approved; 'summary editable only in phase lesson' accepted. minor (deferred → block 1 fixes): unsaved edits linger after the pair auto-closes (reset S.edits when phase leaves lesson); Back during saving reopens the question (harmless).
 Task 11: complete (commits 1acc51c..2d0860b, review clean)
 - BLOCK 1 STOP: coordinator raises journal-dev-lesson, logs in as teacher1, owner checks list (QR by phone camera). Student screen is task 12 — student check-in in block 1 is done by the coordinator by request (checkin.mark), not by the owner.
+- OWNER 23.11: block 1 ACCEPTED («Да, все пока что так как я хотел»). QR read by the owner's phone NOT explicitly confirmed — Ruling: carry the phone QR check to block 2 (student QR link) and task 13 (live site from phone); if it fails, replace site/js/qr.js by a vetted MIT library vendored in site/vendor/ (told the owner) — cost if wrong: one small task.
+- Coordinator stand journal-dev-lesson stopped (preview_stop) before task 12.
