@@ -315,3 +315,42 @@ test('scoring.save: no direct writes of a closed unit reach the log', () => {
   s.call('scoring.save', { scheme: { ...DEFAULT_SCHEME, activity: 5 } }, s.t.admin);
   assert.equal(s.store.list('changeLog').length, logs);
 });
+
+// the closing does not depend on the present teacher or on the half of the year in force
+const markOf = (s, id) => ({ pairId: id, marks: [{ studentId: s.a2, status: 'excused', noCoat: false, activity: null }], reason: 'справка' });
+
+test('a closed unit stays closed when the teacher of the subject changes to one without a syllabus', () => {
+  const s = setup();
+  s.unitNumbers();
+  s.closeUnit(1);
+  const subject = s.store.get('subjects', s.sb1);
+  assert.equal(s.call('dir.save', { table: 'subjects', row: { ...subject, teacherId: s.ids.teacher2 } }, s.t.admin).ok, true);
+  const j = s.call('journal.get', { subjectId: s.sb1 }, s.t.dean).data.journal;
+  assert.deepEqual(j.closed, { units: [1], final: false });
+  assert.deepEqual(j.pairs.filter((p) => p.unit === 1).map((p) => p.mode), ['none', 'none']);
+  const before = s.snapshot();
+  for (const who of ['dean', 'admin']) assert.equal(s.call('journal.savePair', markOf(s, s.p0901), s.t[who]).error.code, 'unit_closed');
+  assert.equal(s.call('journal.reopenPair', { pairId: s.p0901, reason: 'x' }, s.t.dean).error.code, 'unit_closed');
+  assert.equal(s.call('journal.saveResults', { subjectId: s.sb1, unit: 1, field: 'control', items: [{ studentId: s.a2, value: 30 }], reason: 'x' }, s.t.dean).ok, false);
+  assert.deepEqual(s.snapshot(), before);
+  // only the administrator opens it again
+  const closure = s.store.list('closures')[0];
+  s.store.update('closures', closure.id, { reopenedAt: '2026-10-01 10:00:00', reopenedBy: s.ids.admin });
+  assert.equal(s.call('journal.savePair', markOf(s, s.p0901), s.t.dean).ok, true);
+});
+
+test('a closed unit stays closed when the half of the year is switched', () => {
+  const s = setup();
+  s.unitNumbers();
+  s.closeUnit(1);
+  const cur = s.call('settings.get', {}, s.t.dean).data.settings;
+  assert.equal(s.call('settings.save', { settings: { ...cur, semester: 2 } }, s.t.dean).ok, true);
+  const before = s.snapshot();
+  assert.equal(s.call('journal.savePair', markOf(s, s.p0901), s.t.dean).error.code, 'unit_closed');
+  assert.equal(s.call('journal.reopenPair', { pairId: s.p0901, reason: 'x' }, s.t.dean).error.code, 'unit_closed');
+  assert.equal(s.call('journal.saveResults', { subjectId: s.sb1, unit: 1, field: 'control', items: [{ studentId: s.a2, value: 30 }], reason: 'x' }, s.t.dean).ok, false);
+  assert.deepEqual(s.snapshot(), before);
+  const closure = s.store.list('closures')[0];
+  s.store.update('closures', closure.id, { reopenedAt: '2026-10-01 10:00:00', reopenedBy: s.ids.admin });
+  assert.equal(s.call('journal.savePair', markOf(s, s.p0901), s.t.dean).ok, true);
+});

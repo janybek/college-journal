@@ -7,9 +7,8 @@ import { inSemester } from '../core/topics.js';
 import { syllabusFor } from '../core/syllabus.js';
 import { compareNames } from '../core/names.js';
 import { firstPairId, pairPoints, studentResults } from '../core/grades.js';
-import { closedUnitsOf } from '../core/ledger.js';
 import { liveAttempts, subjectResult } from '../core/exam.js';
-import { selfWorkOf } from './journalData.js';
+import { closedOfSubject, selfWorkOf } from './journalData.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -105,7 +104,7 @@ export function studentGrades(rows, platform, user) {
           };
         });
       const teacher = rows.staff.find((x) => x.id === subject.teacherId);
-      const closed = closedUnitsOf(rows.closures, subject.id, planSemester);
+      const closed = closedOfSubject(rows, subject, settings, all).closed;
       return {
         subjectId: subject.id, name: subject.name, teacherName: teacher ? teacher.fullName : '', hasSyllabus: syllabus !== null,
         units: result.units.map((u) => ({

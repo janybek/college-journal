@@ -72,23 +72,40 @@ export function selfWorkOf(rows, subject, planSemester, studentId, nowMs, self) 
   return result;
 }
 
-// The units and the final sheet of the subject that are closed in the half of the plan in force: nobody changes them directly.
-export function closedOfSubject(rows, subject, settings) {
-  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
-  const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
-  return { planSemester, closed: closedUnitsOf(rows.closures, subject.id, planSemester) };
+// A pair keeps the half of the plan of its own topic, so changing the teacher of the subject or switching the half of the year never frees a closed unit.
+// -> { planSemester, unit } | null (a pair without a topic belongs to no unit)
+export function pairKeyOf(rows, pair) {
+  const topic = pair.topicId ? rows.topics.find((t) => t.id === pair.topicId) : undefined;
+  if (!topic || !Number.isInteger(topic.unit)) return null;
+  const syllabus = rows.syllabi.find((s) => s.id === topic.syllabusId);
+  return { planSemester: syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null, unit: topic.unit };
 }
 
-// The unit of the topic of a pair (null for a pair without a topic).
-export function unitOfPair(rows, pair) {
-  const topic = pair.topicId ? rows.topics.find((t) => t.id === pair.topicId) : undefined;
-  return topic && Number.isInteger(topic.unit) ? topic.unit : null;
+// The units and the final sheet of the subject that are closed: of the syllabus in force; without one, of the halves the pairs of the subject belong to.
+export function closedOfSubject(rows, subject, settings, pairs) {
+  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
+  if (syllabus) {
+    const planSemester = Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
+    return { planSemester, closed: closedUnitsOf(rows.closures, subject.id, planSemester) };
+  }
+  const units = new Set();
+  let final = false;
+  const seen = new Set();
+  for (const p of pairs) {
+    const key = pairKeyOf(rows, p);
+    if (!key || seen.has(key.planSemester)) continue;
+    seen.add(key.planSemester);
+    const c = closedUnitsOf(rows.closures, subject.id, key.planSemester);
+    for (const u of c.units) units.add(u);
+    final = final || c.final;
+  }
+  return { planSemester: null, closed: { units: [...units].sort((a, b) => a - b), final } };
 }
 
 // True when the pair belongs to a closed unit of its subject.
 export function pairUnitClosed(rows, subject, pair) {
-  const unit = subject ? unitOfPair(rows, pair) : null;
-  return unit !== null && closedOfSubject(rows, subject, readSettings(rows.settings)).closed.units.includes(unit);
+  const key = subject ? pairKeyOf(rows, pair) : null;
+  return key !== null && closedUnitsOf(rows.closures, subject.id, key.planSemester).units.includes(key.unit);
 }
 
 const nameOf = (rows, id) => (rows.find((r) => r.id === id) || { fullName: '' }).fullName;
@@ -121,7 +138,7 @@ export function journalView(rows, platform, subjectId, user) {
   const now = { date: localDate(nowMs), time: localTime(nowMs) };
   const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
   const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
-  const closed = closedUnitsOf(rows.closures, subject.id, planSemester);
+  const closed = closedOfSubject(rows, subject, settings, all).closed;
 
   // lessons of the pairs
   const topics = new Map(rows.topics.map((t) => [t.id, t]));
@@ -141,7 +158,7 @@ export function journalView(rows, platform, subjectId, user) {
     const teacher = viewer.teacher && (p.teacherId === viewer.id || subject.teacherId === viewer.id);
     // 'open': the pair runs and this person leads it; 'start': this person may start it now; otherwise null
     const leads = viewer.teacher && p.teacherId === viewer.id;
-    const shut = unit !== null && closed.units.includes(unit);
+    const shut = pairUnitClosed(rows, subject, p);
     const lesson = shut ? null : leads && p.status === 'running' ? 'open' : leads && startProblem(p, nowMs) === null ? 'start' : null;
     return {
       id: p.id, date: p.date, slot: p.slot, startTime: p.startTime, startedAt: p.startedAt || '', lesson, status: p.status, state,
