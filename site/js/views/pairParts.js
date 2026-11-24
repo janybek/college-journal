@@ -3,7 +3,9 @@ import { el, badge, iconButton, avatarTone, modal, refresh } from '../ui.js';
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { addDays, dayParts, isTime } from '../dates.js';
-import { pairFlags, topicText, lessonTypeKey, lessonParts, controlLine, weekRows, gridDays, cellPairs, ownTime, hyphenate } from '../pairs.js';
+import {
+  pairFlags, topicText, lessonTypeKey, lessonParts, controlLine, weekRows, gridDays, cellPairs, ownTime, hyphenate, examDayLabel,
+} from '../pairs.js';
 
 // Parts shared by the schedule screens: the deanery's «Расписание» and the teacher's and student's own week.
 // Everything from the server goes in as text.
@@ -145,9 +147,10 @@ function dayTitle(date, titleId, dayHref, title, hintHidden = false) {
 }
 
 // Days in a row, each with its pairs; «today» is marked, an empty day says so.
-// cardOptions: { show, onOpen, canOpen(pair), dayHref(date) }: only the pairs canOpen accepts (all, without it)
-// become buttons; a day for which dayHref(date) gives an address has its name as a link there.
-export function dayList(days, today, { show = [], onOpen = null, canOpen = null, dayHref = null } = {}) {
+// cardOptions: { show, onOpen, canOpen(pair), dayHref(date), exam }: only the pairs canOpen accepts (all, without it)
+// become buttons; a day for which dayHref(date) gives an address has its name as a link there; a day of the credit week
+// (`exam` of the server's answer) carries its label, and when it has no pairs it says so.
+export function dayList(days, today, { show = [], onOpen = null, canOpen = null, dayHref = null, exam = null } = {}) {
   return el('div', { class: 'days', 'data-count': days.length }, days.map(({ date, pairs }) => {
     const { day, weekday } = dayParts(date);
     const isToday = date === today;
@@ -157,16 +160,18 @@ export function dayList(days, today, { show = [], onOpen = null, canOpen = null,
       el('span', { class: 'visually-hidden' }, ', '),
       el('span', { class: 'day__date' }, dayMonth(date)),
     ]);
-    return el('section', { class: 'day' + (isToday ? ' is-today' : '') + (pairs.length === 0 ? ' is-empty' : ''), 'aria-labelledby': titleId },
+    const examKey = examDayLabel(date, exam);
+    return el('section', { class: 'day' + (isToday ? ' is-today' : '') + (pairs.length === 0 ? ' is-empty' : '') + (examKey ? ' is-exam' : ''), 'aria-labelledby': titleId },
       el('header', { class: 'day__head' },
         el('span', { class: 'day__leaf', 'aria-hidden': 'true' },
           el('span', { class: 'day__weekday' }, t('date.weekdayShort.' + weekday)),
           el('span', { class: 'day__number' }, String(day))),
         el('h2', { class: 'day__title', id: titleId }, title),
         hint,
-        isToday ? badge(t('pairs.today'), 'primary', true) : null),
+        isToday ? badge(t('pairs.today'), 'primary', true) : null,
+        examKey ? badge(t(examKey), 'warning') : null),
       pairs.length === 0
-        ? el('p', { class: 'day__none' }, t('pairs.none'))
+        ? el('p', { class: 'day__none' }, t(examKey ? 'schedule.exam.empty' : 'pairs.none'))
         : el('ul', { class: 'day__pairs' }, pairs.map((pair) => el('li', {},
           pairCard(pair, { show, onOpen: opener(pair, onOpen, canOpen) })))));
   }));
@@ -202,7 +207,7 @@ export function weekView(days, today, { pairs, from, list = false, ...cardOption
 
 // A table: a row for each pair number of the week with its time on the left, a column for each day (Monday to
 // Friday, a weekend day only with a pair). A cell holds short cards; an empty cell stays empty.
-function weekGrid(pairs, from, today, { show = [], onOpen = null, canOpen = null, dayHref = null } = {}) {
+function weekGrid(pairs, from, today, { show = [], onOpen = null, canOpen = null, dayHref = null, exam = null } = {}) {
   const dates = gridDays(pairs, from);
   return el('div', { class: 'table-scroll week-grid' },
     el('table', { class: 'grid', 'data-days': dates.length },
@@ -210,21 +215,21 @@ function weekGrid(pairs, from, today, { show = [], onOpen = null, canOpen = null
       el('colgroup', {}, el('col', { class: 'grid__slot-col' }), dates.map(() => el('col', {}))),
       el('thead', {}, el('tr', {},
         el('th', { scope: 'col', class: 'grid__corner' }, t('pairs.grid.slot')),
-        dates.map((date) => gridHead(date, today, dayHref)))),
+        dates.map((date) => gridHead(date, today, dayHref, exam)))),
       el('tbody', {}, weekRows(pairs).map((row) => el('tr', {},
         el('th', { scope: 'row', class: 'grid__slot' },
           el('span', { class: 'grid__pair' }, t('settings.pairN', { n: row.slot })),
           el('span', { class: 'grid__time' }, pairTime(row))),
         dates.map((date) => {
           const here = cellPairs(pairs, date, row.slot);
-          return el('td', { class: 'grid__cell' + (date === today ? ' is-today' : '') }, here.length === 0 ? null
+          return el('td', { class: 'grid__cell' + (date === today ? ' is-today' : '') + (examDayLabel(date, exam) ? ' is-exam' : '') }, here.length === 0 ? null
             : el('ul', { class: 'grid__pairs' }, here.map((pair) => el('li', {},
               briefCard(pair, row, { show, onOpen: opener(pair, onOpen, canOpen) })))));
         }))))));
 }
 
 // The head of a day's column: its name (a link to the week template when dayHref gives one), its date, «Сегодня».
-function gridHead(date, today, dayHref) {
+function gridHead(date, today, dayHref, exam) {
   const isToday = date === today;
   const titleId = 'grid-day-' + date;
   const [title, hint] = dayTitle(date, titleId, dayHref, [
@@ -232,10 +237,12 @@ function gridHead(date, today, dayHref) {
     el('span', { class: 'visually-hidden' }, ', '),
     el('span', { class: 'grid__date' }, dayMonth(date)),
   ], true);
-  return el('th', { scope: 'col', id: titleId, class: 'grid__day' + (isToday ? ' is-today' : '') },
+  const examKey = examDayLabel(date, exam);
+  return el('th', { scope: 'col', id: titleId, class: 'grid__day' + (isToday ? ' is-today' : '') + (examKey ? ' is-exam' : '') },
     el('span', { class: 'grid__dayhead' },
       el('span', { class: 'grid__daytitle' }, title), hint,
-      isToday ? badge(t('pairs.today'), 'primary', true) : null));
+      isToday ? badge(t('pairs.today'), 'primary', true) : null,
+      examKey ? badge(t(examKey), 'warning') : null));
 }
 
 // The short card of the grid: the subject on up to three lines (its full name in the tooltip and the pair's window),

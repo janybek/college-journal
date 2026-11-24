@@ -16,7 +16,7 @@ import { weekNav, weekView, pairDetails, pairCardId } from './pairParts.js';
 const blank = () => ({
   from: null,          // the Monday of the week shown; null: the week of «today»
   today: null,         // from the last answer of the server
-  result: null,        // { from, pairs }: what is drawn
+  result: null,        // { from, pairs, exam }: what is drawn
   loadingFrom: undefined,
   errorKey: null,
   ticket: 0,
@@ -68,7 +68,7 @@ async function load(owner) {
     if (state !== owner || owner.ticket !== ticket) return;
     owner.today = data.today;
     owner.from = data.from;
-    owner.result = { from: data.from, pairs: data.pairs };
+    owner.result = { from: data.from, pairs: data.pairs, exam: data.exam ?? null };
     owner.errorKey = null;
   } catch (error) {
     if (state !== owner || owner.ticket !== ticket) return;
@@ -104,7 +104,7 @@ function body(student) {
     el('div', { class: 'schedule-week' },
       result.pairs.length === 0 ? note('info', t('my.emptyWeek')) : null,
       weekView(days, state.today, {
-        pairs: result.pairs, from: result.from, list: student, show: student ? ['teacher'] : ['group'], onOpen: openDetails,
+        pairs: result.pairs, from: result.from, list: student, show: student ? ['teacher'] : ['group'], onOpen: openDetails, exam: result.exam,
       })));
 }
 

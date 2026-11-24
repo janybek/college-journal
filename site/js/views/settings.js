@@ -9,6 +9,7 @@ import { permissions } from '../shell.js';
 import { isDate, isTime, minutesOf, addMinutes, dayParts } from '../dates.js';
 import { bellOptions, nextBell } from '../bells.js';
 import { scoringCard, leaveScoringCard } from './scoringCard.js';
+import { confirmDialog } from './taskForm.js';
 
 // Semester settings (#/settings): the semester dates and which semester is on, the days off and the bell times.
 // Drawn from `state`, so a redraw (language switch) keeps what was typed. What depends on a typed value (the date
@@ -21,14 +22,16 @@ const MAX_BELLS = 8;
 const LAST_MINUTE = 23 * 60 + 59;
 // The break a new class gets after the last one.
 const NEW_BREAK = 10;
-const FIELD_NAMES = ['semesterStart', 'semesterEnd', 'semester', 'holidays', 'bells'];
+const FIELD_NAMES = ['semesterStart', 'semesterEnd', 'semester', 'holidays', 'bells', 'examStart', 'examEnd', 'collegeName'];
 const SEMESTERS = [1, 2];
 
 const blank = () => ({
-  loaded: null,          // { settings, defaultBells, pairMinutes } from settings.get; null until loaded
+  loaded: null,          // { settings, extra, defaultBells, pairMinutes } from settings.get; null until loaded
   loadErrorKey: null,
   pending: false,
   values: null,          // what is on screen: { semesterStart, semesterEnd, semester, holidays, bells }
+  extra: null,           // what is on screen of the credit week and the college name: { examStart, examEnd, collegeName }
+  examPairs: 0,          // regular pairs left on the credit week by the last save
   newHoliday: '',
   holidayErrorKey: null,
   errors: {},            // field -> { key, params }
@@ -39,12 +42,13 @@ const blank = () => ({
   busy: false,
 });
 let state = blank();
-let live = null;         // elements updated in place: { status, dateHints, holidays, bells }
+let live = null;         // elements updated in place: { status, dateHints: [{ read, hint }], holidays, bells }
 
 const canSave = () => permissions().includes('settings.save');
 const copy = (settings) => ({ ...settings, holidays: [...settings.holidays], bells: [...settings.bells] });
 const sameValues = (a, b) => JSON.stringify(a) === JSON.stringify(b);
-const isDirty = () => !sameValues(state.values, state.loaded.settings);
+const isDirty = () => !sameValues(state.values, state.loaded.settings) || !sameValues(state.extra, state.loaded.extra);
+const readExtra = (extra) => ({ examStart: extra?.examStart ?? '', examEnd: extra?.examEnd ?? '', collegeName: extra?.collegeName ?? '' });
 
 export function leave() {
   state = blank();
@@ -62,7 +66,7 @@ export function render(root) {
   const editable = canSave();
   live = { status: null, dateHints: [], holidays: [], bells: null };
   const panels = el('div', { class: 'settings' },
-    el('div', { class: 'settings__column' }, semesterPanel(editable), holidaysPanel(editable)),
+    el('div', { class: 'settings__column' }, semesterPanel(editable), examPanel(editable), holidaysPanel(editable)),
     el('div', { class: 'settings__column' }, bellsPanel(editable)));
   // The semester form is wrapped so that its sticky save bar stays above the scoring card, not over it.
   const semesterForm = editable ? el('div', { class: 'settings-form' }, panels, ...saveBar())
@@ -77,8 +81,9 @@ async function load(owner) {
   try {
     const data = await call('settings.get', {});
     if (state !== owner) return;
-    owner.loaded = { settings: copy(data.settings), defaultBells: [...data.defaultBells], pairMinutes: data.pairMinutes };
+    owner.loaded = { settings: copy(data.settings), extra: readExtra(data.extra), defaultBells: [...data.defaultBells], pairMinutes: data.pairMinutes };
     owner.values = copy(data.settings);
+    owner.extra = readExtra(data.extra);
     owner.loadErrorKey = null;
   } catch (error) {
     if (state !== owner) return;
@@ -124,22 +129,60 @@ function panel(id, iconName, titleKey, hint, ...body) {
 }
 
 function semesterPanel(editable) {
-  const dateField = (name, id, labelKey) => {
-    const error = state.errors[name];
-    const input = field({
-      id, label: t(labelKey), type: 'date', value: state.values[name], hint: dateHint(state.values[name]),
-      error: error ? error.key : null,
-      onInput: (value) => { state.values[name] = value; forgetDateErrors(name); syncAll(); },
-      attrs: { readonly: !editable, required: true },
-    });
-    live.dateHints.push({ name, hint: input.querySelector('.field__hint') });
-    return input;
-  };
+  const dateField = (name, id, labelKey) => dateInput(state.values, name, id, labelKey, editable, true);
   return panel('settings-semester', 'calendar', 'settings.semester', t('settings.semesterHint'),
     el('div', { class: 'date-pair' },
       dateField('semesterStart', 'settings-start', 'settings.start'),
       dateField('semesterEnd', 'settings-end', 'settings.end')),
-    semesterSwitch(editable));
+    semesterSwitch(editable),
+    collegeField(editable));
+}
+
+// A date field of the semester values or of the extra values, with the date in words under it.
+function dateInput(source, name, id, labelKey, editable, required) {
+  const error = state.errors[name];
+  const input = field({
+    id, label: t(labelKey), type: 'date', value: source[name], hint: dateHint(source[name]),
+    error: error ? error.key : null,
+    onInput: (value) => { source[name] = value; forgetDateErrors(name); syncAll(); },
+    attrs: { readonly: !editable, required },
+  });
+  live.dateHints.push({ read: () => source[name], hint: input.querySelector('.field__hint') });
+  return input;
+}
+
+// The name printed at the top of the ledgers.
+function collegeField(editable) {
+  const error = state.errors.collegeName;
+  return field({
+    id: 'settings-college', label: t('settings.college'), value: state.extra.collegeName, hint: t('settings.collegeHint'),
+    error: error ? error.key : null,
+    onInput: (value) => { state.extra.collegeName = value; forgetError('collegeName'); syncStatus(); },
+    attrs: { readonly: !editable, autocomplete: 'off', maxlength: '300' },
+  });
+}
+
+// The credit week: two dates, both or none. The hint says what it does to the schedule and to the exam date.
+function examPanel(editable) {
+  const empty = state.extra.examStart === '' && state.extra.examEnd === '';
+  return panel('settings-exam', 'calendarOff', 'settings.exam.title', t('settings.exam.hint'),
+    el('div', { class: 'date-pair' },
+      dateInput(state.extra, 'examStart', 'settings-exam-start', 'settings.exam.start', editable, false),
+      dateInput(state.extra, 'examEnd', 'settings-exam-end', 'settings.exam.end', editable, false)),
+    empty && !editable ? el('p', { class: 'muted' }, t('settings.exam.none')) : null,
+    editable ? el('div', { class: 'exam-actions' },
+      el('button', { type: 'button', id: 'settings-exam-clear', class: 'button button--secondary', disabled: empty, onclick: clearExam },
+        icon('trash'), t('settings.exam.clear'))) : null);
+}
+
+function clearExam() {
+  state.extra.examStart = '';
+  state.extra.examEnd = '';
+  delete state.errors.examStart;
+  delete state.errors.examEnd;
+  state.messageKey = null;
+  changed();
+  focusById('settings-exam-start');
 }
 
 // «Сейчас идёт: 1 семестр / 2 семестр»: the syllabi of this semester go on the pairs. Read-only, the chosen one
@@ -321,7 +364,9 @@ function forgetBellErrors() {
 
 // The person is fixing a marked field: its mark and the message about the whole form go at once. In place, as a
 // redraw would throw the caret out of a date field.
-const INPUT_IDS = { semesterStart: 'settings-start', semesterEnd: 'settings-end' };
+const INPUT_IDS = {
+  semesterStart: 'settings-start', semesterEnd: 'settings-end', examStart: 'settings-exam-start', examEnd: 'settings-exam-end', collegeName: 'settings-college',
+};
 
 function forgetError(name) {
   if (state.messageKey) {
@@ -341,6 +386,9 @@ function forgetError(name) {
 function forgetDateErrors(name) {
   forgetError(name);
   if (state.errors.semesterEnd?.range) forgetError('semesterEnd');
+  // The credit week is checked against the semester and its two dates against each other: any date clears its marks.
+  if (state.errors.examStart) forgetError('examStart');
+  if (state.errors.examEnd) forgetError('examEnd');
 }
 
 // Typing another day off takes the mark off the field for a new day off.
@@ -368,7 +416,7 @@ function checkBells(bells, pairMinutes) {
 
 function syncAll() {
   if (!live || !state.values) return;
-  for (const { name, hint } of live.dateHints) if (hint) hint.textContent = dateHint(state.values[name]);
+  for (const { read, hint } of live.dateHints) if (hint) hint.textContent = dateHint(read());
   const { semesterStart, semesterEnd } = state.values;
   for (const { date, outside } of live.holidays) {
     outside.hidden = !(isDate(semesterStart) && isDate(semesterEnd)) || (date >= semesterStart && date <= semesterEnd);
@@ -453,10 +501,18 @@ function saveBar() {
       state.saved ? [
         note('success', state.savedSemester ? t('settings.saved') + ' ' + t('settings.savedSemester', { n: state.savedSemester }) : t('settings.saved')),
         note('info', t('settings.savedHint')),
+        state.examPairs > 0 ? examPairsNote() : null,
       ] : null,
       state.messageKey ? note('error', t(state.messageKey), { role: 'alert', id: 'settings-message' }) : null),
     el('div', { class: 'savebar' }, live.status, submit),
   ];
+}
+
+// «On the credit week stand N regular pairs»: they go when the schedule is made again on «Шаблон недели».
+function examPairsNote() {
+  const link = permissions().includes('schedule.generate')
+    ? el('a', { class: 'note__link', id: 'settings-exam-link', href: '#/template' }, t('settings.exam.toTemplate')) : null;
+  return note('warning', [t('settings.exam.pairsNote', { n: state.examPairs }), link ? ' ' : '', link].filter(Boolean), { id: 'settings-exam-pairs' });
 }
 
 async function save() {
@@ -480,15 +536,30 @@ async function save() {
     return;
   }
 
+  // The semester is switched: its ledgers, exams and retakes close for good, so the person is asked first.
+  if (values.semester !== owner.loaded.settings.semester) {
+    const yes = await confirmDialog({
+      id: 'settings-switch', title: t('settings.semesterSwitch.confirm'), no: t('common.cancel'), yes: t('settings.semesterSwitch.yes'),
+    });
+    if (state !== owner) return;
+    if (!yes) {
+      focusById('settings-save');
+      return;
+    }
+  }
+
   owner.busy = true;
   refresh();
   try {
-    const data = await call('settings.save', { settings: copy(values) });
+    const data = await call('settings.save', { settings: copy(values), extra: { ...owner.extra } });
     if (state !== owner) return;
     const before = owner.loaded.settings.semester;
     owner.loaded.settings = copy(data.settings);
+    owner.loaded.extra = readExtra(data.extra);
     if (data.settings.semester !== before) owner.savedSemester = data.settings.semester;
     owner.values = copy(data.settings);
+    owner.extra = readExtra(data.extra);
+    owner.examPairs = Number.isInteger(data.examPairs) ? data.examPairs : 0;
     owner.saved = true;
   } catch (error) {
     if (state !== owner) return;

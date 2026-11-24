@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref, topicText, lessonTypeKey, lessonParts, controlLine,
-  weekRows, gridDays, cellPairs, ownTime, hyphenate,
+  weekRows, gridDays, cellPairs, ownTime, hyphenate, inExamWeek, examDayLabel,
 } from '../site/js/pairs.js';
 import { pairLock } from '../core/schedule.js';
 import { SCHEMA } from '../core/schema.js';
@@ -157,4 +157,25 @@ test('hyphenate: long words of a subject get soft hyphens between syllables, so 
   for (const word of hyphenate('Электрокардиография Фармакология Communication').split(' ')) {
     for (const piece of word.split('\u00AD')) assert.ok(piece.length >= 2, word);
   }
+});
+
+test('inExamWeek: the edges of the credit week are in, the day before and after are out, empty dates and no week are out', () => {
+  const exam = { start: '2026-12-14', end: '2026-12-19' };
+  assert.equal(inExamWeek('2026-12-14', exam), true);
+  assert.equal(inExamWeek('2026-12-19', exam), true);
+  assert.equal(inExamWeek('2026-12-16', exam), true);
+  assert.equal(inExamWeek('2026-12-13', exam), false);
+  assert.equal(inExamWeek('2026-12-20', exam), false);
+  assert.equal(inExamWeek('2026-12-16', { start: '', end: '' }), false);
+  assert.equal(inExamWeek('2026-12-16', undefined), false);
+  assert.equal(inExamWeek('2026-12-16', null), false);
+  assert.equal(inExamWeek('2026-12-16', {}), false);
+});
+
+test('examDayLabel: the dictionary key of a day of the credit week, null for any other day', () => {
+  const exam = { start: '2026-12-14', end: '2026-12-19' };
+  assert.equal(examDayLabel('2026-12-15', exam), 'schedule.exam.day');
+  assert.equal(examDayLabel('2026-12-21', exam), null);
+  assert.equal(examDayLabel('2026-12-15', { start: '', end: '' }), null);
+  assert.equal(examDayLabel('2026-12-15', undefined), null);
 });

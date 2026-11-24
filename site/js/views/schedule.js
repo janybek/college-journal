@@ -8,7 +8,7 @@ import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { getToken } from '../session.js';
 import { addDays, addMinutes, isDate, isTime, mondayOf } from '../dates.js';
-import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref } from '../pairs.js';
+import { groupByDay, pairFlags, canEditPair, canRestorePair, pairPatch, templateHref, inExamWeek, examDayLabel } from '../pairs.js';
 import { weekNav, weekView, pairDetails, pairCardId, pairTime, weekdayDate, lessonPieces, flagBadge } from './pairParts.js';
 
 // The deanery's schedule (#/schedule): the week of a group or of a teacher, or one day across all groups. A week
@@ -40,7 +40,7 @@ const blank = () => ({
   from: null,          // the Monday of the week shown; null: the week of «today»
   day: null,           // the day of the day mode; null: «today»
   today: null,         // from the last answer of the server
-  result: null,        // { key, scope, from, pairs }: what is drawn
+  result: null,        // { key, scope, from, pairs, exam }: what is drawn
   loadingKey: null,
   loadErrorKey: null,
   ticket: 0,
@@ -152,7 +152,7 @@ async function loadPairs(owner) {
     } else {
       owner.from = data.from;
     }
-    owner.result = { key: keyOf(owner), scope: scopeOf(owner), from: data.from, pairs };
+    owner.result = { key: keyOf(owner), scope: scopeOf(owner), from: data.from, pairs, exam: data.exam ?? null };
     owner.loadErrorKey = null;
   } catch (error) {
     if (state !== owner || owner.ticket !== ticket) return;
@@ -251,7 +251,8 @@ function dayTools() {
     el('button', { type: 'button', id: 'day-today', class: 'button button--secondary', onclick: () => show({ day: state.today }) }, t('pairs.today')),
     el('p', { class: 'schedule-day__label', 'aria-live': 'polite' },
       el('span', {}, weekdayDate(state.day)),
-      state.day === state.today ? badge(t('pairs.today'), 'primary', true) : null));
+      state.day === state.today ? badge(t('pairs.today'), 'primary', true) : null,
+      examDayLabel(state.day, state.result?.exam) ? badge(t('schedule.exam.day'), 'warning') : null));
 }
 
 // The week or the day
@@ -270,7 +271,7 @@ function body() {
   if (!shown) return el('div', { class: 'schedule-empty' }, failedOrLoading(null));
   const stale = shown.key !== keyOf(state);
   return el('div', { class: 'schedule-body' + (stale ? ' is-stale' : ''), 'aria-busy': stale ? 'true' : null },
-    state.mode === 'day' ? dayTable(shown.pairs) : weekBody(shown));
+    state.mode === 'day' ? dayTable(shown.pairs, shown.exam) : weekBody(shown));
 }
 
 function weekBody(shown) {
@@ -279,6 +280,7 @@ function weekBody(shown) {
   const week = weekView(days, state.today, {
     pairs: shown.pairs,
     from: shown.from,
+    exam: shown.exam,
     show: state.mode === 'group' ? ['teacher'] : ['group'],
     onOpen: openCard,
     // The week of a group: a weekday opens that day of the group's week template.
@@ -292,8 +294,8 @@ function weekBody(shown) {
 
 const actionId = (pair) => 'pair-action-' + pair.id;
 
-function dayTable(pairs) {
-  if (pairs.length === 0) return emptyState('calendar', el('p', {}, t('schedule.emptyDay')));
+function dayTable(pairs, exam) {
+  if (pairs.length === 0) return emptyState('calendar', el('p', {}, t(inExamWeek(state.day, exam) ? 'schedule.exam.empty' : 'schedule.emptyDay')));
   const actions = canChange() && pairs.some(canOpen);
   const columns = [
     { label: t('schedule.col.pair'), className: 'schedule-table__pair' },

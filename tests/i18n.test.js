@@ -534,3 +534,15 @@ test('unit 6 task 20: print and Excel of the ledger and of the exam sheet have t
     for (const key of ['ledger.file.prefix', 'ledger.exam.file.prefix']) assert.ok(!/[\/:*?"<>|]/.test(dict[key]), lang + ' ' + key);
   }
 });
+
+test('unit 6 task 23: the credit week in the settings and on the schedule screens has its texts in every language', () => {
+  const keys = ['title', 'hint', 'start', 'end', 'clear', 'none', 'pairsNote', 'toTemplate'].map((k) => 'settings.exam.' + k);
+  keys.push('settings.college', 'settings.collegeHint', 'settings.semesterSwitch.confirm', 'settings.semesterSwitch.yes',
+    'schedule.exam.day', 'schedule.exam.empty', 'schedule.exam.now');
+  for (const field of ['examStart', 'examEnd']) for (const code of ['required', 'bad_value', 'too_long', 'out_of_semester']) keys.push(`settings.error.${field}.${code}`);
+  for (const code of ['bad_value', 'too_long']) keys.push('settings.error.collegeName.' + code);
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+    assert.ok(dict['settings.exam.pairsNote'].includes('{n}'), lang);
+  }
+});

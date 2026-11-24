@@ -5,6 +5,7 @@ import { el, errorKey, avatar, badge, emptyState, pageHeader } from '../ui.js';
 import { icon } from '../icons.js';
 import { activeRole, menuParts, navFor, countBadge } from '../shell.js';
 import { pairCard, weekdayDate, lessonPieces } from './pairParts.js';
+import { inExamWeek } from '../pairs.js';
 import { teacherBadge } from '../subjects.js';
 import { todayAction, clockText, cameMark } from '../lesson.js';
 import { homeCardLines } from '../work.js';
@@ -17,7 +18,7 @@ const STUDENT_SECTIONS = [
 // Last known subjects of the signed-in teacher: shown at once, refreshed in the background on every visit.
 const subjects = { owner: null, list: null, errorKey: null, pending: null };
 // The student's pairs of «today» (the server says which day that is), kept the same way.
-const today = { owner: null, date: null, pairs: null, errorKey: null, pending: null };
+const today = { owner: null, date: null, pairs: null, exam: null, errorKey: null, pending: null };
 // The counts of the student's assignments (work.mine), kept the same way.
 const work = { owner: null, data: null, errorKey: null, pending: null };
 // The subjects of the student's group, kept the same way.
@@ -167,7 +168,7 @@ function todaySection(user) {
   const date = el('p', { class: 'today__date' });
   const draw = () => {
     date.textContent = today.date ? weekdayDate(today.date) : '';
-    body.replaceChildren(todayBody(user, draw));
+    body.replaceChildren(...examLine(), todayBody(user, draw));
   };
   draw();
   loadToday(user).then(draw);
@@ -177,6 +178,12 @@ function todaySection(user) {
       el('div', { class: 'today__title' }, el('h2', { class: 'soon__title', id: 'home-today' }, t('home.today')), date)),
     body,
     el('a', { class: 'button button--primary today__week', href: '#/my' }, icon('calendar'), t('home.toWeek')));
+}
+
+// «Идёт зачётная неделя»: one line when today (the server's day) is inside the credit week.
+function examLine() {
+  return today.date && inExamWeek(today.date, today.exam)
+    ? [el('p', { class: 'today__exam', id: 'home-exam-week' }, icon('calendarOff'), t('schedule.exam.now'))] : [];
 }
 
 function todayBody(user, redraw) {
@@ -196,7 +203,7 @@ function todayBody(user, redraw) {
 }
 
 function loadToday(user) {
-  if (today.owner !== user.id) Object.assign(today, { owner: user.id, date: null, pairs: null, errorKey: null, pending: null });
+  if (today.owner !== user.id) Object.assign(today, { owner: user.id, date: null, pairs: null, exam: null, errorKey: null, pending: null });
   if (!today.pending) {
     const owner = user.id;
     const mine = () => today.owner === owner;
@@ -206,7 +213,7 @@ function loadToday(user) {
         (data) => {
           if (!mine()) return;
           const pairs = data.pairs.filter((pair) => pair.date === data.today).sort((a, b) => a.slot - b.slot);
-          Object.assign(today, { date: data.today, pairs, errorKey: null });
+          Object.assign(today, { date: data.today, pairs, exam: data.exam ?? null, errorKey: null });
         },
         (error) => { if (mine()) today.errorKey = errorKey(error.code); },
       )
@@ -282,11 +289,21 @@ function renderStaff(root, user) {
       sections.push(section('home-' + group.items[0].name, t(group.titleKey), el('ul', { class: 'tiles' }, group.items.map(tile))));
     }
   }
+  if (parts.includes('subjects') && permissions.includes('schedule.mine')) sections.push(examDayCard(user));
   if (parts.includes('subjects') && permissions.includes('lesson.mine')) sections.push(lessonsSection(user));
   if (parts.includes('subjects') && permissions.includes('teacher.mySubjects')) sections.push(subjectsSection(user));
   root.append(
     pageHeader({ id: 'home-name', title: user.fullName, lead: role ? t('role.' + role) : null }),
     ...(sections.length > 0 ? sections : [emptyState('info', el('p', {}, t('home.nothing')))]));
+}
+
+// The teacher's line about the credit week, above «Пары сегодня»: a card only on a day of the credit week.
+function examDayCard(user) {
+  const host = el('div', { class: 'exam-day-host' });
+  const draw = () => host.replaceChildren(...examLine());
+  draw();
+  loadToday(user).then(() => { if (host.isConnected) draw(); });
+  return host;
 }
 
 // ---- «Пары сегодня» of the teacher: start a pair or open the screen of a started one ----

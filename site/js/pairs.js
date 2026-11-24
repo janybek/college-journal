@@ -152,3 +152,15 @@ function hyphenateWord(word) {
 export function hyphenate(text) {
   return String(text ?? '').replace(/[a-zа-яёөүң]+/gi, hyphenateWord);
 }
+
+// ---- The credit week: `exam` of schedule.list / schedule.mine ({ start, end }, '' when there is none) ----
+
+// The date is a day of the credit week. A copy of inExam in core/settings.js: the site cannot load core/.
+export function inExamWeek(date, exam) {
+  return !!exam && typeof exam.start === 'string' && exam.start !== '' && date >= exam.start && date <= exam.end;
+}
+
+// The key of the label of a day of the credit week; null for any other day.
+export function examDayLabel(date, exam) {
+  return inExamWeek(date, exam) ? 'schedule.exam.day' : null;
+}
