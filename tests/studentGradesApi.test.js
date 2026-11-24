@@ -53,5 +53,5 @@ test('student.grades: manual current points, a student without a group', () => {
   store.update('students', a1, { groupId: '' });
   at('2026-09-30', '12:00');
   const none = call('student.grades', {}, t.a1).data;
-  assert.deepEqual(none, { today: none.today, scheme: none.scheme, split: { semester: 60, exam: 40, admission: 30 }, subjects: [] });
+  assert.deepEqual(none, { today: none.today, scheme: none.scheme, split: { semester: 60, exam: 40, admission: 30 }, subjects: [], stateExams: [] });
 });

@@ -9,6 +9,7 @@ import { compareNames } from '../core/names.js';
 import { firstPairId, pairPoints, studentResults } from '../core/grades.js';
 import { liveAttempts, subjectResult } from '../core/exam.js';
 import { closedOfSubject, selfWorkOf } from './journalData.js';
+import { studentStateExams } from './stateExamData.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
@@ -46,7 +47,7 @@ export function studentGrades(rows, platform, user) {
     minimum: scheme.minimum, fair: scheme.fair, good: scheme.good, excellent: scheme.excellent,
   };
   const groupId = student ? student.groupId : '';
-  if (!groupId) return { today, scheme: schemeOut, split: splitOut, subjects: [] };
+  if (!groupId) return { today, scheme: schemeOut, split: splitOut, subjects: [], stateExams: [] };
 
   // the own marks only: of one pair the last row
   const mine = new Map();
@@ -117,5 +118,5 @@ export function studentGrades(rows, platform, user) {
         final: closed.final ? finalOf(rows, subject.id, planSemester, me, result, scheme) : null,
       };
     });
-  return { today, scheme: schemeOut, split: splitOut, subjects };
+  return { today, scheme: schemeOut, split: splitOut, subjects, stateExams: studentStateExams(rows, groupId, me, scheme) };
 }
