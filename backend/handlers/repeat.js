@@ -1,8 +1,9 @@
-import { cancelCard, enrol, repeatCandidates, repeatGet, repeatList, saveCard } from '../repeatData.js';
+import { cancelCard, enrol, repeatCandidates, repeatGet, repeatList, repeatMine, saveCard } from '../repeatData.js';
 import { closeRepeat, reopenRepeat, saveAttempt, saveWorks } from '../repeatScores.js';
 
 export const repeatHandlers = {
   'repeat.list': (data, ctx, user) => repeatList(ctx.store, ctx.platform, user),
+  'repeat.mine': (data, ctx, user) => repeatMine(ctx.store, ctx.platform, user),
   'repeat.get': (data, ctx, user) => repeatGet(ctx.store, ctx.platform, data, user),
   'repeat.candidates': (data, ctx, user) => repeatCandidates(ctx.store, ctx.platform, data, user),
   'repeat.enrol': (data, ctx, user) => enrol(ctx.store, ctx.platform, data, user),

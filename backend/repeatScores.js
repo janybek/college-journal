@@ -52,10 +52,10 @@ export function saveWorks(store, platform, data, user) {
   }
   const at = localDateTime(platform.now());
   const row = saved(store, card, { works, worksNote: note, updatedBy: user.id, updatedAt: at });
-  const log = valueChanged
-    ? logRow(at, user, card, 'works', had ? String(card.works) : '', String(works), reason)
-    : logRow(at, user, card, 'worksNote', card.worksNote || '', note);
-  store.insertMany('changeLog', [log]);
+  const log = [];
+  if (valueChanged) log.push(logRow(at, user, card, 'works', had ? String(card.works) : '', String(works), reason));
+  if (noteChanged) log.push(logRow(at, user, card, 'worksNote', card.worksNote || '', note));
+  store.insertMany('changeLog', log);
   return { repeat: cardView(rows, platform, row, user) };
 }
 

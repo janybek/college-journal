@@ -259,6 +259,15 @@ test('the old tables stay, the log has a row for every change, every table is re
   call('repeat.reopen', { reason: 'ошибка в ведомости' }, s.t.admin);
   assert.deepEqual(old(), was);
   assert.deepEqual([logOf('works').length, logOf('try1').length, logOf('status').length], [2, 2, 2]);
-  assert.equal(s.store.list('changeLog').filter((r) => r.entity === 'repeat' && r.field !== 'enrol').length, 6);
+  assert.equal(s.store.list('changeLog').filter((r) => r.entity === 'repeat' && r.field !== 'enrol').length, 8);   // 2 works, 2 notes (the first fill and the change), 2 tries, 2 statuses
   assert.equal(JSON.stringify(call('repeat.save', {}, s.t.dean)).includes('passwordHash'), false);
+});
+
+test('a change of the works and of the note in one request writes both lines of the change log', () => {
+  const { call, logOf } = ready();
+  call('repeat.saveWorks', { works: 45, note: 'Реферат' });
+  const r = call('repeat.saveWorks', { works: 50, note: 'Реферат и доклад', reason: 'добавлен доклад' });
+  assert.equal(r.ok, true);
+  assert.deepEqual(logOf('works').map((x) => [x.before, x.after, x.reason]), [['', '45', ''], ['45', '50', 'добавлен доклад']]);
+  assert.deepEqual(logOf('worksNote').map((x) => [x.before, x.after]), [['', 'Реферат'], ['Реферат', 'Реферат и доклад']]);
 });

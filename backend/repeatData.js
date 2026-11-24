@@ -41,6 +41,16 @@ export const findCard = (rows, repeatId) => {
 };
 
 export const attemptsOfCard = (rows, card) => liveAttempts(rows.repeatAttempts.filter((a) => a.repeatId === card.id));
+// The card shown beside the total of a student in a half: of the not cancelled ones the last by the time of creation.
+export function shownCard(cards, studentId, subjectId, planSemester) {
+  let best = null;
+  for (const c of cards || []) {
+    if (c.status === 'cancelled' || c.studentId !== studentId || c.subjectId !== subjectId || (c.planSemester ?? null) !== (planSemester ?? null)) continue;
+    if (best === null || (cmp(c.createdAt || '', best.createdAt || '') || cmp(c.id, best.id)) > 0) best = c;
+  }
+  return best;
+}
+
 const hasResults = (card, attempts) => Number.isInteger(card.works) || attempts.length > 0;
 
 function resultOf(rows, card, attempts) {
@@ -86,6 +96,51 @@ export function cardView(rows, platform, card, user) {
       force: viewer.manager && open && overdue,
       reopen: isAdmin(user) && (card.status === 'passed' || card.status === 'failed'),
     },
+  };
+}
+
+// The mark beside the total of the ledger and of "Оценки": only the kind, the state and the total of the repeat.
+export function repeatMark(card, attempts, scheme, split) {
+  const result = repeatResult({ card, attempts, scheme, split });
+  return { kind: card.kind, status: card.status, total: result.total, word: result.word, main: isMain(card) };
+}
+
+// The own cards of a student, the newest first; no id of a card or of a try, no commission.
+export function studentRepeats(rows, platform, studentId) {
+  const today = localDate(platform.now());
+  const scheme = readScheme(rows.settings);
+  const split = readSplit(rows.settings);
+  const byCard = new Map();
+  for (const a of rows.repeatAttempts || []) {
+    if (!byCard.has(a.repeatId)) byCard.set(a.repeatId, []);
+    byCard.get(a.repeatId).push(a);
+  }
+  const mine = (rows.repeats || []).filter((c) => c.studentId === studentId && c.status !== 'cancelled')
+    .sort((a, b) => cmp(b.createdAt || '', a.createdAt || '') || cmp(b.id, a.id));
+  return mine.map((card) => {
+    const attempts = liveAttempts(byCard.get(card.id) || []);
+    const result = repeatResult({ card, attempts, scheme, split });
+    const subject = rows.subjects.find((s) => s.id === card.subjectId) || { name: '' };
+    const prev = prevOf(card);
+    return {
+      subjectId: card.subjectId, subjectName: subject.name, planSemester: card.planSemester, kind: card.kind, orderNo: card.orderNo, orderDate: card.orderDate,
+      deadline: card.deadline, overdue: isOverdue(card, today), status: card.status, teacherName: nameOf(rows.staff, card.teacherId),
+      works: { value: Number.isInteger(card.works) ? card.works : null, note: card.worksNote || '', max: split.semester },
+      attempts: attempts.map((a) => ({ no: a.no, date: a.date, outcome: a.outcome, score: a.score })),
+      exam: result.exam, total: result.total, word: result.word, preliminary: card.status === 'open',
+      prev: { semester: prev.semester, status: prev.status, exam: prev.exam, total: prev.total, word: prev.word },
+    };
+  });
+}
+
+// 'repeat.mine' {} -> { today, split, repeats }
+export function repeatMine(store, platform, user) {
+  const rows = readRepeatRows(store);
+  const split = readSplit(rows.settings);
+  return {
+    today: localDate(platform.now()),
+    split: { semester: split.semester, exam: split.exam, admission: split.admission },
+    repeats: studentRepeats(rows, platform, user.id),
   };
 }
 
@@ -203,13 +258,8 @@ export function repeatCandidates(store, platform, data, user) {
   return { subject: { id: subject.id, name: subject.name, groupName: group ? group.name : '', teacherId: subject.teacherId }, teachers, halves };
 }
 
-// The tables of the ledger (settled) and of the repeat, each read once.
-function readAll(store, platform) {
-  const rows = readLedgerRows(store, platform);
-  rows.repeats = store.list('repeats');
-  rows.repeatAttempts = store.list('repeatAttempts');
-  return rows;
-}
+// The tables of the ledger (settled; they include the two of the repeat), each read once.
+const readAll = (store, platform) => readLedgerRows(store, platform);
 
 export const logRow = (at, user, card, field, before, after, reason = '') => ({
   at, actorId: user.id, entity: 'repeat', subjectId: card.subjectId, pairId: '', studentId: card.studentId, unit: null, field, before, after, reason, late: false,

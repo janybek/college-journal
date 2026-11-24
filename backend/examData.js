@@ -125,6 +125,7 @@ export function addAttempt(store, platform, data, user) {
   if (!ledger.final.closed) throw new AppError('not_closed');
   const student = typeof data.studentId === 'string' ? ledger.students.find((s) => s.id === data.studentId) : undefined;
   if (!student || student.left) throw invalid([{ field: 'studentId', code: 'bad_ref' }]);
+  if (student.repeat) throw invalid([{ field: 'studentId', code: 'on_repeat' }]);
   const next = student.next;
   if (!next) throw invalid([{ field: 'studentId', code: 'not_allowed' }]);
   if (next.commission && !viewer.manager) throw new AppError('forbidden');

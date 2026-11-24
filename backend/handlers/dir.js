@@ -121,6 +121,7 @@ const BLOCKERS = {
     ['attendance', (r) => r.studentId === id], ['checkins', (r) => r.studentId === id], ['unitResults', (r) => r.studentId === id], ['changeLog', (r) => r.studentId === id],
     ['submissions', (r) => r.studentId === id], ['files', (r) => r.ownerId === id],
     ['requests', (r) => r.studentId === id], ['stateExamResults', (r) => r.studentId === id], ['examAttempts', (r) => r.studentId === id],
+    ['repeats', (r) => r.studentId === id],
   ],
   staff: (id) => [
     ['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id], ['syllabi', (r) => r.teacherId === id],
@@ -129,9 +130,11 @@ const BLOCKERS = {
     ['closures', (r) => r.closedBy === id || r.reopenedBy === id], ['requests', (r) => r.authorId === id || r.deanBy === id || r.finalBy === id],
     ['announcements', (r) => r.authorId === id || r.removedBy === id], ['stateExams', (r) => r.createdBy === id || r.updatedBy === id],
     ['stateExamResults', (r) => r.updatedBy === id], ['subjectExams', (r) => r.updatedBy === id], ['examAttempts', (r) => r.updatedBy === id],
+    ['repeats', (r) => r.teacherId === id || r.createdBy === id || r.updatedBy === id || r.closedBy === id], ['repeatAttempts', (r) => r.updatedBy === id],
   ],
   subjects: (id) => [['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id], ['unitResults', (r) => r.subjectId === id], ['assignments', (r) => r.subjectId === id],
     ['closures', (r) => r.subjectId === id], ['requests', (r) => r.subjectId === id], ['subjectExams', (r) => r.subjectId === id], ['examAttempts', (r) => r.subjectId === id],
+    ['repeats', (r) => r.subjectId === id],
   ],
   rooms: (id) => [['weekTemplate', (r) => r.roomId === id], ['pairs', (r) => r.roomId === id]],
 };

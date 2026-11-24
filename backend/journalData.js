@@ -539,10 +539,19 @@ export function changeLogView(store, platform, data, user) {
   const assignments = store.list('assignments');
   const requests = store.list('requests');
   const stateExams = store.list('stateExams');
+  const repeats = store.list('repeats');
 
+  // the lines of a repeat course: the office and the teacher of that repeat (a card not cancelled of the same student and subject)
+  const ofRepeatTeacher = (r) => repeats.some((c) => c.status !== 'cancelled' && c.teacherId === user.id && c.studentId === r.studentId && c.subjectId === r.subjectId);
+  const seesRepeat = (r) => viewer.manager || viewer.reader || ofRepeatTeacher(r);
+  let repeatOnly = false;
   if (!viewer.manager && !viewer.reader) {
     const own = given('subjectId') && subjects.some((s) => s.id === data.subjectId && s.teacherId === user.id);
-    if (!own) throw new AppError('forbidden');
+    if (!own) {
+      // not the teacher of the subject, but of a repeat of it: only the lines of that repeat
+      repeatOnly = given('subjectId') && repeats.some((c) => c.status !== 'cancelled' && c.teacherId === user.id && c.subjectId === data.subjectId);
+      if (!repeatOnly) throw new AppError('forbidden');
+    }
   }
 
   const byId = (list) => new Map(list.map((r) => [r.id, r]));
@@ -559,6 +568,7 @@ export function changeLogView(store, platform, data, user) {
   const groupIdOf = (r) => (r.entity === 'exam' ? (examOf.get(r.examId) || {}).groupId : (subjectOf.get(r.subjectId) || {}).groupId);
 
   const picked = changeLog.filter((r) => {
+    if (r.entity === 'repeat' ? !seesRepeat(r) : repeatOnly) return false;
     if (given('subjectId') && r.subjectId !== data.subjectId) return false;
     if (given('pairId') && r.pairId !== data.pairId) return false;
     if (given('studentId') && r.studentId !== data.studentId) return false;

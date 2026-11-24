@@ -10,9 +10,10 @@ import { FINAL_UNIT, activeClosure, closeProblems, closedUnitsOf } from '../core
 import { finalProblems, liveAttempts, subjectResult } from '../core/exam.js';
 import { settleLessons } from './lessonSettle.js';
 import { JOURNAL_TABLES, journalView, lastOf, viewerOf } from './journalData.js';
+import { attemptsOfCard, repeatMark, shownCard } from './repeatData.js';
 
 export const LEDGER_LIST_TABLES = ['subjects', 'groups', 'staff', 'syllabi', 'topics', 'settings', 'closures'];
-export const LEDGER_TABLES = [...JOURNAL_TABLES, 'subjectExams', 'examAttempts'];
+export const LEDGER_TABLES = [...JOURNAL_TABLES, 'subjectExams', 'examAttempts', 'repeats', 'repeatAttempts'];
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const nameOf = (list, id) => (list.find((r) => r.id === id) || { fullName: '' }).fullName;
@@ -115,6 +116,8 @@ export function ledgerView(rows, platform, subjectId, user) {
     const r = view.results[s.id];
     const live = attempts.get(s.id) || [];
     const res = subjectResult({ semester: r.semester, admitted: r.admitted === true && Number.isInteger(r.semester), attempts: live, scheme: view.scheme });
+    const card = shownCard(rows.repeats, s.id, subject.id, planSemester);
+    const repeat = card ? repeatMark(card, attemptsOfCard({ repeatAttempts: rows.repeatAttempts || [] }, card), view.scheme, view.split) : null;
     return {
       id: s.id, fullName: s.fullName, left: s.left,
       units: r.units.map((u) => ({
@@ -122,7 +125,8 @@ export function ledgerView(rows, platform, subjectId, user) {
         control: u.control, total: u.total, word: u.word, currentLow: u.currentLow, controlLow: u.controlLow,
       })),
       preliminary: r.preliminary, semester: r.semester, complete: r.complete, admitted: r.admitted, attempts: live,
-      status: res.status, tries: res.tries, exam: res.exam, total: res.total, word: res.word, next: s.left ? null : res.next,
+      status: res.status, tries: res.tries, exam: res.exam, total: res.total, word: res.word, next: s.left || repeat ? null : res.next,
+      ...(repeat ? { repeat } : {}),
     };
   });
 
