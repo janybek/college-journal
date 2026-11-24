@@ -284,10 +284,11 @@ test('--demo: the assignments, their works and one picture come with the people;
 test('--demo: the ledger, the requests, the announcements and the exams come with the people; --wipe erases them and writes them again, the same count', async (t) => {
   const config = emptyBase(t);
   assert.equal((await run(config, [])).code, EXIT.ok);
-  const tables = ['closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts'];
+  const tables = ['closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts', 'repeats', 'repeatAttempts'];
   const first = open(t, config);
   const counts = tables.map((name) => first.store.list(name).length);
-  assert.deepEqual(counts.slice(0, 4), [3, 4, 3, 1]);
+  assert.deepEqual(counts.slice(0, 4), [4, 4, 3, 1]);
+  assert.deepEqual(counts.slice(7), [4, 2]);
   assert.equal(counts.every((n) => n > 0), true);
   // an old record of the owner in a new table must go with the wipe
   first.store.insert('announcements', { authorId: 'st_old', audience: 'all', title: 'Старое объявление', createdAt: '2026-01-01 10:00:00' });

@@ -14,7 +14,10 @@ import { submitWork } from '../backend/workStudent.js';
 import { uploadFile } from '../backend/workFiles.js';
 import { gradeWork } from '../backend/workGrade.js';
 import { currentAttempt } from '../core/work.js';
-import { closeUnit } from '../backend/ledgerData.js';
+import { closeUnit, readLedgerRows } from '../backend/ledgerData.js';
+import { enrol } from '../backend/repeatData.js';
+import { closeRepeat, saveAttempt, saveWorks } from '../backend/repeatScores.js';
+import { halfResults } from '../backend/repeatSnapshot.js';
 import { createRequest, decideRequest } from '../backend/requestData.js';
 import { saveStateExam, saveStateExamScores } from '../backend/stateExamData.js';
 import { saveAnnouncement } from '../backend/announceData.js';
@@ -192,7 +195,7 @@ function seedSyllabi(store, platform, subjects, teacherName, adminRow) {
 
 // The common filling: groups, students, disciplines, subjects, the week, syllabi, pairs. The staff of the stand
 // (everyone except the administrator) is made here; the administrator is made by the caller or already is in the store.
-function fill(store, platform, { passwordHash, names, studentsMustChange, admin, files }) {
+function fill(store, platform, { passwordHash, names, studentsMustChange, admin, files, repeats = true }) {
   const common = { passwordHash, mustChangePassword: false, active: true };
   const staff = STAFF.filter((person) => person.login !== 'admin')
     .map((person) => store.insert('staff', { ...person, fullName: names.staff[person.login], ...common, lang: 'ru' }));
@@ -242,6 +245,7 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin,
   seedWork(store, platform, files);
   seedLedger(store, platform);
   seedExam(store, platform);
+  if (repeats) seedRepeat(store, platform);
 }
 
 // A small real PDF (one page, the text «Syllabus sample»), with a proper cross-reference table.
@@ -285,12 +289,12 @@ export function seedSyllabusFile(store, platform, files) {
 }
 
 // Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
-export function seed(store, platform, files = null) {
+export function seed(store, platform, files = null, { repeats = true } = {}) {
   if (store.list('staff').length > 0) return;
   // The stored hash carries its own salt, so one hash serves every person.
   const passwordHash = hashPassword(platform, DEV_PASSWORD);
   const admin = store.insert('staff', { ...STAFF[0], passwordHash, mustChangePassword: false, active: true, lang: 'ru' });
-  fill(store, platform, { passwordHash, names: NAMES.latin, studentsMustChange: true, admin, files });
+  fill(store, platform, { passwordHash, names: NAMES.latin, studentsMustChange: true, admin, files, repeats });
   seedSyllabusFile(store, platform, files);
 }
 
@@ -667,4 +671,88 @@ export function seedExam(store, platform) {
   store.insertMany('examAttempts', [...outcomes].map(([studentId, result]) => ({
     subjectId: subject.id, planSemester, studentId, no: 1, date, outcome: result.outcome, score: result.score, commission: '', ...stamp,
   })));
+}
+
+// The repeat courses of «Информатика» 02-1 (teacher1) on the stand: every state of the card, found by the result of seedExam.
+// Like seedExam it writes the OLD tables straight (the semester of the stand is still going): the retakes and the closing of the final sheet
+// (unit 0, teacher1, 9 days ago); the cards and their scores go only through the functions of repeatData / repeatScores, by dean and teacher1.
+// The students are taken by their result, not by the number of the card; with the stand as it is now (22 students of 02-1, card numbers):
+//   S2001 «неуд.» after three sits (the retakes 7 and 5 days ago, the second by the commission «Комиссия Стендовая»): card «весь предмет», open, works 3/4 of the maximum;
+//   S2003 «не явился(ась)»: card «только экзамен», open, one try 2 days ago, the total «удовл.» (preliminary);
+//   S2020 not admitted: card «весь предмет», closed «сдал» (works 4/5 of the maximum, the exam to «хорошо»);
+//   S2006 «неуд.» after one sit: card «весь предмет», teacher3, the deadline 2 days ago («срок вышел»), no works;
+//   S2007 «неуд.» after one sit and S2008 «I»: no card (the owner enrols them himself). The others passed.
+// The cards are written by a clock 4 days back: the order «12-с» of that day; the deadline 30 days ahead (S2006: 2 days ago).
+// The pairs of the closed units stay planned (a condition of the stand): they cannot be marked.
+export function seedRepeat(store, platform) {
+  const find = (login) => {
+    const row = store.list('staff').find((p) => p.login === login);
+    if (!row) throw new Error(`seed: no person ${login} for the repeat courses`);
+    return row;
+  };
+  const [teacherRow, deanRow, teacher3] = ['teacher1', 'dean', 'teacher3'].map(find);
+  const teacher = staffUser(teacherRow);
+  const dean = staffUser(deanRow);
+  const group = store.list('groups').find((g) => g.name === '02-1');
+  const subject = group && store.list('subjects').find((s) => s.name === 'Информатика' && s.groupId === group.id && s.teacherId === teacherRow.id);
+  if (!subject) throw new Error('seed: no «Информатика» of teacher1 in 02-1 for the repeat courses');
+  const today = todayOf(platform);
+  const cardOf = new Map(store.list('students').filter((s) => s.groupId === group.id).map((s) => [s.id, s.cardNo]));
+  const first = journalView(readJournalRows(store), platform, subject.id, teacher);
+  const { planSemester } = first.subject;
+  const { scheme, split } = first;
+
+  const rows = halfResults(readLedgerRows(store, platform), platform, subject, planSemester, dean).students
+    .sort((a, b) => cardOf.get(a.id).localeCompare(cardOf.get(b.id)));
+  const pick = (list, what) => {
+    if (list.length === 0) throw new Error(`seed: no student of 02-1 for the repeat courses: ${what}`);
+    return list[0];
+  };
+  const failed = pick(rows.filter((r) => r.status === 'done' && r.word === 'fail'), 'fail');
+  const absent = pick(rows.filter((r) => r.status === 'absent'), 'absent');
+  const notAdmitted = pick(rows.filter((r) => r.status === 'not_admitted' && r.complete === true), 'not admitted');
+  const [oneSitA, oneSitB] = rows.filter((r) => r.status === 'none' && r.admitted === true);
+  if (!oneSitA || !oneSitB) throw new Error('seed: no two students of 02-1 without an exam result for the repeat courses');
+
+  // the old tables: the sits that make the fails, the closing of the final sheet
+  const stamp = (date) => ({ updatedBy: teacher.id, updatedAt: `${date} 12:00:00` });
+  const sit = (student, no, ago, exam, commission = '') => ({
+    subjectId: subject.id, planSemester, studentId: student.id, no, date: addDays(today, -ago), outcome: 'score', score: exam, commission, ...stamp(addDays(today, -ago)),
+  });
+  const failExam = (student) => Math.min(split.exam, Math.max(0, scheme.fair - 8 - student.semester));
+  const again = (student, k) => Math.min(split.exam, student.exam + k, Math.max(student.exam, scheme.fair - 1 - student.semester));
+  store.insertMany('examAttempts', [
+    sit(failed, 2, 7, again(failed, 1)),
+    sit(failed, 3, 5, again(failed, 2), 'Комиссия Стендовая'),
+    sit(oneSitA, 1, 3, failExam(oneSitA)),
+    sit(oneSitB, 1, 3, failExam(oneSitB)),
+  ]);
+  store.insertMany('closures', [{
+    subjectId: subject.id, planSemester, unit: 0, closedBy: teacher.id, closedAt: `${addDays(today, -9)} 15:00:00`, reopenedBy: '', reopenedAt: '',
+  }]);
+
+  // the cards
+  const back = platform.now() - 4 * 86400000;
+  const clock = Object.assign(Object.create(platform), { now: () => back });
+  const order = { orderNo: '12-с', orderDate: addDays(today, -4) };
+  const card = (student, kind, deadline, teacherId = teacherRow.id) => enrol(store, clock, {
+    subjectId: subject.id, planSemester, studentId: student.id, kind, ...order, deadline, teacherId,
+  }, dean).repeat.id;
+  const ahead = addDays(today, 30);
+  const score = (repeatId, date, exam) => saveAttempt(store, platform, { repeatId, date, outcome: 'score', score: exam }, teacher);
+
+  const worksFull = (share) => Math.round(split.semester * share);
+  const fullId = card(failed, 'full', ahead);
+  saveWorks(store, platform, { repeatId: fullId, works: worksFull(0.75), note: 'Реферат и две практические работы' }, teacher);
+
+  const examId = card(absent, 'exam', ahead);
+  score(examId, addDays(today, -2), Math.min(split.exam, Math.max(0, scheme.fair + 2 - absent.semester)));
+
+  const passedId = card(notAdmitted, 'full', ahead);
+  const works = worksFull(0.8);
+  saveWorks(store, platform, { repeatId: passedId, works, note: 'Реферат и практические работы' }, teacher);
+  score(passedId, addDays(today, -3), Math.min(split.exam, Math.max(0, scheme.good + 1 - works)));
+  closeRepeat(store, platform, { repeatId: passedId }, teacher);
+
+  card(oneSitA, 'full', addDays(today, -2), teacher3.id);
 }

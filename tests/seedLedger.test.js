@@ -15,7 +15,7 @@ function stand(settings = []) {
   const platform = createNodePlatform({ now: () => bishkek(TODAY, '12:00'), secret: 'test-secret' });
   const store = createMemoryStore(SCHEMA, platform);
   if (settings.length > 0) store.insertMany('settings', settings);
-  seed(store, platform);
+  seed(store, platform, null, { repeats: false });   // the closed final sheet of seedRepeat is tried in seedRepeat.test.js
   const ctx = { store, platform };
   const tokens = {};
   const call = (action, data, who) => {
