@@ -1,8 +1,15 @@
 // Password hashing and session tokens. Pure: all time, randomness and hashing come from `platform`.
+// Hashing is scrypt (v2) where the platform has `scryptHex`; on Apps Script it is v1 (salted SHA-256 rounds).
+// Both formats are accepted when verifying.
 
 export const HASH_ROUNDS = 100;
 // Temporary passwords (random, must be changed at first login) are hashed lighter.
+// With scrypt these two values only choose the strength: own password or temporary password.
 export const TEMP_HASH_ROUNDS = 20;
+export const SCRYPT = {
+  own: { logN: 14, r: 8, p: 1, keylen: 32 },
+  temp: { logN: 12, r: 8, p: 1, keylen: 32 },
+};
 export const MIN_PASSWORD = 6;
 export const TOKEN_TTL_MS = { staff: 7 * 86400000, student: 30 * 86400000 };
 
@@ -26,20 +33,53 @@ export function constantTimeEqual(a, b) {
 }
 
 export function hashPassword(platform, password, salt, rounds = HASH_ROUNDS) {
+  if (typeof platform.scryptHex === 'function') {
+    const usedSalt = salt === undefined ? platform.randomHex(16) : salt;
+    const o = rounds === TEMP_HASH_ROUNDS ? SCRYPT.temp : SCRYPT.own;
+    const hex = platform.scryptHex(password, usedSalt, o);
+    return 'v2$' + o.logN + '$' + o.r + '$' + o.p + '$' + usedSalt + '$' + hex;
+  }
+  return hashV1(platform, password, salt, rounds);
+}
+
+function hashV1(platform, password, salt, rounds) {
   const usedSalt = salt === undefined ? platform.randomHex(8) : salt;
   let h = platform.sha256Hex(usedSalt + ':' + password);
   for (let i = 1; i < rounds; i++) h = platform.sha256Hex(h + ':' + usedSalt);
   return 'v1$' + rounds + '$' + usedSalt + '$' + h;
 }
 
+function verifyV2(platform, password, parts) {
+  if (typeof platform.scryptHex !== 'function' || parts.length !== 6) return false;
+  const [, logNText, rText, pText, salt, hash] = parts;
+  if (!/^[0-9]{1,2}$/.test(logNText) || !/^[0-9]{1,2}$/.test(rText) || !/^[0-9]$/.test(pText)) return false;
+  const logN = Number(logNText);
+  const r = Number(rText);
+  const p = Number(pText);
+  if (logN < 10 || logN > 16 || r < 1 || r > 16 || p < 1 || p > 4) return false;
+  if (!/^[0-9a-f]{16,64}$/.test(salt) || !/^[0-9a-f]{64}$/.test(hash)) return false;
+  const hex = platform.scryptHex(password, salt, { logN, r, p, keylen: 32 });
+  return typeof hex === 'string' && constantTimeEqual(hex, hash);
+}
+
 export function verifyPassword(platform, password, stored) {
   if (typeof stored !== 'string' || typeof password !== 'string') return false;
-  const parts = stored.split('$');
-  if (parts.length !== 4 || parts[0] !== 'v1') return false;
-  if (!/^[1-9][0-9]*$/.test(parts[1])) return false;
-  const rounds = Number(parts[1]);
-  if (rounds > MAX_STORED_ROUNDS) return false;
-  return constantTimeEqual(hashPassword(platform, password, parts[2], rounds), stored);
+  try {
+    const parts = stored.split('$');
+    if (parts[0] === 'v2') return verifyV2(platform, password, parts);
+    if (parts.length !== 4 || parts[0] !== 'v1') return false;
+    if (!/^[1-9][0-9]*$/.test(parts[1])) return false;
+    const rounds = Number(parts[1]);
+    if (rounds > MAX_STORED_ROUNDS) return false;
+    return constantTimeEqual(hashV1(platform, password, parts[2], rounds), stored);
+  } catch (error) {
+    return false;
+  }
+}
+
+// True when the stored hash is the old v1 and this platform can make scrypt: rewrite it after a good login.
+export function needsRehash(platform, stored) {
+  return typeof platform.scryptHex === 'function' && typeof stored === 'string' && stored.startsWith('v1$');
 }
 
 export function passwordVersion(stored) {

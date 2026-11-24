@@ -1,9 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { scryptSync } from 'node:crypto';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import {
   HASH_ROUNDS, TEMP_HASH_ROUNDS, MIN_PASSWORD, TOKEN_TTL_MS, hashPassword, verifyPassword, passwordVersion,
-  passwordProblem, generateTempPassword, issueToken, readToken,
+  passwordProblem, generateTempPassword, issueToken, readToken, needsRehash, SCRYPT,
 } from '../core/auth.js';
 
 const p = createNodePlatform({ now: () => 1000, secret: 's' });
@@ -87,4 +88,70 @@ test('readToken rejects a valid signature over non-JSON or wrong shape', () => {
   assert.equal(readToken(p, sign(encodeURIComponent('null'))), null);
   assert.equal(readToken(p, sign(encodeURIComponent(JSON.stringify({ uid: 'a', kind: 'root', pv: 'x', exp: 5000 })))), null);
   assert.equal(readToken(p, sign(encodeURIComponent(JSON.stringify({ uid: 'a', kind: 'staff', pv: 'x', exp: 'soon' })))), null);
+});
+
+// ---- scrypt (v2) ----
+const scryptHex = (password, salt, { logN, r, p: par, keylen }) =>
+  scryptSync(password, salt, keylen, { N: 2 ** logN, r, p: par, maxmem: 64 * 1024 * 1024 }).toString('hex');
+const ps = { ...p, scryptHex };
+const SALT = '00112233445566778899aabbccddeeff';
+
+test('SCRYPT constants', () => {
+  assert.deepEqual(SCRYPT, { own: { logN: 14, r: 8, p: 1, keylen: 32 }, temp: { logN: 12, r: 8, p: 1, keylen: 32 } });
+});
+
+test('scrypt platform: v2 format and verify', () => {
+  const h = hashPassword(ps, 'secret1');
+  assert.match(h, /^v2\$14\$8\$1\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
+  const t = hashPassword(ps, 'tmp12345', undefined, TEMP_HASH_ROUNDS);
+  assert.match(t, /^v2\$12\$8\$1\$[0-9a-f]{32}\$[0-9a-f]{64}$/);
+  assert.equal(verifyPassword(ps, 'secret1', h), true);
+  assert.equal(verifyPassword(ps, 'secret2', h), false);
+  assert.equal(verifyPassword(ps, 'tmp12345', t), true);
+});
+
+test('scrypt known vector', () => {
+  const h = hashPassword(ps, 'test-pass', SALT);
+  const expected = scryptSync('test-pass', SALT, 32, { N: 16384, r: 8, p: 1, maxmem: 64 * 1024 * 1024 }).toString('hex');
+  assert.equal(h, 'v2$14$8$1$' + SALT + '$' + expected);
+});
+
+test('without scryptHex: still v1, v2 is rejected', () => {
+  assert.match(hashPassword(p, 'abc123'), /^v1\$100\$/);
+  assert.match(hashPassword(p, 'abc123', undefined, TEMP_HASH_ROUNDS), /^v1\$20\$/);
+  assert.equal(verifyPassword(p, 'test-pass', hashPassword(ps, 'test-pass', SALT)), false);
+});
+
+test('v1 hash verifies on the scrypt platform too', () => {
+  assert.equal(verifyPassword(ps, 'abc123', hashPassword(p, 'abc123')), true);
+});
+
+test('broken v2 strings give false and never throw', () => {
+  const good = hashPassword(ps, 'x-pass1', SALT);
+  const hash = good.split('$')[5];
+  const mk = (logN, r, par, salt, h) => ['v2', logN, r, par, salt, h].join('$');
+  const bad = [
+    good + '$extra', ['v2', 14, 8, 1, SALT].join('$'),
+    mk(9, 8, 1, SALT, hash), mk(17, 8, 1, SALT, hash), mk('14a', 8, 1, SALT, hash),
+    mk(14, 0, 1, SALT, hash), mk(14, 17, 1, SALT, hash), mk(14, 8, 0, SALT, hash), mk(14, 8, 5, SALT, hash),
+    mk(14, 8, 1, 'AABBCCDDEEFF00112233445566778899', hash), mk(14, 8, 1, 'abcdef', hash),
+    mk(14, 8, 1, SALT, hash.slice(1)),
+  ];
+  for (const s of bad) assert.equal(verifyPassword(ps, 'x-pass1', s), false, s);
+  assert.equal(verifyPassword(ps, 'x-pass1', 12345), false);
+  assert.equal(verifyPassword(ps, 'x-pass1', null), false);
+  assert.equal(verifyPassword(ps, 'x-pass1', good), true);
+  const boom = { ...p, scryptHex() { throw new Error('boom'); } };
+  assert.equal(verifyPassword(boom, 'x-pass1', good), false);
+});
+
+test('needsRehash', () => {
+  assert.equal(needsRehash(ps, hashPassword(p, 'abc123')), true);
+  assert.equal(needsRehash(ps, hashPassword(ps, 'abc123')), false);
+  assert.equal(needsRehash(p, hashPassword(p, 'abc123')), false);
+});
+
+test('passwordVersion of a v2 hash is its last 8 chars', () => {
+  const h = hashPassword(ps, 'abc123', SALT);
+  assert.equal(passwordVersion(h), h.slice(-8));
 });
