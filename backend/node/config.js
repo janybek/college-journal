@@ -111,6 +111,10 @@ export function readConfig({ env = process.env, root = REPO_ROOT, file } = {}) {
   const host = settings.host ?? '127.0.0.1';
   if (typeof host !== 'string' || !(IPV4.test(host) || host === '::' || host === '::1')) throw new ConfigError('bad_host', 'bad host');
   const siteDir = siteFolderOf(settings.siteDir, root);
+  // the site folder is public: it may not be, hold or lie inside the data, the copies or the alerts
+  for (const other of [dataDir, backupDir, alertDir]) {
+    if (siteDir !== '' && other !== '' && (isInside(siteDir, other) || isInside(other, siteDir))) throw new ConfigError('bad_site_dir', 'the site folder touches a folder of the data');
+  }
 
   return {
     dataDir, backupDir, alertDir, port, origins, host, siteDir,

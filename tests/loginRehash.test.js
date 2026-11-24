@@ -105,3 +105,21 @@ test('scrypt on Node: the stored v2 hash verifies, is salted, and a v1 of the sa
   const v1 = hashPassword({ ...platform, scryptHex: undefined }, 'Secret-1');
   assert.equal(verifyPassword(platform, 'Secret-1', v1), true);
 });
+
+test('an unknown login and an inactive account cost one scrypt, like a wrong password; nothing is written', (t) => {
+  const { config, base, passwordHash } = oldUser(t);
+  let calls = 0;
+  const platform = { ...base.platform, scryptHex: (...args) => { calls += 1; return base.platform.scryptHex(...args); } };
+  const ctx = { store: base.store, platform };
+  const login = (name, password) => handleRequest(JSON.stringify({ action: 'auth.login', data: { login: name, password } }), ctx);
+  const before = snapshotStaff(config);
+  assert.equal(login('nobody', 'whatever-1').error.code, 'bad_credentials');
+  assert.equal(calls, 1);
+  calls = 0;
+  assert.equal(login('olduser', 'wrong-pass').error.code, 'bad_credentials');      // a v1 account: the typed password is checked once (v1 is not scrypt)
+  assert.equal(calls, 0);
+  assert.equal(login('', 'x').error.code, 'bad_credentials');
+  assert.equal(calls, 1);
+  assert.deepEqual(snapshotStaff(config), before);
+  assert.equal(hashOf(config, 'olduser'), passwordHash);
+});

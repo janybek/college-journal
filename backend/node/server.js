@@ -37,7 +37,7 @@ export async function startServer({ config, base, logger, guard = createLoginGua
   const { platform, store } = base;
   const ctx = { store, platform, files, loginGuard: guard, log: (e) => logger.error('handler', e) };
   const notFound = (res) => {
-    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
     res.end('Not found');
   };
   const site = config.siteDir ? createSiteHandler(config.siteDir, { notFound }) : null;

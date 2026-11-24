@@ -19,6 +19,11 @@ function sessionFor(ctx, row, kind) {
   return { token, user: publicUser(row, kind, ctx.store) };
 }
 
+// Never matches: only there so that a missing account costs one hash of the usual strength.
+const DUMMY_V2 = 'v2$14$8$1$' + '0123456789abcdef'.repeat(2) + '$' + 'f'.repeat(64);
+const DUMMY_V1 = 'v1$100$0123456789abcdef$' + 'f'.repeat(64);
+const dummyHash = (platform) => (typeof platform.scryptHex === 'function' ? DUMMY_V2 : DUMMY_V1);
+
 // An old v1 hash is rewritten as scrypt after a good login (the typed password is known only now).
 // A failed write is no reason to refuse the login: the old hash still works and the token is made for it.
 function rehashed(password, found, ctx) {
@@ -43,6 +48,8 @@ function login(data, ctx) {
   const found = findByLogin(ctx.store, typed);
   const ok = found !== null && isUsable(found.row) && verifyPassword(ctx.platform, data.password, found.row.passwordHash);
   if (!ok) {
+    // an unknown login costs the same time as a wrong password: the answer does not tell which logins exist
+    if (found === null || !isUsable(found.row)) verifyPassword(ctx.platform, data.password, dummyHash(ctx.platform));
     if (guard) guard.fail(key, now);
     throw new AppError('bad_credentials');
   }

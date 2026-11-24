@@ -121,3 +121,22 @@ test('siteDir in the settings: a folder that exists, relative to the repository;
   assert.throws(() => readConfig({ root, env: { ...env, JOURNAL_SITE_DIR: path.join(root, 'file.txt') } }), { code: 'bad_site_dir' });
   assert.throws(() => readConfig({ root, env: { ...env, JOURNAL_SITE_DIR: path.join(root, 'nope') } }), { code: 'bad_site_dir' });
 });
+
+test('siteDir may not be, hold or lie inside the data, copies or alert folders; a sibling is fine', (t) => {
+  const { root, outside } = tempRoot(t);
+  const data = path.join(outside, 'data');
+  const copies = path.join(outside, 'copies');
+  const alert = path.join(outside, 'alert');
+  for (const d of [data, copies, alert, path.join(outside, 'site'), path.join(data, 'pub'), path.join(outside, 'holder', 'copies')]) fs.mkdirSync(d, { recursive: true });
+  const read = (siteDir, extra = {}) => readConfig({ root, env: { JOURNAL_DATA_DIR: data, JOURNAL_BACKUP_DIR: copies, JOURNAL_ALERT_DIR: alert, JOURNAL_SITE_DIR: siteDir, ...extra } });
+  assert.equal(read(path.join(outside, 'site')).siteDir, path.join(outside, 'site'));
+  for (const siteDir of [data, outside, path.join(data, 'pub'), copies, alert]) assert.throws(() => read(siteDir), { code: 'bad_site_dir' }, siteDir);
+  assert.throws(() => read(path.join(outside, 'holder'), { JOURNAL_BACKUP_DIR: path.join(outside, 'holder', 'copies') }), { code: 'bad_site_dir' });
+  assert.throws(() => read(path.join(outside, 'site'), { JOURNAL_ALERT_DIR: path.join(outside, 'site', 'a') }), { code: 'bad_site_dir' });
+});
+
+test('a 404 on a site path carries nosniff too', async (t) => {
+  const { site } = siteFolder(t);
+  const { raw } = await start(t, { config: { siteDir: site } });
+  assert.equal((await raw('GET', '/nope.html')).headers['x-content-type-options'], 'nosniff');
+});
