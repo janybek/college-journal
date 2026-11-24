@@ -243,3 +243,13 @@ test('the teacher of a closed subject changes to one without a syllabus: the clo
   const journal = s.call('journal.get', { subjectId: s.sb1 }, s.t.dean).data.journal;
   assert.equal(journal.subject.planSemester, 1);
 });
+
+test('ledger.list after the teacher changed to one without a syllabus: the closures stay, no pairs are read (final review, N1)', () => {
+  const s = setup();
+  s.allUnits(); s.examHead(); s.examRow(s.a1); s.examRow(s.a2, { score: 20 }); s.closeFinal(); s.at('2026-12-26');
+  s.store.update('subjects', s.sb1, { teacherId: s.ids.teacher2 });
+  s.spy.reset();
+  const row = s.call('ledger.list', {}, s.t.dean).data.subjects.find((x) => x.subjectId === s.sb1);
+  assert.deepEqual([row.hasSyllabus, row.final, row.units], [false, true, [{ unit: 1, closed: true }, { unit: 2, closed: true }]]);
+  assert.equal(s.spy.lists.pairs, undefined);
+});

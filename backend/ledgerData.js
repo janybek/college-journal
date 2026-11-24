@@ -26,6 +26,19 @@ export function readLedgerRows(store, platform) {
   return settleLessons(store, platform, rows);
 }
 
+// Without a syllabus in force (the teacher changed): the closures of the half with the closed final sheet, else with the most closed units.
+function closedWithoutSyllabus(closures, subjectId) {
+  const halves = new Set(closures.filter((c) => c.subjectId === subjectId).map((c) => c.planSemester ?? null));
+  let best = { units: [], final: false };
+  let weight = -1;
+  for (const half of halves) {
+    const c = closedUnitsOf(closures, subjectId, half);
+    const w = (c.final ? 1000 : 0) + c.units.length;
+    if (w > weight) { weight = w; best = c; }
+  }
+  return best;
+}
+
 // 'ledger.list': the subjects the person may open with the closed units; no journal numbers are counted.
 export function ledgerList(store, platform, user) {
   const rows = {};
@@ -45,8 +58,8 @@ export function ledgerList(store, platform, user) {
     if (!viewer.manager && !viewer.reader && !own) continue;
     const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
     const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
-    const closed = closedUnitsOf(rows.closures, subject.id, planSemester);
-    const units = syllabus ? [...(unitsOf.get(syllabus.id) || [])].sort((a, b) => a - b) : [];
+    const closed = syllabus ? closedUnitsOf(rows.closures, subject.id, planSemester) : closedWithoutSyllabus(rows.closures, subject.id);
+    const units = syllabus ? [...(unitsOf.get(syllabus.id) || [])].sort((a, b) => a - b) : closed.units;
     const group = rows.groups.find((g) => g.id === subject.groupId);
     list.push({
       subjectId: subject.id, name: subject.name, groupName: group ? group.name : '', teacherName: nameOf(rows.staff, subject.teacherId),
