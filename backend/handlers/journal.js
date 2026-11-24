@@ -8,6 +8,6 @@ export const journalHandlers = {
   'journal.saveResults': (data, ctx, user) => saveUnitResults(ctx.store, ctx.platform, data, user),
   'journal.missPair': (data, ctx, user) => missPair(ctx.store, ctx.platform, data, user),
   'journal.reopenPair': (data, ctx, user) => reopenPair(ctx.store, ctx.platform, data, user),
-  'student.grades': (data, ctx, user) => studentGrades(readSettledRows(ctx.store, ctx.platform), ctx.platform, user),
+  'student.grades': (data, ctx, user) => studentGrades({ ...readSettledRows(ctx.store, ctx.platform), examAttempts: ctx.store.list('examAttempts') }, ctx.platform, user),
   'journal.log': (data, ctx, user) => changeLogView(ctx.store, ctx.platform, data, user),
 };

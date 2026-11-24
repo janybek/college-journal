@@ -13,6 +13,7 @@ import { firstPairId, studentResults } from '../core/grades.js';
 import { LESSON_CLEAR, startProblem } from '../core/lesson.js';
 import { currentAttempt, selfByWork } from '../core/work.js';
 import { checkMark, checkReason, checkResultValue, markChanges, markMode, markState, normalizeMark } from '../core/journal.js';
+import { closedUnitsOf } from '../core/ledger.js';
 import { relayout } from './scheduleData.js';
 import { settleLessons } from './lessonSettle.js';
 
@@ -71,6 +72,25 @@ export function selfWorkOf(rows, subject, planSemester, studentId, nowMs, self) 
   return result;
 }
 
+// The units and the final sheet of the subject that are closed in the half of the plan in force: nobody changes them directly.
+export function closedOfSubject(rows, subject, settings) {
+  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
+  const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
+  return { planSemester, closed: closedUnitsOf(rows.closures, subject.id, planSemester) };
+}
+
+// The unit of the topic of a pair (null for a pair without a topic).
+export function unitOfPair(rows, pair) {
+  const topic = pair.topicId ? rows.topics.find((t) => t.id === pair.topicId) : undefined;
+  return topic && Number.isInteger(topic.unit) ? topic.unit : null;
+}
+
+// True when the pair belongs to a closed unit of its subject.
+export function pairUnitClosed(rows, subject, pair) {
+  const unit = subject ? unitOfPair(rows, pair) : null;
+  return unit !== null && closedOfSubject(rows, subject, readSettings(rows.settings)).closed.units.includes(unit);
+}
+
 const nameOf = (rows, id) => (rows.find((r) => r.id === id) || { fullName: '' }).fullName;
 
 // Of several rows of one key the last one wins: by `stamp`, then by id.
@@ -101,6 +121,7 @@ export function journalView(rows, platform, subjectId, user) {
   const now = { date: localDate(nowMs), time: localTime(nowMs) };
   const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
   const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
+  const closed = closedUnitsOf(rows.closures, subject.id, planSemester);
 
   // lessons of the pairs
   const topics = new Map(rows.topics.map((t) => [t.id, t]));
@@ -120,10 +141,11 @@ export function journalView(rows, platform, subjectId, user) {
     const teacher = viewer.teacher && (p.teacherId === viewer.id || subject.teacherId === viewer.id);
     // 'open': the pair runs and this person leads it; 'start': this person may start it now; otherwise null
     const leads = viewer.teacher && p.teacherId === viewer.id;
-    const lesson = leads && p.status === 'running' ? 'open' : leads && startProblem(p, nowMs) === null ? 'start' : null;
+    const shut = unit !== null && closed.units.includes(unit);
+    const lesson = shut ? null : leads && p.status === 'running' ? 'open' : leads && startProblem(p, nowMs) === null ? 'start' : null;
     return {
       id: p.id, date: p.date, slot: p.slot, startTime: p.startTime, startedAt: p.startedAt || '', lesson, status: p.status, state,
-      mode: markMode({ state, held: held(p), teacher, manager: viewer.manager }),
+      mode: shut ? 'none' : markMode({ state, held: held(p), teacher, manager: viewer.manager }),
       lessonType: p.lessonType, unit, topicName: topic ? topic.name : '', number: topic ? (numberOf(topic) ?? '') : '',
       first: p.id === first, counts: held(p) && p.lessonType !== 'control' && unit !== null,
       teacherId: p.teacherId, teacherName: nameOf(rows.staff, p.teacherId), substitution: isSubstitution(p, subject),
@@ -205,6 +227,7 @@ export function journalView(rows, platform, subjectId, user) {
       semester: settings.semester, planSemester, hasSyllabus: syllabus !== null,
     },
     scheme, split: { semester: split.semester, exam: split.exam, admission: split.admission }, partial, can: { results: viewer.manager || owner, manage: viewer.manager },
+    closed, canRequest: owner,
     students, pairs, marks,
     units: unitList.map((unit) => (byWork.has(unit) ? { unit, title: titles.get(unit) || '', byWork: true } : { unit, title: titles.get(unit) || '' })),
     results,
@@ -299,6 +322,7 @@ export function savePairMarks(store, platform, data, user) {
   const viewer = viewerOf(user);
   const teacher = viewer.teacher && (pair.teacherId === user.id || (!!subject && subject.teacherId === user.id));
   if (!subject || (!teacher && !viewer.manager)) throw new AppError('forbidden');
+  if (pairUnitClosed(rows, subject, pair)) throw new AppError('unit_closed');
 
   const scheme = readScheme(rows.settings);
   const settings = readSettings(rows.settings);
@@ -412,6 +436,7 @@ export function saveUnitResults(store, platform, data, user) {
 
   const view = journalView(rows, platform, subject.id, user);
   if (!Number.isInteger(data.unit) || !view.units.some((u) => u.unit === data.unit)) throw new AppError('invalid', { fields: [{ field: 'unit', code: 'bad_value' }] });
+  if (view.closed.units.includes(data.unit)) throw new AppError('unit_closed');
   if (field === 'self' && view.units.find((u) => u.unit === data.unit).byWork === true) throw new AppError('invalid', { fields: [{ field: 'unit', code: 'self_by_work' }] });
 
   // the saved rows of this subject: of the rows of one student and unit the last one wins
@@ -556,6 +581,7 @@ function changePairStatus(store, platform, data, user, reopen) {
   const pair = typeof data.pairId === 'string' ? rows.pairs.find((p) => p.id === data.pairId) : undefined;
   const subject = pair && rows.subjects.find((s) => s.id === pair.subjectId);
   if (!pair || !subject) throw new AppError('not_found');
+  if (reopen && pair.status === 'closed' && pairUnitClosed(rows, subject, pair)) throw new AppError('unit_closed');
   const code = checkReason(data.reason);
   if (code) throw new AppError('invalid', { fields: [{ field: 'reason', code }] });
   const reason = data.reason.trim();

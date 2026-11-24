@@ -13,7 +13,7 @@ import { isSubstitution } from '../core/schedule.js';
 import { firstPairId } from '../core/grades.js';
 import { markMode, markState } from '../core/journal.js';
 import { LESSON, codeAt, lessonClock, pairKey, qrAt, startFrom, startProblem } from '../core/lesson.js';
-import { JOURNAL_TABLES, lastOf, readJournalRows, viewerOf } from './journalData.js';
+import { JOURNAL_TABLES, lastOf, pairUnitClosed, readJournalRows, viewerOf } from './journalData.js';
 import { settleLessons } from './lessonSettle.js';
 import { pairViews } from './scheduleData.js';
 import { subjectRights } from './workData.js';
@@ -47,11 +47,12 @@ export function lessonMine(store, platform, user) {
   const pairs = pairViews(store, (p) => p.date === today && p.teacherId === user.id, rows).map((v) => {
     const pair = byId.get(v.id);
     const problem = pair.status === 'running' ? 'running' : startProblem(pair, nowMs);
-    const lesson = problem === 'running' ? 'open' : problem === null ? 'start' : null;
+    const shut = problem === null && pairUnitClosed(rows, rows.subjects.find((s) => s.id === pair.subjectId), pair);
+    const lesson = shut ? null : problem === 'running' ? 'open' : problem === null ? 'start' : null;
     return {
       id: v.id, slot: v.slot, startTime: v.startTime, endTime: v.endTime, subjectId: v.subjectId, subjectName: v.subjectName,
       groupName: v.groupName, roomName: v.roomName, topic: v.topic, status: v.status,
-      lesson, problem: lesson === null ? problem : null, startFrom: startFrom(pair),
+      lesson, problem: shut ? 'unit_closed' : lesson === null ? problem : null, startFrom: startFrom(pair),
     };
   });
   return { today, pairs };
@@ -145,6 +146,7 @@ export function startLesson(store, platform, data, user) {
   if (problem === 'running') return answer(settleLessons(store, platform, rows), platform, pair.id, user);
   if (problem !== null) throw new AppError(problem);
   const subject = rows.subjects.find((s) => s.id === pair.subjectId);
+  if (subject && pairUnitClosed(rows, subject, pair)) throw new AppError('unit_closed');
   const others = rows.pairs.filter((p) => p.status === 'running' && p.teacherId === user.id && p.id !== pair.id).map((p) => p.id);
   const after = settleLessons(store, platform, rows, { finish: others, actorId: user.id });
   const patch = {

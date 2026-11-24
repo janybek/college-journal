@@ -7,9 +7,10 @@ import { syllabusFor } from '../core/syllabus.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
 import { compareNames } from '../core/names.js';
 import { checkAssignment, currentAttempt, workState } from '../core/work.js';
+import { closedUnitsOf } from '../core/ledger.js';
 import { viewerOf } from './journalData.js';
 
-export const WORK_TABLES = ['subjects', 'groups', 'staff', 'students', 'syllabi', 'topics', 'units', 'settings', 'pairs', 'assignments', 'submissions', 'files'];
+export const WORK_TABLES = ['subjects', 'groups', 'staff', 'students', 'syllabi', 'topics', 'units', 'settings', 'pairs', 'assignments', 'submissions', 'files', 'closures'];
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const LESSON_LETTER = { lecture: 'Л', practice: 'П', control: 'М', seminar: 'С', lab: 'ЛР' };
@@ -19,6 +20,12 @@ export function readWorkRows(store) {
   const rows = {};
   for (const table of WORK_TABLES) rows[table] = store.list(table);
   return rows;
+}
+
+// True when the assignment is self-work of a closed unit: nobody changes it, nobody hands it in.
+export function srsClosed(rows, assignment) {
+  if (assignment.kind !== 'srs' || !Number.isInteger(assignment.unit)) return false;
+  return closedUnitsOf(rows.closures, assignment.subjectId, assignment.planSemester ?? null).units.includes(assignment.unit);
 }
 
 // -> { read, manage }: manage is the teacher of the subject now; read adds the office.
@@ -124,6 +131,7 @@ export function workList(store, platform, data, user) {
     return {
       id: a.id, kind: a.kind, unit: a.unit, topicId: a.topicId, topicName: topic ? topic.name : '', pairId: a.pairId, title: a.title, dueAt: a.dueAt,
       maxPoints: a.maxPoints, current: isCurrent(a, settings), locked: byStudent.size > 0, counts,
+      ...(srsClosed(rows, a) ? { closed: true } : {}),
     };
   }).sort((a, b) => cmp(b.dueAt, a.dueAt) || cmp(a.id, b.id));
 
@@ -157,6 +165,7 @@ export function saveAssignment(store, platform, data, user) {
     old = assignmentOf(rows, data.id);
     if (old.subjectId !== subject.id) throw new AppError('bad_request');
     attempts = rows.submissions.filter((r) => r.assignmentId === old.id);
+    if (srsClosed(rows, old)) throw new AppError('unit_closed');
   }
 
   // a pair gives its own topic and the unit of the topic; the data of the request for them are not read
@@ -176,10 +185,12 @@ export function saveAssignment(store, platform, data, user) {
     units: plan.units.map((u) => u.unit), topics: plan.topics.map((t) => ({ id: t.id, unit: t.unit })), nowMs, old, locked, maxGiven,
   });
   if (problems.length > 0) throw new AppError('invalid', { fields: problems });
+  const planSemester = old ? old.planSemester ?? null : plan.syllabus && Number.isInteger(plan.syllabus.planSemester) ? plan.syllabus.planSemester : null;
+  if (srsClosed(rows, { subjectId: subject.id, planSemester, kind: value.kind, unit: value.unit })) throw new AppError('unit_closed');
 
   if (old === null) {
     const [row] = store.insertMany('assignments', [{
-      subjectId: subject.id, ...value, planSemester: plan.syllabus && Number.isInteger(plan.syllabus.planSemester) ? plan.syllabus.planSemester : null,
+      subjectId: subject.id, ...value, planSemester,
       pairId: pair ? pair.id : '', createdBy: user.id, createdAt: at, updatedBy: '', updatedAt: '',
     }]);
     return { assignment: { id: row.id } };
@@ -204,6 +215,7 @@ export function removeAssignment(store, platform, data, user) {
   const assignment = assignmentOf(rows, data.assignmentId);
   const { rights } = rightsOf(rows, assignment, user);
   if (!rights.manage) throw new AppError('forbidden');
+  if (srsClosed(rows, assignment)) throw new AppError('unit_closed');
   if (rows.submissions.some((r) => r.assignmentId === assignment.id)) throw new AppError('in_use');
   store.removeMany('assignments', [assignment.id]);
   const pending = rows.files.filter((f) => f.assignmentId === assignment.id && f.state === 'pending');
@@ -227,6 +239,7 @@ export function staffWorkView(rows, platform, assignment, user) {
   const settings = readSettings(rows.settings);
   const byStudent = attemptsByStudent(rows, assignment.id);
   const { topic, unitTitle } = assignmentPlace(rows, subject, assignment, settings);
+  const shut = srsClosed(rows, assignment);
 
   const filesOf = new Map();
   for (const f of rows.files) {
@@ -262,7 +275,8 @@ export function staffWorkView(rows, platform, assignment, user) {
       title: assignment.title, description: assignment.description, dueAt: assignment.dueAt, maxPoints: assignment.maxPoints, createdAt: assignment.createdAt,
       locked: byStudent.size > 0,
     },
-    can: { manage: rights.manage, grade: rights.manage },
+    can: shut ? { manage: false, grade: false } : { manage: rights.manage, grade: rights.manage },
+    ...(shut ? { closed: true } : {}),
     students: [...listed.map((s) => studentView(s, false)), ...left.map((s) => studentView(s, true))],
   };
 }

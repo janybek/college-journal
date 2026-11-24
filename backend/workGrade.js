@@ -4,7 +4,7 @@ import { AppError } from '../core/errors.js';
 import { localDateTime } from '../core/dates.js';
 import { checkReason } from '../core/journal.js';
 import { checkGrade, currentAttempt } from '../core/work.js';
-import { readWorkRows, staffWorkView, subjectRights } from './workData.js';
+import { readWorkRows, srsClosed, staffWorkView, subjectRights } from './workData.js';
 
 const isStr = (v) => typeof v === 'string';
 const logText = (value) => (value === null || value === undefined ? '' : String(value));
@@ -16,6 +16,7 @@ export function gradeWork(store, platform, data, user) {
   const subject = assignment ? rows.subjects.find((s) => s.id === assignment.subjectId) : undefined;
   if (!assignment || !subject) throw new AppError('not_found');
   if (!subjectRights(subject, user).manage) throw new AppError('forbidden');
+  if (srsClosed(rows, assignment)) throw new AppError('unit_closed');
 
   const list = isStr(data.studentId) ? rows.submissions.filter((r) => r.assignmentId === assignment.id && r.studentId === data.studentId) : [];
   const student = isStr(data.studentId) ? rows.students.find((s) => s.id === data.studentId) : undefined;

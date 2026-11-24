@@ -3,7 +3,7 @@ import { AppError } from '../core/errors.js';
 import { localDate, localDateTime } from '../core/dates.js';
 import { FILE_KINDS, FILE_LIMITS, base64Bytes, cleanFileName, isStoredName, kindByName, sniffKind } from '../core/files.js';
 import { currentAttempt } from '../core/work.js';
-import { subjectRights, readWorkRows } from './workData.js';
+import { subjectRights, readWorkRows, srsClosed } from './workData.js';
 import { isYoung, studentTask } from './workStudent.js';
 
 const isStr = (v) => typeof v === 'string';
@@ -12,6 +12,7 @@ export function uploadFile(store, platform, files, data, user) {
   if (!files) throw new AppError('files_unavailable');
   const rows = readWorkRows(store);
   const { assignment } = studentTask(rows, data.assignmentId, user);
+  if (srsClosed(rows, assignment)) throw new AppError('unit_closed');
   const last = currentAttempt(rows.submissions.filter((r) => r.assignmentId === assignment.id && r.studentId === user.id));
   if (last && last.status === 'checked') throw new AppError('already_checked');
 

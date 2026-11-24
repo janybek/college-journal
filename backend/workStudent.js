@@ -4,7 +4,7 @@ import { localDate, localDateTime, parseLocalDateTime } from '../core/dates.js';
 import { readSettings } from '../core/settings.js';
 import { FILE_LIMITS } from '../core/files.js';
 import { WORK, currentAttempt, taskCounts, workState } from '../core/work.js';
-import { assignmentPlace, isCurrent, readWorkRows } from './workData.js';
+import { assignmentPlace, isCurrent, readWorkRows, srsClosed } from './workData.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const isStr = (v) => typeof v === 'string';
@@ -46,10 +46,11 @@ export function workMine(store, platform, user) {
     tasks.push({
       id: a.id, subjectId: subject.id, subjectName: subject.name, kind: a.kind, unit: a.unit, title: a.title, dueAt: a.dueAt, maxPoints: a.maxPoints,
       state, late, overdue, points: state === 'checked' ? last.points ?? null : null,
+      ...(srsClosed(rows, a) ? { closed: true } : {}),
     });
   }
   tasks.sort((a, b) => ORDER[a.state] - ORDER[b.state] || cmp(a.dueAt, b.dueAt) || cmp(a.id, b.id));
-  return { today: localDate(nowMs), now: localDateTime(nowMs), counts: taskCounts(tasks, nowMs), tasks };
+  return { today: localDate(nowMs), now: localDateTime(nowMs), counts: taskCounts(tasks.filter((t) => t.closed !== true), nowMs), tasks };
 }
 
 // The answer of 'work.get' to the student: the task, his attempts with their files, his pending files of this task.
@@ -69,6 +70,7 @@ export function studentWorkView(rows, platform, assignment, user) {
   const list = rows.submissions.filter((r) => r.assignmentId === assignment.id && r.studentId === user.id);
   const last = currentAttempt(list);
   const state = workState(assignment, last, nowMs);
+  const shut = srsClosed(rows, assignment);
   return {
     now: localDateTime(nowMs),
     assignment: {
@@ -84,13 +86,15 @@ export function studentWorkView(rows, platform, assignment, user) {
       })),
       pending: own.filter((f) => f.state === 'pending' && isYoung(f, nowMs)).sort(byAt).map(fileView),
     },
-    canSubmit: !last || last.status !== 'checked',
+    canSubmit: !shut && (!last || last.status !== 'checked'),
+    ...(shut ? { closed: true } : {}),
   };
 }
 
 export function submitWork(store, platform, data, user) {
   const rows = readWorkRows(store);
   const { assignment } = studentTask(rows, data.assignmentId, user);
+  if (srsClosed(rows, assignment)) throw new AppError('unit_closed');
   const text = isStr(data.text) ? data.text.trim() : null;
   const ids = data.fileIds;
   if (text === null || text.length > WORK.textMax) throw new AppError('bad_request');

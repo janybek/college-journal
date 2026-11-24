@@ -7,6 +7,8 @@ import { inSemester } from '../core/topics.js';
 import { syllabusFor } from '../core/syllabus.js';
 import { compareNames } from '../core/names.js';
 import { firstPairId, pairPoints, studentResults } from '../core/grades.js';
+import { closedUnitsOf } from '../core/ledger.js';
+import { liveAttempts, subjectResult } from '../core/exam.js';
 import { selfWorkOf } from './journalData.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -18,6 +20,18 @@ function lastOf(list, stamp) {
     if (best === null || (cmp(row[stamp] || '', best[stamp] || '') || cmp(row.id, best.id)) > 0) best = row;
   }
   return best;
+}
+
+// The own exam of the student, shown only when the final sheet is closed: the last attempt decides, the commission and the dates of the others stay out.
+function finalOf(rows, subjectId, planSemester, me, result, scheme) {
+  const mine = (rows.examAttempts || []).filter((r) => r.studentId === me && r.subjectId === subjectId && (r.planSemester ?? null) === planSemester);
+  const admitted = result.admitted === true && Number.isInteger(result.semester);
+  const live = admitted ? liveAttempts(mine) : [];
+  const res = subjectResult({ semester: result.semester, admitted, attempts: live, scheme });
+  return {
+    status: res.status, exam: res.exam, total: res.total, word: res.word, tries: res.tries, canRetake: res.next !== null,
+    attempts: live.map((a) => ({ no: a.no, date: a.date, outcome: a.outcome, score: a.score })),
+  };
 }
 
 export function studentGrades(rows, platform, user) {
@@ -91,14 +105,17 @@ export function studentGrades(rows, platform, user) {
           };
         });
       const teacher = rows.staff.find((x) => x.id === subject.teacherId);
+      const closed = closedUnitsOf(rows.closures, subject.id, planSemester);
       return {
         subjectId: subject.id, name: subject.name, teacherName: teacher ? teacher.fullName : '', hasSyllabus: syllabus !== null,
         units: result.units.map((u) => ({
           unit: u.unit, title: titles.get(u.unit) || '', current: u.current, manual: u.manual !== null,
           self: u.self, control: u.control, total: u.total, word: u.word, currentLow: u.currentLow, controlLow: u.controlLow,
           ...(u.selfWork ? { selfWork: u.selfWork } : {}),
+          ...(closed.units.includes(u.unit) ? { closed: true } : {}),
         })),
         outside: result.outside, preliminary: result.preliminary, semester: result.semester, complete: result.complete, admitted: result.admitted, attendance: result.attendance, pairs,
+        final: closed.final ? finalOf(rows, subject.id, planSemester, me, result, scheme) : null,
       };
     });
   return { today, scheme: schemeOut, split: splitOut, subjects };
