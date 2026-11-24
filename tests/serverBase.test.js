@@ -5,7 +5,10 @@ import path from 'node:path';
 import { handleRequest } from '../backend/api.js';
 import { readConfig } from '../backend/node/config.js';
 import { initBase, openBase, resetAdminPassword } from '../backend/node/base.js';
-import { PERSON, open, snapshotStaff, tempBase, tempConfig, tempRoot } from './serverSetup.js';
+import { baseIsEmpty } from '../backend/node/demo.js';
+import { DEFAULT_SCHEME, schemeToRows, readScheme } from '../core/scoring.js';
+import { main, EXIT } from '../backend/node/server.js';
+import { PERSON, envOf, keep, open, snapshotStaff, tempBase, tempConfig, tempRoot } from './serverSetup.js';
 
 const read = (root, fileData, env = {}) => { if (fileData !== undefined) fs.writeFileSync(path.join(root, 'serve.local.json'), typeof fileData === 'string' ? fileData : JSON.stringify(fileData)); return readConfig({ env, root }); };
 const codeOf = (fn) => { try { fn(); return null; } catch (e) { return e.code; } };
@@ -86,7 +89,7 @@ test('a token lives through a restart; upgrade adds a new sheet and keeps the ro
   base.db.exec('DROP TABLE "rooms"');
   base.close();
   base = open(t, config);
-  assert.deepEqual(base.upgrade(), { created: ['rooms'], added: [] });
+  assert.deepEqual(base.upgrade(), { created: ['rooms'], added: [], moved: [] });
   assert.equal(handleRequest({ action: 'auth.me', token }, base).data.user.fullName, PERSON.fullName);
 });
 test('resetAdminPassword: the old password dies, the new one works and must be changed; other people are untouched; a lost admin row comes back', (t) => {
@@ -101,4 +104,30 @@ test('resetAdminPassword: the old password dies, the new one works and must be c
   base.store.removeMany('staff', base.store.list('staff').filter((r) => r.login === 'admin').map((r) => r.id));
   const again = resetAdminPassword(config);
   assert.equal(call('auth.login', { login: 'admin', password: again.adminTempPassword }).ok, true);
+});
+test('upgrade moves a saved scheme to the regulation once; a fresh base stays empty', (t) => {
+  const config = tempConfig(t);
+  initBase(config);
+  const base = open(t, config);
+  assert.deepEqual(base.upgrade().moved, []);
+  assert.equal(baseIsEmpty(base.db), true);
+  base.store.insertMany('settings', schemeToRows({ ...DEFAULT_SCHEME, good: 76 }));
+  assert.equal(base.upgrade().moved[0], 'scoreGood');
+  assert.deepEqual(base.upgrade().moved, []);
+  assert.equal(readScheme(base.store.list('settings')).good, 80);
+});
+test('the server start writes one line about the moved scheme, without values; the second start writes none', async (t) => {
+  const config = tempConfig(t);
+  initBase(config);
+  const base = open(t, config);
+  base.store.insertMany('settings', schemeToRows({ ...DEFAULT_SCHEME, good: 76 }));
+  base.close();
+  const lines = () => (fs.readFileSync(config.logFile, 'utf8').match(/scheme moved to the regulation: .*/g) || []);
+  const first = keep(t, await main([], { env: envOf(config), root: config.root, out: () => {}, stopCheckMs: 60000 }));
+  assert.equal(first.code, EXIT.ok);
+  assert.deepEqual(lines().map((l) => l.trim()), ['scheme moved to the regulation: scoreGood, scoreSemester, scoreExam, scoreAdmission']);
+  await first.stop();
+  const second = keep(t, await main([], { env: envOf(config), root: config.root, out: () => {}, stopCheckMs: 60000 }));
+  assert.equal(second.code, EXIT.ok);
+  assert.equal(lines().length, 1);
 });

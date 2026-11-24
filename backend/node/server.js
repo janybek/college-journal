@@ -219,6 +219,7 @@ export async function main(argv, { env = process.env, root, out: given, echo, no
       if (upgraded.created.length > 0 || upgraded.added.length > 0) {
         logger.info(`base upgraded: ${upgraded.created.length} tables made, ${upgraded.added.length} columns added`);
       }
+      if (upgraded.moved.length > 0) logger.info(`scheme moved to the regulation: ${upgraded.moved.join(', ')}`);
       upkeep();
       server = await startServer({ config, base, logger, files, version: readVersion({ env }) });
     } catch (error) {

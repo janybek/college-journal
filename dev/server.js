@@ -4,6 +4,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { SCHEMA } from '../core/schema.js';
 import { createFileStore } from '../backend/store/fileStore.js';
+import { applySchemeUpgrade } from '../backend/schemeUpgrade.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { handleRequest } from '../backend/api.js';
 import { createLoginGuard } from '../core/loginGuard.js';
@@ -90,6 +91,7 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
     console.log(`stand file carried over: versions ${upgraded.versions}, split rows ${upgraded.split}, units ${upgraded.units}, untouched rows ${upgraded.skipped.length}, zero-hour rows ${upgraded.zeroHours.length}; copy: ${path.basename(dataPath)}.before-addendum-3.bak`);
   }
   const store = createFileStore(SCHEMA, platform, dataPath);
+  applySchemeUpgrade(store);
   // the box of the files lies beside the data file: files for the fictional stand, real-files for the real one
   const filesDir = path.join(path.dirname(dataPath), seederFor(dataPath, mode) === seedAdmin ? 'real-files' : FILES_DIR);
   const files = createDiskFiles(filesDir);

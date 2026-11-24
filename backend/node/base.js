@@ -7,6 +7,7 @@ import { SCHEMA } from '../../core/schema.js';
 import { hashPassword, generateTempPassword, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { normalizeRow } from '../../core/validate.js';
 import { createNodePlatform } from '../platform/nodePlatform.js';
+import { applySchemeUpgrade } from '../schemeUpgrade.js';
 import { createSqliteStore, ensureTables, openDatabase } from '../store/sqliteStore.js';
 
 // Opening and first run of the working base. Node only: this file is not bundled for Apps Script.
@@ -80,7 +81,7 @@ export function openBase(config, { now } = {}) {
     let closed = false;
     return {
       db, store, platform,
-      upgrade: () => ensureTables(SCHEMA, db),
+      upgrade: () => ({ ...ensureTables(SCHEMA, db), ...applySchemeUpgrade(store) }),
       close() {
         if (closed) return;
         closed = true;

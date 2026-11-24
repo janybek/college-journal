@@ -85,6 +85,13 @@ test('journal.get: the unit rows are read by subject, student and plan semester'
   const j = journalOf(s, sb1, t.teacher1);
   assert.deepEqual([j.results[a1].units[0].control, j.results[a1].units[0].self, j.results[a1].units[0].manual, j.results[a1].units[0].total], [30, 10, 36, 76]);
   assert.equal(j.results[a2].units[0].control, null);
+  assert.deepEqual(j.split, { semester: 60, exam: 40, admission: 30 });
+  assert.equal(j.results[a1].semester, 46);
+  assert.equal('word' in j.results[a1], false);
+  assert.equal(j.results[a1].units[0].word, 'fair');
+  assert.deepEqual([j.results[a1].complete, j.results[a1].admitted], [false, false]);
+  s.call('scoring.save', { scheme: { ...DEFAULT_SCHEME }, split: { semester: 50, exam: 50, admission: 25 } }, t.dean);
+  assert.equal(journalOf(s, sb1, t.teacher1).results[a1].semester, 38);
 });
 
 test('journal.get: the numbers are recounted after the scheme changes', () => {

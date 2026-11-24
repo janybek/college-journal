@@ -3,7 +3,7 @@ import { AppError } from '../core/errors.js';
 import { isDate, localDate, localDateTime, localTime } from '../core/dates.js';
 import { FIXED_STATUSES, RESULT_FIELDS } from '../core/schema.js';
 import { readSettings } from '../core/settings.js';
-import { readScheme } from '../core/scoring.js';
+import { readScheme, readSplit } from '../core/scoring.js';
 import { NO_LESSON, inSemester } from '../core/topics.js';
 import { syllabusFor } from '../core/syllabus.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
@@ -89,6 +89,7 @@ export function journalView(rows, platform, subjectId, user) {
   const viewer = viewerOf(user);
   const settings = readSettings(rows.settings);
   const scheme = readScheme(rows.settings);
+  const split = readSplit(rows.settings);
   const owner = viewer.teacher && subject.teacherId === viewer.id;
   const all = rows.pairs.filter((p) => p.subjectId === subject.id && inSemester(p.date, settings));
   const whole = viewer.manager || viewer.reader || owner;
@@ -192,7 +193,7 @@ export function journalView(rows, platform, subjectId, user) {
     const forCount = all.map((p) => ({ id: p.id, status: p.status, lessonType: p.lessonType, unit: unitOf(p), first: p.id === first }));
     for (const s of students) {
       const selfWork = selfWorkOf(rows, subject, planSemester, s.id, nowMs, scheme.self);
-      results[s.id] = studentResults({ pairs: forCount, marks: rawMarks.get(s.id) || new Map(), unitRows: unitRows.get(s.id) || new Map(), units: unitList, scheme, selfWork });
+      results[s.id] = studentResults({ pairs: forCount, marks: rawMarks.get(s.id) || new Map(), unitRows: unitRows.get(s.id) || new Map(), units: unitList, scheme, split, selfWork });
     }
   }
 
@@ -203,7 +204,7 @@ export function journalView(rows, platform, subjectId, user) {
       teacherId: subject.teacherId, teacherName: nameOf(rows.staff, subject.teacherId),
       semester: settings.semester, planSemester, hasSyllabus: syllabus !== null,
     },
-    scheme, partial, can: { results: viewer.manager || owner, manage: viewer.manager },
+    scheme, split: { semester: split.semester, exam: split.exam, admission: split.admission }, partial, can: { results: viewer.manager || owner, manage: viewer.manager },
     students, pairs, marks,
     units: unitList.map((unit) => (byWork.has(unit) ? { unit, title: titles.get(unit) || '', byWork: true } : { unit, title: titles.get(unit) || '' })),
     results,

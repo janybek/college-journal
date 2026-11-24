@@ -16,6 +16,8 @@ test('student.grades: a student reads only their own points and absences', () =>
   assert.deepEqual(g.subjects[0].pairs.map((p) => [p.date, p.status, p.activity, p.earned, p.possible]), [['2026-09-01', 'present', null, 20, 20], ['2026-09-08', 'present', 7, 27, 30]]);
   assert.deepEqual(g.subjects[0].attendance, { marked: 2, attended: 2, late: 0, absent: 0, excused: 0, madeup: 0, noCoat: 0, percent: 100 });
   assert.equal(g.subjects[0].teacherName, 'Иванова Нургуль');
+  assert.deepEqual(g.split, { semester: 60, exam: 40, admission: 30 });
+  assert.deepEqual([g.subjects[0].preliminary, g.subjects[0].semester, 'word' in g.subjects[0]], [84, 50, false]);
   assert.deepEqual(Object.keys(g.scheme).sort(), ['activity', 'attendance', 'control', 'current', 'excellent', 'fair', 'good', 'minimum', 'self']);
 
   // Review Focus 2: foreign ids in the request change nothing; nothing foreign in the answer
@@ -50,5 +52,6 @@ test('student.grades: manual current points, a student without a group', () => {
   assert.equal(JSON.stringify(g).includes('секретная'), false);
   store.update('students', a1, { groupId: '' });
   at('2026-09-30', '12:00');
-  assert.deepEqual(call('student.grades', {}, t.a1).data.subjects, []);
+  const none = call('student.grades', {}, t.a1).data;
+  assert.deepEqual(none, { today: none.today, scheme: none.scheme, split: { semester: 60, exam: 40, admission: 30 }, subjects: [] });
 });
