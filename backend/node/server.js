@@ -15,6 +15,7 @@ import { createDiskFiles, sweepFiles, spaceAlarm } from './files.js';
 import { createSiteHandler } from './static.js';
 import { runDemo } from './demo.js';
 import { EXIT } from './exit.js';
+import { readVersion, UNKNOWN_VERSION } from './version.js';
 
 // The working server: answers only its own site, serves no files, limits login attempts, keeps a work log.
 // Node only: this file is not bundled for Apps Script.
@@ -33,7 +34,7 @@ function actionOf(body) {
   }
 }
 
-export async function startServer({ config, base, logger, guard = createLoginGuard(), maxBodyBytes = MAX_BODY_BYTES, files }) {
+export async function startServer({ config, base, logger, guard = createLoginGuard(), maxBodyBytes = MAX_BODY_BYTES, files, version = UNKNOWN_VERSION }) {
   const { platform, store } = base;
   const ctx = { store, platform, files, loginGuard: guard, log: (e) => logger.error('handler', e) };
   const notFound = (res) => {
@@ -79,7 +80,7 @@ export async function startServer({ config, base, logger, guard = createLoginGua
       // The path is cut by hand, never parsed as an address: the addresses '//' and '/\' make URL parsing throw.
       const pathname = String(req.url).split('?')[0];
       if (pathname === '/api') return await handleApi(req, res);
-      if (pathname === '/health') return req.method === 'GET' ? sendJson(res, 200, { ok: true, data: 'journal' }) : notFound(res);
+      if (pathname === '/health') return req.method === 'GET' ? sendJson(res, 200, { ok: true, data: 'journal', version }) : notFound(res);
       return site ? site(req, res, String(req.url)) : notFound(res);
     } catch (error) {
       if (!req.destroyed) logger.error('request', error);
@@ -219,7 +220,7 @@ export async function main(argv, { env = process.env, root, out: given, echo, no
         logger.info(`base upgraded: ${upgraded.created.length} tables made, ${upgraded.added.length} columns added`);
       }
       upkeep();
-      server = await startServer({ config, base, logger, files });
+      server = await startServer({ config, base, logger, files, version: readVersion({ env }) });
     } catch (error) {
       backups?.stop();
       base.close();

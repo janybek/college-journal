@@ -89,7 +89,7 @@ test('other methods on a site path: 405 with Allow; the API and the check still 
     assert.deepEqual([res.status, res.headers.allow], [405, 'GET, HEAD'], method);
   }
   const health = await raw('GET', '/health');
-  assert.deepEqual([health.status, JSON.parse(health.body)], [200, { ok: true, data: 'journal' }]);
+  assert.deepEqual([health.status, JSON.parse(health.body)], [200, { ok: true, data: 'journal', version: 'unknown' }]);
   assert.equal((await raw('POST', '/health')).status, 404);
   const res = await post(login(PERSON.password), { Origin: ORIGIN });
   assert.deepEqual([res.status, (await res.json()).ok], [200, true]);

@@ -42,6 +42,8 @@ test('Dockerfile: the base image, only the named folders, no secrets, the user n
   assert.equal(/JOURNAL_ORIGINS=/.test(d), false);
   assert.match(d, /RUN mkdir -p \/data \/backup && chown node:node \/data \/backup/);
   assert.equal(d.indexOf('USER node') > d.indexOf('RUN mkdir'), true);
+  assert.match(d, /^ARG JOURNAL_VERSION=unknown$/m);
+  assert.match(d, /JOURNAL_AUTO_INIT=1 \\\n\s+JOURNAL_VERSION=\$JOURNAL_VERSION\n/);               // inside the ENV block, a real line continuation
   assert.match(d, /^EXPOSE 5373$/m);
   assert.match(d, /^VOLUME \["\/data", "\/backup"\]$/m);
   assert.match(d, /^HEALTHCHECK .*\\\n\s+CMD \["node", "-e", "fetch\(.*\/health/m);
@@ -70,6 +72,8 @@ test('image.yml: ghcr, the right actions and tags, the test job is not a gate; p
   assert.match(y, /images: ghcr\.io\/\$\{\{ github\.repository \}\}/);
   assert.match(y, /type=raw,value=latest/);
   assert.match(y, /type=sha,prefix=,format=short/);
+  assert.match(y, /build-args: JOURNAL_VERSION=\$\{\{ steps\.ver\.outputs\.short \}\}/);
+  assert.match(y, /GITHUB_SHA::7/);
   assert.match(y, /push: true/);
   assert.match(y, /platforms: linux\/amd64/);
   assert.match(y, /node-version: 24/);

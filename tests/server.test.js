@@ -15,7 +15,7 @@ test('the site gets its answer with its own origin in the header and never a wil
     [200, ORIGIN, 'Origin', 'no-store', 'nosniff', true]);
   assert.equal(srv.address, '127.0.0.1');
   const health = await raw('GET', '/health');
-  assert.deepEqual([health.status, JSON.parse(health.body), health.headers['access-control-allow-origin']], [200, { ok: true, data: 'journal' }, undefined]);
+  assert.deepEqual([health.status, JSON.parse(health.body), health.headers['access-control-allow-origin']], [200, { ok: true, data: 'journal', version: 'unknown' }, undefined]);
 });
 
 test('a foreign, look-alike, null or missing Origin: 403, nothing is run, nothing is written and a login attempt is not counted', async (t) => {

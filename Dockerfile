@@ -10,6 +10,9 @@ COPY backend ./backend
 COPY core ./core
 COPY site ./site
 
+# The version shown by /health: the short commit hash, given by the image build (.git is not in the image).
+ARG JOURNAL_VERSION=unknown
+
 # JOURNAL_ORIGINS is not set here: the cluster gives the address of its site (see DOCKER.md).
 ENV NODE_ENV=production \
     JOURNAL_DATA_DIR=/data \
@@ -17,7 +20,8 @@ ENV NODE_ENV=production \
     JOURNAL_HOST=0.0.0.0 \
     JOURNAL_PORT=5373 \
     JOURNAL_SITE_DIR=/app/site \
-    JOURNAL_AUTO_INIT=1
+    JOURNAL_AUTO_INIT=1 \
+    JOURNAL_VERSION=$JOURNAL_VERSION
 
 # The application files stay owned by root (read-only for the user node); only the two data folders are writable.
 RUN mkdir -p /data /backup && chown node:node /data /backup

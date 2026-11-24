@@ -158,7 +158,7 @@ export async function start(t, options = {}) {
   const base = open(t, config, { now: options.now });
   base.upgrade();
   const logger = createLogger(config.logFile, { now: base.platform.now });
-  const srv = keep(t, await startServer({ config, base, logger, guard: options.guard, maxBodyBytes: options.maxBodyBytes }));
+  const srv = keep(t, await startServer({ config, base, logger, guard: options.guard, maxBodyBytes: options.maxBodyBytes, version: options.version }));
   const send = (method, requestPath, headers, body) => new Promise((resolve, reject) => {
     const req = http.request({ host: '127.0.0.1', port: srv.port, path: requestPath, method, headers, agent: false }, (res) => {
       const chunks = [];

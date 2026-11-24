@@ -55,7 +55,7 @@
 
 ## Проверка работы
 
-`GET /health` отвечает `{"ok":true,"data":"journal"}`. В образе уже есть `HEALTHCHECK`. На Node 24 в журнале при старте может быть строка `ExperimentalWarning: SQLite is an experimental feature`: это нормально.
+`GET /health` отвечает `{"ok":true,"data":"journal","version":"<хеш>"}`: `version` — короткий хеш коммита, он совпадает с тегом образа (`ghcr.io/janybek/college-journal:<хеш>`), так видно, какая версия выкатилась. В образе уже есть `HEALTHCHECK`. На Node 24 в журнале при старте может быть строка `ExperimentalWarning: SQLite is an experimental feature`: это нормально.
 
 ## Прокси, доступ из интернета
 

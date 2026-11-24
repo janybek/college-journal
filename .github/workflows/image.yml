@@ -27,6 +27,8 @@ jobs:
           tags: |
             type=raw,value=latest
             type=sha,prefix=,format=short
+      - id: ver
+        run: echo "short=${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
       - uses: docker/build-push-action@v6
         with:
           context: .
@@ -34,6 +36,7 @@ jobs:
           platforms: linux/amd64
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: JOURNAL_VERSION=${{ steps.ver.outputs.short }}
 
   # Not a gate for the image: it may fail on Linux the first time while the image still publishes.
   test:
