@@ -7872,3 +7872,79 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .lg-dialog__warn { color: var(--warning); font-weight: 500; }
 
 .lg-accept { display: flex; align-items: center; gap: var(--space-3); min-height: 2.75rem; cursor: pointer; font-weight: 500; }
+
+/* The exam part of the ledger: the head, the results, the closing of the final sheet, the tries. */
+.lg-exam { display: grid; gap: var(--space-4); padding: var(--space-5); }
+
+.lg-exam [hidden],
+#ledger-attempt-dialog [hidden] { display: none; }
+
+.lg-exam__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); }
+
+.lg-exam__title { font-size: 1.125rem; font-weight: 600; letter-spacing: -0.015em; }
+
+.lg-exam__wait { margin: 0; color: var(--text-muted); }
+
+.lg-exam__close { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+.lg-exam__stop { display: inline-flex; flex: 1 1 18rem; min-width: 0; align-items: center; gap: var(--space-2); margin: 0; color: var(--warning); font-size: 0.875rem; font-weight: 500; }
+
+.lg-exam__stop .icon { flex: none; width: 1rem; height: 1rem; }
+
+.lg-exam .button[aria-disabled="true"] { opacity: 0.55; cursor: not-allowed; }
+
+.lg-exam__facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr)); gap: var(--space-3) var(--space-5); margin: 0; }
+
+.lg-exam__fact { min-width: 0; }
+
+.lg-exam__fact dt { color: var(--text-muted); font-size: 0.8125rem; }
+
+.lg-exam__fact dd { margin: 0; font-weight: 500; overflow-wrap: anywhere; }
+
+.lg-exam__facts--head { padding-top: var(--space-3); border-top: 1px solid var(--border); }
+
+.lg-exam__head { display: grid; grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr)); align-items: start; gap: var(--space-4); padding-top: var(--space-4); border-top: 1px solid var(--border); }
+
+.lg-exam__actions { display: grid; gap: var(--space-3); max-width: 40rem; }
+
+.lg-exam__buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.lg-ex-cell { min-width: 12rem; text-align: left; }
+
+.lg-ex-control { display: flex; align-items: center; gap: var(--space-2); }
+
+.lg-grid .lg-ex-input, .lg-ex-input { width: 4.25rem; min-width: 0; text-align: center; font-variant-numeric: tabular-nums; }
+
+.lg-ex-mode { width: auto; min-width: 7.5rem; }
+
+.lg-ex-none { color: var(--text-muted); font-style: italic; }
+
+.lg-ex-error { display: flex; align-items: flex-start; gap: var(--space-1); margin: var(--space-1) 0 0; color: var(--danger); font-size: 0.8125rem; white-space: normal; }
+
+.lg-ex-error .icon { flex: none; width: 0.875rem; height: 0.875rem; margin-top: 0.125rem; }
+
+.lg-grid .lg-sub td { padding: 0; background: var(--surface); }
+
+.lg-grid .lg-sub:hover td { background: var(--surface); }
+
+.lg-sub__body {
+  position: sticky;
+  left: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3) var(--space-5);
+  width: max-content;
+  max-width: 100vw;
+  padding: var(--space-2) var(--space-4) var(--space-2) 2.75rem;
+}
+
+.lg-hist { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin: 0; padding: 0; list-style: none; color: var(--text-muted); font-size: 0.875rem; }
+
+.lg-hist__item { display: inline-flex; gap: var(--space-2); }
+
+.lg-hist__date { font-variant-numeric: tabular-nums; }
+
+.lg-hist__result { color: var(--text); font-weight: 600; }
+
+.lg-hist__item[title] { cursor: help; }

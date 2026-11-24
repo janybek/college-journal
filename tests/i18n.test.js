@@ -499,3 +499,21 @@ test('unit 6 task 18: the ledger screens have their texts in every language', ()
     assert.ok(dict['ledger.low'].includes('{min}'));
   }
 });
+
+test('unit 6 task 19: the exam of the ledger has its texts in every language, the maximum only as a placeholder', () => {
+  const keys = ['title', 'notReady', 'date', 'examiner', 'examinerHint', 'assistants', 'strict', 'saveHead', 'enter', 'save', 'saving', 'reason', 'reasonHint', 'notAdmitted', 'leave',
+    'error.bad_value', 'error.date.out_of_exam', 'error.date.in_future', 'error.date.order', 'error.date.in_session', 'error.studentId.not_admitted', 'error.studentId.has_retake', 'error.commission.required']
+    .map((k) => 'ledger.exam.' + k);
+  keys.push('ledger.final.block.units_open', 'ledger.final.block.no_units', 'ledger.final.block.no_date', 'ledger.final.block.exam_missing', 'ledger.final.early', 'ledger.final.close', 'ledger.final.closeBody',
+    'ledger.attempt.first', 'ledger.attempt.retake', 'ledger.attempt.commission', 'ledger.attempt.addFirst', 'ledger.attempt.addRetake', 'ledger.attempt.addCommission', 'ledger.attempt.commissionField',
+    'error.final_closed', 'error.units_open');
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    for (const key of keys) {
+      assert.ok(dict[key], lang + ' ' + key);
+      assert.ok(!/(^|\D)(60|40)(\D|$)/.test(dict[key]), lang + ' ' + key + ' has a regulation number');
+      assert.deepEqual(ru[key].match(/\{\w+\}/g)?.sort(), dict[key].match(/\{\w+\}/g)?.sort(), lang + ' ' + key + ' placeholders');
+    }
+    assert.ok(dict['ledger.exam.error.bad_value'].includes('{max}'), lang);
+    assert.ok(dict['ledger.final.block.units_open'].includes('{n}'), lang);
+  }
+});

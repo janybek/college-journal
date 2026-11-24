@@ -97,3 +97,86 @@ export function examNote(examWeek, today, final) {
   if (today < examWeek.start) return { key: 'ledger.exam.from', params: { date: dayOf(examWeek.start) } };
   return { key: 'ledger.exam.now', params: { date: dayOf(examWeek.end) } };
 }
+
+// ---- The exam: the head, the results of the first sitting, the history of the tries ----
+
+const ABSENT = 'absent';
+const INCOMPLETE = 'incomplete';
+const firstTry = (student) => student.attempts.find((a) => a.no === 1);
+const textOfTry = (attempt) => {
+  if (!attempt || !attempt.outcome) return '';
+  return attempt.outcome === 'score' ? String(attempt.score) : attempt.outcome;
+};
+const canEnter = (student) => student.admitted === true && !student.left;
+
+// The fields of the exam column: the first try of those who may sit it. A score as digits, «absent», «incomplete» or ''.
+export function examDraft(students) {
+  const draft = new Map();
+  for (const s of students) if (canEnter(s)) draft.set(s.id, textOfTry(firstTry(s)));
+  return draft;
+}
+
+// What goes to the server: only the changed fields. bad: whose field is neither a whole number up to the exam maximum of the answer nor a word.
+export function examItems(draft, students, split) {
+  const items = [];
+  const bad = [];
+  for (const s of students) {
+    if (!canEnter(s) || !draft.has(s.id)) continue;
+    const text = String(draft.get(s.id)).trim();
+    if (text === textOfTry(firstTry(s))) continue;
+    if (text === '') items.push({ studentId: s.id, outcome: null, score: null });
+    else if (text === ABSENT || text === INCOMPLETE) items.push({ studentId: s.id, outcome: text, score: null });
+    else if (/^\d{1,3}$/.test(text) && Number(text) <= split.exam) items.push({ studentId: s.id, outcome: 'score', score: Number(text) });
+    else bad.push(s.id);
+  }
+  return { items, bad };
+}
+
+// A result that was already there is changed: a reason is needed.
+export function examNeedsReason(items, students) {
+  const byId = new Map(students.map((s) => [s.id, s]));
+  return items.some((item) => {
+    const student = byId.get(item.studentId);
+    return student ? textOfTry(firstTry(student)) !== '' : false;
+  });
+}
+
+// What stops the closing of the final sheet: the first reason of the server.
+export function finalNote(final) {
+  const [first] = final && Array.isArray(final.blocking) ? final.blocking : [];
+  return first ? { key: 'ledger.final.block.' + first.code, params: { n: first.n } } : null;
+}
+
+// The title of a try in the history. index: how many sittings (a score or «did not come») came before it; «I» is not a sitting.
+export function attemptLabel(attempt, index) {
+  if (index === 0) return { key: 'ledger.attempt.first', params: {} };
+  if (attempt.commission) return { key: 'ledger.attempt.commission', params: { n: index } };
+  return { key: 'ledger.attempt.retake', params: { n: index } };
+}
+
+export function attemptLines(attempts) {
+  let sittings = 0;
+  return attempts.map((attempt) => {
+    const label = attemptLabel(attempt, sittings);
+    if (attempt.outcome === 'score' || attempt.outcome === ABSENT) sittings += 1;
+    const result = examCell({ status: attempt.outcome === 'score' ? 'done' : attempt.outcome, exam: attempt.score });
+    return { no: attempt.no, date: attempt.date, label, result, commission: attempt.commission || '' };
+  });
+}
+
+// The button under a student after the final sheet is closed: the first sitting after «I», a retake, or a retake by a commission.
+export function nextLabel(next) {
+  if (!next) return null;
+  if (!next.retake) return { key: 'ledger.attempt.addFirst' };
+  return { key: next.commission ? 'ledger.attempt.addCommission' : 'ledger.attempt.addRetake' };
+}
+
+// The server refuses to close a unit with a code and no number; the screen knows the number from the unit it shows.
+export function unitBlockNote(error, units, unitNumber) {
+  if (!error || error.code !== 'invalid' || !Array.isArray(error.fields) || !error.fields[0]) return null;
+  const { field, code } = error.fields[0];
+  if (field !== 'unit' || (code !== 'pairs_not_held' && code !== 'self_pending')) return null;
+  const unit = units.find((u) => u.unit === unitNumber);
+  const entry = unit && Array.isArray(unit.blocking) ? unit.blocking.find((b) => b.code === code) : undefined;
+  return entry ? { key: 'ledger.block.' + code, params: { n: entry.n } } : null;
+}

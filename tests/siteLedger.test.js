@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ledgerColumns, unitCellText, isLow, admissionCell, examCell, finalCell, closeNote, canCloseUnit, wordCounts, examNote,
+  examDraft, examItems, examNeedsReason, finalNote, attemptLabel, attemptLines, nextLabel, unitBlockNote,
 } from '../site/js/ledger.js';
 
 const U = (over) => ({ unit: 1, current: 38, manual: false, self: 16, selfPending: 0, control: 30, total: 84, word: 'good', currentLow: false, controlLow: false, ...over });
@@ -61,4 +62,42 @@ test('the columns: a group per unit, then the semester, the admission, the exam,
   assert.deepEqual(columns.map((c) => c.type), ['unit', 'unit', 'semester', 'admission', 'exam', 'final', 'word']);
   assert.deepEqual(columns[0], { type: 'unit', unit: 1, title: 'Основы', closed: true, fields: ['current', 'self', 'control', 'total'] });
   assert.equal(columns[1].closed, false);
+});
+
+const A = (no, outcome, score = null, date = '2026-12-15', commission = '') => ({ id: 'xa_' + no, no, date, outcome, score, commission });
+const P = (id, over = {}) => ({ id, left: false, admitted: true, attempts: [], ...over });
+const list = [P('a1', { attempts: [A(1, 'score', 35)] }), P('a2', { attempts: [A(1, 'absent')] }), P('a3', { admitted: false }), P('a4'), P('a5', { left: true })];
+
+test('the exam draft holds the first try of those admitted who have not left; the changed ones go to the server', () => {
+  assert.deepEqual([...examDraft(list)], [['a1', '35'], ['a2', 'absent'], ['a4', '']]);
+  const draft = new Map([['a1', '33'], ['a2', 'absent'], ['a4', 'incomplete']]);
+  assert.deepEqual(examItems(draft, list, SP), { items: [{ studentId: 'a1', outcome: 'score', score: 33 }, { studentId: 'a4', outcome: 'incomplete', score: null }], bad: [] });
+  assert.deepEqual(examItems(new Map([['a1', ''], ['a2', '41'], ['a4', '3.5']]), list, SP), { items: [{ studentId: 'a1', outcome: null, score: null }], bad: ['a2', 'a4'] });
+  assert.deepEqual(examItems(new Map([['a2', '45']]), list, { semester: 50, exam: 50, admission: 25 }).bad, []);
+  assert.deepEqual([examNeedsReason([{ studentId: 'a4', outcome: 'score', score: 30 }], list), examNeedsReason([{ studentId: 'a1', outcome: 'score', score: 33 }], list)], [false, true]);
+});
+
+test('what stops the closing of the final sheet, and the history of the tries', () => {
+  assert.deepEqual([finalNote({ blocking: [{ code: 'units_open', n: 1 }, { code: 'no_date', n: 0 }] }), finalNote({ blocking: [{ code: 'exam_missing', n: 2 }] }), finalNote({ blocking: [] })],
+    [{ key: 'ledger.final.block.units_open', params: { n: 1 } }, { key: 'ledger.final.block.exam_missing', params: { n: 2 } }, null]);
+  const history = attemptLines([A(1, 'score', 20), A(2, 'score', 21, '2027-01-12'), A(3, 'score', 25, '2027-01-19', 'Член комиссии Первый')]);
+  assert.deepEqual(history.map((x) => [x.date, x.label.key, x.label.params, x.result.text]),
+    [['2026-12-15', 'ledger.attempt.first', {}, '20'], ['2027-01-12', 'ledger.attempt.retake', { n: 1 }, '21'], ['2027-01-19', 'ledger.attempt.commission', { n: 2 }, '25']]);
+  assert.deepEqual(attemptLines([A(1, 'incomplete'), A(2, 'absent', null, '2026-12-18')]).map((x) => [x.label.key, x.result.key]),
+    [['ledger.attempt.first', 'ledger.exam.incomplete'], ['ledger.attempt.first', 'ledger.exam.absent']]);
+  assert.deepEqual(attemptLabel(A(2, 'score', 5), 1), { key: 'ledger.attempt.retake', params: { n: 1 } });
+});
+
+test('the button of the next try', () => {
+  assert.deepEqual([nextLabel(null), nextLabel({ no: 2, retake: false, commission: false }), nextLabel({ no: 2, retake: true, commission: false }), nextLabel({ no: 3, retake: true, commission: true })],
+    [null, { key: 'ledger.attempt.addFirst' }, { key: 'ledger.attempt.addRetake' }, { key: 'ledger.attempt.addCommission' }]);
+});
+
+test('a refused closing of a unit is told with the number from the screen', () => {
+  const units = [{ unit: 1, blocking: [{ code: 'pairs_not_held', n: 3 }] }, { unit: 2, blocking: [] }];
+  const error = (code) => ({ code: 'invalid', fields: [{ field: 'unit', code }] });
+  assert.deepEqual(unitBlockNote(error('pairs_not_held'), units, 1), { key: 'ledger.block.pairs_not_held', params: { n: 3 } });
+  assert.equal(unitBlockNote(error('self_pending'), units, 2), null);   // the screen is stale: no number to tell
+  assert.equal(unitBlockNote(error('bad_value'), units, 1), null);
+  assert.equal(unitBlockNote({ code: 'forbidden' }, units, 1), null);
 });

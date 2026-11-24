@@ -5,13 +5,14 @@ import { icon } from '../icons.js';
 import { semesterCell } from '../journal.js';
 import { permissions } from '../shell.js';
 import {
-  ledgerColumns, wordTone, unitCellText, isLow, admissionCell, examCell, finalCell, closeNote, canCloseUnit, wordCounts, examNote,
+  ledgerColumns, unitCellText, isLow, admissionCell, examCell, finalCell, closeNote, canCloseUnit, examNote, unitBlockNote,
 } from '../ledger.js';
+import { examSection, examTd as examEditTd, studentExtra, countsList, reset as resetExam } from './ledgerExam.js';
 
 // The ledger of a subject (#/ledger/<subjectId>, ledger.get): the numbers of the journal for every unit, then the semester
 // points, the admission, the exam, the total and the grade. Every number is the server's; the screen only chooses words
 // and tones. Closing a unit and reopening (the administrator, with a reason) ask in a window and draw the ledger again
-// from the answer. Names and reasons are only ever text. Entering the exam is not here yet.
+// from the answer. Names and reasons are only ever text. The exam part (its head, the results, closing the final sheet, the retakes) is in ledgerExam.js.
 
 const FINAL = 0;                 // the unit number of the final sheet in ledger.reopen
 const REASON_MAX = 300;
@@ -26,6 +27,7 @@ const blank = (subjectId = null) => ({
 let state = blank();
 
 export function leave() {
+  resetExam();
   state = blank();
 }
 
@@ -99,23 +101,22 @@ function body(view) {
     parts.push(emptyState('table', el('p', { class: 'empty__title' }, t('ledger.emptyStudents'))));
     return el('div', { class: 'ledger' }, parts);
   }
-  parts.push(summary(view), finalBar(view), grid(view));
+  const owner = state;
+  const host = {
+    owner,
+    alive: () => state === owner,
+    apply: (ledger) => { if (state !== owner) return false; owner.data = ledger; return true; },
+    redraw: refresh,
+    dialogShell,
+  };
+  parts.push(summary(view), finalBar(view), grid(view, host), examSection(view, host));
   return el('div', { class: 'ledger' }, parts);
 }
 
 // ---- The line of the group: how many have each word (only when every unit is closed) ----
 
 function summary(view) {
-  if (!view.exam.ready) return null;
-  const counts = wordCounts(view.students);
-  const chips = [];
-  for (const word of ['excellent', 'good', 'fair', 'fail']) if (counts[word] > 0) chips.push([t('journal.grade.' + word), counts[word], wordTone(word)]);
-  for (const [key, tone] of [['absent', 'danger'], ['incomplete', 'warning'], ['notAdmitted', 'danger']]) {
-    if (counts[key] > 0) chips.push([t('ledger.count.' + key), counts[key], tone]);
-  }
-  if (chips.length === 0) return null;
-  return el('ul', { class: 'lg-counts', id: 'ledger-counts', 'aria-label': t('ledger.counts.label') },
-    chips.map(([text, n, tone]) => el('li', {}, badge(`${text}: ${n}`, tone))));
+  return view.exam.ready ? countsList(view.students, 'ledger-counts') : null;
 }
 
 // ---- The final sheet: its state, and «Открыть заново» for the administrator ----
@@ -145,7 +146,7 @@ function reopenMenu(id, unit) {
 
 // ---- The grid ----
 
-function grid(view) {
+function grid(view, host) {
   const columns = ledgerColumns(view);
   const { scheme, split } = view;
   const max = { current: scheme.current, self: scheme.self, control: scheme.control, total: 100 };
@@ -168,7 +169,11 @@ function grid(view) {
       scope: 'col', class: `lg-field lg-field--${field}`, title: t('journal.tip.' + field, { max: max[field] }),
     }, t('journal.col.' + field))))));
 
-  const rows = students.map((student, index) => studentRow(view, student, index + 1, unitCols, { ready, closed, max, min: scheme.minimum }));
+  const colCount = 1 + unitCols.length * 4 + 5;
+  const rows = students.flatMap((student, index) => [
+    studentRow(view, student, index + 1, unitCols, { ready, closed, max, min: scheme.minimum }, host),
+    studentExtra(view, student, colCount, host),
+  ]).filter(Boolean);
   const scroller = el('div', { class: 'table-scroll lg-scroll', tabindex: '0', role: 'region', 'aria-labelledby': 'ledger-title' },
     el('table', { class: 'lg-grid', id: 'ledger-grid' }, head, el('tbody', {}, rows)));
   return el('section', { class: 'card lg-card-grid', 'aria-labelledby': 'ledger-title' }, scroller);
@@ -194,13 +199,13 @@ function unitHead(view, column) {
     action && hint && hint.key === 'ledger.missing' ? el('span', { class: 'lg-unit-head__note lg-unit-head__note--neutral' }, t(hint.key, hint.params)) : null);
 }
 
-function studentRow(view, student, number, unitCols, { ready, closed, max, min }) {
+function studentRow(view, student, number, unitCols, { ready, closed, max, min }, host) {
   const cells = [];
   for (const column of unitCols) {
     const row = student.units.find((u) => u.unit === column.unit);
     for (const field of column.fields) cells.push(row ? unitCell(row, field, max, min) : el('td', { class: 'lg-num lg-pts lg-empty' }, '—'));
   }
-  cells.push(semesterTd(student, view.split), admissionTd(student, ready, view.split), examTd(student), finalTd(student, ready, closed), wordTd(student, ready, closed));
+  cells.push(semesterTd(student, view.split), admissionTd(student, ready, view.split), examEditTd(view, student, host) ?? examTd(student), finalTd(student, ready, closed), wordTd(student, ready, closed));
   return el('tr', { class: student.left ? 'is-left' : null },
     el('th', { scope: 'row', class: 'lg-name' },
       el('span', { class: 'lg-name__no' }, String(number)),
@@ -298,7 +303,7 @@ function openClose(unitNumber) {
       confirm.removeAttribute('aria-busy');
       confirm.classList.remove('is-busy');
       confirm.textContent = t('ledger.close.confirm');
-      problem.replaceChildren(note('error', t(failKey(error)), { role: 'alert' }));
+      problem.replaceChildren(note('error', failText(error, view, unit.unit), { role: 'alert' }));
     }
   };
   confirm.addEventListener('click', submit);
@@ -314,7 +319,13 @@ function openClose(unitNumber) {
   focusById(needAccept ? 'ledger-close-accept' : 'ledger-close-confirm');
 }
 
-// The key of the text of a failed request; a stop of the closing is told as in the head of the unit.
+// The text of a failed request; a stop of the closing is told as in the head of the unit.
+function failText(error, view, unitNumber) {
+  const stop = unitBlockNote(error, view.units, unitNumber);
+  return stop ? t(stop.key, stop.params) : t(failKey(error));
+}
+
+// The key of the text of the other failures.
 function failKey(error) {
   if (error.code === 'invalid' && Array.isArray(error.fields) && error.fields[0]) {
     const { field, code } = error.fields[0];
