@@ -71,4 +71,16 @@ export function storeContract(name, makeStore) {
     s.removeMany('rooms', []);
     assert.throws(() => s.removeMany('nope', []), e => e.code === 'bad_request');
   });
+
+  test(`${name}: the tables of the repeat course keep ints and bools`, () => {
+    const s = makeStore();
+    const card = s.insert('repeats', { studentId: 'st_1', subjectId: 'sb_1', planSemester: '1', kind: 'full', prevAdmitted: true, prevExam: 20, works: null, status: 'open' });
+    assert.match(card.id, /^rp_[0-9a-f]{8}$/);
+    assert.deepEqual([card.planSemester, card.prevAdmitted, card.prevExam, card.works, card.prevWord], [1, true, 20, null, '']);
+    const attempt = s.insert('repeatAttempts', { repeatId: card.id, no: 1, date: '2027-01-15', outcome: 'score', score: 30 });
+    assert.match(attempt.id, /^rx_[0-9a-f]{8}$/);
+    assert.deepEqual(s.get('repeatAttempts', attempt.id), { id: attempt.id, repeatId: card.id, no: 1, date: '2027-01-15', outcome: 'score', score: 30, commission: '', updatedBy: '', updatedAt: '' });
+    assert.equal(s.update('repeats', card.id, { works: 45 }).works, 45);
+    assert.equal(s.list('repeats').length, 1);
+  });
 }

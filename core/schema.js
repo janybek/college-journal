@@ -21,12 +21,14 @@ export const RESULT_FIELDS = ['control', 'self', 'current'];
 export const WORK_KINDS = ['hw', 'srs'];                                   // ДЗ, СРС
 export const WORK_STATUSES = ['submitted', 'replaced', 'checked', 'returned']; // сдано, заменено новой попыткой, проверено, возвращено
 export const FILE_STATES = ['pending', 'attached', 'dropped', 'syllabus'];             // загружен и ждёт «Сдать», в сдаче, убран студентом
-export const LOG_ENTITIES = ['mark', 'unit', 'pair', 'work', 'ledger', 'exam', 'subjectExam'];   // 'exam' - гос. экзамен, 'subjectExam' - экзамен предмета
+export const LOG_ENTITIES = ['mark', 'unit', 'pair', 'work', 'ledger', 'exam', 'subjectExam', 'repeat'];   // 'exam' - гос. экзамен, 'subjectExam' - экзамен предмета
 export const REQUEST_KINDS = ['mark', 'current', 'self', 'control', 'work', 'exam'];   // отметка пары, ТК вручную, СРС вручную, рубежный, баллы задания СРС, результат экзамена предмета
 export const EXAM_OUTCOMES = ['score', 'absent', 'incomplete'];                    // баллы, «не явился(ась)», «I»
 export const REQUEST_STATUSES = ['dean', 'prorector', 'applied', 'rejected', 'stale', 'withdrawn'];
 export const OPEN_REQUESTS = ['dean', 'prorector'];                                // ждёт деканат, ждёт проректора
 export const AUDIENCES = ['all', 'teachers', 'group'];
+export const REPEAT_KINDS = ['full', 'exam'];                          // весь предмет, только экзамен
+export const REPEAT_STATUSES = ['open', 'passed', 'failed', 'cancelled']; // идёт, сдал, не сдал, отменён
 
 const col =(key, title, type = 'string') => ({ key, title, type });
 
@@ -243,6 +245,21 @@ export const SCHEMA = {
     columns: [col('id', 'id'), col('subjectId', 'предмет'), col('planSemester', 'семестр по плану', 'int'), col('studentId', 'студент'),
       col('no', 'номер попытки', 'int'), col('date', 'дата'), col('outcome', 'результат'), col('score', 'баллы', 'int'),
       col('commission', 'комиссия'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено')],
+  },
+  repeats: {
+    sheet: 'Повторный курс', prefix: 'rp',
+    columns: [col('id', 'id'), col('studentId', 'студент'), col('subjectId', 'предмет'), col('planSemester', 'семестр по плану', 'int'), col('kind', 'вид'),
+      col('orderNo', 'приказ №'), col('orderDate', 'дата приказа'), col('deadline', 'срок'), col('teacherId', 'преподаватель повтора'),
+      col('prevSemester', 'прежний семестр', 'int'), col('prevAdmitted', 'прежний допуск', 'bool'), col('prevStatus', 'прежний результат'), col('prevExam', 'прежний экзамен', 'int'),
+      col('prevTotal', 'прежний итог', 'int'), col('prevWord', 'прежняя оценка'), col('prevAttempts', 'прежние попытки'), col('prevRepeatId', 'снимок из повтора'),
+      col('works', 'работы повтора', 'int'), col('worksNote', 'что сделано'), col('status', 'состояние'),
+      col('createdBy', 'кто записал'), col('createdAt', 'когда записан'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено'),
+      col('closedBy', 'кто закрыл'), col('closedAt', 'когда закрыт')],
+  },
+  repeatAttempts: {
+    sheet: 'Попытки экзамена повтора', prefix: 'rx',
+    columns: [col('id', 'id'), col('repeatId', 'повтор'), col('no', 'номер попытки', 'int'), col('date', 'дата'), col('outcome', 'результат'),
+      col('score', 'баллы', 'int'), col('commission', 'комиссия'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено')],
   },
 };
 

@@ -119,7 +119,7 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
     attendance: store.list('attendance'), checkins: store.list('checkins'), changeLog: store.list('changeLog'), pairs: store.list('pairs'),
     assignments: store.list('assignments'), submissions: store.list('submissions'), files: store.list('files'), unitResults: store.list('unitResults'),
     closures: store.list('closures'), requests: store.list('requests'), announcements: store.list('announcements'), stateExams: store.list('stateExams'),
-    stateExamResults: store.list('stateExamResults'), subjectExams: store.list('subjectExams'), examAttempts: store.list('examAttempts'), settings: store.list('settings'),
+    stateExamResults: store.list('stateExamResults'), subjectExams: store.list('subjectExams'), examAttempts: store.list('examAttempts'), repeats: store.list('repeats'), repeatAttempts: store.list('repeatAttempts'), settings: store.list('settings'),
     disk: files ? files.names() : [],
   }));
 
@@ -169,6 +169,30 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
     subjectId: sb1, planSemester: 1, studentId, no: 1, date: '2026-12-15', outcome: 'score', score: 35, commission: '', updatedBy: ids.teacher1, updatedAt: '2026-12-15 12:00:00', ...over,
   }).id;
   const closeFinal = (over = {}) => closeUnit(0, { closedAt: '2026-12-16 12:00:00', ...over });
+  // sb1 of the semester 1 closed with a failure: a1 semester 47 + exam 35 = 82 good, a2 38 + 20 = 58 fail, a3 not admitted
+  const failed = () => {
+    allUnits();
+    examHead();
+    examRow(ids.a1, { score: 35 });
+    examRow(ids.a2, { score: 20 });
+    closeFinal();
+  };
+  // a card of the repeat course written straight into the store; `over` replaces fields
+  const repeatCard = (over = {}) => store.insert('repeats', {
+    studentId: ids.a2, subjectId: sb1, planSemester: 1, kind: 'full', orderNo: '15-с', orderDate: '2026-12-20', deadline: '2027-02-01', teacherId: ids.teacher1,
+    prevSemester: 38, prevAdmitted: true, prevStatus: 'done', prevExam: 20, prevTotal: 58, prevWord: 'fail', prevAttempts: '1|2026-12-15|20', prevRepeatId: '',
+    works: null, worksNote: '', status: 'open', createdBy: ids.dean, createdAt: '2026-12-21 10:00:00', updatedBy: ids.dean, updatedAt: '2026-12-21 10:00:00',
+    closedBy: '', closedAt: '', ...over,
+  }).id;
+  // an attempt of the repeat exam written straight into the store
+  const repeatTry = (repeatId, over = {}) => store.insert('repeatAttempts', {
+    repeatId, no: 1, date: '2027-01-15', outcome: 'score', score: 30, commission: '', updatedBy: ids.teacher1, updatedAt: '2027-01-15 12:00:00', ...over,
+  }).id;
+  // the second half of the year through the real settings.save of the deanery; returns its response
+  const switchSemester = () => {
+    at('2027-01-11');
+    return call('settings.save', { settings: { semesterStart: '2027-01-11', semesterEnd: '2027-05-30', holidays: [], bells: DEFAULT_BELLS, semester: 2 } }, t.dean);
+  };
 
   const mark = (pairId, key, status, activity, markedAt, extra = {}) => store.insert('attendance', {
     pairId, studentId: ids[key], status, noCoat: false, activity, source: 'teacher', markedBy: ids.teacher1, markedAt, ...extra,
@@ -184,7 +208,7 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
 
   return {
     store, spy: { lists: spied.lists, writes: spied.writes, reset: spied.reset }, platform, call, t, at, tick, running, snapshot, ids, mark, pairOf, files, task, attempt,
-    closeUnit, request, unitNumbers, allUnits, examHead, examRow, closeFinal,
+    closeUnit, request, unitNumbers, allUnits, examHead, examRow, closeFinal, failed, repeatCard, repeatTry, switchSemester,
     a1: ids.a1, a2: ids.a2, a3: ids.a3, a4: ids.a4, b1: ids.b1, g1, g2, ds1, ds2, sb1, sb2, p0901, p0908, p0915, p0922, q0904, q0911, syllabusId,
   };
 }

@@ -1,11 +1,10 @@
 // Repeat course of a subject: enrolment, the new total, admission, closing, the snapshot as text.
 // Pure rules: no Google, files, network or clock. Thresholds come from `scheme`, maxima from `split`.
 import { isDate, addDays } from './dates.js';
+import { REPEAT_KINDS } from './schema.js';
 import { subjectResult, checkAttempt, examText, parseExamText } from './exam.js';
 
 export const REPEAT = Object.freeze({ orderMax: 40, noteMax: 300, deadlineDaysMax: 366 });
-
-const KINDS = ['full', 'exam'];
 
 export function attemptsText(attempts) {
   return attempts.map((a) => `${a.no}|${a.date}|${examText(a)}`).join(';');
@@ -68,7 +67,7 @@ function lastClosed(cards) {
 }
 
 export function enrolProblem({ prev, kind, cards, fromRepeat = false }) {
-  if (!KINDS.includes(kind)) return { field: 'kind', code: 'bad_value' };
+  if (!REPEAT_KINDS.includes(kind)) return { field: 'kind', code: 'bad_value' };
   if (cards.some((c) => c.status === 'open')) return { field: 'studentId', code: 'has_open' };
   const last = lastClosed(cards);
   if (last && last.status === 'passed') return { field: 'studentId', code: 'passed' };

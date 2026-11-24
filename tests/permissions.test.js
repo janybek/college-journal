@@ -39,7 +39,7 @@ test('actionKind', () => {
 });
 
 test('listPermissions', () => {
-  assert.deepEqual(listPermissions(['student']), ['announce.list', 'checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
+  assert.deepEqual(listPermissions(['student']), ['announce.list', 'checkin.current', 'checkin.mark', 'repeat.mine', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
   const dean = listPermissions(['dean']);
   assert.ok(dean.includes('import.apply:students'));
   assert.ok(!dean.includes('dir.save:staff'));
@@ -85,8 +85,9 @@ test('a file fills the draft: the deanery, the administrator and a teacher (of h
       'schedule.mine', 'syllabus.apply', 'syllabus.attachFile', 'syllabus.dropFile', 'syllabus.file', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects',
       'work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save',
       'announce.list', 'announce.remove', 'announce.save', 'ledger.addAttempt', 'ledger.closeFinal', 'ledger.closeUnit', 'ledger.get', 'ledger.list', 'ledger.saveExam',
+      'repeat.close', 'repeat.get', 'repeat.list', 'repeat.saveAttempt', 'repeat.saveWorks',
       'request.create', 'request.mine', 'request.withdraw', 'stateExam.get', 'stateExam.list'].sort());
-  assert.deepEqual(listPermissions(['student']), ['announce.list', 'checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
+  assert.deepEqual(listPermissions(['student']), ['announce.list', 'checkin.current', 'checkin.mark', 'repeat.mine', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
   assert.equal(can(['dean'], 'topics.plan'), false);
   assert.equal(can(['student'], 'student.subjects'), true);
   assert.equal(can(['teacher'], 'student.subjects'), false);
@@ -185,7 +186,20 @@ test('unit 6 actions: who may call the ledger, request, state exam and announcem
   for (const action of ['ledger.list', 'ledger.get', 'stateExam.list', 'stateExam.get']) none(action, ['student']);
   assert.deepEqual(['admin', 'dean', 'prorector', 'teacher', 'student'].map((r) => can([r], 'announce.list')), [true, true, true, true, true]);
   assert.deepEqual(listPermissions(['student']).filter((p) => /^(ledger|request|stateExam|announce)\./.test(p)), ['announce.list']);
-  for (const table of ['closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts']) {
+  for (const table of ['closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts', 'repeats', 'repeatAttempts']) {
     for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.preview', 'import.apply']) assert.equal(can(['admin'], action, table), false, action + ' ' + table);
   }
+});
+
+test('repeat course rights', () => {
+  const roles = ['admin', 'dean', 'prorector', 'teacher', 'student'];
+  const row = (action) => roles.map((r) => can([r], action));
+  for (const action of ['repeat.list', 'repeat.get']) assert.deepEqual(row(action), [true, true, true, true, false], action);
+  for (const action of ['repeat.candidates', 'repeat.enrol', 'repeat.save', 'repeat.cancel']) assert.deepEqual(row(action), [true, true, false, false, false], action);
+  for (const action of ['repeat.saveWorks', 'repeat.saveAttempt', 'repeat.close']) assert.deepEqual(row(action), [true, true, false, true, false], action);
+  assert.deepEqual(row('repeat.reopen'), [true, false, false, false, false]);
+  assert.deepEqual(row('repeat.mine'), [false, false, false, false, true]);
+  assert.equal(can(['teacher'], 'repeat.enrol'), false);
+  assert.equal(can(['dean'], 'repeat.reopen'), false);
+  assert.equal(can(['student'], 'repeat.list'), false);
 });
