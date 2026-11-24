@@ -34,13 +34,13 @@ export const readRepeatRows = (store) => readTables(store, REPEAT_TABLES);
 export const mayRead = (viewer, card) => viewer.manager || viewer.reader || (viewer.teacher && card.teacherId === viewer.id && card.status !== 'cancelled');
 export const mayScore = (viewer, card) => viewer.manager || (viewer.teacher && card.teacherId === viewer.id && card.status !== 'cancelled');
 
-const findCard = (rows, repeatId) => {
+export const findCard = (rows, repeatId) => {
   const card = typeof repeatId === 'string' ? rows.repeats.find((c) => c.id === repeatId) : undefined;
   if (!card) throw new AppError('not_found');
   return card;
 };
 
-const attemptsOfCard = (rows, card) => liveAttempts(rows.repeatAttempts.filter((a) => a.repeatId === card.id));
+export const attemptsOfCard = (rows, card) => liveAttempts(rows.repeatAttempts.filter((a) => a.repeatId === card.id));
 const hasResults = (card, attempts) => Number.isInteger(card.works) || attempts.length > 0;
 
 function resultOf(rows, card, attempts) {
@@ -211,7 +211,7 @@ function readAll(store, platform) {
   return rows;
 }
 
-const logRow = (at, user, card, field, before, after, reason = '') => ({
+export const logRow = (at, user, card, field, before, after, reason = '') => ({
   at, actorId: user.id, entity: 'repeat', subjectId: card.subjectId, pairId: '', studentId: card.studentId, unit: null, field, before, after, reason, late: false,
 });
 
