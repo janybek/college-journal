@@ -1,5 +1,6 @@
 export default {
   'app.name': 'Журнал колледжа',
+  'env.test.hint': 'Тестовый журнал: люди и данные пробные',
 
   'lang.label': 'Язык',
   'lang.short.ky': 'KG',

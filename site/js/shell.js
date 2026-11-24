@@ -4,6 +4,7 @@ import { el, avatar, iconButton, refresh } from './ui.js';
 import { icon } from './icons.js';
 import { currentTheme, toggleTheme } from './theme.js';
 import { DIR_TABLES } from './views/directoryConfig.js';
+import { isTestSite } from './env.js';
 import { reviewCount, onReviewCount } from './reviewCount.js';
 
 // The frame around the screens: sign-in pages (a centred card), the student's phone bar, and the staff layout
@@ -176,8 +177,14 @@ function keepMenuScroll(nav, saved) {
 
 // Pieces shared by every frame
 
+// A small orange dot after the name, only on the test journal; no visible words, the hint is for hover and screen readers.
+function testDot() {
+  if (!isTestSite(globalThis.location && location.hostname)) return null;
+  return el('span', { class: 'env-dot', role: 'img', title: t('env.test.hint'), 'aria-label': t('env.test.hint') });
+}
+
 function brand(href) {
-  const parts = [el('span', { class: 'brand__mark' }, icon('journal')), el('span', { class: 'brand__name' }, t('app.name'))];
+  const parts = [el('span', { class: 'brand__mark' }, icon('journal')), el('span', { class: 'brand__name' }, t('app.name')), testDot()];
   return href ? el('a', { class: 'brand', href, onclick: closeDrawer }, parts) : el('p', { class: 'brand' }, parts);
 }
 

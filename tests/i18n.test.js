@@ -569,3 +569,11 @@ test('final review I1: a closed unit and a closed half of the plan have their te
   for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
   for (const dict of [ru, ky, en]) for (const p of ['{name}', '{date}']) assert.ok(dict[keys[0]].includes(p), p);
 });
+
+test('the test-journal dot shows only on janybek.github.io and has a hint in all languages', async () => {
+  const { isTestSite } = await import('../site/js/env.js');
+  assert.equal(isTestSite('janybek.github.io'), true);
+  for (const host of ['localhost', '127.0.0.1', 'journal.ism.edu.kg', 'github.io', 'evil-janybek.github.io', '', undefined])
+    assert.equal(isTestSite(host), false, String(host));
+  for (const dict of [ru, ky, en]) assert.ok(dict['env.test.hint']);
+});

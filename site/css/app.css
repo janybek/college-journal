@@ -98,6 +98,7 @@
   --success-wash: rgba(40, 188, 94, 0.14);
   --success-line: rgba(40, 188, 94, 0.28);
   --warning: #f9b800;
+  --env-test: #ff9a1f;
   --warning-wash: rgba(249, 184, 0, 0.14);
   --warning-line: rgba(249, 184, 0, 0.28);
   --danger: #ff5e63;
@@ -157,6 +158,7 @@
   --success-wash: rgba(40, 188, 94, 0.13);
   --success-line: rgba(0, 121, 47, 0.25);
   --warning: #975800;
+  --env-test: #e8710a;
   --warning-wash: rgba(249, 184, 0, 0.16);
   --warning-line: rgba(151, 88, 0, 0.25);
   --danger: #c2181d;
@@ -622,6 +624,20 @@ a { color: inherit; }
 .brand__mark .icon {
   width: 55%;
   height: 55%;
+}
+
+/* The test journal's mark: an orange dot after the name (js/env.js decides where it shows). */
+.env-dot {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: var(--env-test);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+@media print {
+  .env-dot { display: none; }
 }
 
 /* Components: segmented control (languages, roles, directory choice) */

@@ -1,5 +1,6 @@
 export default {
   'app.name': 'College journal',
+  'env.test.hint': 'Test journal: people and data are for trying out',
 
   'lang.label': 'Language',
   'lang.short.ky': 'KG',
