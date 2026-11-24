@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { markToText, textToMark, valueLine, targetLine, statusView, requestProblems, markRequestNeeded, normalizePoints } from '../site/js/requests.js';
+import { markToText, textToMark, valueLine, targetLine, statusView, requestProblems, markRequestNeeded, normalizePoints, queueParts, stepText } from '../site/js/requests.js';
 import { markText, parseMarkText } from '../core/requests.js';
 import ru from '../site/js/i18n/ru.js';
 import ky from '../site/js/i18n/ky.js';
@@ -79,4 +79,29 @@ test('the dictionaries have the texts of the request screens', () => {
   const keys = ['error.not_needed', 'error.request_exists', 'error.request_closed', 'error.request_changed', 'error.too_many', 'request.title', 'request.submit', 'request.mine.empty'];
   for (const dict of [ru, ky, en]) for (const key of keys) assert.ok(dict[key], key);
   for (const kind of ['control', 'self', 'current', 'mark', 'work', 'exam']) for (const dict of [ru, ky, en]) assert.ok(dict['request.target.' + kind], kind);
+});
+
+const req = (id, status, decide) => ({ id, status, can: { decide, withdraw: false } });
+
+test('queueParts: the ones to decide, the open ones of others and the closed, in the order of the answer', () => {
+  const list = [req('a', 'dean', true), req('b', 'prorector', false), req('c', 'prorector', true), req('d', 'applied', false), req('e', 'rejected', false), req('f', 'stale', false)];
+  const parts = queueParts(list);
+  assert.deepEqual(parts.mine.map((r) => r.id), ['a', 'c']);
+  assert.deepEqual(parts.waiting.map((r) => r.id), ['b']);
+  assert.deepEqual(parts.closed.map((r) => r.id), ['d', 'e', 'f']);
+  assert.deepEqual(queueParts(undefined), { mine: [], waiting: [], closed: [] });
+  // a closed request is never "to decide", whatever the flag says
+  assert.deepEqual(queueParts([req('x', 'applied', true)]).mine, []);
+});
+
+test('stepText: whose decision an open request waits for', () => {
+  assert.deepEqual(stepText({ status: 'dean' }), { key: 'request.step.dean' });
+  assert.deepEqual(stepText({ status: 'prorector' }), { key: 'request.step.prorector' });
+  assert.equal(stepText({ status: 'applied' }), null);
+});
+
+test('the keys of the queue screen are in the three dictionaries', () => {
+  for (const key of ['request.queue.title', 'request.queue.hint', 'request.step.dean', 'request.step.prorector', 'request.queue.decided.dean', 'request.queue.decided.prorector', 'request.queue.decided.stale', 'request.queue.decided.changed', 'journal.log.byRequest', 'journal.log.exam.score', 'journal.log.subjectExam.result', 'journal.log.ledger.closed', 'journal.log.ledger.opened', 'journal.log.ledger.finalClosed', 'journal.log.ledger.finalOpened', 'home.requests.waiting']) {
+    for (const dict of [ru, ky, en]) assert.ok(typeof dict[key] === 'string' && dict[key] !== '', key);
+  }
 });

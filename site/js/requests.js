@@ -86,3 +86,22 @@ export function markRequestNeeded(pair, journal, mark, next) {
   if (pair.unit !== null && pair.unit !== undefined && units.includes(pair.unit)) return true;
   return pair.state === 'late' && !smallChange(mark, next);
 }
+
+const OPEN = ['dean', 'prorector'];
+
+// The queue of the deanery and the vice-rector as three parts, each in the order of the answer: the open ones this person decides
+// (the server's can.decide), the other open ones, the closed ones. The buttons follow the flag of the server and nothing else.
+export function queueParts(requests) {
+  const parts = { mine: [], waiting: [], closed: [] };
+  for (const request of Array.isArray(requests) ? requests : []) {
+    if (!OPEN.includes(request.status)) parts.closed.push(request);
+    else if (request.can && request.can.decide === true) parts.mine.push(request);
+    else parts.waiting.push(request);
+  }
+  return parts;
+}
+
+// Whose decision an open request waits for: { key }; null for a closed one.
+export function stepText(request) {
+  return request && OPEN.includes(request.status) ? { key: 'request.step.' + request.status } : null;
+}

@@ -54,6 +54,7 @@ export function navFor(permissionList, role) {
     const items = [{ name: 'journalList', href: '#/journal', textKey: 'journal.list.title', icon: 'table', hintKey: 'journal.hint' }];
     if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet', hintKey: 'ledger.hint' });
     if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard', hintKey: 'tasks.hint' });
+    if (list.includes('request.queue')) items.push({ name: 'requests', href: '#/requests', textKey: 'request.queue.title', icon: 'clipboard', hintKey: 'request.queue.hint' });
     if (list.includes('journal.log')) items.push({ name: 'journalLog', href: '#/journal-log', textKey: 'journalLog.title', icon: 'clipboard', hintKey: 'journalLog.hint' });
     groups.push({ titleKey: 'nav.journal', items });
   }

@@ -207,7 +207,25 @@ export function logLine(row) {
     const p = { before: value(before, PAIR_STATUS_VALUES, 'journal.log.pairStatus.'), after: value(after, PAIR_STATUS_VALUES, 'journal.log.pairStatus.') };
     return line('journal.log.pair.status', p, keyed(p));
   }
+  if (r.entity === 'ledger' && r.field === 'closed') return line(after === 'closed' ? 'journal.log.ledger.closed' : 'journal.log.ledger.opened', { unit: r.unit });
+  if (r.entity === 'ledger' && r.field === 'final') return line(after === 'closed' ? 'journal.log.ledger.finalClosed' : 'journal.log.ledger.finalOpened');
+  if (r.entity === 'exam' && r.field === 'score') {
+    const name = typeof r.examName === 'string' && r.examName !== '' ? r.examName : '—';
+    return line('journal.log.exam.score', { name, before: before === '' ? '—' : before, after: after === '' ? '—' : after });
+  }
+  if (r.entity === 'subjectExam' && /^try[1-9]\d*$/.test(String(r.field))) {
+    const word = (text) => (text === 'absent' || text === 'incomplete' ? 'ledger.exam.' + text : text === '' ? '—' : text);
+    const p = { no: Number(String(r.field).slice(3)), before: word(before), after: word(after) };
+    return line('journal.log.subjectExam.result', p, ['before', 'after'].filter((name) => p[name].startsWith('ledger.exam.')));
+  }
   return line('journal.log.other', { field: r.field || '', before, after });
+}
+
+// The line under a change that a request made: { key, params: { names } } with the people who approved it; null for any other row.
+export function requestNote(row) {
+  if (!row || !row.requestId) return null;
+  const names = (Array.isArray(row.approvedBy) ? row.approvedBy : []).filter((name) => typeof name === 'string' && name !== '').join(', ');
+  return { key: 'journal.log.byRequest', params: { names } };
 }
 
 // ---- The self-work cell of a unit: counted by the assignments or entered by hand ----

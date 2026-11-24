@@ -277,6 +277,7 @@ function renderStaff(root, user) {
   const parts = menuParts(role);
   const sections = [];
   if (parts.includes('office')) {
+    if (permissions.includes('request.queue')) sections.push(requestsBlock(user));
     for (const group of navFor(permissions, role).filter((candidate) => candidate.titleKey)) {
       sections.push(section('home-' + group.items[0].name, t(group.titleKey), el('ul', { class: 'tiles' }, group.items.map(tile))));
     }
@@ -300,6 +301,7 @@ export function leave() {
   clearInterval(here.poll);
   clearInterval(here.clock);
   here.pair = null;
+  Object.assign(requestCount, { owner: null, n: null, pending: null });
 }
 
 // The section appears only when there are pairs today; it asks again every minute while the page is open and visible.
@@ -377,6 +379,33 @@ function loadLessons(user) {
       .finally(() => { if (mine()) lessons.pending = null; });
   }
   return lessons.pending;
+}
+
+// «Заявки: ждут вашего решения — N»: one request.queue each time the home screen is opened (leave() forgets the number); with none
+// waiting, or no answer, there is no block.
+const requestCount = { owner: null, n: null, pending: null };
+
+function requestsBlock(user) {
+  const holder = el('div', { class: 'home-requests', id: 'home-requests' });
+  const draw = () => {
+    holder.replaceChildren();
+    if (requestCount.n > 0) {
+      holder.append(el('a', { class: 'card home-requests__link', id: 'home-requests-link', href: '#/requests' },
+        el('span', { class: 'tile__icon' }, icon('clipboard')),
+        el('span', { class: 'home-requests__text' }, t('home.requests.waiting', { n: requestCount.n })),
+        icon('chevron', 'tile__go')));
+    }
+  };
+  if (requestCount.owner !== user.id) Object.assign(requestCount, { owner: user.id, n: null, pending: null });
+  if (requestCount.n === null && !requestCount.pending) {
+    const owner = user.id;
+    requestCount.pending = call('request.queue', {})
+      .then((data) => { if (requestCount.owner === owner) requestCount.n = Number.isInteger(data.waiting) ? data.waiting : 0; }, () => {})
+      .finally(() => { if (requestCount.owner === owner) requestCount.pending = null; });
+    requestCount.pending.then(draw);
+  }
+  draw();
+  return holder;
 }
 
 function section(id, title, body) {

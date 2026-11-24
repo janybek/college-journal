@@ -8116,3 +8116,45 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .lg-req-cell:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; background: var(--primary-wash); }
 
 .jg-unit-head__closed { display: block; margin-top: 2px; color: var(--text-muted); font-size: 0.6875rem; font-weight: 500; }
+
+/* Screens: requests - the queue of the deanery and the vice-rector, the line "by request" in the change log, the block of the home screen */
+
+.rq-queue { display: grid; gap: var(--space-6); max-width: 46rem; }
+
+.rq-part { display: grid; gap: var(--space-3); justify-items: start; }
+
+.rq-part .rq-list { justify-self: stretch; max-width: none; }
+
+.rq-part .section__title { margin: 0; }
+
+.rq-card--mine { border-inline-start: 3px solid var(--primary); }
+
+.rq-card__teacher { color: var(--text-muted); }
+
+.rq-card__actions .button { min-height: 44px; font-size: 1rem; }
+
+.rq-card__actions .button[aria-disabled="true"] { opacity: 0.6; cursor: progress; }
+
+.rq-toggle { min-height: 44px; font-size: 1rem; }
+
+.jlog-table__request { display: inline-flex; align-items: flex-start; gap: var(--space-1); color: var(--primary-ink); font-size: 0.875rem; }
+
+.jlog-table__request .icon { flex: none; width: 1rem; height: 1rem; margin-top: 0.125rem; }
+
+.home-requests:empty { display: none; }
+
+.home-requests { margin-bottom: var(--space-6); }
+
+.home-requests__link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  padding: var(--space-4);
+  color: var(--text);
+  text-decoration: none;
+  border-inline-start: 3px solid var(--primary);
+}
+
+.home-requests__link:hover { border-color: var(--border-strong); border-inline-start-color: var(--primary); background: var(--surface-raised); }
+
+.home-requests__text { flex: 1; min-width: 0; font-weight: 600; }

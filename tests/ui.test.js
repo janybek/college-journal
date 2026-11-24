@@ -193,3 +193,10 @@ test('navFor: «Заявки» come after «Ведомости» for a teacher w
   assert.deepEqual(items[5], { name: 'requests', href: '#/requests', textKey: 'request.mine.title', icon: 'clipboard' });
   assert.equal(navFor([...DEAN, 'journal.list'], 'teacher')[0].items.some((i) => i.name === 'requests'), false);
 });
+
+test('navFor: «Заявки» of the office come after «Задания», for those with request.queue', () => {
+  const office = navFor(['journal.list', 'journal.log', 'work.overview', 'ledger.list', 'request.queue'], 'dean').find((g) => g.titleKey === 'nav.journal');
+  assert.deepEqual(office.items.map((i) => i.name), ['journalList', 'ledgerList', 'tasks', 'requests', 'journalLog']);
+  assert.deepEqual(office.items[3], { name: 'requests', href: '#/requests', textKey: 'request.queue.title', icon: 'clipboard', hintKey: 'request.queue.hint' });
+  assert.equal(navFor(['journal.list', 'work.overview'], 'dean').flatMap((g) => g.items).some((i) => i.name === 'requests'), false);
+});

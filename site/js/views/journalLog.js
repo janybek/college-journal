@@ -2,7 +2,8 @@ import { call } from '../api.js';
 import { t } from '../i18n.js';
 import { el, errorKey, avatar, badge, emptyState, field, focusById, note, pageHeader, selectField, refresh } from '../ui.js';
 import { isDate, addDays } from '../dates.js';
-import { logLine } from '../journal.js';
+import { icon } from '../icons.js';
+import { logLine, requestNote } from '../journal.js';
 
 // «Журнал изменений» (#/journal-log, #/journal-log/<subjectId>): every change of a saved mark or of the points of a unit
 // (journal.log), the newest first. The whole log is for the deanery, the admin and the vice-rector; the log of one subject
@@ -188,6 +189,7 @@ function line(row, whole) {
   const text = logLine(row);
   const params = { ...text.params };
   for (const name of text.keyParams) params[name] = t(params[name]);
+  const byRequest = requestNote(row);
   return el('tr', { class: 'jlog-row' + (row.late ? ' is-late' : '') },
     el('td', { class: 'jlog-table__when' }, stamp(row.at)),
     el('td', {}, row.actorName
@@ -200,6 +202,7 @@ function line(row, whole) {
     el('td', { class: 'jlog-table__pair' }, isDate(row.pairDate) ? t('journalLog.pairWhen', { date: dayText(row.pairDate).slice(0, 5), slot: row.pairSlot }) : '—'),
     el('td', { class: 'jlog-table__change' }, el('div', { class: 'jlog-table__stack' },
       el('span', {}, t(text.key, params)),
+      byRequest ? el('span', { class: 'jlog-table__request' }, icon('clipboard'), t(byRequest.key, byRequest.params)) : null,
       row.late ? badge(t('journal.log.late'), 'warning') : null)),
     el('td', { class: 'jlog-table__reason' }, row.reason || '—'));
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, selfCell, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, semesterCell, semesterLine, admissionLine } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, selfCell, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, semesterCell, semesterLine, admissionLine, requestNote } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -366,4 +366,32 @@ test('semester points and the admission: numbers come from the split of the answ
     [null, { key: 'grades.semesterSoFar', params: { value: 43, max: 60 }, tone: 'neutral' }, { key: 'grades.semester', params: { value: 47, max: 60 }, tone: 'success' }, { key: 'grades.semester', params: { value: 29, max: 60 }, tone: 'danger' }]);
   assert.deepEqual([admissionLine({ semester: 43, complete: false, admitted: false }, SP), admissionLine({ semester: 47, complete: true, admitted: true }, SP), admissionLine({ semester: 29, complete: true, admitted: false }, SP)],
     [null, { key: 'grades.admitted', params: {}, tone: 'success' }, { key: 'grades.notAdmitted', params: { value: 29, max: 60, need: 30 }, tone: 'danger' }]);
+});
+
+test('logLine: closing and opening of a unit and of the final ledger', () => {
+  assert.deepEqual(logLine({ entity: 'ledger', field: 'closed', unit: 2, before: 'open', after: 'closed' }), { key: 'journal.log.ledger.closed', params: { unit: 2 }, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'ledger', field: 'closed', unit: 2, before: 'closed', after: 'open' }), { key: 'journal.log.ledger.opened', params: { unit: 2 }, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'ledger', field: 'final', unit: null, before: 'open', after: 'closed' }), { key: 'journal.log.ledger.finalClosed', params: {}, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'ledger', field: 'final', unit: null, before: 'closed', after: 'open' }), { key: 'journal.log.ledger.finalOpened', params: {}, keyParams: [] });
+});
+
+test('logLine: a state exam result keeps the name of the exam as text', () => {
+  const line = logLine({ entity: 'exam', field: 'score', examName: 'journal.col.self', before: '', after: '70' });
+  assert.deepEqual(line, { key: 'journal.log.exam.score', params: { name: 'journal.col.self', before: '—', after: '70' }, keyParams: [] });
+  assert.equal(logLine({ entity: 'exam', field: 'score', examName: '', before: '70', after: '' }).params.name, '—');
+});
+
+test('logLine: an attempt of the exam of a subject; the words absent and incomplete are keys', () => {
+  assert.deepEqual(logLine({ entity: 'subjectExam', field: 'try1', before: '', after: '35' }),
+    { key: 'journal.log.subjectExam.result', params: { no: 1, before: '—', after: '35' }, keyParams: [] });
+  assert.deepEqual(logLine({ entity: 'subjectExam', field: 'try2', before: '20', after: 'absent' }),
+    { key: 'journal.log.subjectExam.result', params: { no: 2, before: '20', after: 'ledger.exam.absent' }, keyParams: ['after'] });
+  assert.deepEqual(logLine({ entity: 'subjectExam', field: 'try3', before: 'incomplete', after: '40' }).keyParams, ['before']);
+});
+
+test('requestNote: the people who approved a request; none without a request', () => {
+  assert.deepEqual(requestNote({ requestId: 'r1', approvedBy: ['Dean A.', 'Vice B.'] }), { key: 'journal.log.byRequest', params: { names: 'Dean A., Vice B.' } });
+  assert.deepEqual(requestNote({ requestId: 'r1', approvedBy: ['Dean A.', ''] }).params, { names: 'Dean A.' });
+  assert.equal(requestNote({ entity: 'mark' }), null);
+  assert.equal(requestNote(null), null);
 });
