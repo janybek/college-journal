@@ -5,3 +5,78 @@
 - 24.11.2026 Ruling: план написан fable (`d205999`), переписан fable по положению колледжа 2.9 (`ceac7ce`); ответы на 12 вопросов плана — все по умолчанию (`8d1467f`).
 - 24.11.2026 Ruling: сверка плана (opus, `preflight.md`): I1–I7, M1–M13; откат на `caf33d8` проверен на временной SQLite — ничего не стёрто. Находки внесены агентом sonnet (I7 — вариант по умолчанию «пересдачи до переключения семестра», ждёт подтверждения владельца). M8: ошибка деления — поле `exam`, код `too_small` (как в плане), не `scoreExam`.
 - 24.11.2026 Ruling: I7 — владелец «по умолчанию» (пересдачи до переключения семестра). Памятки сделаны из памяток юнита 5 с Global Constraints и Review Focus плана юнита 6. Следующее — задача 1 (Л) в новом чате координатора.
+- 24.11.2026 Ruling: перед задачей 1 — тестовый сервер владельца обновлён до `d07e157`, версия в /health собрана (`04303b5`, 969 тестов). Задача (г) «тесты на Linux в Actions» ждёт входа владельца в GitHub (лог без входа — 403); не мешает сборке. Начинаем задачу 1, BASE = следующий коммит docs.
+- Task 1: dispatched journal-logic (sonnet), BASE e667240; report task-1-report.md
+- Task 1: implementer DONE (1b8bcd1, 975 тестов, build:gas). Красный прогон не сохранён (minor). studentGrades.js:99 читает word — ожидаемо до задачи 8. Строгая проверка: journal-reviewer (sonnet).
+- Task 1: review — принять (strict, sonnet; probe1.mjs в scratchpad координатора). minor (deferred): studentGrades.js:99 word -> в задачу 8 (убрать ключ явно); upgradeScheme не переводит число 76 (не строку) — Настройки хранят строки, оставить.
+- Task 1: complete (commits e667240..1b8bcd1, review clean)
+- Task 2: dispatched journal-logic (sonnet), BASE 1b8bcd1; проверка облегчённая
+- Task 2: review — принять (light). minor (deferred): ledger.js:26 reopenedAt === '' — если хранилище даст null, закрытие станет «открытым» -> передать в задачи 7/11 (колонка reopenedAt пишется ''); ledger.js:57 units не массив -> исключение (вход строгий).
+- Task 2: complete (commits 1b8bcd1..9494503, review clean)
+- Task 3: dispatched journal-logic (sonnet), BASE 9494503; проверка строгая
+- Task 3: implementer DONE (df8d4ba, 987 тестов). RED не снят (minor).
+- Task 3: review — принять (strict, probe3.mjs в scratchpad координатора). minor (deferred -> задачи 11/12, передать исполнителю): (1) exam.js:68–87 admitted true при semester null даёт итог = exam — защита: semester не число -> not_admitted; (2) examText без score даёт 'undefined'/'null' — обработчик вызывает checkResult до examText; (3) {outcome:'absent'} без ключа score -> bad_value — обработчик нормализует отсутствующий score в null; (4) checkAttempt падает при next null — обработчик отказывает раньше; (5) liveAttempts не приводит no к числу.
+- Task 3: complete (commits 9494503..df8d4ba, review clean)
+- Task 4: dispatched journal-logic (sonnet), BASE df8d4ba; проверка строгая
+- Task 4: implementer DONE (1ffc2b9, 993 тестов); отчёт .txt
+- Task 4: review — принять (strict, probe4.mjs). minor (deferred -> задача 7, тому же агенту «Логика»): requests.js:34 hasRole режет роли без trim (остальной код trim-ит) и requests.js:45 s.active по истинности, а dir.js === true — выровнять (одна-две строки + тест). Прочие minor: null в staff, markText('x'), sameTarget(null) — вход собирается кодом. Для задачи 14: request.decide сам проверяет, что actor активен и роли берутся из базы.
+- Task 4: complete (commits df8d4ba..1ffc2b9, review clean)
+- Task 5: dispatched journal-logic (sonnet), BASE 1ffc2b9; проверка облегчённая
+- Task 5: implementer DONE (f62c9b9, 997 тестов).
+- Task 5: review — принять (light). minor (deferred): settings.js:88 validateExtra — даты не строкой молча пустые (вход из обработчика задачи 10).
+- Task 5: complete (commits 1ffc2b9..f62c9b9, review clean)
+- Task 6: dispatched journal-logic (sonnet), BASE f62c9b9; проверка облегчённая
+- Task 6: implementer DONE (011f161, 1003 теста).
+- Task 6: review — принять (light, видимость seenBy разобрана). minor (deferred -> задача 16): seenBy не смотрит removedAt и срок — обработчик объявлений применяет isShown и seenBy вместе.
+- Task 6: complete (commits f62c9b9..011f161, review clean)
+- Task 7: Ruling: в задачу 7 добавлены minor задачи 4 (core/requests.js hasRole — trim ролей; s.active === true как в dir.js) — тот же агент «Логика», правка в две строки с тестом; дешевле, чем оставлять до общей проверки; если неверно — откат двух строк.
+- Task 7: dispatched journal-logic (sonnet), BASE 011f161; проверка строгая (права); + minor задачи 4; проверить reopenedAt '' в хранилищах
+- 24.11.2026 Ruling (владелец «экономим токены», «так и сделаем»): (1) после задачи 17 — итоги в aidlc-state.md и копию журнала, затем новый чат координатора (/clear); (2) отчёт проверяющего в ответе — не длиннее ~15 строк: вердикт, только находки, без пересказа проверенного; (3) строгая проверка — только задачи по плану (права, данные студентов, баллы), остальные облегчённо. Записать в CLAUDE.md п. 6а после коммита задачи 7 (пока агент работает, файлы репозитория не правим).
+- Task 7: implementer DONE (f141ee1, 1007 тестов; reopenedAt '' во всех хранилищах; unitNumbers через field+items — Ruling: принять, так устроен настоящий API).
+- Task 7: review — принять (strict, probe7.mjs матрица прав, probe7b.mjs старый файл стенда). Без находок по существу.
+- Task 7: complete (commits 011f161..f141ee1, review clean)
+- Task 8: dispatched journal-server (sonnet), BASE 051f8b4; проверка строгая; + minor задачи 1 (word явно)
+- Task 8: implementer DONE (3222322, 1014 тестов; word убран явно; setup() GAS — upgrade после ensureSheets).
+- Task 8: review — принять (strict, probe.mjs; откат d07e157 на базе после перехода — читает, ничего не стёрто, 13 строк Настроек целы). minor (известно, раздел «Откат»): прежний сайт scoring.save без split при пороге 76 -> при следующем запуске 80.
+- Task 8: complete (commits 051f8b4..3222322, review clean)
+- Task 9: dispatched journal-screens (sonnet), BASE 3222322; проверка ИИ — да (оценки студента), владелец смотрит в блоке 1
+- Task 9: implementer DONE_WITH_CONCERNS (7c9c405, 1016 тестов; допущен/не допущен на экране не видны — на стенде нет предмета со всеми юнитами, покрыто тестами помощников; Ruling: принять, покажем в блоке 1 после задач 11/17 со стендом закрытых юнитов; строка допуска — 16 px текстом, не метка 12 px — верно по правилу 16 px). Координатор посмотрел 2 скриншота — в порядке.
+- Task 9: review — принять (данные студента ✅, innerHTML нет). minor (deferred): SPLIT_RANGES 1–99/0–99 в сайте (сервер проверяет); допущен/не допущен — показать в блоке 1.
+- Task 9: complete (commits 3222322..7c9c405, review clean)
+- Task 10: dispatched journal-server (sonnet), BASE 7c9c405; проверка облегчённая; + minor задачи 5 (дата не строкой)
+- Task 10: implementer DONE_WITH_CONCERNS (fd7055f, 1023 теста): тест задания 02.09 -> unit_closed из-за пары 01.09 в setup (тест изменён на отказ + ok через semesterEnd); дата не строкой -> invalid/bad_value; unit_closed не проверяется при смене полугодия без смены дат — отдать проверяющему.
+- Task 10: review — принять (light). (1) правка теста 02.09 верна — расхождение в задании (пара 01.09 в setup); Ruling: принять правку теста. (2) смена полугодия без смены дат закрытые юниты не задевает — дыры нет. minor (deferred): settings.js:115 planSemester по новому полугодию при одновременной смене дат и полугодия.
+- Task 10: complete (commits 7c9c405..fd7055f, review clean)
+- Task 11: dispatched journal-server (sonnet), BASE fd7055f; проверка строгая (права, баллы); + minor задачи 3 (1) и задачи 2 (reopenedAt)
+- Task 11: implementer DONE_WITH_CONCERNS (9ca6eda, 1030 тестов): admitted только при целом семестре (core не менялся); unit.self = selfWork.value при pending>0 (journal.get даёт null) — отдать проверяющему; readLedgerRows добавлен.
+- Task 11: review — принять (strict, probe11.mjs, probe11b.mjs; права и кривые входы — всё отказано, снимки таблиц целы). Important (plan-mandated): ledgerData.js:218 self = selfWork.value при pending>0, а journal.get даёт null.
+- Task 11: Ruling: оставить — план задаёт self = selfWork.value (стр. 1183) и экран задачи 18 рисует его как «5*» «предварительно» по selfPending (unitCellText, стр. 1789); закрыть юнит при self_pending нельзя, так что в закрытую ведомость предварительное число не попадёт — цена ошибки: одна строка в ledgerData.js. Передать в задачу 18: проверить звёздочку и подсказку «ждёт проверки»; в общую проверку — сверка ledger.get/journal.get при pending>0.
+- Task 11: complete (commits fd7055f..9ca6eda, 0 fixed, 1 ruled plan-mandated)
+- Task 12: dispatched journal-server (sonnet), BASE 9ca6eda; проверка строгая; + minor задачи 3 (2)-(5)
+- Task 12: implementer DONE_WITH_CONCERNS (dfa1c78, 1038 тестов): export findSubject/isOwner в ledgerData.js (вне Files — Ruling: принять, иначе дубль); writeExamResult без своего теста (задача 14).
+- Task 12: review — принять (strict, probe12.mjs). minor (deferred -> общая проверка): examData.js:130-146 addAttempt даёт попытку № 1 после закрытия итоговой студенту без первой сдачи (следует из next subjectResult; решить, нужно ли); нет теста writeExamResult (задача 14).
+- Task 12: complete (commits 9ca6eda..dfa1c78, review clean)
+- Task 13: dispatched journal-server (sonnet), BASE dfa1c78; проверка строгая
+- Task 13: implementer DONE_WITH_CONCERNS (d4fce8b, 1051 тестов): JOURNAL_TABLES без таблиц экзамена (задание ошибалось) — student.grades читает examAttempts сам один раз; lesson.mine problem 'unit_closed' -> текст в экранной задаче (error.unit_closed есть в списке плана).
+- Task 13: review — вернуть (strict, probe.mjs в scratchpad). Important: (1) closedOfSubject/journalView берут planSemester из силлабуса текущего преподавателя -> смена teacherId предмета (dir.save) снимает закрытия (journal.savePair деканом на p0901 ok вместо unit_closed); то же saveUnitResults, startLesson, studentGrades. (2) settings.save semester 1->2 тоже снимает закрытие юнита 1 первой половины.
+- Task 13: Ruling: оба пункта — дыры, а не замысел: план «закрытый юнит не меняется никем напрямую», единственный путь — reopen админом. Закрытие должно держать пары/отметки/итоги своего юнита независимо от смены преподавателя и переключения полугодия. Механизм выбирает исполнитель (например, ключ по subjectId + planSemester из строк закрытий/пар, а не из силлабуса нынешнего преподавателя). Цена ошибки: если владелец захочет «после переключения полугодия деканат правит старое» — одна проверка снимается. Minor scoring.js:65 — в тот же круг (зависит от п. 2).
+- Task 13: fix round 1/5 (3 addressed, 0 open — ключ закрытия из темы пары: смена преподавателя и полугодия не снимают закрытие; scoring.js:65 верно; commits d4fce8b..61f9cce). Re-review — принять.
+- Task 13: minor (deferred -> общая проверка): (а) перенос темы ПРОВЕДЁННОЙ пары в другой юнит правкой силлабуса — core/syllabus.js защищает имя и часы, смену unit не видно — проверить, не уводит ли пару из закрытого юнита; (б) studentGrades.js final по planSemester нынешнего силлабуса, без силлабуса — пустая итоговая.
+- Task 13: complete (commits dfa1c78..61f9cce, review clean after 1 round)
+- Task 14: dispatched journal-server (sonnet), BASE 61f9cce; проверка строгая; + замечания задач 4 и 12
+- Task 14: implementer DONE_WITH_CONCERNS (de7c3fa, 1066 тестов): stale ещё при смене полугодия/пропаже предмета или силлабуса; роли и active из базы; writeExamResult покрыт через заявки.
+- Task 14: review — принять (strict, probe14.mjs). minor (deferred -> общая проверка): requestData.js:73/:102/:128 '025' vs '25' — сравнивать канонический текст (pointsText(parsed)), иначе пустая заявка на два согласования (данные не портятся).
+- Task 14: complete (commits 61f9cce..de7c3fa, review clean)
+- Task 15: dispatched journal-server (sonnet), BASE de7c3fa; проверка строгая (данные студентов)
+- Task 15: implementer DONE_WITH_CONCERNS (c6b0795, 1073 теста): BLOCKERS.students без stateExamResults в dir.js (задание считало, что есть) -> задача 17; entered считает только активных, stats — всех показанных.
+- Task 15: review — принять (strict, zz_probe15.test.js в scratchpad; проверяющий временно клал его в tests/ и убрал — git status чист; на будущее — запрет). minor: staff читается без пользы (по заданию).
+- Task 15: complete (commits de7c3fa..c6b0795, review clean)
+- Task 16: dispatched journal-server (sonnet), BASE c6b0795; проверка строгая; + minor задачи 6 (isShown+seenBy)
+- Task 16: implementer DONE (f8e943e, 1078 тестов).
+- Task 16: review — принять (strict, probe16.mjs). Без находок по существу.
+- Task 16: complete (commits c6b0795..f8e943e, review clean)
+- Task 17: dispatched journal-server (sonnet), BASE f8e943e; проверка облегчённая (+ строго in_use); BLOCKERS.students stateExamResults добавить
+- Task 17: implementer DONE (c907c3b, 1091 тест): правка tests/seedMarks.test.js вне Files (2 ожидания сломаны требованиями задачи) — Ruling: принять, отдать проверяющему; not_admitted на 02-1 ровно 3 без запаса.
+- Task 17: review — принять (light + строго in_use и journal.log; probe.mjs). Правка seedMarks.test.js обоснована требованиями задачи. Без находок.
+- Task 17: complete (commits f8e943e..c907c3b, review clean)
+- 24.11.2026 Ruling: задачи 1–17 (логика и сервер) собраны, 1091 тест. По правилу владельца «экономим токены» — итоги в aidlc-state.md, копия журнала, новый чат координатора. Дальше: блок 1 экранов — задачи 18, 19, 20 (и 9 уже сделана), затем стоп на приёмку владельца по скриншотам/стенду. Отложенные minor для общей проверки (задача 27) — строки «minor (deferred)» выше; особо: Task 13 (а) перенос темы проведённой пары в другой юнит; Task 14 '025'; Task 12 addAttempt без первой сдачи; Task 11 сверка ledger.get/journal.get при pending>0 и звёздочка «5*» на экране задачи 18; lesson.mine problem 'unit_closed' — нужен текст error.unit_closed на экранах.
