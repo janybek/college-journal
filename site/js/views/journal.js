@@ -3,7 +3,7 @@ import { t } from '../i18n.js';
 import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '../ui.js';
 import {
   cellView, pairHead, canMark, pairHint, pairActions, VIEWS, DEFAULT_VIEW, addDays, isoWeekday, weekRange, pairDates,
-  nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, selfCell,
+  nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, selfCell, semesterCell,
 } from '../journal.js';
 import { openMarksDialog, openPairActionDialog } from './journalPair.js';
 import { openCellDialog } from './journalCell.js';
@@ -533,7 +533,8 @@ function cell(column, student, result, journal, scheme) {
   const { attendance } = result;
   if (column.field === 'absences') return el('td', { class: 'jg-num jg-sum jg-sum--absences' }, String(attendance.absent + attendance.excused));
   if (column.field === 'percent') return el('td', { class: 'jg-num jg-sum' }, attendance.percent === null ? '—' : attendance.percent + '%');
-  return el('td', { class: 'jg-num jg-sum jg-sum--final', title: result.word ? t('journal.grade.' + result.word) : null }, pointText(result.preliminary));
+  const semester = semesterCell(result, journal.split);
+  return el('td', { class: `jg-num jg-sum jg-sum--final${semester.tone === 'danger' ? ' is-low' : ''}`, title: semester.key ? t(semester.key, semester.params) : null }, semester.text);
 }
 
 function unitCell(field, row, scheme, journal, student) {

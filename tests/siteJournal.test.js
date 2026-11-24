@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, selfCell, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, selfCell, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, semesterCell, semesterLine, admissionLine } from '../site/js/journal.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -353,4 +353,17 @@ test('unitLine: a unit with self-work by assignments says so, and says «provisi
   assert.deepEqual(wait.parts.map((p) => p.key), ['grades.unit.part.current', 'grades.unit.part.selfPending']);
   assert.deepEqual(wait.parts[1].params, { self: 5, n: 1 });
   assert.equal(unitLine({ current: 1, self: 2, control: 3, total: 6 }).key, 'grades.unit.full');
+});
+
+test('semester points and the admission: numbers come from the split of the answer', () => {
+  const SP = { semester: 60, exam: 40, admission: 30 };
+  assert.deepEqual(semesterCell({ semester: null, complete: false, admitted: false }, SP), { text: '—', key: null, params: {}, tone: 'neutral' });
+  assert.deepEqual(semesterCell({ semester: 43, complete: false, admitted: false }, SP), { text: '43', key: 'journal.tip.semesterSoFar', params: { max: 60 }, tone: 'neutral' });
+  assert.deepEqual(semesterCell({ semester: 47, complete: true, admitted: true }, SP), { text: '47', key: 'journal.tip.admitted', params: { max: 60 }, tone: 'neutral' });
+  assert.deepEqual(semesterCell({ semester: 29, complete: true, admitted: false }, SP), { text: '29', key: 'journal.tip.notAdmitted', params: { max: 60, need: 30 }, tone: 'danger' });
+  assert.deepEqual(semesterCell({ semester: 24, complete: true, admitted: false }, { semester: 50, exam: 50, admission: 25 }).params, { max: 50, need: 25 });
+  assert.deepEqual([semesterLine({ semester: null, complete: false, admitted: false }, SP), semesterLine({ semester: 43, complete: false, admitted: false }, SP), semesterLine({ semester: 47, complete: true, admitted: true }, SP), semesterLine({ semester: 29, complete: true, admitted: false }, SP)],
+    [null, { key: 'grades.semesterSoFar', params: { value: 43, max: 60 }, tone: 'neutral' }, { key: 'grades.semester', params: { value: 47, max: 60 }, tone: 'success' }, { key: 'grades.semester', params: { value: 29, max: 60 }, tone: 'danger' }]);
+  assert.deepEqual([admissionLine({ semester: 43, complete: false, admitted: false }, SP), admissionLine({ semester: 47, complete: true, admitted: true }, SP), admissionLine({ semester: 29, complete: true, admitted: false }, SP)],
+    [null, { key: 'grades.admitted', params: {}, tone: 'success' }, { key: 'grades.notAdmitted', params: { value: 29, max: 60, need: 30 }, tone: 'danger' }]);
 });

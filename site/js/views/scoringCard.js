@@ -11,6 +11,7 @@ import { permissions } from '../shell.js';
 const GROUPS = [
   ['pair', ['attendance', 'activity']],
   ['unit', ['current', 'self', 'control']],
+  ['final', ['semester', 'exam', 'admission']],
   ['grades', ['minimum', 'fair', 'good', 'excellent']],
   ['edit', ['editDays']],
 ];
@@ -19,11 +20,16 @@ const RANGES = {
   attendance: [1, 100], activity: [0, 100], current: [1, 100], self: [0, 100], control: [0, 100],
   minimum: [0, 100], fair: [1, 100], good: [1, 100], excellent: [1, 100], editDays: [0, 60],
 };
+// The split of regulation 2.9 (semester / exam / admission); the server checks it again.
+const SPLIT_RANGES = { semester: [1, 99], exam: [1, 99], admission: [0, 99] };
 const CODES = ['sum', 'order', 'too_big', 'bad_value'];
-const NAMES = Object.keys(RANGES);
+const SPLIT_CODES = ['sum', 'too_big', 'bad_value'];
+const SCHEME_NAMES = Object.keys(RANGES);
+const SPLIT_NAMES = Object.keys(SPLIT_RANGES);
+const NAMES = [...SCHEME_NAMES, ...SPLIT_NAMES];
 
 const blank = () => ({
-  loaded: null,        // { scheme, defaults } from scoring.get
+  loaded: null,        // { scheme, defaults, split, splitDefaults } from scoring.get
   loadErrorKey: null,
   pending: false,
   values: null,        // field -> what is typed (string)
@@ -34,15 +40,20 @@ const blank = () => ({
 });
 let state = blank();
 let example = null;    // the example line, updated in place
+let exampleFinal = null;   // the line about the whole subject, updated in place
 
 const canSave = () => permissions().includes('scoring.save');
 
 export function leaveScoringCard() {
   state = blank();
   example = null;
+  exampleFinal = null;
 }
 
-const strings = (scheme) => Object.fromEntries(NAMES.map((name) => [name, String(scheme[name])]));
+const strings = (scheme, split) => Object.fromEntries([
+  ...SCHEME_NAMES.map((name) => [name, String(scheme[name])]),
+  ...SPLIT_NAMES.map((name) => [name, String(split[name])]),
+]);
 const asNumber = (text) => (/^\d+$/.test(String(text).trim()) ? Number(String(text).trim()) : null);
 
 // The card, or null when the person may not see the scheme (a teacher).
@@ -64,8 +75,8 @@ async function load(owner) {
   try {
     const data = await call('scoring.get', {});
     if (state !== owner) return;
-    owner.loaded = { scheme: { ...data.scheme }, defaults: { ...data.defaults } };
-    owner.values = strings(data.scheme);
+    owner.loaded = { scheme: { ...data.scheme }, defaults: { ...data.defaults }, split: { ...data.split }, splitDefaults: { ...data.splitDefaults } };
+    owner.values = strings(data.scheme, data.split);
     owner.loadErrorKey = null;
   } catch (error) {
     if (state !== owner) return;
@@ -86,6 +97,7 @@ function loadingBody() {
 function form() {
   const editable = canSave();
   example = el('p', { class: 'scoring__example', id: 'scoring-example', 'aria-live': 'polite' });
+  exampleFinal = el('p', { class: 'scoring__example', id: 'scoring-example-final', 'aria-live': 'polite' });
   const groups = GROUPS.map(([group, names]) => el('fieldset', { class: 'scoring__group' },
     el('legend', { class: 'scoring__legend' }, t('scoring.group.' + group)),
     el('div', { class: 'scoring__fields' }, names.map((name) => numberField(name, editable)))));
@@ -93,6 +105,7 @@ function form() {
   return el('div', { class: 'scoring__form' },
     ...groups,
     example,
+    exampleFinal,
     editable ? note('warning', t('scoring.warning'), { class: 'scoring__warning' }) : null,
     editable ? actions() : null);
 }
@@ -129,6 +142,12 @@ function syncExample() {
     pair: sum('attendance', 'activity'), first: show('attendance'),
     current: show('current'), self: show('self'), control: show('control'), total: sum('current', 'self', 'control'),
   });
+  if (exampleFinal) {
+    exampleFinal.textContent = t('scoring.example.final', {
+      semester: show('semester'), exam: show('exam'), need: show('admission'),
+      fair: show('fair'), good: show('good'), excellent: show('excellent'),
+    });
+  }
 }
 
 function actions() {
@@ -145,7 +164,7 @@ function actions() {
 
 // The defaults go into the fields; nothing is saved.
 function reset() {
-  state.values = strings(state.loaded.defaults);
+  state.values = strings(state.loaded.defaults, state.loaded.splitDefaults);
   state.errors = {};
   state.messageKey = null;
   state.saved = false;
@@ -158,14 +177,17 @@ async function save() {
   owner.errors = {};
   owner.messageKey = null;
   owner.saved = false;
-  const scheme = Object.fromEntries(NAMES.map((name) => [name, asNumber(owner.values[name]) ?? owner.values[name]]));
+  const typed = (names) => Object.fromEntries(names.map((name) => [name, asNumber(owner.values[name]) ?? owner.values[name]]));
+  const scheme = typed(SCHEME_NAMES);
+  const split = typed(SPLIT_NAMES);
   owner.busy = true;
   refresh();
   try {
-    const data = await call('scoring.save', { scheme });
+    const data = await call('scoring.save', { scheme, split });
     if (state !== owner) return;
     owner.loaded.scheme = { ...data.scheme };
-    owner.values = strings(data.scheme);
+    owner.loaded.split = { ...data.split };
+    owner.values = strings(data.scheme, data.split);
     owner.saved = true;
   } catch (error) {
     if (state !== owner) return;
@@ -184,9 +206,10 @@ function showSaveError(owner, error) {
   const fields = error.code === 'invalid' && Array.isArray(error.fields) ? error.fields : [];
   const shown = fields.filter(({ field: name }) => NAMES.includes(name));
   for (const { field: name, code } of shown) {
-    const known = CODES.includes(code) ? code : 'bad_value';
-    const [min, max] = RANGES[name];
-    owner.errors[name] = { key: 'scoring.error.' + known, params: { min, max } };
+    const split = SPLIT_NAMES.includes(name);
+    const known = (split ? SPLIT_CODES : CODES).includes(code) ? code : 'bad_value';
+    const [min, max] = split ? SPLIT_RANGES[name] : RANGES[name];
+    owner.errors[name] = { key: 'scoring.error.' + (split && known !== 'bad_value' ? 'split.' : '') + known, params: { min, max } };
   }
   if (shown.length === 0) owner.messageKey = errorKey(error.code);
 }

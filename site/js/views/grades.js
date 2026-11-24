@@ -2,7 +2,7 @@ import { call } from '../api.js';
 import { t } from '../i18n.js';
 import { el, errorKey, badge, emptyState, pageHeader, refresh } from '../ui.js';
 import { icon } from '../icons.js';
-import { unitLine, absenceList, pointsText } from '../journal.js';
+import { unitLine, absenceList, pointsText, semesterLine, admissionLine } from '../journal.js';
 import { weekdayDate } from './pairParts.js';
 
 // «Оценки» of a student (#/grades, #/grades/<subjectId>): the points and absences of the person who asks, from
@@ -25,11 +25,11 @@ export function render(root, params = {}) {
     root.append(pageHeader({ id: 'gr-title', title: t('grades.title') }), failedOrLoading());
     return;
   }
-  const { scheme, subjects } = state.data;
-  if (!detail) root.append(listScreen(subjects, scheme));
+  const { scheme, subjects, split } = state.data;
+  if (!detail) root.append(listScreen(subjects, scheme, split));
   else {
     const subject = subjects.find((s) => s.subjectId === params.subjectId);
-    root.append(subject ? detailScreen(subject, scheme) : notFound());
+    root.append(subject ? detailScreen(subject, scheme, split) : notFound());
   }
 }
 
@@ -61,7 +61,7 @@ function failedOrLoading() {
 
 // ---- #/grades: a card for each subject ----
 
-function listScreen(subjects, scheme) {
+function listScreen(subjects, scheme, split) {
   const head = pageHeader({ id: 'gr-title', title: t('grades.title'), lead: t('home.gradesLead') });
   if (subjects.length === 0) return el('div', { class: 'gr' }, head, emptyState('chart', el('p', {}, t('grades.empty'))));
   return el('div', { class: 'gr' }, head,
@@ -72,18 +72,18 @@ function listScreen(subjects, scheme) {
             el('h2', { class: 'gr-card__name' }, subject.name),
             subject.teacherName ? el('p', { class: 'gr-card__teacher' }, subject.teacherName) : null),
           icon('chevron', 'gr-card__go')),
-        summary(subject, scheme))))),
+        summary(subject, scheme, split))))),
     subjects.some((subject) => subject.units.some((unit) => unit.selfWork)) ? el('a', { class: 'button button--secondary gr-tasks', id: 'gr-tasks', href: '#/tasks' }, t('grades.myTasks')) : null,
     howBlock(scheme));
 }
 
 // ---- #/grades/<subjectId>: one subject in full ----
 
-function detailScreen(subject, scheme) {
+function detailScreen(subject, scheme, split) {
   const missed = absenceList(subject.pairs);
   return el('div', { class: 'gr' },
     pageHeader({ id: 'gr-title', title: subject.name, lead: subject.teacherName || null }),
-    el('section', { class: 'card gr-card gr-card--static', 'aria-labelledby': 'gr-title' }, summary(subject, scheme)),
+    el('section', { class: 'card gr-card gr-card--static', 'aria-labelledby': 'gr-title' }, summary(subject, scheme, split)),
     el('section', { class: 'gr-section', 'aria-labelledby': 'gr-missed' },
       el('h2', { class: 'gr-section__title', id: 'gr-missed' }, t('grades.absences')),
       missed.length === 0 ? el('p', { class: 'muted gr-none' }, t('grades.noAbsences')) : el('ul', { class: 'gr-pairs' }, missed.map((pair) => pairRow(pair, false)))),
@@ -117,7 +117,7 @@ function pairRow(pair, withPoints) {
 
 // ---- The totals of a subject, the same on the card and at the top of the details ----
 
-function summary(subject, scheme) {
+function summary(subject, scheme, split) {
   const blocks = [];
   for (const unit of subject.units) blocks.push(unitBlock(unit, scheme));
   if (subject.outside && subject.outside.possible > 0) {
@@ -125,10 +125,12 @@ function summary(subject, scheme) {
   }
   if (blocks.length === 0) blocks.push(el('p', { class: 'muted gr-none' }, t('grades.cardEmpty')));
   const out = [el('div', { class: 'gr-units' }, blocks)];
-  if (subject.preliminary !== null && subject.preliminary !== undefined) {
-    out.unshift(el('p', { class: 'gr-final' },
-      el('span', { class: 'gr-final__text' }, t('grades.preliminary', { value: subject.preliminary, max: scheme.current + scheme.self + scheme.control })),
-      subject.word ? badge(t('journal.grade.' + subject.word), wordTone(subject.word)) : null));
+  const semester = semesterLine(subject, split);
+  const admission = admissionLine(subject, split);
+  if (semester) {
+    out.unshift(el('div', { class: 'gr-semester' },
+      el('p', { class: 'gr-final' }, el('span', { class: 'gr-final__text' }, t(semester.key, semester.params))),
+      admission ? el('p', { class: `gr-admission gr-admission--${admission.tone}` }, t(admission.key, admission.params)) : null));
   }
   const a = subject.attendance;
   if (a && a.marked > 0) out.push(el('p', { class: 'gr-attendance' }, t('grades.attendance', { attended: a.attended, marked: a.marked, missed: a.absent + a.excused })));

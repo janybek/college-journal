@@ -464,3 +464,18 @@ test('the screens of the student for the assignments have texts in all three lan
   assert.equal(ru['work.pick.badType'], 'Такой файл не принимается: фото, PDF, Word, Excel, PowerPoint');
   assert.equal(ru['work.upload.error.bad_file'], 'Файл не похож на свой тип или повреждён');
 });
+
+test('unit 6 task 9: the new scale texts exist in every language and carry the numbers only as placeholders', () => {
+  const keys = ['journal.tip.semesterSoFar', 'journal.tip.admitted', 'journal.tip.notAdmitted', 'grades.semester', 'grades.semesterSoFar', 'grades.admitted', 'grades.notAdmitted',
+    'scoring.group.final', 'scoring.field.semester', 'scoring.field.exam', 'scoring.field.admission', 'scoring.example.final', 'scoring.error.split.sum', 'scoring.error.split.too_big',
+    'error.units_closed', 'error.final_closed'];
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    for (const key of keys) {
+      assert.ok(dict[key], lang + ' ' + key);
+      assert.ok(!/(^|\D)(60|40|30|80)(\D|$)/.test(dict[key]), lang + ' ' + key + ' has a regulation number');
+    }
+    for (const p of ['{semester}', '{exam}', '{need}', '{fair}', '{good}', '{excellent}']) assert.ok(dict['scoring.example.final'].includes(p), lang + ' ' + p);
+    for (const p of ['{value}', '{max}', '{need}']) assert.ok(dict['grades.notAdmitted'].includes(p), lang + ' ' + p);
+    assert.ok(!('grades.preliminary' in dict), lang + ' grades.preliminary is gone');
+  }
+});

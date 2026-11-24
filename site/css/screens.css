@@ -5789,6 +5789,7 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 .jg-sum--final { font-weight: 700; }
 
 .journal-grid .jg-pts.is-low { color: var(--danger); font-weight: 700; }
+.journal-grid .jg-sum--final.is-low { color: var(--danger); }
 
 .jg-empty { color: var(--text-muted); }
 
@@ -6507,6 +6508,19 @@ a.gr-card:hover { border-color: var(--primary-line); }
   letter-spacing: -0.02em;
   line-height: 1.3;
 }
+
+.gr-semester { display: grid; gap: var(--space-1); }
+
+.gr-admission {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.gr-admission--success { color: var(--success); }
+.gr-admission--danger { color: var(--danger); }
 
 .gr-units { display: grid; gap: var(--space-3); }
 

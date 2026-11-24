@@ -388,3 +388,29 @@ export function viewColumns(journal, view) {
   }
   return { pairs, columns: journalColumns({ ...journal, pairs, units }) };
 }
+
+// ---- Semester points and the admission (regulation 2.9). The numbers come from the answer (`split`), not from here. ----
+
+// The «Семестр» cell of the journal: the points, the tip (key + params) and the tone.
+export function semesterCell(result, split) {
+  if (result.semester === null || result.semester === undefined) return { text: '—', key: null, params: {}, tone: 'neutral' };
+  const text = String(result.semester);
+  if (!result.complete) return { text, key: 'journal.tip.semesterSoFar', params: { max: split.semester }, tone: 'neutral' };
+  if (result.admitted) return { text, key: 'journal.tip.admitted', params: { max: split.semester }, tone: 'neutral' };
+  return { text, key: 'journal.tip.notAdmitted', params: { max: split.semester, need: split.admission }, tone: 'danger' };
+}
+
+// The first line of a subject on «Оценки»: the semester points.
+export function semesterLine(subject, split) {
+  if (subject.semester === null || subject.semester === undefined) return null;
+  const params = { value: subject.semester, max: split.semester };
+  if (!subject.complete) return { key: 'grades.semesterSoFar', params, tone: 'neutral' };
+  return { key: 'grades.semester', params, tone: subject.admitted ? 'success' : 'danger' };
+}
+
+// The second line: admitted or not (only when all units are given).
+export function admissionLine(subject, split) {
+  if (!subject.complete) return null;
+  if (subject.admitted) return { key: 'grades.admitted', params: {}, tone: 'success' };
+  return { key: 'grades.notAdmitted', params: { value: subject.semester, max: split.semester, need: split.admission }, tone: 'danger' };
+}
