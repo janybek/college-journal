@@ -100,6 +100,9 @@ export function examNote(examWeek, today, final) {
 
 // ---- The exam: the head, the results of the first sitting, the history of the tries ----
 
+// «07» is 7: a digits-only field is compared and sent as the number it holds.
+const normalNumber = (text) => (/^\d{1,3}$/.test(text) ? String(Number(text)) : text);
+
 const ABSENT = 'absent';
 const INCOMPLETE = 'incomplete';
 const firstTry = (student) => student.attempts.find((a) => a.no === 1);
@@ -128,7 +131,7 @@ export function examItems(draft, students, split) {
   const bad = [];
   for (const s of students) {
     if (!canEnter(s) || !draft.has(s.id)) continue;
-    const text = String(draft.get(s.id)).trim();
+    const text = normalNumber(String(draft.get(s.id)).trim());
     if (text === textOfTry(firstTry(s))) continue;
     if (text === '') items.push({ studentId: s.id, outcome: null, score: null });
     else if (text === ABSENT || text === INCOMPLETE) items.push({ studentId: s.id, outcome: text, score: null });
@@ -224,7 +227,7 @@ export function scoreItems(draft, students) {
   const bad = [];
   for (const s of students) {
     if (s.left || !draft.has(s.id)) continue;
-    const text = String(draft.get(s.id)).trim();
+    const text = normalNumber(String(draft.get(s.id)).trim());
     if (text === scoreText(s)) continue;
     if (text === '') items.push({ studentId: s.id, score: null });
     else if (/^\d{1,3}$/.test(text) && Number(text) <= SCORE_MAX) items.push({ studentId: s.id, score: Number(text) });

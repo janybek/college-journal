@@ -7257,12 +7257,12 @@ a.gr-card:hover { border-color: var(--primary-line); }
 
 .task-info__text { max-width: 70ch; white-space: pre-wrap; overflow-wrap: anywhere; }
 
-.check { display: grid; gap: var(--space-4); align-items: start; }
+.task-check { display: grid; gap: var(--space-4); align-items: start; }
 
-.check > * { min-width: 0; }
+.task-check > * { min-width: 0; }
 
 @media (min-width: 768px) {
-  .check { grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); }
+  .task-check { grid-template-columns: minmax(16rem, 22rem) minmax(0, 1fr); }
   .check__list { position: sticky; top: var(--space-4); max-height: calc(100vh - 2 * var(--space-4)); overflow-y: auto; }
 }
 

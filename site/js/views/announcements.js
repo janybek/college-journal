@@ -119,6 +119,13 @@ function openNew() {
 
 // ---- «Убрать» ----
 
+// After «Убрать»: the «new» button when the person has it, otherwise the heading of the list (so the focus does not fall to the page).
+function focusAfterRemove() {
+  const heading = document.getElementById('announce-heading');
+  if (heading && !heading.hasAttribute('tabindex')) heading.setAttribute('tabindex', '-1');
+  focusById('announce-new', 'announce-heading');
+}
+
 function openRemove(item) {
   const owner = state;
   let busy = false;
@@ -128,7 +135,7 @@ function openRemove(item) {
   const onHash = () => dialog.close();
   const dialog = modal({
     id: 'announce-remove-dialog', labelledBy: 'announce-remove-dialog-title', className: 'dialog--confirm',
-    onClose: () => { window.removeEventListener('hashchange', onHash); dialog.remove(); focusById('announce-new'); },
+    onClose: () => { window.removeEventListener('hashchange', onHash); dialog.remove(); focusAfterRemove(); },
   },
   el('h2', { class: 'dialog__title', id: 'announce-remove-dialog-title' }, t('announce.remove.title')),
   el('p', {}, t('announce.remove.text', { title: item.title })),

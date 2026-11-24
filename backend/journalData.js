@@ -81,7 +81,8 @@ export function pairKeyOf(rows, pair) {
   return { planSemester: syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null, unit: topic.unit };
 }
 
-// The units and the final sheet of the subject that are closed: of the syllabus in force; without one, of the halves the pairs of the subject belong to.
+// The half of the plan of the subject and its closed units and final sheet: of the syllabus in force; without one (the teacher changed to someone
+// without a syllabus), of the halves the held pairs of the subject belong to, so closures and the exam stay (final review, I2).
 export function closedOfSubject(rows, subject, settings, pairs) {
   const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
   if (syllabus) {
@@ -90,6 +91,8 @@ export function closedOfSubject(rows, subject, settings, pairs) {
   }
   const units = new Set();
   let final = false;
+  let planSemester = null;
+  let best = -1;
   const seen = new Set();
   for (const p of pairs) {
     const key = pairKeyOf(rows, p);
@@ -98,8 +101,10 @@ export function closedOfSubject(rows, subject, settings, pairs) {
     const c = closedUnitsOf(rows.closures, subject.id, key.planSemester);
     for (const u of c.units) units.add(u);
     final = final || c.final;
+    const weight = (c.final ? 1000 : 0) + c.units.length;
+    if (weight > best) { best = weight; planSemester = key.planSemester; }
   }
-  return { planSemester: null, closed: { units: [...units].sort((a, b) => a - b), final } };
+  return { planSemester, closed: { units: [...units].sort((a, b) => a - b), final } };
 }
 
 // True when the pair belongs to a closed unit of its subject.
@@ -137,8 +142,7 @@ export function journalView(rows, platform, subjectId, user) {
   const nowMs = platform.now();
   const now = { date: localDate(nowMs), time: localTime(nowMs) };
   const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
-  const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
-  const closed = closedOfSubject(rows, subject, settings, all).closed;
+  const { planSemester, closed } = closedOfSubject(rows, subject, settings, all);
 
   // lessons of the pairs
   const topics = new Map(rows.topics.map((t) => [t.id, t]));
@@ -223,6 +227,7 @@ export function journalView(rows, platform, subjectId, user) {
       for (const u of rows.units) if (u.syllabusId === syllabus.id) titles.set(u.unit, u.title || '');
     }
     for (const p of all) if (held(p) && unitOf(p) !== null) unitNumbers.add(unitOf(p));
+    for (const u of closed.units) unitNumbers.add(u);       // a closed unit stays on the sheet even when no syllabus is in force
   }
   const unitList = [...unitNumbers].sort((a, b) => a - b);
 
@@ -617,7 +622,7 @@ function changePairStatus(store, platform, data, user, reopen) {
   const pair = typeof data.pairId === 'string' ? rows.pairs.find((p) => p.id === data.pairId) : undefined;
   const subject = pair && rows.subjects.find((s) => s.id === pair.subjectId);
   if (!pair || !subject) throw new AppError('not_found');
-  if (reopen && pair.status === 'closed' && pairUnitClosed(rows, subject, pair)) throw new AppError('unit_closed');
+  if (pairUnitClosed(rows, subject, pair)) throw new AppError('unit_closed');
   const code = checkReason(data.reason);
   if (code) throw new AppError('invalid', { fields: [{ field: 'reason', code }] });
   const reason = data.reason.trim();

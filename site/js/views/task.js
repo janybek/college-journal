@@ -112,7 +112,7 @@ function body() {
     info(),
     students.length === 0
       ? emptyState('cap', el('p', { class: 'empty__title', id: 'task-no-students' }, t('work.noStudents')))
-      : el('div', { class: 'check' }, studentList(), workPanel(students.find((s) => s.id === state.selectedId) ?? students[0], assignment)));
+      : el('div', { class: 'task-check' }, studentList(), workPanel(students.find((s) => s.id === state.selectedId) ?? students[0], assignment)));
 }
 
 function info() {
@@ -350,7 +350,7 @@ function previous(student, earlier, assignment) {
 function closedGrade(student, current, assignment) {
   const user = getUser();
   const may = !!user && activeRole(user) === 'teacher' && Array.isArray(user.permissions) && user.permissions.includes('request.create')
-    && !!assignment.teacherName && assignment.teacherName === user.fullName;
+    && state.data.can?.request === true;
   return el('div', { class: 'grade-read', id: 'task-closed' },
     readOnlyGrade(current, assignment),
     el('p', { class: 'rq-closed-note', id: 'task-closed-note' }, t('request.unitClosedWork')),

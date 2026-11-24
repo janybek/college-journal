@@ -460,3 +460,14 @@ test('request.create: 50 open requests of one author are the limit; each table i
   assert.equal(s.call('request.mine', {}, s.t.teacher1).ok, true);
   for (const table of REQUEST_TABLES) assert.ok((s.spy.lists[table] || 0) <= 1, 'mine ' + table);
 });
+
+test('request.create: the text after is stored and compared as the journal writes it (final review, M1)', () => {
+  const s = ready();
+  const mk = control(s);
+  const before = s.snapshot();
+  assert.deepEqual(mk({ after: '025' }).error.fields, [{ field: 'after', code: 'same' }]);
+  assert.deepEqual(s.snapshot(), before);
+  const made = mk({ after: '031' });
+  assert.equal(made.data.request.after, '31');
+  assert.equal(s.store.list('requests').find((r) => r.id === made.data.request.id).after, '31');
+});

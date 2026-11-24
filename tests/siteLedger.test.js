@@ -306,3 +306,10 @@ test('the sheet of a state exam without any score has no counts of words', () =>
   const rows = stateExamRows(EXAM_VIEW({ students: [SE('b', 'Студент Второй', null)], stats: { total: 1, entered: 0, fail: 0, fair: 0, good: 0, excellent: 0, average: null } }), labels);
   assert.ok(rows.some((r) => r[0] === 'без баллов: 1'));
 });
+
+test('«035» against 35 is not a change: no item and no reason is asked (final review, S2)', () => {
+  assert.deepEqual(examItems(new Map([['a1', '035']]), list, SP), { items: [], bad: [] });
+  assert.deepEqual(examItems(new Map([['a1', '036']]), list, SP).items, [{ studentId: 'a1', outcome: 'score', score: 36 }]);
+  assert.deepEqual(scoreItems(new Map([['a', '090'], ['c', '055']]), EXAM_STUDENTS), { items: [], bad: [] });
+  assert.deepEqual(scoreItems(new Map([['b', '080']]), EXAM_STUDENTS), { items: [{ studentId: 'b', score: 80 }], bad: [] });
+});

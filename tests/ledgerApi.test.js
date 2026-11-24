@@ -226,3 +226,20 @@ test('ledger.closeFinal: the credit week, what is missing, the record, the right
   s3.examRow(s3.a2);
   assert.equal(s3.call('ledger.closeFinal', { subjectId: s3.sb1 }, s3.t.teacher1).ok, true);
 });
+
+test('the teacher of a closed subject changes to one without a syllabus: the closures and the exam stay in the ledger and for the student (final review, I2)', () => {
+  const s = setup();
+  s.allUnits(); s.examHead(); s.examRow(s.a1); s.examRow(s.a2, { score: 20 }); s.closeFinal(); s.at('2026-12-26');
+  const grades = () => s.call('student.grades', {}, s.t.a1).data.subjects.find((x) => x.subjectId === s.sb1);
+  const finalBefore = grades().final;
+  s.store.update('subjects', s.sb1, { teacherId: s.ids.teacher2 });
+  const l = s.call('ledger.get', { subjectId: s.sb1 }, s.t.dean).data.ledger;
+  assert.equal(l.units.length > 0 && l.units.every((u) => u.closed), true);
+  assert.deepEqual([l.final.closed, rowOf(l, s.a1).exam], [true, 35]);
+  assert.equal(l.subject.planSemester, 1);
+  assert.deepEqual(grades().final, finalBefore);
+  assert.equal(grades().final.status, 'done');
+  assert.equal(grades().final.total, 82);
+  const journal = s.call('journal.get', { subjectId: s.sb1 }, s.t.dean).data.journal;
+  assert.equal(journal.subject.planSemester, 1);
+});

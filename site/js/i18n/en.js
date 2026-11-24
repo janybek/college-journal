@@ -1077,6 +1077,8 @@ export default {
   'sform.checks.plan.held_missing': 'The topic «{name}» was already given ({date}) and is not in the plan. Put the topic back under the same name.',
   'sform.checks.plan.held_hours': 'The topic «{name}» was already given ({date}) in {held} h, and the plan has fewer hours now. Put the hours back.',
   'sform.checks.plan.held_kind': 'The topic «{name}» was already given ({date}) as another kind of lesson. Put the kind back.',
+  'sform.checks.plan.held_closed': 'The topic “{name}” was already held ({date}) in a closed unit — it cannot move to another unit. Put it back in its unit.',
+  'sform.checks.title.semester_closed': 'The semester cannot be changed: units are already closed or exam results exist in the groups of this discipline. Put back the previous semester.',
   'sform.checks.selfWork.bad_unit': 'Work {n} refers to a unit the plan does not have.',
   'sform.checks.literature.empty': 'No literature is given.',
   'sform.checks.software.empty': 'No programs or resources are given.',

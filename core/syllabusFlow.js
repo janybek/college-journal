@@ -2,6 +2,7 @@
 import { FIXED_STATUSES, LESSON_KINDS, OPEN_STATUSES } from './schema.js';
 import { compareNames } from './names.js';
 import { courseOf } from './syllabusFile.js';
+import { closedUnitsOf } from './ledger.js';
 import { HOURS_PER_PAIR, NO_LESSON, lessonTypeOf, partsOf } from './topics.js';
 
 // The greater version wins, then the greater id: two matching rows (two simultaneous «Fill» on Google) give one answer.
@@ -73,7 +74,8 @@ export function copiesOf(topics, approvedTopics) {
 const pairOrder = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || (a.slot || 0) - (b.slot || 0) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 
 // Held pairs of the rows of the approved version against the copies of those rows in the new version.
-export function checkHeld(draftTopics, approvedTopics, pairs) {
+// closures + planSemester (of the approved version): a held pair of a unit that is closed now must stay in that unit.
+export function checkHeld(draftTopics, approvedTopics, pairs, closures = [], planSemester = null) {
   const copies = copiesOf(draftTopics, approvedTopics);
   const held = new Map();
   for (const p of pairs || []) {
@@ -93,6 +95,9 @@ export function checkHeld(draftTopics, approvedTopics, pairs) {
     else if (mine.some((p) => p.lessonType !== lessonTypeOf(copy))) errors.push({ section: 'plan', code: 'held_kind', ...where });
     else if (mine.some((p) => p.part > partsOf(copy, p.lessonType))) {
       errors.push({ section: 'plan', code: 'held_hours', ...where, held: Math.max(...mine.map((p) => p.part)) * HOURS_PER_PAIR });
+    } else if (copy.unit !== a.unit) {
+      const shut = mine.find((p) => closedUnitsOf(closures, p.subjectId, planSemester).units.includes(a.unit));
+      if (shut) errors.push({ section: 'plan', code: 'held_closed', name: a.name, date: shut.date });
     }
   }
   return errors;

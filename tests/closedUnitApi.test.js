@@ -197,7 +197,8 @@ test('work.get, work.list, work.mine: the closed self-work is marked, the open o
   assert.equal(s.call('work.get', { assignmentId: H }, s.t.a1).data.canSubmit, true);
 
   const staff = s.call('work.get', { assignmentId: A }, s.t.teacher1).data;
-  assert.deepEqual([staff.can, staff.closed], [{ manage: false, grade: false }, true]);
+  assert.deepEqual([staff.can, staff.closed], [{ manage: false, grade: false, request: true }, true]);   // the subject teacher may file a request
+  assert.equal(s.call('work.get', { assignmentId: A }, s.t.teacher2).error.code, 'forbidden');
   const open = s.call('work.get', { assignmentId: B }, s.t.teacher1).data;
   assert.deepEqual([open.can, 'closed' in open], [{ manage: true, grade: true }, false]);
   assert.deepEqual(s.call('work.get', { assignmentId: A }, s.t.dean).data.can, { manage: false, grade: false });
@@ -353,4 +354,20 @@ test('a closed unit stays closed when the half of the year is switched', () => {
   const closure = s.store.list('closures')[0];
   s.store.update('closures', closure.id, { reopenedAt: '2026-10-01 10:00:00', reopenedBy: s.ids.admin });
   assert.equal(s.call('journal.savePair', markOf(s, s.p0901), s.t.dean).ok, true);
+});
+
+test('a pair of a closed unit is neither returned from "missed" nor marked missed (final review, M2)', () => {
+  const s = setup();
+  s.unitNumbers();
+  const base = s.store.get('pairs', s.p0908);
+  const missed = s.store.insert('pairs', { ...base, id: undefined, date: '2026-09-09', status: 'missed' });
+  const planned = s.store.insert('pairs', { ...base, id: undefined, date: '2026-09-10', status: 'planned' });
+  s.closeUnit(1);
+  s.at('2026-10-01');
+  const before = s.snapshot();
+  for (const who of ['dean', 'admin']) {
+    assert.equal(s.call('journal.reopenPair', { pairId: missed.id, reason: 'ошибка' }, s.t[who]).error.code, 'unit_closed', who);
+    assert.equal(s.call('journal.missPair', { pairId: planned.id, reason: 'ошибка' }, s.t[who]).error.code, 'unit_closed', who);
+  }
+  assert.deepEqual(s.snapshot(), before);
 });

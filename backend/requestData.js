@@ -71,7 +71,7 @@ function inspect(rows, view, subject, t) {
     const row = lastOf(rows.unitResults.filter((r) => r.subjectId === subject.id && r.studentId === student.id && (r.planSemester ?? null) === planSemester && r.unit === t.unit), 'updatedAt');
     const value = parsePointsText(t.after);
     if (value === undefined || checkResultValue(t.kind, value, view.scheme) !== null) throw bad('after', 'bad_value');
-    return { now: pointsText(row ? row[column] : null), attemptId: '', unit: t.unit, value };
+    return { now: pointsText(row ? row[column] : null), after: pointsText(value), attemptId: '', unit: t.unit, value };
   }
 
   if (t.kind === 'mark') {
@@ -90,7 +90,7 @@ function inspect(rows, view, subject, t) {
     if (!next) throw bad('after', 'bad_value');
     const problems = checkMark(old, next, { mode: 'reason', pair: { first: pair.first, lessonType: pair.lessonType }, scheme: view.scheme });
     if (problems.length > 0) throw bad('after', problems[0].code);
-    return { now: markText(old), attemptId: '', unit: pair.unit, pair: raw, existing, old, next };
+    return { now: markText(old), after: markText(next), attemptId: '', unit: pair.unit, pair: raw, existing, old, next };
   }
 
   if (t.kind === 'work') {
@@ -100,7 +100,7 @@ function inspect(rows, view, subject, t) {
     const current = currentAttempt(rows.submissions.filter((r) => r.assignmentId === assignment.id && r.studentId === student.id));
     const value = parsePointsText(t.after);
     if (value === undefined || value === null || value > assignment.maxPoints) throw bad('after', 'bad_value');
-    return { now: current ? pointsText(current.points) : '', attemptId: current ? current.id : '', unit: assignment.unit, assignment, current, value };
+    return { now: current ? pointsText(current.points) : '', after: pointsText(value), attemptId: current ? current.id : '', unit: assignment.unit, assignment, current, value };
   }
 
   // the result of the exam: the final sheet is closed and the target is the last attempt of the student
@@ -110,7 +110,7 @@ function inspect(rows, view, subject, t) {
   if (!last) throw bad('studentId', 'no_attempt');
   const result = parseExamText(t.after);
   if (!result || checkResult(result, view.split) !== null) throw bad('after', 'bad_value');
-  return { now: examText(last), attemptId: last.id, unit: null, attempt: last, result };
+  return { now: examText(last), after: examText(result), attemptId: last.id, unit: null, attempt: last, result };
 }
 
 // 'request.create' { kind, subjectId, unit, pairId, assignmentId, studentId, before, after, reason } -> { request }
@@ -125,7 +125,7 @@ export function createRequest(store, platform, data, user) {
 
   const found = inspect(rows, view, subject, data);
   if (data.before !== found.now) throw bad('before', 'changed');
-  if (data.after === data.before) throw bad('after', 'same');
+  if (found.after === found.now) throw bad('after', 'same');
   const code = checkReason(data.reason);
   if (code) throw bad('reason', code);
 
@@ -140,7 +140,7 @@ export function createRequest(store, platform, data, user) {
 
   const at = localDateTime(platform.now());
   const [saved] = store.insertMany('requests', [{
-    ...target, attemptId: found.attemptId, before: data.before, after: data.after, reason: data.reason.trim(), authorId: user.id, createdAt: at,
+    ...target, attemptId: found.attemptId, before: data.before, after: found.after, reason: data.reason.trim(), authorId: user.id, createdAt: at,
     status: 'dean', deanBy: '', deanAt: '', finalBy: '', finalAt: '', closedAt: '', closeNote: '',
   }]);
   return { request: requestView({ ...rows, requests: [...rows.requests, saved] }, saved, actorOf(rows, user)) };

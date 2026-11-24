@@ -3,9 +3,9 @@
 import { AppError } from '../core/errors.js';
 import { LIMITS, plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
-import { approvalPlan, checkHeld, checkSubmit, rightsOn, versionsOf } from '../core/syllabusFlow.js';
+import { approvalPlan, checkSubmit, rightsOn, versionsOf } from '../core/syllabusFlow.js';
 import { loadSettings, relayout, todayOf } from './scheduleData.js';
-import { groupsOfTeacher, readTables, versionOf, viewerOf } from './syllabusDraft.js';
+import { groupsOfTeacher, heldErrors, readTables, versionOf, viewerOf } from './syllabusDraft.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const isManager = (user) => user.roles.includes('admin') || user.roles.includes('dean');
@@ -29,7 +29,7 @@ function examine(store, version, syllabi, subjects) {
   const { approved } = versionsOf(syllabi, { disciplineId: version.disciplineId, teacherId: version.teacherId, semester: version.semester });
   const rows = rowsOfVersion(tables, version.id);
   const previous = approved && approved.id !== version.id ? rowsOfVersion(tables, approved.id) : null;
-  const held = previous ? checkHeld(rows.topics, previous.topics, pairs) : [];
+  const held = previous ? heldErrors(store, version, approved, rows, previous, pairs, subjects) : [];
   return { tables, pairs, approved: previous ? approved : null, rows, previous, checks: checkSubmit(buildDoc(version, rows), held, groupsOfTeacher(version, subjects, store.list('groups'))) };
 }
 

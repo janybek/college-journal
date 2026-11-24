@@ -88,6 +88,22 @@ export function versionOf(syllabi, id) {
   return version;
 }
 
+// The errors of the held pairs of the approved version against the new one: lessons, hours, kind (checkHeld), the closed units and the half of the plan.
+// A closed unit or the exam of the old half is never moved by a new version (final review, I1).
+export function heldErrors(store, version, approved, rows, previous, pairs, subjects) {
+  if (!approved || approved.id === version.id) return [];
+  const closures = store.list('closures');
+  const old = approved.planSemester ?? null;
+  const errors = checkHeld(rows.topics, previous.topics, pairs, closures, old);
+  if ((version.planSemester ?? null) !== old) {
+    const mine = new Set(subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId).map((s) => s.id));
+    const inOld = (r) => mine.has(r.subjectId) && (r.planSemester ?? null) === old;
+    const stands = closures.some((c) => inOld(c) && c.reopenedAt === '') || store.list('subjectExams').some(inOld) || store.list('examAttempts').some(inOld);
+    if (stands) errors.push({ section: 'title', code: 'semester_closed' });
+  }
+  return errors;
+}
+
 // 'syllabus.form' { syllabusId } -> the version, its subject, what the viewer may do, the document and the checks before submitting.
 export function draftForm(store, platform, data, user) {
   const syllabi = store.list('syllabi');
@@ -106,7 +122,7 @@ export function draftForm(store, platform, data, user) {
   const { approved } = versionsOf(syllabi, keyOfVersion(version));
   const rows = rowsOfVersion(tables, version.id);
   const doc = buildDoc(version, rows);
-  const held = approved && approved.id !== version.id ? checkHeld(rows.topics, rowsOfVersion(tables, approved.id).topics, pairs) : [];
+  const held = approved && approved.id !== version.id ? heldErrors(store, version, approved, rows, rowsOfVersion(tables, approved.id), pairs, subjects) : [];
 
   const groupName = (id) => (groups.find((g) => g.id === id) || { name: '' }).name;
   const mine = subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId)

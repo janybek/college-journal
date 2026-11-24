@@ -1,7 +1,7 @@
 import { call } from '../api.js';
 import { getUser } from '../session.js';
 import { t } from '../i18n.js';
-import { el, errorKey, avatar, badge, emptyState, pageHeader } from '../ui.js';
+import { el, errorKey, avatar, badge, emptyState, note, pageHeader } from '../ui.js';
 import { icon } from '../icons.js';
 import { activeRole, menuParts, navFor, countBadge } from '../shell.js';
 import { pairCard, weekdayDate, lessonPieces } from './pairParts.js';
@@ -312,7 +312,7 @@ export function leave() {
   clearInterval(here.clock);
   here.pair = null;
   Object.assign(requestCount, { owner: null, n: null, pending: null });
-  Object.assign(announceHome, { owner: null, items: null, pending: null });
+  Object.assign(announceHome, { owner: null, items: null, error: null, pending: null });
 }
 
 // The section appears only when there are pairs today; it asks again every minute while the page is open and visible.
@@ -421,7 +421,7 @@ function requestsBlock(user) {
 
 // «Объявления»: the last three at the top of the home screen, one announce.list each time the screen is opened (leave() forgets them);
 // with none, or no answer, there is no block. Title and the first line are only text.
-const announceHome = { owner: null, items: null, pending: null };
+const announceHome = { owner: null, items: null, error: null, pending: null };
 
 function announceBlock(user) {
   const holder = el('div', { class: 'home-announce', id: 'home-announce' });
@@ -438,7 +438,7 @@ function announceBlock(user) {
           firstLine(item.text) ? el('span', { class: 'home-announce__line' }, firstLine(item.text)) : null)))),
       el('a', { class: 'home-announce__all', id: 'home-announce-all', href: '#/announcements' }, t('announce.home.all'), icon('chevron'))));
   };
-  if (announceHome.owner !== user.id) Object.assign(announceHome, { owner: user.id, items: null, pending: null });
+  if (announceHome.owner !== user.id) Object.assign(announceHome, { owner: user.id, items: null, error: null, pending: null });
   if (announceHome.items === null && !announceHome.pending) {
     const owner = user.id;
     announceHome.pending = call('announce.list', {})
@@ -459,6 +459,7 @@ function studentAnnounce(user) {
     holder.replaceChildren(el('header', { class: 'home-announce__head' },
       el('span', { class: 'tile__icon' }, icon('bell')),
       el('h2', { class: 'section__title home-announce__title', id: 'home-announce-title' }, t('home.news'))));
+    if (announceHome.error) { holder.append(note('error', t(announceHome.error), { role: 'alert', id: 'home-announce-error' })); return; }
     if (items === null) { holder.append(el('p', { class: 'loading' }, t('announce.loading'))); return; }
     if (items.length === 0) holder.append(el('p', { class: 'homework__none', id: 'home-announce-none' }, t('announce.home.empty')));
     else {
@@ -476,11 +477,12 @@ function studentAnnounce(user) {
     }
     holder.append(el('a', { class: 'home-announce__all', id: 'home-announce-all', href: '#/announcements' }, t('announce.home.all'), icon('chevron')));
   };
-  if (announceHome.owner !== user.id) Object.assign(announceHome, { owner: user.id, items: null, pending: null });
+  if (announceHome.owner !== user.id) Object.assign(announceHome, { owner: user.id, items: null, error: null, pending: null });
   if (announceHome.items === null && !announceHome.pending) {
     const owner = user.id;
     announceHome.pending = call('announce.list', {})
-      .then((data) => { if (announceHome.owner === owner) announceHome.items = Array.isArray(data.items) ? data.items : []; }, () => { if (announceHome.owner === owner) announceHome.items = []; })
+      .then((data) => { if (announceHome.owner === owner) { announceHome.items = Array.isArray(data.items) ? data.items : []; announceHome.error = null; } },
+        (failure) => { if (announceHome.owner === owner) announceHome.error = errorKey(failure && failure.code); })
       .finally(() => { if (announceHome.owner === owner) announceHome.pending = null; });
     announceHome.pending.then(() => { if (holder.isConnected) draw(); });
   }

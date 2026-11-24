@@ -275,7 +275,7 @@ export function staffWorkView(rows, platform, assignment, user) {
       title: assignment.title, description: assignment.description, dueAt: assignment.dueAt, maxPoints: assignment.maxPoints, createdAt: assignment.createdAt,
       locked: byStudent.size > 0,
     },
-    can: shut ? { manage: false, grade: false } : { manage: rights.manage, grade: rights.manage },
+    can: shut ? { manage: false, grade: false, ...(rights.manage ? { request: true } : {}) } : { manage: rights.manage, grade: rights.manage },
     ...(shut ? { closed: true } : {}),
     students: [...listed.map((s) => studentView(s, false)), ...left.map((s) => studentView(s, true))],
   };

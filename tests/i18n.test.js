@@ -563,3 +563,9 @@ test('unit 6 task 24: the state exams have their texts in every language, the ma
     assert.ok(dict['stateExam.title'] && dict['stateExam.hint'] && dict['stateExam.print.title'], lang);
   }
 });
+
+test('final review I1: a closed unit and a closed half of the plan have their texts in every language', () => {
+  const keys = ['sform.checks.plan.held_closed', 'sform.checks.title.semester_closed'];
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) for (const p of ['{name}', '{date}']) assert.ok(dict[keys[0]].includes(p), p);
+});

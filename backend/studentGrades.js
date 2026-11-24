@@ -70,7 +70,7 @@ export function studentGrades(rows, platform, user) {
       const all = rows.pairs.filter((p) => p.subjectId === subject.id && inSemester(p.date, settings));
       const first = firstPairId(all);
       const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
-      const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
+      const { planSemester, closed } = closedOfSubject(rows, subject, settings, all);
       const unitOf = (p) => { const t = topics.get(p.topicId); return t && Number.isInteger(t.unit) ? t.unit : null; };
 
       const unitNumbers = new Set();
@@ -80,6 +80,7 @@ export function studentGrades(rows, platform, user) {
         for (const u of rows.units) if (u.syllabusId === syllabus.id) titles.set(u.unit, u.title || '');
       }
       for (const p of all) if (held(p) && unitOf(p) !== null) unitNumbers.add(unitOf(p));
+      for (const u of closed.units) unitNumbers.add(u);       // a closed unit stays on the sheet even when no syllabus is in force
       const unitList = [...unitNumbers].sort((a, b) => a - b);
 
       const unitRows = new Map();
@@ -105,7 +106,6 @@ export function studentGrades(rows, platform, user) {
           };
         });
       const teacher = rows.staff.find((x) => x.id === subject.teacherId);
-      const closed = closedOfSubject(rows, subject, settings, all).closed;
       return {
         subjectId: subject.id, name: subject.name, teacherName: teacher ? teacher.fullName : '', hasSyllabus: syllabus !== null,
         units: result.units.map((u) => ({

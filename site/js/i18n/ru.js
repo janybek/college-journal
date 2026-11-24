@@ -1077,6 +1077,8 @@ export default {
   'sform.checks.plan.held_missing': 'Тема «{name}» уже проведена ({date}), а в плане её нет. Верните тему под тем же названием.',
   'sform.checks.plan.held_hours': 'Тема «{name}» уже проведена ({date}): на неё ушло {held} ч, а в плане теперь меньше. Верните прежние часы.',
   'sform.checks.plan.held_kind': 'Тема «{name}» уже проведена ({date}) другим видом занятия. Верните прежний вид.',
+  'sform.checks.plan.held_closed': 'Тема «{name}» уже проведена ({date}) в закрытом юните — переносить её в другой юнит нельзя. Верните прежний юнит.',
+  'sform.checks.title.semester_closed': 'Семестр менять нельзя: в группах по этой дисциплине уже закрыты юниты или есть результаты экзамена. Верните прежний семестр.',
   'sform.checks.selfWork.bad_unit': 'Работа {n} ссылается на юнит, которого нет в плане.',
   'sform.checks.literature.empty': 'Не указана литература.',
   'sform.checks.software.empty': 'Не указаны программы и ресурсы.',

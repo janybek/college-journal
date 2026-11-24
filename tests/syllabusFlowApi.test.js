@@ -309,3 +309,60 @@ test('a title of the 2nd course with the plan semester of the 1st is refused at 
   assert.deepEqual([direct.approved, direct.changedPairs, direct.checks.errors], [false, 0, [expected]]);
   assert.equal(snapshotAll(), before);
 });
+
+// A closed unit of the approved version: the held pair stays in it, the half of the plan stays (final review, I1)
+function closedWorld() {
+  const w = ready();
+  w.approveFirst();
+  const held = w.pairOf(w.sb3, '2026-09-02');
+  w.store.update('pairs', held.id, { status: 'closed' });
+  const closure = w.store.insert('closures', { subjectId: w.sb3, planSemester: 1, unit: 1, closedBy: w.teacher1, closedAt: '2026-09-30 12:00:00', reopenedBy: '', reopenedAt: '' });
+  const movedPlan = (id) => {
+    const plan = w.planOf ? w.planOf(id) : structuredClone(w.call('syllabus.form', { syllabusId: id }, w.dean).data.doc.plan);
+    const lecture = plan.units[0].lecture.find((r) => r.name === 'Введение');
+    plan.units[0].lecture = plan.units[0].lecture.filter((r) => r !== lecture);
+    plan.units.push({ title: '', lecture: [lecture], practice: [], seminar: [], lab: [], control: [] });
+    return plan;
+  };
+  return { ...w, held, closure, movedPlan };
+}
+
+test('a new version cannot move a held topic out of its closed unit: submit and approve refuse, nothing is written; after the reopening it passes', () => {
+  const w = closedWorld();
+  const { store, call, save, draft, snapshotAll, teacher1, dean, sb1, movedPlan, closure, held } = w;
+  const second = draft(sb1, 1, teacher1);
+  save(second, 'plan', movedPlan(second), teacher1);
+  const before = snapshotAll();
+  const expected = { section: 'plan', code: 'held_closed', name: 'Введение', date: '2026-09-02' };
+  const sent = call('syllabus.submit', { syllabusId: second }, teacher1).data;
+  assert.deepEqual([sent.submitted, sent.checks.errors], [false, [expected]]);
+  const direct = call('syllabus.approve', { syllabusId: second }, dean).data;
+  assert.deepEqual([direct.approved, direct.changedPairs, direct.checks.errors], [false, 0, [expected]]);
+  assert.deepEqual(call('syllabus.form', { syllabusId: second }, teacher1).data.checks.errors, [expected]);
+  assert.equal(snapshotAll(), before);
+  assert.equal(store.get('pairs', held.id).topicId, held.topicId);
+  // the administrator reopens the unit: the same version passes
+  store.update('closures', closure.id, { reopenedBy: dean, reopenedAt: '2026-10-01 10:00:00' });
+  assert.equal(call('syllabus.submit', { syllabusId: second }, teacher1).data.submitted, true);
+  assert.equal(call('syllabus.approve', { syllabusId: second }, dean).data.approved, true);
+});
+
+test('a new version with another half of the plan is refused while closures or exam results stand in the old half', () => {
+  const w = closedWorld();
+  const { store, call, save, draft, snapshotAll, teacher1, dean, sb1, closure } = w;
+  const second = draft(sb1, 1, teacher1);
+  const title = { ...call('syllabus.form', { syllabusId: second }, teacher1).data.doc.title, course: 2, planSemester: 3 };
+  save(second, 'title', title, teacher1);
+  const before = snapshotAll();
+  const expected = { section: 'title', code: 'semester_closed' };
+  const sent = call('syllabus.submit', { syllabusId: second }, teacher1).data;
+  assert.deepEqual([sent.submitted, sent.checks.errors], [false, [expected]]);
+  const direct = call('syllabus.approve', { syllabusId: second }, dean).data;
+  assert.deepEqual([direct.approved, direct.checks.errors], [false, [expected]]);
+  assert.equal(snapshotAll(), before);
+  // exam attempts of the old half stop it as well
+  store.update('closures', closure.id, { reopenedBy: dean, reopenedAt: '2026-10-01 10:00:00' });
+  assert.equal(call('syllabus.submit', { syllabusId: second, dryRun: true }, teacher1).data.checks.errors.length, 0);
+  store.insert('examAttempts', { subjectId: w.sb3, studentId: w.s1, planSemester: 1, attempt: 1, score: 35, date: '2026-12-20', enteredBy: teacher1, enteredAt: '2026-12-20 10:00:00' });
+  assert.deepEqual(call('syllabus.submit', { syllabusId: second, dryRun: true }, teacher1).data.checks.errors, [expected]);
+});
