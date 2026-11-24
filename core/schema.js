@@ -21,7 +21,12 @@ export const RESULT_FIELDS = ['control', 'self', 'current'];
 export const WORK_KINDS = ['hw', 'srs'];                                   // ДЗ, СРС
 export const WORK_STATUSES = ['submitted', 'replaced', 'checked', 'returned']; // сдано, заменено новой попыткой, проверено, возвращено
 export const FILE_STATES = ['pending', 'attached', 'dropped', 'syllabus'];             // загружен и ждёт «Сдать», в сдаче, убран студентом
-export const LOG_ENTITIES = ['mark', 'unit', 'pair', 'work'];
+export const LOG_ENTITIES = ['mark', 'unit', 'pair', 'work', 'ledger', 'exam', 'subjectExam'];   // 'exam' - гос. экзамен, 'subjectExam' - экзамен предмета
+export const REQUEST_KINDS = ['mark', 'current', 'self', 'control', 'work', 'exam'];   // отметка пары, ТК вручную, СРС вручную, рубежный, баллы задания СРС, результат экзамена предмета
+export const EXAM_OUTCOMES = ['score', 'absent', 'incomplete'];                    // баллы, «не явился(ась)», «I»
+export const REQUEST_STATUSES = ['dean', 'prorector', 'applied', 'rejected', 'stale', 'withdrawn'];
+export const OPEN_REQUESTS = ['dean', 'prorector'];                                // ждёт деканат, ждёт проректора
+export const AUDIENCES = ['all', 'teachers', 'group'];
 
 const col =(key, title, type = 'string') => ({ key, title, type });
 
@@ -172,7 +177,8 @@ export const SCHEMA = {
     sheet: 'Журнал изменений', prefix: 'cl',
     columns: [col('id', 'id'), col('at', 'когда'), col('actorId', 'кто'), col('entity', 'что'), col('subjectId', 'предмет'),
       col('pairId', 'пара'), col('studentId', 'студент'), col('unit', 'юнит', 'int'), col('field', 'поле'),
-      col('before', 'было'), col('after', 'стало'), col('reason', 'причина'), col('late', 'после срока', 'bool'), col('assignmentId', 'задание')],
+      col('before', 'было'), col('after', 'стало'), col('reason', 'причина'), col('late', 'после срока', 'bool'), col('assignmentId', 'задание'),
+      col('requestId', 'заявка'), col('examId', 'гос. экзамен')],
   },
   checkins: {
     sheet: 'Отметки с телефона', prefix: 'ci',
@@ -198,6 +204,45 @@ export const SCHEMA = {
     columns: [col('id', 'id'), col('assignmentId', 'задание'), col('submissionId', 'сдача'), col('ownerId', 'студент'),
       col('state', 'состояние'), col('name', 'имя файла'), col('kind', 'вид'), col('size', 'размер, байт', 'int'),
       col('stored', 'имя на диске'), col('at', 'когда загружен')],
+  },
+  closures: {
+    sheet: 'Закрытые юниты', prefix: 'cu',
+    columns: [col('id', 'id'), col('subjectId', 'предмет'), col('planSemester', 'семестр по плану', 'int'), col('unit', 'юнит', 'int'),
+      col('closedBy', 'кто закрыл'), col('closedAt', 'когда закрыт'), col('reopenedBy', 'кто открыл'), col('reopenedAt', 'когда открыт')],
+  },
+  requests: {
+    sheet: 'Заявки', prefix: 'rq',
+    columns: [col('id', 'id'), col('kind', 'что меняется'), col('subjectId', 'предмет'), col('planSemester', 'семестр по плану', 'int'),
+      col('unit', 'юнит', 'int'), col('pairId', 'пара'), col('assignmentId', 'задание'), col('attemptId', 'попытка'), col('studentId', 'студент'),
+      col('before', 'было'), col('after', 'стало'), col('reason', 'причина'), col('authorId', 'кто подал'), col('createdAt', 'когда подана'),
+      col('status', 'состояние'), col('deanBy', 'деканат: кто'), col('deanAt', 'деканат: когда'), col('finalBy', 'проректор: кто'),
+      col('finalAt', 'проректор: когда'), col('closedAt', 'когда закрыта'), col('closeNote', 'причина отказа')],
+  },
+  announcements: {
+    sheet: 'Объявления', prefix: 'an',
+    columns: [col('id', 'id'), col('authorId', 'кто написал'), col('audience', 'кому'), col('groupId', 'группа'), col('title', 'заголовок'),
+      col('text', 'текст'), col('createdAt', 'когда написано'), col('expiresOn', 'показывать до'), col('removedBy', 'кто убрал'), col('removedAt', 'когда убрано')],
+  },
+  stateExams: {
+    sheet: 'Гос. экзамены', prefix: 'se',
+    columns: [col('id', 'id'), col('groupId', 'группа'), col('name', 'название'), col('date', 'дата'),
+      col('createdBy', 'кто создал'), col('createdAt', 'когда создан'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменён')],
+  },
+  stateExamResults: {
+    sheet: 'Результаты гос. экзаменов', prefix: 'sr',
+    columns: [col('id', 'id'), col('examId', 'экзамен'), col('studentId', 'студент'), col('score', 'баллы', 'int'),
+      col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено')],
+  },
+  subjectExams: {
+    sheet: 'Экзамены предметов', prefix: 'xe',
+    columns: [col('id', 'id'), col('subjectId', 'предмет'), col('planSemester', 'семестр по плану', 'int'), col('date', 'дата экзамена'),
+      col('examiner', 'экзаменатор'), col('assistants', 'ассистенты'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено')],
+  },
+  examAttempts: {
+    sheet: 'Попытки экзамена', prefix: 'xa',
+    columns: [col('id', 'id'), col('subjectId', 'предмет'), col('planSemester', 'семестр по плану', 'int'), col('studentId', 'студент'),
+      col('no', 'номер попытки', 'int'), col('date', 'дата'), col('outcome', 'результат'), col('score', 'баллы', 'int'),
+      col('commission', 'комиссия'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено')],
   },
 };
 

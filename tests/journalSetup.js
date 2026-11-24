@@ -118,6 +118,8 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   const snapshot = () => JSON.parse(JSON.stringify({
     attendance: store.list('attendance'), checkins: store.list('checkins'), changeLog: store.list('changeLog'), pairs: store.list('pairs'),
     assignments: store.list('assignments'), submissions: store.list('submissions'), files: store.list('files'), unitResults: store.list('unitResults'),
+    closures: store.list('closures'), requests: store.list('requests'), announcements: store.list('announcements'), stateExams: store.list('stateExams'),
+    stateExamResults: store.list('stateExamResults'), subjectExams: store.list('subjectExams'), examAttempts: store.list('examAttempts'), settings: store.list('settings'),
     disk: files ? files.names() : [],
   }));
 
@@ -131,6 +133,42 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
     assignmentId, studentId: ids[key], n: 1, text: 'ответ', paper: false, submittedAt: '2026-09-18 10:00:00', status: 'submitted',
     points: null, comment: '', checkedBy: '', checkedAt: '', ...over,
   }).id;
+
+  // a closed unit written straight into the store (unit 0 is the final sheet)
+  const closeUnit = (unit, over = {}) => store.insert('closures', {
+    subjectId: sb1, planSemester: 1, unit, closedBy: ids.teacher1, closedAt: '2026-09-30 12:00:00', reopenedBy: '', reopenedAt: '', ...over,
+  }).id;
+  // a request written straight into the store
+  const request = (over = {}) => store.insert('requests', {
+    kind: 'control', subjectId: sb1, planSemester: 1, unit: 1, pairId: '', assignmentId: '', attemptId: '', studentId: ids.a2, before: '25', after: '31',
+    reason: 'ошибка при вводе', authorId: ids.teacher1, createdAt: '2026-10-01 10:00:00', status: 'dean', deanBy: '', deanAt: '', finalBy: '', finalAt: '',
+    closedAt: '', closeNote: '', ...over,
+  }).id;
+  // the numbers of unit 1 from the rules of the unit: through real requests of teacher1 on 30.09 (the current control is computed by itself: a1 38, a2 20, a3 0)
+  const unitNumbers = () => {
+    at('2026-09-30');
+    call('journal.saveResults', { subjectId: sb1, unit: 1, field: 'self', items: [{ studentId: ids.a1, value: 16 }, { studentId: ids.a2, value: 12 }] }, t.teacher1);
+    call('journal.saveResults', { subjectId: sb1, unit: 1, field: 'control', items: [{ studentId: ids.a1, value: 30 }, { studentId: ids.a2, value: 25 }] }, t.teacher1);
+  };
+  // unit 2 written straight into the results (its pairs are not held yet: the current control is manual) and both units closed
+  const allUnits = () => {
+    unitNumbers();
+    const row = (key, current, self, control) => store.insert('unitResults', {
+      subjectId: sb1, studentId: ids[key], planSemester: 1, unit: 2, control, self, currentManual: current, updatedBy: ids.teacher1, updatedAt: '2026-12-10 10:00:00',
+    });
+    row('a1', 26, 15, 30); row('a2', 30, 18, 22); row('a3', 31, 14, 30);
+    closeUnit(1);
+    closeUnit(2, { closedAt: '2026-12-10 12:00:00' });
+  };
+  // the head of the exam of sb1 written straight into the store
+  const examHead = (over = {}) => store.insert('subjectExams', {
+    subjectId: sb1, planSemester: 1, date: '2026-12-15', examiner: '', assistants: 'Ассистент Первый', updatedBy: ids.teacher1, updatedAt: '2026-12-15 09:00:00', ...over,
+  }).id;
+  // an attempt of the exam written straight into the store
+  const examRow = (studentId, over = {}) => store.insert('examAttempts', {
+    subjectId: sb1, planSemester: 1, studentId, no: 1, date: '2026-12-15', outcome: 'score', score: 35, commission: '', updatedBy: ids.teacher1, updatedAt: '2026-12-15 12:00:00', ...over,
+  }).id;
+  const closeFinal = (over = {}) => closeUnit(0, { closedAt: '2026-12-16 12:00:00', ...over });
 
   const mark = (pairId, key, status, activity, markedAt, extra = {}) => store.insert('attendance', {
     pairId, studentId: ids[key], status, noCoat: false, activity, source: 'teacher', markedBy: ids.teacher1, markedAt, ...extra,
@@ -146,6 +184,7 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
 
   return {
     store, spy: { lists: spied.lists, writes: spied.writes, reset: spied.reset }, platform, call, t, at, tick, running, snapshot, ids, mark, pairOf, files, task, attempt,
+    closeUnit, request, unitNumbers, allUnits, examHead, examRow, closeFinal,
     a1: ids.a1, a2: ids.a2, a3: ids.a3, a4: ids.a4, b1: ids.b1, g1, g2, ds1, ds2, sb1, sb2, p0901, p0908, p0915, p0922, q0904, q0911, syllabusId,
   };
 }

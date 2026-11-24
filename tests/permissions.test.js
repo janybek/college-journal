@@ -39,7 +39,7 @@ test('actionKind', () => {
 });
 
 test('listPermissions', () => {
-  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
+  assert.deepEqual(listPermissions(['student']), ['announce.list', 'checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
   const dean = listPermissions(['dean']);
   assert.ok(dean.includes('import.apply:students'));
   assert.ok(!dean.includes('dir.save:staff'));
@@ -83,8 +83,10 @@ test('a file fills the draft: the deanery, the administrator and a teacher (of h
     ['journal.get', 'journal.list', 'journal.log', 'journal.saveResults', 'journal.savePair',
       'lesson.mine', 'lesson.get', 'lesson.start', 'lesson.endCheckin', 'lesson.finish',
       'schedule.mine', 'syllabus.apply', 'syllabus.attachFile', 'syllabus.dropFile', 'syllabus.file', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects',
-      'work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save'].sort());
-  assert.deepEqual(listPermissions(['student']), ['checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
+      'work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save',
+      'announce.list', 'announce.remove', 'announce.save', 'ledger.addAttempt', 'ledger.closeFinal', 'ledger.closeUnit', 'ledger.get', 'ledger.list', 'ledger.saveExam',
+      'request.create', 'request.mine', 'request.withdraw', 'stateExam.get', 'stateExam.list'].sort());
+  assert.deepEqual(listPermissions(['student']), ['announce.list', 'checkin.current', 'checkin.mark', 'schedule.mine', 'student.grades', 'student.subjects', 'syllabus.file', 'syllabus.get', 'work.dropFile', 'work.file', 'work.get', 'work.mine', 'work.submit', 'work.upload']);
   assert.equal(can(['dean'], 'topics.plan'), false);
   assert.equal(can(['student'], 'student.subjects'), true);
   assert.equal(can(['teacher'], 'student.subjects'), false);
@@ -171,4 +173,19 @@ test('unit 5: the rights of work.* actions, role by role', () => {
   assert.deepEqual(listPermissions(['student']).filter((p) => p.startsWith('work.')), ['work.file', 'work.get', 'work.mine', 'work.submit', 'work.dropFile', 'work.upload'].sort());
   assert.deepEqual(listPermissions(['teacher']).filter((p) => p.startsWith('work.')), ['work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save']);
   for (const role of ['admin', 'dean', 'prorector']) assert.deepEqual(listPermissions([role]).filter((p) => p.startsWith('work.')), ['work.file', 'work.get', 'work.list', 'work.overview']);
+});
+
+test('unit 6 actions: who may call the ledger, request, state exam and announcement actions', () => {
+  const none = (action, roles) => { for (const role of roles) assert.equal(can([role], action), false, role + ' ' + action); };
+  for (const action of ['ledger.closeUnit', 'ledger.closeFinal', 'ledger.saveExam', 'ledger.addAttempt', 'announce.save', 'announce.remove']) { assert.equal(can(['teacher'], action), true); none(action, ['prorector', 'student']); }
+  assert.equal(can(['admin'], 'ledger.reopen'), true); none('ledger.reopen', ['dean', 'prorector', 'teacher', 'student']);
+  for (const action of ['request.create', 'request.mine', 'request.withdraw']) { assert.equal(can(['teacher'], action), true); none(action, ['admin', 'dean', 'prorector', 'student']); }
+  for (const action of ['request.queue', 'request.decide']) none(action, ['teacher', 'student']);
+  for (const action of ['stateExam.save', 'stateExam.saveScores', 'stateExam.remove']) none(action, ['prorector', 'teacher', 'student']);
+  for (const action of ['ledger.list', 'ledger.get', 'stateExam.list', 'stateExam.get']) none(action, ['student']);
+  assert.deepEqual(['admin', 'dean', 'prorector', 'teacher', 'student'].map((r) => can([r], 'announce.list')), [true, true, true, true, true]);
+  assert.deepEqual(listPermissions(['student']).filter((p) => /^(ledger|request|stateExam|announce)\./.test(p)), ['announce.list']);
+  for (const table of ['closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts']) {
+    for (const action of ['dir.list', 'dir.save', 'dir.remove', 'import.preview', 'import.apply']) assert.equal(can(['admin'], action, table), false, action + ' ' + table);
+  }
 });

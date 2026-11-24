@@ -31,7 +31,7 @@ export function parsePointsText(text) {
   return /^\d{1,3}$/.test(text) ? Number(text) : undefined;
 }
 
-const hasRole = (roles, role) => String(roles).split(',').includes(role);
+const hasRole = (roles, role) => String(roles).split(',').map((r) => r.trim()).includes(role);
 
 export function mayDecide(request, actor, staff) {
   if (!request || !actor || !Array.isArray(actor.roles) || !Array.isArray(staff)) return false;
@@ -42,7 +42,7 @@ export function mayDecide(request, actor, staff) {
   if (banned.has(actor.id)) return false;
   if (actor.roles.includes(role)) return true;
   if (!actor.roles.includes('admin')) return false;
-  return !staff.some((s) => s.active && !banned.has(s.id) && hasRole(s.roles, role));
+  return !staff.some((s) => s.active === true && !banned.has(s.id) && hasRole(s.roles, role));
 }
 
 export function sameTarget(a, b) {

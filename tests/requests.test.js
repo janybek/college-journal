@@ -50,3 +50,10 @@ test('limitedAllowed is exported', () => {
   assert.equal(limitedAllowed(m('absent'), m('present')), false);
   assert.equal(limitedAllowed(m('excused'), m('madeup')), true);
 });
+
+test('who may decide: the roles of a staff row are trimmed and only a strict active counts', () => {
+  const spaced = [P('d2', 'teacher, dean'), P('ad', 'admin'), P('t1', 'teacher')];
+  assert.equal(mayDecide(R(), { id: 'ad', roles: ['admin'] }, spaced), false);
+  const inactive = [{ id: 'd1', roles: 'dean', active: 'yes' }, { id: 'ad', roles: 'admin', active: true }];
+  assert.equal(mayDecide(R(), { id: 'ad', roles: ['admin'] }, inactive), true);
+});

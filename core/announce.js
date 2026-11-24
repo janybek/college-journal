@@ -1,14 +1,13 @@
 import { isDate, addDays } from './dates.js';
+import { AUDIENCES } from './schema.js';
 
 export const ANNOUNCE = Object.freeze({ titleMax: 120, textMax: 2000, defaultDays: 30, farDays: 366, perDay: 20, listMax: 100 });
-
-const KINDS = ['all', 'teachers', 'group'];
 
 export function checkAnnouncement(input, { today, groups }) {
   const src = input || {};
   const problems = [];
   const audience = src.audience;
-  if (!KINDS.includes(audience)) problems.push({ field: 'audience', code: 'bad_value' });
+  if (!AUDIENCES.includes(audience)) problems.push({ field: 'audience', code: 'bad_value' });
   let groupId = '';
   if (audience === 'group') {
     if (typeof src.groupId !== 'string' || !groups.some((g) => g.id === src.groupId)) problems.push({ field: 'groupId', code: 'bad_ref' });

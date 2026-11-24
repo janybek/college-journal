@@ -1,22 +1,23 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { SCHEMA, SEMESTERS, tableNames, PAIR_STATUSES, FIXED_STATUSES, LESSON_TYPES, WEEKDAYS, SYLLABUS_STATUSES, OPEN_STATUSES, LESSON_KINDS,
-  ATTENDANCE_STATUSES, ATTENDED_STATUSES, MARK_SOURCES, CHECKIN_WAYS, CHECKIN_RESULTS, RESULT_FIELDS, LOG_ENTITIES, WORK_KINDS, WORK_STATUSES, FILE_STATES } from '../core/schema.js';
+  ATTENDANCE_STATUSES, ATTENDED_STATUSES, MARK_SOURCES, CHECKIN_WAYS, CHECKIN_RESULTS, RESULT_FIELDS, LOG_ENTITIES, WORK_KINDS, WORK_STATUSES, FILE_STATES, REQUEST_KINDS, EXAM_OUTCOMES, REQUEST_STATUSES, OPEN_REQUESTS, AUDIENCES } from '../core/schema.js';
 
 test('tableNames lists tables in schema order', () => {
   assert.deepEqual(tableNames(), ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'translations', 'settings', 'weekTemplate',
     'syllabi', 'topics', 'units', 'outcomes', 'selfWork', 'literature', 'software', 'grading', 'rules', 'pairs',
-    'attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files']);
+    'attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files',
+    'closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts']);
 });
 
 test('journal tables, substitute column and statuses', () => {
-  assert.deepEqual(tableNames().slice(-7), ['attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files']);
+  assert.deepEqual(tableNames().slice(-14, -7), ['attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files']);
   assert.deepEqual(SCHEMA.attendance.columns.map((c) => c.key), ['id', 'pairId', 'studentId', 'status', 'noCoat', 'activity', 'source', 'markedBy', 'markedAt']);
   assert.deepEqual(SCHEMA.unitResults.columns.map((c) => c.key), ['id', 'subjectId', 'studentId', 'planSemester', 'unit', 'control', 'self', 'currentManual', 'updatedBy', 'updatedAt']);
-  assert.deepEqual(SCHEMA.changeLog.columns.map((c) => c.key), ['id', 'at', 'actorId', 'entity', 'subjectId', 'pairId', 'studentId', 'unit', 'field', 'before', 'after', 'reason', 'late', 'assignmentId']);
+  assert.deepEqual(SCHEMA.changeLog.columns.map((c) => c.key), ['id', 'at', 'actorId', 'entity', 'subjectId', 'pairId', 'studentId', 'unit', 'field', 'before', 'after', 'reason', 'late', 'assignmentId', 'requestId', 'examId']);
   assert.deepEqual(SCHEMA.pairs.columns.slice(-7).map((c) => [c.key, c.type]), [['substitute', 'bool'], ['startedAt', 'string'], ['startedBy', 'string'],
     ['checkinUntil', 'string'], ['checkinClosed', 'bool'], ['finishedAt', 'string'], ['finishedBy', 'string']]);
-  assert.equal(tableNames().at(-1), 'files');
+  assert.equal(tableNames().at(-1), 'examAttempts');
   assert.deepEqual(SCHEMA.checkins.columns.map((c) => c.key), ['id', 'pairId', 'studentId', 'device', 'way', 'result', 'at']);
   assert.deepEqual([SCHEMA.checkins.sheet, SCHEMA.checkins.prefix], ['Отметки с телефона', 'ci']);
   assert.deepEqual([MARK_SOURCES, CHECKIN_WAYS, CHECKIN_RESULTS], [['teacher', 'code', 'qr', 'auto'], ['code', 'qr'], ['ok', 'wrong']]);
@@ -25,7 +26,7 @@ test('journal tables, substitute column and statuses', () => {
   assert.deepEqual(ATTENDANCE_STATUSES, ['present', 'late', 'absent', 'excused', 'madeup']);
   assert.deepEqual(ATTENDED_STATUSES, ['present', 'late', 'madeup']);
   assert.deepEqual(RESULT_FIELDS, ['control', 'self', 'current']);
-  assert.deepEqual(LOG_ENTITIES, ['mark', 'unit', 'pair', 'work']);
+  assert.deepEqual(LOG_ENTITIES, ['mark', 'unit', 'pair', 'work', 'ledger', 'exam', 'subjectExam']);
 });
 
 test('students sheet and column titles', () => {
@@ -89,12 +90,33 @@ test('syllabus version fields and section sheets', () => {
 });
 
 test('unit 5 tables: assignments, submissions, files, the work log column and the constants', () => {
-  assert.deepEqual(tableNames().slice(-4), ['checkins', 'assignments', 'submissions', 'files']);
+  assert.deepEqual(tableNames().slice(-11, -7), ['checkins', 'assignments', 'submissions', 'files']);
   assert.deepEqual(SCHEMA.assignments.columns.map((c) => c.key), ['id', 'subjectId', 'kind', 'planSemester', 'unit', 'topicId', 'pairId', 'title', 'description', 'dueAt', 'maxPoints', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt']);
   assert.deepEqual(SCHEMA.submissions.columns.map((c) => [c.key, c.type]).filter(([, t]) => t !== 'string'), [['n', 'int'], ['paper', 'bool'], ['points', 'int']]);
   assert.deepEqual(SCHEMA.files.columns.map((c) => c.key), ['id', 'assignmentId', 'submissionId', 'ownerId', 'state', 'name', 'kind', 'size', 'stored', 'at']);
   assert.deepEqual([SCHEMA.assignments.sheet, SCHEMA.submissions.sheet, SCHEMA.files.sheet, SCHEMA.assignments.prefix, SCHEMA.submissions.prefix, SCHEMA.files.prefix],
     ['Задания', 'Сдачи', 'Файлы', 'as', 'su', 'fl']);
-  assert.equal(SCHEMA.changeLog.columns.at(-1).key, 'assignmentId');
-  assert.deepEqual([WORK_KINDS, WORK_STATUSES, FILE_STATES, LOG_ENTITIES], [['hw', 'srs'], ['submitted', 'replaced', 'checked', 'returned'], ['pending', 'attached', 'dropped', 'syllabus'], ['mark', 'unit', 'pair', 'work']]);
+  assert.equal(SCHEMA.changeLog.columns.at(-3).key, 'assignmentId');
+  assert.deepEqual([WORK_KINDS, WORK_STATUSES, FILE_STATES, LOG_ENTITIES], [['hw', 'srs'], ['submitted', 'replaced', 'checked', 'returned'], ['pending', 'attached', 'dropped', 'syllabus'], ['mark', 'unit', 'pair', 'work', 'ledger', 'exam', 'subjectExam']]);
+});
+
+test('unit 6 tables: closures, requests, announcements, state exams, subject exams, attempts and the constants', () => {
+  assert.deepEqual(tableNames().slice(-8), ['files', 'closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts']);
+  assert.deepEqual(SCHEMA.subjectExams.columns.map((c) => [c.key, c.type]), [['id', 'string'], ['subjectId', 'string'], ['planSemester', 'int'], ['date', 'string'], ['examiner', 'string'], ['assistants', 'string'], ['updatedBy', 'string'], ['updatedAt', 'string']]);
+  assert.deepEqual(SCHEMA.examAttempts.columns.map((c) => c.key), ['id', 'subjectId', 'planSemester', 'studentId', 'no', 'date', 'outcome', 'score', 'commission', 'updatedBy', 'updatedAt']);
+  assert.deepEqual(SCHEMA.examAttempts.columns.filter((c) => c.type !== 'string').map((c) => [c.key, c.type]), [['planSemester', 'int'], ['no', 'int'], ['score', 'int']]);
+  assert.deepEqual(['subjectExams', 'examAttempts'].map((t) => [SCHEMA[t].sheet, SCHEMA[t].prefix]), [['Экзамены предметов', 'xe'], ['Попытки экзамена', 'xa']]);
+  assert.deepEqual(EXAM_OUTCOMES, ['score', 'absent', 'incomplete']);
+  assert.deepEqual(SCHEMA.closures.columns.map((c) => c.key), ['id', 'subjectId', 'planSemester', 'unit', 'closedBy', 'closedAt', 'reopenedBy', 'reopenedAt']);
+  assert.deepEqual(SCHEMA.requests.columns.map((c) => c.key), ['id', 'kind', 'subjectId', 'planSemester', 'unit', 'pairId', 'assignmentId', 'attemptId', 'studentId', 'before', 'after', 'reason',
+    'authorId', 'createdAt', 'status', 'deanBy', 'deanAt', 'finalBy', 'finalAt', 'closedAt', 'closeNote']);
+  assert.deepEqual(SCHEMA.requests.columns.filter((c) => c.type !== 'string').map((c) => [c.key, c.type]), [['planSemester', 'int'], ['unit', 'int']]);
+  assert.deepEqual(SCHEMA.announcements.columns.map((c) => c.key), ['id', 'authorId', 'audience', 'groupId', 'title', 'text', 'createdAt', 'expiresOn', 'removedBy', 'removedAt']);
+  assert.deepEqual(SCHEMA.stateExams.columns.map((c) => c.key), ['id', 'groupId', 'name', 'date', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt']);
+  assert.deepEqual(SCHEMA.stateExamResults.columns.map((c) => [c.key, c.type]), [['id', 'string'], ['examId', 'string'], ['studentId', 'string'], ['score', 'int'], ['updatedBy', 'string'], ['updatedAt', 'string']]);
+  assert.deepEqual(['closures', 'requests', 'announcements', 'stateExams', 'stateExamResults'].map((t) => [SCHEMA[t].sheet, SCHEMA[t].prefix]),
+    [['Закрытые юниты', 'cu'], ['Заявки', 'rq'], ['Объявления', 'an'], ['Гос. экзамены', 'se'], ['Результаты гос. экзаменов', 'sr']]);
+  assert.deepEqual(SCHEMA.changeLog.columns.slice(-3).map((c) => c.key), ['assignmentId', 'requestId', 'examId']);
+  assert.deepEqual([LOG_ENTITIES, REQUEST_KINDS, REQUEST_STATUSES, OPEN_REQUESTS, AUDIENCES],
+    [['mark', 'unit', 'pair', 'work', 'ledger', 'exam', 'subjectExam'], ['mark', 'current', 'self', 'control', 'work', 'exam'], ['dean', 'prorector', 'applied', 'rejected', 'stale', 'withdrawn'], ['dean', 'prorector'], ['all', 'teachers', 'group']]);
 });

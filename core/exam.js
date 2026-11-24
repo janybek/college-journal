@@ -2,9 +2,7 @@
 // Pure rules: no Google, files, network or clock. Thresholds come from `scheme`, the exam maximum from `split`.
 import { gradeWord } from './grades.js';
 import { isDate } from './dates.js';
-
-// Task 7 replaces this with the import of EXAM_OUTCOMES.
-const OUTCOMES = ['score', 'absent', 'incomplete'];
+import { EXAM_OUTCOMES } from './schema.js';
 
 export const EXAM = Object.freeze({ triesMax: 3, rowsMax: 6, examinerMax: 120, textMax: 300, itemsMax: 200 });
 
@@ -23,7 +21,7 @@ export function parseExamText(text) {
 }
 
 export function checkResult(result, split) {
-  if (!result || typeof result !== 'object' || !OUTCOMES.includes(result.outcome)) return { field: 'outcome', code: 'bad_value' };
+  if (!result || typeof result !== 'object' || !EXAM_OUTCOMES.includes(result.outcome)) return { field: 'outcome', code: 'bad_value' };
   if (result.outcome === 'score') {
     const ok = Number.isInteger(result.score) && result.score >= 0 && result.score <= split.exam;
     return ok ? null : { field: 'score', code: 'bad_value' };

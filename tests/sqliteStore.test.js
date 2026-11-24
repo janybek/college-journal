@@ -205,13 +205,30 @@ test('ensureTables adds syllabi.fileId to a base without it; an old row reads it
 
 test('ensureTables on a unit 4 base adds the work tables and changeLog.assignmentId; old log rows read assignmentId as empty', (t) => {
   const { db } = tmpBase(t, { empty: true });
-  const oldColumns = SCHEMA.changeLog.columns.slice(0, -1);
+  const oldColumns = SCHEMA.changeLog.columns.slice(0, -3);
   db.exec(`CREATE TABLE "changeLog" (${oldColumns.map((c) => `"${c.key}" TEXT`).join(', ')}); INSERT INTO "changeLog" ("id", "entity", "field") VALUES ('cl_1', 'mark', 'status')`);
   const result = ensureTables(SCHEMA, db);
   for (const name of ['assignments', 'submissions', 'files']) assert.ok(result.created.includes(name), name);
-  assert.deepEqual(result.added.map(([table, key]) => table + '.' + key), ['changeLog.assignmentId']);
+  assert.deepEqual(result.added.map(([table, key]) => table + '.' + key), ['changeLog.assignmentId', 'changeLog.requestId', 'changeLog.examId']);
   const store = createSqliteStore(SCHEMA, platform, db);
   for (const name of ['assignments', 'submissions', 'files']) assert.deepEqual(store.list(name), [], name);
   assert.equal(store.get('changeLog', 'cl_1').assignmentId, '');
+  assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
+});
+
+test('ensureTables on a unit 5 base adds the seven unit 6 tables and changeLog.requestId and examId; old log rows read them as empty', (t) => {
+  const { db } = tmpBase(t, { empty: true });
+  const oldColumns = SCHEMA.changeLog.columns.slice(0, -2);
+  db.exec(`CREATE TABLE "changeLog" (${oldColumns.map((c) => `"${c.key}" TEXT`).join(', ')}); INSERT INTO "changeLog" ("id", "entity", "field") VALUES ('cl_1', 'work', 'points')`);
+  const result = ensureTables(SCHEMA, db);
+  const added = ['closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts'];
+  for (const name of added) assert.ok(result.created.includes(name), name);
+  assert.deepEqual(result.added.map(([table, key]) => table + '.' + key), ['changeLog.requestId', 'changeLog.examId']);
+  const store = createSqliteStore(SCHEMA, platform, db);
+  for (const name of added) assert.deepEqual(store.list(name), [], name);
+  const row = store.get('changeLog', 'cl_1');
+  assert.deepEqual([row.requestId, row.examId], ['', '']);
+  const id = store.insert('closures', { subjectId: 'sb_1', planSemester: 1, unit: 0, closedBy: 'st_1', closedAt: '2026-12-16 12:00:00' }).id;
+  assert.equal(store.get('closures', id).reopenedAt, '');
   assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
 });
