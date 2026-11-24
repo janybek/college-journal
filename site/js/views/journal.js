@@ -3,7 +3,7 @@ import { t } from '../i18n.js';
 import { el, errorKey, emptyState, focusById, note, pageHeader, refresh } from '../ui.js';
 import {
   cellView, pairHead, canMark, pairHint, pairActions, VIEWS, DEFAULT_VIEW, addDays, isoWeekday, weekRange, pairDates,
-  nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, selfCell, semesterCell,
+  nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, selfCell, semesterCell, savedResult,
 } from '../journal.js';
 import { openMarksDialog, openPairActionDialog } from './journalPair.js';
 import { openCellDialog } from './journalCell.js';
@@ -12,6 +12,7 @@ import { icon } from '../icons.js';
 import { getUser, getPref, setPref } from '../session.js';
 import { activeRole } from '../shell.js';
 import { todayAction } from '../lesson.js';
+import { openRequestForm } from './requestForm.js';
 
 // The journal of a subject (#/journal/<subjectId>): the grid of students and pairs, read only (journal.get).
 // Rows are students (those who left stand last, dimmed); columns are pairs, and after the last pair of a unit
@@ -337,7 +338,8 @@ function head(column, journal) {
     const unit = journal.units.find((u) => u.unit === column.unit);
     const max = { current: journal.scheme.current, self: journal.scheme.self, control: journal.scheme.control, total: 100 }[column.field];
     const byWork = column.field === 'self' && !!unit && unit.byWork === true;
-    const open = journal.can.results && !byWork && (column.field === 'control' || column.field === 'self');
+    const shut = unitShut(journal, column.unit);
+    const open = journal.can.results && !byWork && !shut && (column.field === 'control' || column.field === 'self');
     return el('th', { scope: 'col', class: `jg-unit-head jg-unit-head--${column.field}${open ? ' is-open' : ''}`, tabindex: open ? null : '0' },
       open ? el('button', {
         type: 'button', class: 'jg-open jg-unit-open', id: unitOpenId(column), 'aria-haspopup': 'dialog',
@@ -346,9 +348,10 @@ function head(column, journal) {
       el('span', { class: 'jg-unit-head__unit' }, t('journal.col.unit', { n: column.unit })),
       el('span', { class: 'jg-unit-head__label' }, label),
       open ? el('span', { class: 'jg-unit-head__act', 'aria-hidden': 'true' }, icon('pencil')) : null,
+      shut ? el('span', { class: 'jg-unit-head__closed', id: 'journal-unit-closed-' + column.unit + '-' + column.field }, t('request.closedTag')) : null,
       byWork ? el('span', { class: 'jg-unit-head__tag' }, t('journal.self.byWork')) : null,
       byWork ? el('a', { class: 'jg-unit-head__tasks', id: 'journal-unit-tasks-' + column.unit, href: '#/tasks/' + encodeURIComponent(journal.subject.id) }, t('journal.self.tasks')) : null,
-      tip([unit && unit.title ? unit.title + '. ' : '', byWork ? t('journal.self.byWorkHint') : t('journal.tip.' + column.field, { max })].join('')));
+      tip([unit && unit.title ? unit.title + '. ' : '', byWork ? t('journal.self.byWorkHint') : t('journal.tip.' + column.field, { max }), shut ? '. ' + t(journal.canRequest ? 'request.unitClosed' : 'request.unitClosedOffice') : ''].join('')));
   }
   const key = column.type === 'outside' ? 'journal.col.outside' : 'journal.col.' + column.field;
   const tipKey = column.type === 'outside' ? null : 'journal.tip.' + column.field;
@@ -537,10 +540,45 @@ function cell(column, student, result, journal, scheme) {
   return el('td', { class: `jg-num jg-sum jg-sum--final${semester.tone === 'danger' ? ' is-low' : ''}`, title: semester.key ? t(semester.key, semester.params) : null }, semester.text);
 }
 
+const unitShut = (journal, unit) => !!journal.closed && Array.isArray(journal.closed.units) && journal.closed.units.includes(unit);
+const textOf = (value) => (value === null || value === undefined ? '' : String(value));
+
+// A number of a closed unit the teacher of the subject may ask to change: the same cell, as a button that opens the request.
+function askable(journal, student, row, field) {
+  if (journal.canRequest !== true || student.left || !unitShut(journal, row.unit) || !journal.results[student.id]) return null;
+  const unit = journal.units.find((u) => u.unit === row.unit);
+  if (field === 'current') return { kind: 'current', before: textOf(savedResult(journal, student.id, row.unit, 'current')), max: journal.scheme.current };
+  if (field === 'self') return unit && unit.byWork === true ? null : { kind: 'self', before: textOf(savedResult(journal, student.id, row.unit, 'self')), max: journal.scheme.self };
+  if (field === 'control') return { kind: 'control', before: textOf(savedResult(journal, student.id, row.unit, 'control')), max: journal.scheme.control };
+  return null;
+}
+
+function asRequest(td, ask, row, student, journal) {
+  if (!ask) return td;
+  const id = `journal-request-${ask.kind}${row.unit}-${student.id}`;
+  const inner = el('span', { class: 'jg-pts__in' }, ...td.childNodes);
+  td.append(el('button', {
+    type: 'button', class: 'jg-cell-open', id, 'aria-haspopup': 'dialog',
+    'aria-label': `${t('request.file')}: ${student.fullName || '—'}, ${t('request.target.' + ask.kind, { unit: row.unit })}`,
+    onclick: () => openRequestForm({
+      kind: ask.kind, subjectId: journal.subject.id, subjectName: `${journal.subject.name} · ${journal.subject.groupName}`, unit: row.unit, student,
+      before: ask.before, max: ask.max, onClosed: () => focusById(id),
+    }),
+  }), inner);
+  td.classList.add('is-open');
+  return td;
+}
+
 function unitCell(field, row, scheme, journal, student) {
+  const ask = askable(journal, student, row, field);
+  if (ask) return asRequest(plainUnitCell(field, row, scheme, journal, student), ask, row, student, journal);
+  return plainUnitCell(field, row, scheme, journal, student);
+}
+
+function plainUnitCell(field, row, scheme, journal, student) {
   if (field === 'current') {
     const manual = row.manual !== null;
-    const open = journal.can.results && !student.left;
+    const open = journal.can.results && !student.left && !unitShut(journal, row.unit);
     const title = [t('journal.tip.current', { max: scheme.current }), manual ? t('journal.tip.manual') : null].filter(Boolean).join(', ');
     const inner = [pointText(row.current), manual ? el('span', { class: 'jg-star' }, '*') : null];
     return el('td', { class: `jg-num jg-pts${row.currentLow ? ' is-low' : ''}${open ? ' is-open' : ''}`, title },

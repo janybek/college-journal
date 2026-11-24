@@ -186,3 +186,10 @@ test('navFor: «Ведомости» follow «Задания» for the teacher a
   assert.equal(office.items[1].hintKey, 'ledger.hint');
   assert.equal(navFor(['schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'ledgerList'), false);
 });
+
+test('navFor: «Заявки» come after «Ведомости» for a teacher with request.mine, and only for the teacher menu', () => {
+  const items = navFor([...DEAN, 'schedule.mine', 'journal.list', 'work.overview', 'ledger.list', 'request.mine'], 'teacher')[0].items;
+  assert.deepEqual(items.map((i) => i.name), ['home', 'mySchedule', 'journalList', 'tasks', 'ledgerList', 'requests']);
+  assert.deepEqual(items[5], { name: 'requests', href: '#/requests', textKey: 'request.mine.title', icon: 'clipboard' });
+  assert.equal(navFor([...DEAN, 'journal.list'], 'teacher')[0].items.some((i) => i.name === 'requests'), false);
+});

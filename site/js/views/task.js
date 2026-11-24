@@ -9,6 +9,7 @@ import { preparePhoto, readAsBase64 } from '../photo.js';
 import { openTaskForm } from './taskForm.js';
 import { openFile } from './fileView.js';
 import { renderTask as soon } from './tasks.js';
+import { openRequestForm } from './requestForm.js';
 
 // The screen of one assignment for the staff (#/task/<id>): the students of the group on the left, the work of the chosen one
 // on the right, and, for the teacher of the subject, the grade (work.grade). The office and the prorector read the same and
@@ -311,7 +312,8 @@ function workPanel(student, assignment) {
     state.status ? note('success', t(state.status), { id: 'grade-status', role: 'status' }) : null,
     state.problemKey ? note('error', t(state.problemKey), { id: 'grade-problem', role: 'alert' }) : null,
     current ? attemptBlock(current, assignment, true) : el('p', { class: 'check-work__none', id: 'check-none' }, t('work.state.none')),
-    staffMay(can, activeRole(getUser())).grade ? gradeBlock(student, current, assignment) : readOnlyGrade(current, assignment),
+    state.data.closed === true ? closedGrade(student, current, assignment)
+      : staffMay(can, activeRole(getUser())).grade ? gradeBlock(student, current, assignment) : readOnlyGrade(current, assignment),
     earlier.length > 0 ? previous(student, earlier, assignment) : null);
 }
 
@@ -342,6 +344,24 @@ function previous(student, earlier, assignment) {
       onclick: () => { if (open) state.prevOpen.delete(student.id); else state.prevOpen.add(student.id); refresh(); },
     }, t('work.prev', { n: earlier.length })),
     open ? el('div', { class: 'check__previous-list', id: 'check-prev' }, earlier.map((a) => attemptBlock(a, assignment, false))) : null);
+}
+
+// The self-work of a closed unit: nobody grades it any more; the teacher of the subject asks for a change by a request.
+function closedGrade(student, current, assignment) {
+  const user = getUser();
+  const may = !!user && activeRole(user) === 'teacher' && Array.isArray(user.permissions) && user.permissions.includes('request.create')
+    && !!assignment.teacherName && assignment.teacherName === user.fullName;
+  return el('div', { class: 'grade-read', id: 'task-closed' },
+    readOnlyGrade(current, assignment),
+    el('p', { class: 'rq-closed-note', id: 'task-closed-note' }, t('request.unitClosedWork')),
+    may ? el('button', {
+      type: 'button', class: 'button button--secondary rq-cell-link', id: 'task-request',
+      onclick: () => openRequestForm({
+        kind: 'work', subjectId: assignment.subjectId, subjectName: `${assignment.subjectName} · ${assignment.groupName}`, assignment, unit: assignment.unit, student,
+        before: current && current.points !== null && current.points !== undefined ? String(current.points) : '', max: assignment.maxPoints,
+        onClosed: () => { const button = document.getElementById('task-request'); if (button) button.focus(); },
+      }),
+    }, t('request.fileWork')) : null);
 }
 
 // What the office sees instead of the grade block.

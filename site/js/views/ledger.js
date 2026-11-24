@@ -10,6 +10,8 @@ import {
 import { examSection, examTd as examEditTd, studentExtra, countsList, reset as resetExam, sheetTools, textLabels } from './ledgerExam.js';
 import { ledgerOrientation } from '../print.js';
 import { ledgerSheet, ledgerBook, ledgerFileName } from '../ledgerFile.js';
+import { openRequestForm } from './requestForm.js';
+import { targetLine } from '../requests.js';
 
 // The ledger of a subject (#/ledger/<subjectId>, ledger.get): the numbers of the journal for every unit, then the semester
 // points, the admission, the exam, the total and the grade. Every number is the server's; the screen only chooses words
@@ -215,9 +217,12 @@ function studentRow(view, student, number, unitCols, { ready, closed, max, min }
   const cells = [];
   for (const column of unitCols) {
     const row = student.units.find((u) => u.unit === column.unit);
-    for (const field of column.fields) cells.push(row ? unitCell(row, field, max, min) : el('td', { class: 'lg-num lg-pts lg-empty' }, '—'));
+    const unit = view.units.find((u) => u.unit === column.unit);
+    for (const field of column.fields) {
+      cells.push(row ? requestCell(view, student, unit, field, unitCell(row, field, max, min), requestOfUnit(view, student, unit, row, field)) : el('td', { class: 'lg-num lg-pts lg-empty' }, '—'));
+    }
   }
-  cells.push(semesterTd(student, view.split), admissionTd(student, ready, view.split), examEditTd(view, student, host) ?? examTd(student), finalTd(student, ready, closed), wordTd(student, ready, closed));
+  cells.push(semesterTd(student, view.split), admissionTd(student, ready, view.split), examEditTd(view, student, host) ?? requestCell(view, student, null, 'exam', examTd(student), requestOfExam(view, student)), finalTd(student, ready, closed), wordTd(student, ready, closed));
   return el('tr', { class: student.left ? 'is-left' : null },
     el('th', { scope: 'row', class: 'lg-name' },
       el('span', { class: 'lg-name__no' }, String(number)),
@@ -270,6 +275,46 @@ function wordTd(student, ready, closed) {
   return el('td', { class: 'lg-word' },
     badge(t(cell.key), cell.tone),
     cell.draft ? el('span', { class: 'lg-draft' }, t('ledger.draft')) : null);
+}
+
+// ---- A request to correct a closed number: the cell becomes a button (only the teacher of the subject, see can.request) ----
+
+const textOf = (value) => (value === null || value === undefined ? '' : String(value));
+
+// What a cell of a closed unit asks for: { kind, before, max, unit }, or null when it is not a number the teacher may ask to change.
+function requestOfUnit(view, student, unit, row, field) {
+  if (!view.can.request || !unit || !unit.closed) return null;
+  if (field === 'current') return { kind: 'current', before: row.manual ? textOf(row.current) : '', max: view.scheme.current, unit: unit.unit };
+  if (field === 'self') return unit.byWork ? null : { kind: 'self', before: textOf(row.self), max: view.scheme.self, unit: unit.unit };
+  if (field === 'control') return { kind: 'control', before: textOf(row.control), max: view.scheme.control, unit: unit.unit };
+  return null;
+}
+
+// The exam of a closed final sheet: the last try of the student.
+function requestOfExam(view, student) {
+  if (!view.can.request || !view.final.closed || student.attempts.length === 0) return null;
+  const last = student.attempts[student.attempts.length - 1];
+  if (!last.outcome) return null;
+  return { kind: 'exam', before: last.outcome === 'score' ? textOf(last.score) : last.outcome, max: view.split.exam, attemptNo: last.no };
+}
+
+// The cell as it is, or the same cell with a button over its content that opens the window of the request.
+function requestCell(view, student, unit, field, td, ask) {
+  if (!ask) return td;
+  const id = `ledger-request-${ask.kind}${ask.unit ?? ''}-${student.id}`;
+  const target = targetLine({ kind: ask.kind, unit: ask.unit ?? null, attemptNo: ask.attemptNo ?? null });
+  const button = el('button', {
+    type: 'button', class: 'lg-req-cell', id, 'aria-haspopup': 'dialog',
+    'aria-label': `${t('request.file')}: ${student.fullName || '—'}, ${t(target.key, target.params)}`,
+    onclick: () => openRequestForm({
+      kind: ask.kind, subjectId: view.subject.id, subjectName: `${view.subject.name} · ${view.subject.groupName}`, unit: ask.unit ?? null,
+      attemptNo: ask.attemptNo ?? null, student, before: ask.before, max: ask.max, onClosed: () => focusById(id),
+    }),
+  }, ...td.childNodes);
+  td.append(button);
+  td.classList.add('is-request');
+  td.title = [td.title, t('request.file')].filter(Boolean).join(', ');
+  return td;
 }
 
 // ---- Closing a unit ----

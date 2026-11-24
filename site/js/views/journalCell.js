@@ -3,6 +3,8 @@ import { t } from '../i18n.js';
 import { el, errorKey, fieldErrorKey, badge, focusById, holdOnLeave, markBusy, modal, note } from '../ui.js';
 import { icon } from '../icons.js';
 import { activityAllowed, cellView, coatAllowed, lateOptions, logLine, pairScore } from '../journal.js';
+import { markToText } from '../requests.js';
+import { openRequestForm } from './requestForm.js';
 
 // The window of a cell of the journal grid: one student on one held pair. Free and reason modes change the status,
 // the lab coat and the activity (the reason is required in `reason`); `limited` (a teacher after the term) offers
@@ -31,6 +33,9 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
 
   const pairNow = () => journal.pairs.find((p) => p.id === firstPair.id) || firstPair;
   const markNow = () => ((journal.marks && journal.marks[firstPair.id]) || {})[student.id] || null;
+  // The unit of the pair is closed, or the term is over: what the teacher cannot change himself goes by a request (only the teacher of the subject).
+  const unitShut = () => { const pair = pairNow(); return pair.unit !== null && pair.unit !== undefined && !!journal.closed && journal.closed.units.includes(pair.unit); };
+  const mayAsk = () => journal.canRequest === true && pairNow().status === 'closed' && (unitShut() || pairNow().state === 'late');
 
   // ---- the draft of the form (rebuilt after every save) ----
   let draft;
@@ -260,10 +265,10 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
       paintEditor();
     } else if (mode === 'limited') {
       const limited = buildLimited();
-      form.replaceChildren(...[limited, lateOptions(markNow()).length > 0 ? buildReason() : null].filter(Boolean));
+      form.replaceChildren(...[limited, lateOptions(markNow()).length > 0 ? buildReason() : null, mayAsk() ? el('p', { class: 'rq-closed-note', id: 'journal-cell-request-hint' }, t('request.cellHint')) : null].filter(Boolean));
       if (rows) paintLimited();
     } else {
-      form.replaceChildren(note('info', t('journal.cell.readOnly'), { id: 'journal-cell-readonly' }));
+      form.replaceChildren(note('info', t(unitShut() ? (mayAsk() ? 'request.cellHint' : 'request.unitClosedOffice') : 'journal.cell.readOnly'), { id: 'journal-cell-readonly' }));
     }
     drawActions();
   }
@@ -274,9 +279,19 @@ export function openCellDialog({ journal: first, pair: firstPair, student, onSav
     const mode = pairNow().mode;
     const editable = mode === 'free' || mode === 'reason' || (mode === 'limited' && lateOptions(markNow()).length > 0);
     go = editable ? el('button', { type: 'button', id: 'journal-cell-save', class: 'button button--primary', onclick: save }, icon('check'), t('common.save')) : null;
+    const ask = mayAsk() ? el('button', { type: 'button', id: 'journal-cell-request', class: editable ? 'button button--secondary' : 'button button--primary', onclick: openRequest }, t('request.file')) : null;
     actions.replaceChildren(...[
       el('button', { type: 'button', id: 'journal-cell-cancel', class: 'button button--secondary', onclick: tryClose }, editable ? t('common.cancel') : t('common.close')),
-      go].filter(Boolean));
+      ask, go].filter(Boolean));
+  }
+
+  // The window of the request over this one: the mark as it is now, and the new one chosen there.
+  function openRequest() {
+    if (busy) return;
+    openRequestForm({
+      kind: 'mark', subjectId: journal.subject.id, subjectName: `${journal.subject.name} · ${journal.subject.groupName}`, pair: pairNow(), journal, student,
+      before: markToText(markNow()), onClosed: () => focusById('journal-cell-request', 'journal-cell-cancel'),
+    });
   }
 
   const idle = () => {

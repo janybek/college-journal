@@ -199,3 +199,13 @@ test('resolveRoute: the list of ledgers needs ledger.list, the ledger of a subje
   assert.equal(resolveRoute('#/ledger/%E0%A4%A', teacher).view, 'home');
   assert.equal(resolveRoute('#/ledger/sb_1/x', teacher).view, 'home');
 });
+
+test('resolveRoute: «Заявки» open for a teacher and for the office, not for a student', () => {
+  const teacher = { mustChangePassword: false, permissions: ['request.mine', 'request.create'] };
+  const office = { mustChangePassword: false, roles: ['dean'], permissions: ['request.queue'] };
+  const student = { mustChangePassword: false, permissions: ['schedule.mine', 'syllabus.get'] };
+  assert.deepEqual(resolveRoute('#/requests', teacher), { view: 'requests', params: {} });
+  assert.deepEqual(resolveRoute('#/requests', office), { view: 'requests', params: {} });
+  assert.equal(resolveRoute('#/requests', student).view, 'home');
+  assert.equal(resolveRoute('#/requests/x', teacher).view, 'home');
+});
