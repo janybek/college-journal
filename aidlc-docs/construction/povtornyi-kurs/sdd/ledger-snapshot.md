@@ -1,0 +1,43 @@
+# SDD ledger — plan: aidlc-docs/construction/povtornyi-kurs/plan.md
+
+Доработка «Повторный курс» (13 задач). Спецификация — `design.md` рядом с планом. Решения владельца — таблица решений `aidlc-docs/aidlc-state.md` (25.11.2026). Сверка плана — `preflight.md` в этой папке.
+
+- 25.11.2026 Ruling: памятки сделаны из памяток юнита 6: правила юнита 6 и 2–5 действуют, поверх них — раздел «Новые правила доработки» плана; Review Focus — плана повтора; строки «Проверка задач» и «Модели» юнита 6 убраны (действуют колонка «Проверка» плана и правило 5 CLAUDE.md). Работа на `main`, как во всех юнитах (согласие владельца — порядок AI-DLC).
+- Task 1: dispatched journal-logic (sonnet), BASE da05899; проверка строгая; report task-1-report.md
+- Task 1: implementer DONE (40cf175, 1183 теста, build:gas). RED не сохранён (minor). Строгая проверка: journal-reviewer (sonnet).
+- Task 1: review — принять (strict, sonnet; probe.mjs в scratchpad координатора). minor (deferred -> задача 2): core/repeat.js:65,160 «последняя» карточка при равных датах — сравнение id строками (как core/exam.js:58); проверить формат id в задаче 2.
+- Task 1: complete (commits da05899..40cf175, review clean)
+- Ruling: minor id-строками закрыт — id вида <prefix>_<randomHex> (memoryStore.js:13), не числа; при равных датах выбор детерминирован, как в exam.js — без правки.
+- Task 2: dispatched journal-logic (sonnet), BASE 40cf175; проверка облегчённая
+- Task 2: implementer DONE (5340370, 1192 теста, build:gas). Правлены прежние тесты: api.test.js:192 (права учителя), gasBundle 33->35 листов, sheetsStore 32->34.
+- Task 2: review — принять (light). minor: journalSetupRepeat.test.js проверяет только total/word/status — достаточно.
+- Task 2: complete (commits 40cf175..5340370, review clean)
+- Task 3: dispatched journal-server (sonnet), BASE 5340370; проверка строгая
+- Task 3: implementer DONE (ec82999, 1199 тестов, build:gas). Нет поля группы в строке результата; retakesLeft нет (задача 4 из next); halvesOf пропускает planSemester null.
+- Task 3: review — принять (strict, probe.test.js в scratchpad координатора: «I», «не явился», 3 попытки с комиссией — совпадает до/после переключения). minor (deferred -> задача 4): (1) repeatSnapshot.js:117/100 — в текущем полугодии в списке все активные студенты, после переключения — только со следами (так велит п. 5 задания); кандидатов отбирать по status, не по присутствию; (2) halfResults не проверяет, что planSemester из halvesOf — задача 4 берёт номер только из halvesOf.
+- Ruling: minor (1) — поведение задано планом (студент без следов полугодия не кандидат); в жизни у каждого студента группы есть отметки, расхождения не будет.
+- Task 3: complete (commits 5340370..ec82999, review clean)
+- Task 4: dispatched journal-server (sonnet), BASE ec82999; проверка строгая (права)
+- Task 4: implementer DONE_WITH_CONCERNS (61e51a8, 1216 тестов, build:gas). RED не снят (minor). Ruling: repeat.save проверяет teacherId только при смене (как срок) — иначе карточку с отключённым преподавателем нельзя поправить; принять, если проверка не найдёт дыры. Ruling: candidates без subjectId читает только справочники + repeats — принять при условии «каждая таблица один раз». repeat_closed без текста в словарях — задача экранов 9/10.
+- Task 4: review — принять (strict, probe4.mjs в scratchpad координатора; обход прав не удался, internal нет). minor: openCard not_found/forbidden различимы только для ролей с правом (проректор/деканат) — без правки; fromRepeat считается в трёх местах (repeatData.js:154) — без правки; repeat_closed в словари — задачи 9/10.
+- Task 4: complete (commits ec82999..61e51a8, review clean)
+- Task 5: dispatched journal-server (sonnet), BASE 61e51a8; проверка строгая (права, баллы)
+- Task 5: implementer DONE (e9fe97f, 1228 тестов, RED 0/12, build:gas). repeatData.js: export findCard/attemptsOfCard/logRow. Тесты на 2027-01-20.
+- Task 5: review — принять (strict, probe.mjs в scratchpad координатора). minor (deferred -> задача 6, тот же «Сервер»): repeatScores.js:55-57 — при смене и числа работ, и причины в одном запросе строка журнала worksNote не пишется (добавить вторую строку в тот же insertMany + тест). minor: принудительное закрытие деканатом после срока в журнале не отличимо от обычного — без правки (виден автор-деканат).
+- Task 5: complete (commits 61e51a8..e9fe97f, review clean)
+- Task 6: dispatched journal-server (sonnet), BASE e9fe97f; проверка строгая (данные студентов); + minor worksNote из задачи 5
+- Task 6: implementer DONE_WITH_CONCERNS (711b913, 1239 тестов, RED 0/10, build:gas; правка worksNote в том же коммите). Изменено право journal.log: преподаватель повтора без предмета видит только строки entity 'repeat' своих неотменённых карточек — на строгую проверку. Ruling: worksNote пишется и при первом заполнении причины (пусто -> текст) — верно, это изменение. Циклический импорт ledgerData<->repeatData — допустимо, если build:gas и тесты зелёные.
+- Task 6: review — принять (strict, probe.test.js в scratchpad координатора; чужих данных у студента нет, journal.log преподавателя повтора — только строки repeat своего студента). Ruling: расширение journal.log принято — без него teacher2 после замены не видит строк повтора, которые задание требует показать.
+- Ruling: minor journalData.js:145,153 — строки повтора видны по паре студент+предмет, а не по карточке: преподаватель новой карточки видит строки прежней карточки того же студента. Это история того же студента по тому же предмету, не чужие данные; repeatId в «Журнал изменений» = новая колонка базы — без согласования не добавляем. На общую проверку (задача 13) — отметить.
+- Ruling: worksNote из пустого значения в журнале оставить — это настоящее изменение (видно, когда причина появилась).
+- Task 6: complete (commits e9fe97f..711b913, review clean)
+- Task 7: dispatched journal-server (sonnet), BASE 711b913; проверка облегчённая
+- Task 7: implementer DONE_WITH_CONCERNS (df0814f, 1244 теста, build:gas, стенд 5273 — 4 карточки, остановлен по PID). Соответствие людей стенда не как в задании (seedExam решает, кто кто): S2001 — неуд. после 3 сдач, «весь предмет», идёт; S2003 — не явился, «только экзамен», идёт; S2020 — не допущен, «весь предмет», сдал; S2006 — неуд., teacher3, срок вышел; S2007 — неуд., без карточки; S2008 — «I», без карточки. Задачам 9–12 давать ЭТО соответствие. Прочее: seed(…, { repeats }) для тестов; seedLedger.test.js правлен в stand(); demo.test.js — числа.
+- Ruling: даты задания 7 противоречат друг другу (пересдачи раньше первой сдачи, карточки раньше сдачи) — ошибка плана; владелец увидит их на экранах. Тому же агенту: последовательная цепочка дат, коммит fix:, раздел «Даты стенда» в отчёте. Проверка — после правки.
+- Task 7: даты исправлены (cf67b3e, 1244 теста): сдача и закрытие T-3, пересдачи T-2/T-1, приказы T-3 (просроченная, срок T-2), T-1, T; попытки повтора T. Облегчённая проверка 711b913..cf67b3e.
+- Task 7: review — принять (light). minor: seed.js:178-179 «неуд.» подобран под нынешние данные seedExam (тест поймает); RED нет; student.grades у «не явился» проверен через repeat.mine.
+- Task 7: complete (commits 711b913..cf67b3e, review clean)
+- Task 8: dispatched journal-reviewer (sonnet, строго) — проба отката на b829763, всё во временной папке; HEAD cf67b3e
+- Task 8: проба отката — принять (journal-reviewer sonnet; t8.mjs в scratchpad координатора\probe): прежний b829763 на новой базе — 0 internal, строки repeats/repeatAttempts/entity 'repeat' не изменились (и после backup/restore); addAttempt студенту с карточкой проходит; dir.remove студента/предмета с карточкой — in_use, преподавателя только повтора — удаляет (новый код показывает пустое имя); demo-wipe оставляет 4 карточки-сироты, новый код читает без ошибок; снимок prevAttempts не меняется от пересдачи прежним кодом.
+- Task 8: complete (проба, кода нет)
+- Ruling: серверная часть (задачи 1–8) закончена — по правилу 6б итоги в aidlc-state.md и копию журнала, затем новый чат координатора для блока экранов 1 (задачи 9–11).
