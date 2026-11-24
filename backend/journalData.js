@@ -16,7 +16,7 @@ import { checkMark, checkReason, checkResultValue, markChanges, markMode, markSt
 import { relayout } from './scheduleData.js';
 import { settleLessons } from './lessonSettle.js';
 
-export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'units', 'settings', 'attendance', 'unitResults', 'assignments', 'submissions'];
+export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'units', 'settings', 'attendance', 'unitResults', 'assignments', 'submissions', 'closures'];
 
 // Every table of the journal, each read once. `settings` stays the rows of the sheet.
 export function readJournalRows(store) {
