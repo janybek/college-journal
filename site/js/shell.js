@@ -46,6 +46,7 @@ export function navFor(permissionList, role) {
     if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard' });
     if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet' });
     if (list.includes('request.mine')) items.push({ name: 'requests', href: '#/requests', textKey: 'request.mine.title', icon: 'clipboard' });
+    if (list.includes('stateExam.list')) items.push({ name: 'stateExams', href: '#/state-exams', textKey: 'stateExam.title', icon: 'sheet' });
     return [{ titleKey: 'nav.teaching', items }];
   }
   const groups = [{ titleKey: null, items: [HOME] }];
@@ -55,6 +56,7 @@ export function navFor(permissionList, role) {
     if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet', hintKey: 'ledger.hint' });
     if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard', hintKey: 'tasks.hint' });
     if (list.includes('request.queue')) items.push({ name: 'requests', href: '#/requests', textKey: 'request.queue.title', icon: 'clipboard', hintKey: 'request.queue.hint' });
+    if (list.includes('stateExam.list')) items.push({ name: 'stateExams', href: '#/state-exams', textKey: 'stateExam.title', icon: 'sheet', hintKey: 'stateExam.hint' });
     if (list.includes('journal.log')) items.push({ name: 'journalLog', href: '#/journal-log', textKey: 'journalLog.title', icon: 'clipboard', hintKey: 'journalLog.hint' });
     groups.push({ titleKey: 'nav.journal', items });
   }
@@ -220,6 +222,7 @@ function currentName(view, params, role) {
   if (view === 'journal') return 'journalList';
   if (view === 'task') return 'tasks';
   if (view === 'ledger') return 'ledgerList';
+  if (view === 'stateExam') return 'stateExams';
   if (view === 'journalLog') return menuParts(role).includes('office') ? 'journalLog' : 'journalList';
   if (view === 'syllabus' || view === 'syllabusForm') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;

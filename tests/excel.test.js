@@ -383,3 +383,25 @@ test('examSheetBook: a retake by a commission is listed with the composition as 
   assert.equal(commission.t, 's');
   assert.equal(commission.f, undefined);
 });
+
+// ---- Task 24: the file of a state exam ----
+
+import { stateExamBook } from '../site/js/ledgerFile.js';
+
+test('stateExamBook: a name that looks like a formula stays a text, the scores stay numbers', () => {
+  const view = {
+    today: '2026-12-10', collegeName: 'Колледж Вымышленный', can: { manage: false },
+    exam: { id: 'se1', groupId: 'g1', groupName: '03-1', name: '=1+1', date: '2026-12-10' },
+    scheme: { fair: 60, good: 80, excellent: 90 },
+    students: [{ id: 'a', fullName: '=СУММ(A1)', left: false, score: 91, word: 'excellent' }, { id: 'b', fullName: 'Студент Второй', left: false, score: null, word: null }],
+    stats: { total: 2, entered: 1, fail: 0, fair: 0, good: 0, excellent: 1, average: 91 },
+  };
+  const book = stateExamBook(XLSX, view, { ...ledgerLabels, sheet: 'Госэкзамен' });
+  assert.deepEqual(book.SheetNames, ['Госэкзамен']);
+  const sheet = read(book);
+  const [, name] = findCell(sheet, '=СУММ(A1)');
+  assert.equal(name.t, 's');
+  assert.equal(name.f, undefined);
+  assert.equal(findCell(sheet, '=1+1')[1].t, 's');
+  assert.equal(findCell(sheet, 91)[1].t, 'n');
+});

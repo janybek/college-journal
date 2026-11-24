@@ -195,3 +195,52 @@ export function unitBlockNote(error, units, unitNumber) {
   const entry = unit && Array.isArray(unit.blocking) ? unit.blocking.find((b) => b.code === code) : undefined;
   return entry ? { key: 'ledger.block.' + code, params: { n: entry.n } } : null;
 }
+
+// ---- The state exams: the scores of a group ----
+
+export const SCORE_MAX = 100;   // the top of the scale of a state exam (the server checks it again)
+const SCORE_WORDS = ['excellent', 'good', 'fair', 'fail'];
+const scoreText = (student) => (student.score === null || student.score === undefined ? '' : String(student.score));
+
+// The word of a score by the thresholds of the answer (scheme: { fair, good, excellent }); null without a score.
+export function scoreWord(score, scheme) {
+  if (score === null || score === undefined) return null;
+  if (score >= scheme.excellent) return 'excellent';
+  if (score >= scheme.good) return 'good';
+  if (score >= scheme.fair) return 'fair';
+  return 'fail';
+}
+
+// The fields of the scores: what each student has now (a score or ''). Those who left are shown, not entered.
+export function scoreDraft(students) {
+  const draft = new Map();
+  for (const s of students) if (!s.left) draft.set(s.id, scoreText(s));
+  return draft;
+}
+
+// What goes to the server: only the changed fields ('' clears the score). bad: whose field is not a whole number from 0 to 100.
+export function scoreItems(draft, students) {
+  const items = [];
+  const bad = [];
+  for (const s of students) {
+    if (s.left || !draft.has(s.id)) continue;
+    const text = String(draft.get(s.id)).trim();
+    if (text === scoreText(s)) continue;
+    if (text === '') items.push({ studentId: s.id, score: null });
+    else if (/^\d{1,3}$/.test(text) && Number(text) <= SCORE_MAX) items.push({ studentId: s.id, score: Number(text) });
+    else bad.push(s.id);
+  }
+  return { items, bad };
+}
+
+// A score that was already there is changed or erased: a reason is needed.
+export function scoresNeedReason(items, students) {
+  const had = new Set(students.filter((s) => s.score !== null && s.score !== undefined).map((s) => s.id));
+  return items.some((item) => had.has(item.studentId));
+}
+
+// The chips under the table: how many students have each word, those without a score, the average. The numbers are the server's.
+export function examSummary(stats) {
+  const parts = SCORE_WORDS.map((word) => ({ key: 'journal.grade.' + word, n: stats[word], tone: wordTone(word) }));
+  return { words: stats.entered > 0 ? parts : [], missing: stats.total - stats.entered, average: stats.average };
+}

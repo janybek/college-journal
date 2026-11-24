@@ -225,3 +225,84 @@ test('a field of the exam column is shown as its draft says; its error sits on t
   assert.deepEqual(['', '35', 'absent', 'incomplete'].map(examModeOf), ['score', 'score', 'absent', 'incomplete']);
   assert.deepEqual(['', '35', 'x1', 'absent', 'incomplete'].map(examFieldTarget), ['input', 'input', 'input', 'select', 'select']);
 });
+
+// ---- Task 24: the state exams ----
+
+const { scoreDraft, scoreItems, scoresNeedReason, scoreWord } = await import('../site/js/ledger.js');
+const { stateExamFileName, stateExamRows } = await import('../site/js/ledgerFile.js');
+
+const SE = (id, fullName, score, over = {}) => ({ id, fullName, left: false, score, word: null, ...over });
+const EXAM_STUDENTS = [SE('a', 'Студент Первый', 90), SE('b', 'Студент Второй', null), SE('c', 'Студент Третий', 55), SE('d', 'Выбывший Студент', 70, { left: true })];
+const EXAM_VIEW = (over = {}) => ({
+  today: '2026-12-10', collegeName: 'Колледж Вымышленный', can: { manage: true },
+  exam: { id: 'se1', groupId: 'g1', groupName: '03-1', name: 'Гос. экзамен: специальность', date: '2026-12-10' },
+  scheme: { fair: 60, good: 80, excellent: 90 },
+  students: EXAM_STUDENTS,
+  stats: { total: 4, entered: 3, fail: 1, fair: 0, good: 0, excellent: 1, average: 72 },
+  ...over,
+});
+
+test('the fields of the state exam: the score of those who are in the group; those who left are not entered', () => {
+  assert.deepEqual([...scoreDraft(EXAM_STUDENTS)], [['a', '90'], ['b', ''], ['c', '55']]);
+});
+
+test('the changed scores: only changed fields go, an empty field clears, what is not a whole number up to 100 is bad', () => {
+  const draft = scoreDraft(EXAM_STUDENTS);
+  assert.deepEqual(scoreItems(draft, EXAM_STUDENTS), { items: [], bad: [] });
+  draft.set('b', '80');
+  assert.deepEqual(scoreItems(draft, EXAM_STUDENTS), { items: [{ studentId: 'b', score: 80 }], bad: [] });
+  draft.set('a', '');
+  draft.set('c', '0');
+  assert.deepEqual(scoreItems(draft, EXAM_STUDENTS), { items: [{ studentId: 'a', score: null }, { studentId: 'b', score: 80 }, { studentId: 'c', score: 0 }], bad: [] });
+  for (const text of ['101', '9.5', '-1', 'абв', '1e1', '1000']) {
+    const d = scoreDraft(EXAM_STUDENTS);
+    d.set('b', text);
+    assert.deepEqual(scoreItems(d, EXAM_STUDENTS), { items: [], bad: ['b'] }, text);
+  }
+  const spaced = scoreDraft(EXAM_STUDENTS);
+  spaced.set('b', ' 100 ');
+  assert.deepEqual(scoreItems(spaced, EXAM_STUDENTS).items, [{ studentId: 'b', score: 100 }]);
+});
+
+test('a reason is needed once a score that was there is changed or erased, not for a first entry', () => {
+  assert.equal(scoresNeedReason([{ studentId: 'b', score: 80 }], EXAM_STUDENTS), false);
+  assert.equal(scoresNeedReason([{ studentId: 'a', score: 76 }], EXAM_STUDENTS), true);
+  assert.equal(scoresNeedReason([{ studentId: 'a', score: null }], EXAM_STUDENTS), true);
+  assert.equal(scoresNeedReason([{ studentId: 'b', score: 80 }, { studentId: 'c', score: 56 }], EXAM_STUDENTS), true);
+  assert.equal(scoresNeedReason([], EXAM_STUDENTS), false);
+});
+
+test('the word of a score comes from the thresholds of the answer', () => {
+  const scheme = { fair: 60, good: 80, excellent: 90 };
+  assert.deepEqual([89, 90, 80, 79, 60, 59, 0].map((n) => scoreWord(n, scheme)), ['good', 'excellent', 'good', 'fair', 'fair', 'fail', 'fail']);
+  assert.equal(scoreWord(null, scheme), null);
+  assert.equal(scoreWord(70, { fair: 50, good: 65, excellent: 75 }), 'good');
+});
+
+test('the file name of a state exam holds the name, the group and the date, and no student', () => {
+  assert.equal(stateExamFileName(EXAM_VIEW(), 'Госэкзамен'), 'Госэкзамен_Гос. экзамен_ специальность_03-1_2026-12-10.xlsx');
+  assert.equal(stateExamFileName(EXAM_VIEW(), 'Госэкзамен').includes('Студент'), false);
+});
+
+test('the rows of the state exam sheet: the head, scores as numbers, the word as text, the counts and the signatures of the commission', () => {
+  const rows = stateExamRows(EXAM_VIEW(), labels);
+  assert.deepEqual(rows[0], ['Колледж Вымышленный']);
+  assert.deepEqual(rows[1], ['ВЕДОМОСТЬ ГОСУДАРСТВЕННОГО ЭКЗАМЕНА']);
+  assert.ok(rows.some((r) => r[1] === 'Название' && r[2] === 'Гос. экзамен: специальность'));
+  assert.ok(rows.some((r) => r[1] === 'Группа' && r[2] === '03-1'));
+  assert.ok(rows.some((r) => r[1] === 'Дата' && r[2] === '10.12.2026'));
+  const at = rows.findIndex((r) => r[0] === '№');
+  assert.deepEqual(rows[at], ['№', 'ФИО', 'Баллы', 'Оценка']);
+  assert.deepEqual(rows[at + 1], [1, 'Студент Первый', 90, 'отлично']);
+  assert.deepEqual(rows[at + 2], [2, 'Студент Второй', '', '']);
+  assert.deepEqual(rows[at + 3], [3, 'Студент Третий', 55, 'неудовлетворительно']);
+  assert.deepEqual(rows[at + 4], [4, 'Выбывший Студент', 70, 'удовлетворительно']);
+  assert.ok(rows.some((r) => r[0] === 'отлично: 1 · хорошо: 0 · удовлетворительно: 0 · неудовлетворительно: 1 · без баллов: 1 · средний балл 72'));
+  assert.ok(rows.some((r) => typeof r[0] === 'string' && r[0].startsWith('Председатель комиссии ____')));
+  assert.ok(rows.some((r) => typeof r[0] === 'string' && r[0].startsWith('Члены комиссии ____')));
+});
+
+test('the sheet of a state exam without any score has no counts of words', () => {
+  const rows = stateExamRows(EXAM_VIEW({ students: [SE('b', 'Студент Второй', null)], stats: { total: 1, entered: 0, fail: 0, fair: 0, good: 0, excellent: 0, average: null } }), labels);
+  assert.ok(rows.some((r) => r[0] === 'без баллов: 1'));
+});

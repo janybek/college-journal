@@ -8195,3 +8195,55 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .day.is-exam.is-empty { grid-template-columns: minmax(0, 1fr); }
 
 .day.is-exam.is-empty .day__none { justify-self: start; }
+
+/* Task 24 (unit 6): «Гос. экзамены». The list of the exams of the groups and the sheet of one exam: the students with the score
+   and the word. The deanery types the scores in the column of the scores; the word follows what is typed. */
+
+.se-table { min-width: 40rem; }
+
+.se-table__date { white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+.se-table__name { font-weight: 600; }
+
+.se-table .se-table__actions { width: 1%; text-align: right; white-space: nowrap; }
+
+.se-actions { display: flex; justify-content: flex-end; gap: var(--space-2); }
+
+/* The buttons stand over the link that covers the whole row. */
+.se-actions .button { position: relative; z-index: 1; }
+
+.se-actions .button.is-locked { opacity: 0.55; cursor: not-allowed; }
+
+.se-sheet .table-scroll { max-width: 100%; }
+
+.se-grid { min-width: 28rem; }
+
+.se-grid .se-grid__no { width: 3rem; color: var(--text-muted); font-variant-numeric: tabular-nums; text-align: right; }
+
+.se-grid__name { font-weight: 500; text-align: left; }
+
+.se-grid__name .badge { margin-left: var(--space-2); }
+
+.se-grid .se-grid__score { width: 8rem; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
+
+.se-grid .se-grid__score--edit { width: 17rem; text-align: left; vertical-align: top; }
+
+.se-grid__score--edit .lg-ex-error { text-align: left; }
+
+.se-grid .se-grid__word { min-width: 11rem; }
+
+.se-grid .se-row.is-left { color: var(--text-muted); }
+
+.se-input { margin-inline: 0; }
+
+.se-none { color: var(--text-muted); }
+
+.se-actions-bar { display: grid; gap: var(--space-3); justify-items: start; }
+
+.se-actions-bar--edit { max-width: 40rem; width: 100%; }
+
+.se-reason { width: 100%; }
+
+.se-reason[hidden] { display: none; }
+
+.state-exam.has-printable { display: block; }

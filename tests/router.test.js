@@ -209,3 +209,16 @@ test('resolveRoute: «Заявки» open for a teacher and for the office, not 
   assert.equal(resolveRoute('#/requests', student).view, 'home');
   assert.equal(resolveRoute('#/requests/x', teacher).view, 'home');
 });
+
+test('resolveRoute: the state exams need stateExam.list, one exam needs stateExam.get', () => {
+  const staff = { mustChangePassword: false, roles: ['dean'], permissions: ['stateExam.list', 'stateExam.get'] };
+  const student = { mustChangePassword: false, roles: ['student'], permissions: ['student.grades'] };
+  assert.deepEqual(resolveRoute('#/state-exams', staff), { view: 'stateExams', params: {} });
+  assert.deepEqual(resolveRoute('#/state-exam/se_1', staff), { view: 'stateExam', params: { examId: 'se_1' } });
+  assert.equal(resolveRoute('#/state-exams', student).view, 'home');
+  assert.equal(resolveRoute('#/state-exam/se_1', student).view, 'home');
+  assert.equal(resolveRoute('#/state-exams', { mustChangePassword: false, permissions: ['stateExam.get'] }).view, 'home');
+  assert.equal(resolveRoute('#/state-exam/se_1', { mustChangePassword: false, permissions: ['stateExam.list'] }).view, 'home');
+  assert.equal(resolveRoute('#/state-exam/%E0%A4%A', staff).view, 'home');
+  assert.equal(resolveRoute('#/state-exam/a/b', staff).view, 'home');
+});

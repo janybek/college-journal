@@ -200,3 +200,14 @@ test('navFor: «Заявки» of the office come after «Задания», for 
   assert.deepEqual(office.items[3], { name: 'requests', href: '#/requests', textKey: 'request.queue.title', icon: 'clipboard', hintKey: 'request.queue.hint' });
   assert.equal(navFor(['journal.list', 'work.overview'], 'dean').flatMap((g) => g.items).some((i) => i.name === 'requests'), false);
 });
+
+test('navFor: «Гос. экзамены» come after «Заявки», in the journal group of the office and in the teacher menu', () => {
+  const office = navFor(['journal.list', 'journal.log', 'work.overview', 'ledger.list', 'request.queue', 'stateExam.list'], 'dean').find((g) => g.titleKey === 'nav.journal');
+  assert.deepEqual(office.items.map((i) => i.name), ['journalList', 'ledgerList', 'tasks', 'requests', 'stateExams', 'journalLog']);
+  assert.deepEqual(office.items[4], { name: 'stateExams', href: '#/state-exams', textKey: 'stateExam.title', icon: 'sheet', hintKey: 'stateExam.hint' });
+  const teacher = navFor([...DEAN, 'schedule.mine', 'journal.list', 'work.overview', 'ledger.list', 'request.mine', 'stateExam.list'], 'teacher')[0].items;
+  assert.deepEqual(teacher.map((i) => i.name), ['home', 'mySchedule', 'journalList', 'tasks', 'ledgerList', 'requests', 'stateExams']);
+  assert.deepEqual(teacher[6], { name: 'stateExams', href: '#/state-exams', textKey: 'stateExam.title', icon: 'sheet' });
+  assert.equal(navFor(['journal.list'], 'dean').flatMap((g) => g.items).some((i) => i.name === 'stateExams'), false);
+  assert.equal(navFor(['schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'stateExams'), false);
+});

@@ -546,3 +546,20 @@ test('unit 6 task 23: the credit week in the settings and on the schedule screen
     assert.ok(dict['settings.exam.pairsNote'].includes('{n}'), lang);
   }
 });
+
+test('unit 6 task 24: the state exams have their texts in every language, the maximum only as a placeholder', () => {
+  const src = Object.keys(ru).filter((key) => key.startsWith('stateExam.'));
+  assert.ok(src.length > 60);
+  for (const [lang, dict] of Object.entries({ ky, en })) {
+    assert.deepEqual(Object.keys(dict).filter((key) => key.startsWith('stateExam.')).sort(), src.slice().sort(), lang);
+  }
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    assert.ok(dict['stateExam.error.score.bad_value'].includes('{max}'), lang);
+    assert.ok(dict['stateExam.scoreOf'].includes('{max}') && dict['stateExam.scoreOf'].includes('{name}'), lang);
+    assert.ok(dict['stateExam.scoresOf'].includes('{entered}') && dict['stateExam.scoresOf'].includes('{total}'), lang);
+    assert.ok(dict['stateExam.average'].includes('{n}'), lang);
+    assert.ok(dict['stateExam.remove.text'].includes('{name}') && dict['stateExam.remove.text'].includes('{group}'), lang);
+    for (const key of ['stateExam.file.prefix']) assert.ok(!/[/:*?"<>|]/.test(dict[key]), lang + ' ' + key);
+    assert.ok(dict['stateExam.title'] && dict['stateExam.hint'] && dict['stateExam.print.title'], lang);
+  }
+});

@@ -1,4 +1,4 @@
-import { ledgerColumns, admissionCell, examCell, finalCell, isLow, wordCounts, attemptLines } from './ledger.js';
+import { ledgerColumns, admissionCell, examCell, finalCell, isLow, wordCounts, attemptLines, scoreWord } from './ledger.js';
 
 // What the ledger and the exam sheet look like on paper and in an Excel file: the same rows for both. No DOM here and no
 // library of its own (XLSX comes from outside), so the tests run it as it is. Every number is the server's; nothing is counted
@@ -236,4 +236,52 @@ export function ledgerBook(XLSX, view, labels) {
 
 export function examSheetBook(XLSX, view, labels) {
   return bookOf(XLSX, examSheet(view, labels), labels.sheet, [5, 34, 16, 16, 16, 24]);
+}
+
+// ---- The sheet of a state exam ----
+
+export function stateExamFileName(view, prefix) {
+  const { exam } = view;
+  return `${safeFilePart(prefix)}_${safeFilePart(exam.name)}_${safeFilePart(exam.groupName)}_${exam.date}.xlsx`;
+}
+
+// The line under the table: the words of the group (once someone has a score), those without a score, the average.
+function scoreCountsLine(view, t) {
+  const { stats } = view;
+  const parts = stats.entered > 0 ? WORDS.map((word) => `${t('journal.grade.' + word)}: ${stats[word]}`) : [];
+  if (stats.total > stats.entered) parts.push(`${t('stateExam.missing')}: ${stats.total - stats.entered}`);
+  if (stats.average !== null && stats.average !== undefined) parts.push(t('stateExam.average', { n: stats.average }));
+  return parts.join(' · ');
+}
+
+// The same shape as ledgerSheet: the head, the table of students (those who left only with a score), the counts, the commission.
+export function stateExamSheet(view, labels) {
+  const { t } = labels;
+  const { exam } = view;
+  const body = [];
+  const low = [];
+  for (const student of view.students) {
+    const word = scoreWord(student.score, view.scheme);
+    body.push([body.length + 1, student.fullName || BLANK, numberOrBlank(student.score), word ? t('journal.grade.' + word) : BLANK]);
+    low.push([false, false, word === 'fail', word === 'fail']);
+  }
+  return {
+    college: view.collegeName || BLANK,
+    title: t('stateExam.print.title'),
+    draft: BLANK,
+    facts: [[t('stateExam.print.name'), exam.name], [t('stateExam.print.group'), exam.groupName], [t('stateExam.print.date'), dayFull(exam.date)]],
+    head: [[t('ledger.print.no'), t('ledger.print.fullName'), t('stateExam.col.score'), t('stateExam.col.word')]],
+    merges: [], body, low,
+    counts: scoreCountsLine(view, t),
+    retakes: null,
+    signs: [signLine(t('stateExam.print.signChair'), BLANK), signLine(t('stateExam.print.signMembers'), BLANK)],
+  };
+}
+
+export function stateExamRows(view, labels) {
+  return fileRows(stateExamSheet(view, labels)).rows;
+}
+
+export function stateExamBook(XLSX, view, labels) {
+  return bookOf(XLSX, stateExamSheet(view, labels), labels.sheet, [5, 34, 10, 24]);
 }

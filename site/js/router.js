@@ -71,6 +71,10 @@ export function resolveRoute(hash, user) {
   if (grades && permissions.includes('student.grades') && idOf(grades[1]) !== null) return { view: 'grades', params: { subjectId: idOf(grades[1]) } };
   // «Заявки»: the requests of a teacher to correct closed data (request.mine); the deanery's queue (request.queue) comes to the same address.
   if (path === '/requests' && (permissions.includes('request.mine') || permissions.includes('request.queue'))) return { view: 'requests', params: {} };
+  // «Гос. экзамены»: the list; #/state-exam/<examId>: the sheet of one exam (the deanery enters the scores, the others read). The server checks every right itself.
+  if (path === '/state-exams' && permissions.includes('stateExam.list')) return { view: 'stateExams', params: {} };
+  const stateExam = /^\/state-exam\/([^/]+)$/.exec(path);
+  if (stateExam && permissions.includes('stateExam.get') && idOf(stateExam[1]) !== null) return { view: 'stateExam', params: { examId: idOf(stateExam[1]) } };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
   // «Я на паре»: the check-in of a student (a pass from a QR link also lands here).
