@@ -1,5 +1,6 @@
 // Points of the journal: of a pair, current control, unit total, attendance. Pure functions; nothing is stored.
 import { ATTENDED_STATUSES, FIXED_STATUSES } from './schema.js';
+import { DEFAULT_SPLIT } from './scoring.js';
 
 const isFixed = (pair) => FIXED_STATUSES.includes(pair.status);
 const cap = (value, max) => (value === null || value === undefined ? null : Math.min(value, max));
@@ -62,7 +63,14 @@ export function attendanceStats(items) {
 const sumPoints = (list) => list.reduce((acc, p) => ({ earned: acc.earned + p.earned, possible: acc.possible + p.possible }), { earned: 0, possible: 0 });
 const num = (v) => (v === null || v === undefined ? null : Number(v));
 
-export function studentResults({ pairs, marks, unitRows, units, scheme, selfWork = new Map() }) {
+// Points of the semester out of split.semester: the mean of the unit totals scaled to the semester share.
+export function semesterPoints(totals, split) {
+  if (!totals.length) return null;
+  const sum = totals.reduce((a, b) => a + b, 0);
+  return Math.round((sum * split.semester) / (100 * totals.length));
+}
+
+export function studentResults({ pairs, marks, unitRows, units, scheme, selfWork = new Map(), split = DEFAULT_SPLIT }) {
   const held = pairs.filter(isFixed);
   const pointsOf = (list) => list.map((p) => pairPoints(marks.get(p.id) || null, p, scheme)).filter((x) => x !== null);
   const totals = [];
@@ -89,5 +97,8 @@ export function studentResults({ pairs, marks, unitRows, units, scheme, selfWork
   const outside = sumPoints(pointsOf(held.filter((p) => p.unit === null || p.unit === undefined)));
   const preliminary = totals.length ? Math.round(totals.reduce((a, b) => a + b, 0) / totals.length) : null;
   const items = held.filter((p) => marks.has(p.id)).map((p) => marks.get(p.id));
-  return { units: result, outside, preliminary, word: gradeWord(preliminary, scheme), attendance: attendanceStats(items) };
+  const semester = semesterPoints(totals, split);
+  const complete = result.length > 0 && result.every((u) => u.total !== null);
+  const admitted = complete && semester > split.admission;
+  return { units: result, outside, preliminary, semester, complete, admitted, attendance: attendanceStats(items) };
 }

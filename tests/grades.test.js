@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DEFAULT_SCHEME } from '../core/scoring.js';
+import { DEFAULT_SCHEME, DEFAULT_SPLIT } from '../core/scoring.js';
 import {
-  firstPairId, pairPoints, currentControl, unitTotal, gradeWord, attendanceStats, studentResults,
+  firstPairId, pairPoints, currentControl, unitTotal, gradeWord, attendanceStats, studentResults, semesterPoints,
 } from '../core/grades.js';
 
 const S = DEFAULT_SCHEME;
@@ -32,7 +32,7 @@ test('current control, totals, words', () => {
   assert.equal(currentControl([{ earned: 25, possible: 80 }], S), 13);
   assert.equal(currentControl([], S), null);
   assert.deepEqual([unitTotal({ current: 29, self: 16, control: 30 }), unitTotal({ current: 29, self: null, control: 30 }), unitTotal({ current: null, self: 16, control: 30 })], [75, null, null]);
-  assert.deepEqual([59, 60, 75, 76, 89, 90, 100, null].map((x) => gradeWord(x, S)), ['fail', 'fair', 'fair', 'good', 'good', 'excellent', 'excellent', null]);
+  assert.deepEqual([59, 60, 79, 80, 89, 90, 100, null].map((x) => gradeWord(x, S)), ['fail', 'fair', 'fair', 'good', 'good', 'excellent', 'excellent', null]);
 });
 
 test('first pair of a subject', () => {
@@ -70,7 +70,7 @@ test('student results: the plan example', () => {
   assert.deepEqual(r.outside, { earned: 27, possible: 30 });
   assert.deepEqual(r.attendance, { marked: 7, attended: 5, late: 1, absent: 1, excused: 1, madeup: 0, noCoat: 1, percent: 71 });
   assert.equal(r.preliminary, 72);
-  assert.equal(r.word, 'fair');
+  assert.deepEqual([r.preliminary, r.semester, r.complete, r.admitted, 'word' in r], [72, 43, false, false, false]);
 });
 
 test('student results: manual current, low marks, missing parts', () => {
@@ -85,15 +85,14 @@ test('student results: manual current, low marks, missing parts', () => {
   const noSelf = run({ unitRows: rows({ self: null }) });
   assert.equal(noSelf.units[0].total, null);
   assert.equal(noSelf.preliminary, null);
-  assert.equal(noSelf.word, null);
+  assert.deepEqual([noSelf.preliminary, noSelf.semester, noSelf.complete, noSelf.admitted], [null, null, false, false]);
 });
 
 test('student results: preliminary is the mean of unit totals', () => {
   const unitRows = new Map([[1, { unit: 1, self: 16, control: 30, currentManual: 29 }], [2, { unit: 2, self: 20, control: 30, currentManual: 30 }]]);
   const r = studentResults({ pairs, marks: marks(), unitRows, units: [1, 2], scheme: S });
   assert.deepEqual([r.units[0].total, r.units[1].total], [75, 80]);
-  assert.equal(r.preliminary, 78);
-  assert.equal(r.word, 'good');
+  assert.deepEqual([r.preliminary, r.semester, r.complete, r.admitted], [78, 47, true, true]);
 });
 
 test('student results: self above the maximum is capped, total stays within 100', () => {
@@ -140,4 +139,20 @@ test('student results: self-work counted from assignments replaces the manual se
   const wait = { earned: 8, max: 30, pending: 1, value: 5 };
   const p = studentResults({ pairs, marks: marks(), unitRows, units: [1, 2], scheme: S, selfWork: new Map([[2, wait]]) });
   assert.deepEqual([p.units[1].self, p.units[1].total, p.units[1].selfWork], [null, null, wait]);
+});
+
+test('semester points: rounding by the 60/40 split', () => {
+  const SP = DEFAULT_SPLIT;
+  assert.deepEqual([[84, 71], [57, 70], [75], [50, 50], [50, 51], [50, 52], [45, 50], [95, 96], [100], []].map((t) => semesterPoints(t, SP)), [47, 38, 45, 30, 30, 31, 29, 57, 60, null]);
+  assert.equal(semesterPoints([84, 71], { semester: 50, exam: 50, admission: 25 }), 39);
+});
+
+test('student results: admission threshold and completeness', () => {
+  const unitRows = new Map([[1, { unit: 1, self: 16, control: 30, currentManual: 29 }], [2, { unit: 2, self: 20, control: 30, currentManual: 30 }]]);
+  const at = (admission) => studentResults({ pairs, marks: marks(), unitRows, units: [1, 2], scheme: S, split: { semester: 60, exam: 40, admission } });
+  assert.equal(at(47).admitted, false);
+  assert.equal(at(46).admitted, true);
+  const none = studentResults({ pairs, marks: marks(), unitRows, units: [], scheme: S });
+  assert.deepEqual([none.semester, none.complete, none.admitted], [null, false, false]);
+  assert.equal(run().units[0].word, 'fair');
 });
