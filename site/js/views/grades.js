@@ -2,7 +2,9 @@ import { call } from '../api.js';
 import { t } from '../i18n.js';
 import { el, errorKey, badge, emptyState, pageHeader, refresh } from '../ui.js';
 import { icon } from '../icons.js';
-import { unitLine, absenceList, pointsText, semesterLine, admissionLine } from '../journal.js';
+import { unitLine, absenceList, pointsText, semesterLine, admissionLine, examLines, stateExamLine } from '../journal.js';
+import { attemptLines, SCORE_MAX } from '../ledger.js';
+import { dayText } from '../announce.js';
 import { weekdayDate } from './pairParts.js';
 
 // «Оценки» of a student (#/grades, #/grades/<subjectId>): the points and absences of the person who asks, from
@@ -25,8 +27,8 @@ export function render(root, params = {}) {
     root.append(pageHeader({ id: 'gr-title', title: t('grades.title') }), failedOrLoading());
     return;
   }
-  const { scheme, subjects, split } = state.data;
-  if (!detail) root.append(listScreen(subjects, scheme, split));
+  const { scheme, subjects, split, stateExams } = state.data;
+  if (!detail) root.append(listScreen(subjects, scheme, split, Array.isArray(stateExams) ? stateExams : []));
   else {
     const subject = subjects.find((s) => s.subjectId === params.subjectId);
     root.append(subject ? detailScreen(subject, scheme, split) : notFound());
@@ -61,9 +63,9 @@ function failedOrLoading() {
 
 // ---- #/grades: a card for each subject ----
 
-function listScreen(subjects, scheme, split) {
+function listScreen(subjects, scheme, split, stateExams) {
   const head = pageHeader({ id: 'gr-title', title: t('grades.title'), lead: t('home.gradesLead') });
-  if (subjects.length === 0) return el('div', { class: 'gr' }, head, emptyState('chart', el('p', {}, t('grades.empty'))));
+  if (subjects.length === 0) return el('div', { class: 'gr' }, head, emptyState('chart', el('p', {}, t('grades.empty'))), stateExamBlock(stateExams));
   return el('div', { class: 'gr' }, head,
     el('ul', { class: 'gr-list' }, subjects.map((subject) => el('li', {},
       el('a', { class: 'card gr-card', href: '#/grades/' + encodeURIComponent(subject.subjectId) },
@@ -72,8 +74,9 @@ function listScreen(subjects, scheme, split) {
             el('h2', { class: 'gr-card__name' }, subject.name),
             subject.teacherName ? el('p', { class: 'gr-card__teacher' }, subject.teacherName) : null),
           icon('chevron', 'gr-card__go')),
-        summary(subject, scheme, split))))),
+        summary(subject, scheme, split, false))))),
     subjects.some((subject) => subject.units.some((unit) => unit.selfWork)) ? el('a', { class: 'button button--secondary gr-tasks', id: 'gr-tasks', href: '#/tasks' }, t('grades.myTasks')) : null,
+    stateExamBlock(stateExams),
     howBlock(scheme));
 }
 
@@ -83,7 +86,7 @@ function detailScreen(subject, scheme, split) {
   const missed = absenceList(subject.pairs);
   return el('div', { class: 'gr' },
     pageHeader({ id: 'gr-title', title: subject.name, lead: subject.teacherName || null }),
-    el('section', { class: 'card gr-card gr-card--static', 'aria-labelledby': 'gr-title' }, summary(subject, scheme, split)),
+    el('section', { class: 'card gr-card gr-card--static', 'aria-labelledby': 'gr-title' }, summary(subject, scheme, split, true)),
     el('section', { class: 'gr-section', 'aria-labelledby': 'gr-missed' },
       el('h2', { class: 'gr-section__title', id: 'gr-missed' }, t('grades.absences')),
       missed.length === 0 ? el('p', { class: 'muted gr-none' }, t('grades.noAbsences')) : el('ul', { class: 'gr-pairs' }, missed.map((pair) => pairRow(pair, false)))),
@@ -117,7 +120,7 @@ function pairRow(pair, withPoints) {
 
 // ---- The totals of a subject, the same on the card and at the top of the details ----
 
-function summary(subject, scheme, split) {
+function summary(subject, scheme, split, detail) {
   const blocks = [];
   for (const unit of subject.units) blocks.push(unitBlock(unit, scheme));
   if (subject.outside && subject.outside.possible > 0) {
@@ -130,7 +133,10 @@ function summary(subject, scheme, split) {
   if (semester) {
     out.unshift(el('div', { class: 'gr-semester' },
       el('p', { class: 'gr-final' }, el('span', { class: 'gr-final__text' }, t(semester.key, semester.params))),
-      admission ? el('p', { class: `gr-admission gr-admission--${admission.tone}` }, t(admission.key, admission.params)) : null));
+      admission ? el('p', { class: `gr-admission gr-admission--${admission.tone}` }, t(admission.key, admission.params)) : null,
+      ...examLines(subject, split).map((line) => el('p', { class: `gr-admission gr-admission--${line.tone} gr-exam`, 'data-line': line.key },
+        t(line.key, line.params), line.word ? [' ', badge(t('journal.grade.' + line.word), wordTone(line.word))] : null)),
+      detail ? attemptHistory(subject) : null));
   }
   const a = subject.attendance;
   if (a && a.marked > 0) out.push(el('p', { class: 'gr-attendance' }, t('grades.attendance', { attended: a.attended, marked: a.marked, missed: a.absent + a.excused })));
@@ -146,6 +152,7 @@ function unitBlock(unit, scheme) {
   };
   return el('div', { class: 'gr-unit' },
     el('p', { class: 'gr-unit__name' }, unit.title ? t('grades.unitTitled', { n: unit.unit, title: unit.title }) : t('grades.unitName', { n: unit.unit }),
+      unit.closed ? badge(t('grades.unitClosed'), 'neutral') : null,
       unit.total !== null && unit.word ? badge(t('journal.grade.' + unit.word), wordTone(unit.word)) : null),
     el('p', { class: 'gr-unit__line' }, line.parts ? line.parts.map((part) => t(part.key, { ...part.params, ...params })).join(' · ') : t(line.key, params)),
     unit.currentLow ? lowNote('grades.low.current', scheme) : null,
@@ -153,6 +160,30 @@ function unitBlock(unit, scheme) {
 }
 
 const lowNote = (key, scheme) => el('p', { class: 'gr-low' }, icon('alert', 'gr-low__icon'), el('span', {}, t(key, { minimum: scheme.minimum })));
+
+// The tries of the exam, only when there is more than one: «15.12 · первая сдача · 20». The last one counts.
+function attemptHistory(subject) {
+  const attempts = subject.final && Array.isArray(subject.final.attempts) ? subject.final.attempts : [];
+  if (attempts.length < 2) return null;
+  return el('div', { class: 'gr-attempts', id: 'gr-attempts' },
+    el('p', { class: 'gr-attempts__title' }, t('grades.attempts')),
+    el('ul', { class: 'gr-attempts__list' }, attemptLines(attempts).map((line) => el('li', {},
+      [dayText(line.date).slice(0, 5), t(line.label.key, line.label.params), line.result.key ? t(line.result.key) : line.result.text].join(' · ')))));
+}
+
+// ---- «Государственные экзамены»: only the own result ----
+
+function stateExamBlock(exams) {
+  if (exams.length === 0) return null;
+  return el('section', { class: 'gr-section gr-state', id: 'gr-state', 'aria-labelledby': 'gr-state-title' },
+    el('h2', { class: 'gr-section__title', id: 'gr-state-title' }, t('grades.stateExam.title')),
+    el('ul', { class: 'gr-pairs' }, exams.map((exam) => {
+      const line = stateExamLine(exam);
+      return el('li', { class: 'gr-pair' },
+        el('div', { class: 'gr-pair__top' }, el('span', { class: 'gr-pair__date' }, exam.name), el('span', { class: 'muted' }, dayText(exam.date))),
+        el('p', { class: 'gr-pair__topic' }, t(line.key, { ...line.params, max: SCORE_MAX }), line.word ? [' · ', badge(t('journal.grade.' + line.word), wordTone(line.word))] : null));
+    })));
+}
 
 // ---- «Как считаются баллы» ----
 

@@ -1,6 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, selfCell, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, semesterCell, semesterLine, admissionLine, requestNote } from '../site/js/journal.js';
+import { listRows, listBadges, journalColumns, cellView, pairHead, draftMarks, changedMarks, activityAllowed, coatAllowed, canMark, pairHint, lateOptions, logLine, pairScore, parsePoints, resultItems, needsReason, savedResult, pairActions, unitLine, selfCell, absenceList, pointsText, weekRange, addDays, isoWeekday, pairsOfDay, pairsOfWeek, pairsOfUnit, nearestPairDate, stepPairDate, unitOptions, currentUnit, viewColumns, semesterCell, semesterLine, admissionLine, requestNote, examLines, stateExamLine } from '../site/js/journal.js';
+import ruDict from '../site/js/i18n/ru.js';
+import kyDict from '../site/js/i18n/ky.js';
+import enDict from '../site/js/i18n/en.js';
 
 test('listRows: a teacher sees only their own subjects and those where they covered pairs; the office sees all', () => {
   assert.deepEqual(listRows([{ own: true }, { own: false, covers: true }, { own: false, covers: false }], 'teacher').length, 2);
@@ -394,4 +397,52 @@ test('requestNote: the people who approved a request; none without a request', (
   assert.deepEqual(requestNote({ requestId: 'r1', approvedBy: ['Dean A.', ''] }).params, { names: 'Dean A.' });
   assert.equal(requestNote({ entity: 'mark' }), null);
   assert.equal(requestNote(null), null);
+});
+
+// ---- task 26: the exam and the total of a subject, the state exam of a student ----
+
+const SPLIT = { semester: 60, exam: 40, admission: 30 };
+const fin = (status, extra = {}) => ({ final: { status, exam: null, total: null, word: null, canRetake: false, attempts: [], ...extra } });
+
+test('examLines: an open final sheet shows nothing', () => {
+  assert.deepEqual(examLines({ final: null }, SPLIT), []);
+});
+
+test('examLines: done gives the exam and the total with the word; the maxima come from the split', () => {
+  const lines = examLines(fin('done', { exam: 35, total: 82, word: 'good' }), SPLIT);
+  assert.deepEqual(lines, [
+    { key: 'grades.exam', params: { value: 35, max: 40 }, tone: 'neutral' },
+    { key: 'grades.final', params: { value: 82, max: 100 }, tone: 'primary', word: 'good' },
+  ]);
+  const other = examLines(fin('done', { exam: 30, total: 70, word: 'fair' }), { semester: 50, exam: 50, admission: 25 });
+  assert.deepEqual([other[0].params.max, other[1].params.max], [50, 100]);
+});
+
+test('examLines: failed with a retake, absent, incomplete, none, not admitted', () => {
+  const failed = examLines(fin('done', { exam: 12, total: 58, word: 'fail', canRetake: true }), SPLIT);
+  assert.deepEqual([failed[1].word, failed[1].tone, failed[2]], ['fail', 'danger', { key: 'grades.exam.canRetake', params: {}, tone: 'neutral' }]);
+  assert.deepEqual(examLines(fin('absent', { canRetake: true }), SPLIT).map((l) => l.key), ['grades.exam.absent', 'grades.exam.canRetake']);
+  assert.deepEqual(examLines(fin('incomplete'), SPLIT), [{ key: 'grades.exam.incomplete', params: {}, tone: 'warning' }]);
+  assert.deepEqual(examLines(fin('none'), SPLIT), [{ key: 'grades.exam.none', params: {}, tone: 'neutral' }]);
+  assert.deepEqual(examLines(fin('not_admitted'), SPLIT), [{ key: 'grades.final.notAdmitted', params: {}, tone: 'danger' }]);
+});
+
+test('stateExamLine: with a score, and without', () => {
+  assert.deepEqual(stateExamLine({ name: 'X', date: '2026-06-01', score: 90, word: 'excellent' }), { key: 'grades.stateExam.score', params: { score: 90 }, word: 'excellent' });
+  assert.deepEqual(stateExamLine({ name: 'X', date: '2026-06-01', score: null, word: null }), { key: 'grades.stateExam.none', params: {}, word: null });
+});
+
+test('unitLine of a closed unit is the same as of an open one', () => {
+  const unit = { current: 20, self: 10, control: 15, total: 45, selfWork: false };
+  assert.deepEqual(unitLine({ ...unit, closed: true }), unitLine(unit));
+});
+
+test('task 26 keys are in three dictionaries; value and max are placeholders, no 40 or 100 in digits', () => {
+  const keys = ['grades.final', 'grades.final.notAdmitted', 'grades.exam', 'grades.exam.absent', 'grades.exam.incomplete', 'grades.exam.none', 'grades.exam.canRetake',
+    'grades.stateExam.title', 'grades.stateExam.score', 'grades.stateExam.none', 'grades.unitClosed', 'work.closedUnit', 'announce.home.all', 'announce.home.empty'];
+  for (const dict of [ruDict, kyDict, enDict]) {
+    for (const key of keys) assert.equal(typeof dict[key], 'string', key);
+    for (const key of ['grades.exam', 'grades.final']) assert.ok(dict[key].includes('{value}') && dict[key].includes('{max}') && !/(40|100)/.test(dict[key]), key);
+    assert.equal('home.newsSoon' in dict, false);
+  }
 });

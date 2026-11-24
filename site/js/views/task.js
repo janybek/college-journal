@@ -539,6 +539,7 @@ function mineWork(data) {
       el('p', { class: 'mine-comment__label' }, t('work.mine.comment')),
       el('p', { class: 'mine-comment__text' }, current.comment)) : null,
     current ? mineAttempt(current, true) : null,
+    data.closed === true && !data.canSubmit ? note('info', t('work.closedUnit'), { id: 'mine-closed', role: 'status' }) : null,
     data.canSubmit ? mineForm(data) : null,
     earlier.length > 0 ? minePrevious(earlier) : null);
 }

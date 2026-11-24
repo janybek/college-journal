@@ -9,12 +9,7 @@ import { inExamWeek } from '../pairs.js';
 import { teacherBadge } from '../subjects.js';
 import { todayAction, clockText, cameMark } from '../lesson.js';
 import { homeCardLines } from '../work.js';
-import { topItems, firstLine } from '../announce.js';
-
-// Sections later units fill in; for now the student sees what is coming.
-const STUDENT_SECTIONS = [
-  ['home.news', 'home.newsSoon', 'bell'],
-];
+import { topItems, firstLine, dayText } from '../announce.js';
 
 // Last known subjects of the signed-in teacher: shown at once, refreshed in the background on every visit.
 const subjects = { owner: null, list: null, errorKey: null, pending: null };
@@ -42,6 +37,7 @@ function renderStudent(root, user) {
           el('span', { class: 'muted' }, t('home.group')),
           user.groupName ? badge(user.groupName, 'primary') : el('span', { class: 'muted' }, t('home.noGroup'))))),
     hereSection(user),
+    studentAnnounce(user),
     homeworkSection(user),
     todaySection(user),
     studentSubjectsSection(user),
@@ -50,12 +46,7 @@ function renderStudent(root, user) {
       el('div', { class: 'soon__body' },
         el('h2', { class: 'soon__title' }, t('home.grades')),
         el('p', { class: 'soon__text' }, t('home.gradesLead'))),
-      icon('chevron', 'soon__go')),
-    el('ul', { class: 'soon-list' }, STUDENT_SECTIONS.map(([title, text, iconName]) => el('li', { class: 'card soon' },
-      el('span', { class: 'soon__icon' }, icon(iconName)),
-      el('div', { class: 'soon__body' },
-        el('h2', { class: 'soon__title' }, t(title)),
-        el('p', { class: 'soon__text' }, t(text)))))));
+      icon('chevron', 'soon__go')));
 }
 
 // ---- «Я на паре»: a pair of the group whose check-in is open now ----
@@ -454,6 +445,44 @@ function announceBlock(user) {
       .then((data) => { if (announceHome.owner === owner) announceHome.items = Array.isArray(data.items) ? data.items : []; }, () => {})
       .finally(() => { if (announceHome.owner === owner) announceHome.pending = null; });
     announceHome.pending.then(draw);
+  }
+  draw();
+  return holder;
+}
+
+// The student's block «Объявления»: the last three (announce.list gives him only what is for him), a tap opens the text in place.
+function studentAnnounce(user) {
+  const holder = el('section', { class: 'card home-announce__card home-announce--student', id: 'home-announce', 'aria-labelledby': 'home-announce-title' });
+  const open = new Set();
+  const draw = () => {
+    const items = announceHome.items;
+    holder.replaceChildren(el('header', { class: 'home-announce__head' },
+      el('span', { class: 'tile__icon' }, icon('bell')),
+      el('h2', { class: 'section__title home-announce__title', id: 'home-announce-title' }, t('home.news'))));
+    if (items === null) { holder.append(el('p', { class: 'loading' }, t('announce.loading'))); return; }
+    if (items.length === 0) holder.append(el('p', { class: 'homework__none', id: 'home-announce-none' }, t('announce.home.empty')));
+    else {
+      holder.append(el('ul', { class: 'home-announce__list' }, topItems(items).map((item) => {
+        const full = open.has(item.id);
+        return el('li', { class: 'home-announce__item' },
+          el('button', {
+            type: 'button', class: 'home-announce__link home-announce__toggle', id: 'home-announce-item-' + item.id, 'aria-expanded': String(full),
+            onclick: () => { if (open.has(item.id)) open.delete(item.id); else open.add(item.id); draw(); document.getElementById('home-announce-item-' + item.id)?.focus(); },
+          },
+          el('span', { class: 'home-announce__name' }, item.title),
+          el('span', { class: 'home-announce__by' }, t('announce.by', { name: item.authorName || '—', date: dayText(item.createdAt) })),
+          item.text ? el('span', { class: 'home-announce__line' + (full ? ' is-full' : ' is-two') }, item.text) : null));
+      })));
+    }
+    holder.append(el('a', { class: 'home-announce__all', id: 'home-announce-all', href: '#/announcements' }, t('announce.home.all'), icon('chevron')));
+  };
+  if (announceHome.owner !== user.id) Object.assign(announceHome, { owner: user.id, items: null, pending: null });
+  if (announceHome.items === null && !announceHome.pending) {
+    const owner = user.id;
+    announceHome.pending = call('announce.list', {})
+      .then((data) => { if (announceHome.owner === owner) announceHome.items = Array.isArray(data.items) ? data.items : []; }, () => { if (announceHome.owner === owner) announceHome.items = []; })
+      .finally(() => { if (announceHome.owner === owner) announceHome.pending = null; });
+    announceHome.pending.then(() => { if (holder.isConnected) draw(); });
   }
   draw();
   return holder;

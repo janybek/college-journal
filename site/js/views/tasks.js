@@ -304,7 +304,8 @@ function mineTask(task, now) {
       view.lateKey ? badge(t(view.lateKey), 'warning') : null),
     el('span', { class: 'mine-task__title' }, task.title),
     el('span', { class: 'mine-task__meta' },
-      task.state === 'checked' ? null : el('span', { class: 'task-due task-due--' + due.tone }, t(due.key, due.params)),
+      task.closed === true ? el('span', { class: 'mine-task__closed' }, t('work.closedUnit'))
+        : task.state === 'checked' ? null : el('span', { class: 'task-due task-due--' + due.tone }, t(due.key, due.params)),
       task.state === 'checked' && Number.isInteger(task.points) ? el('span', { class: 'mine-task__points' }, t('work.mine.points', { n: task.points, max: task.maxPoints })) : null),
     icon('chevron', 'mine-task__chevron'));
 }

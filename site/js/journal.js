@@ -432,3 +432,29 @@ export function admissionLine(subject, split) {
   if (subject.admitted) return { key: 'grades.admitted', params: {}, tone: 'success' };
   return { key: 'grades.notAdmitted', params: { value: subject.semester, max: split.semester, need: split.admission }, tone: 'danger' };
 }
+
+// ---- «Оценки» of a student: the exam and the total of a subject (shown once the final sheet is closed) ----
+
+const examWordTone = (word) => (word === 'excellent' ? 'success' : word === 'good' ? 'primary' : word === 'fair' ? 'warning' : 'danger');
+
+// subject.final of student.grades -> the lines under «Семестр» and the admission, in order. The maxima come from `split`.
+export function examLines(subject, split) {
+  const final = subject ? subject.final : null;
+  if (!final) return [];
+  const lines = [];
+  if (final.status === 'not_admitted') return [{ key: 'grades.final.notAdmitted', params: {}, tone: 'danger' }];
+  if (final.status === 'done') {
+    lines.push({ key: 'grades.exam', params: { value: final.exam, max: split.exam }, tone: 'neutral' });
+    lines.push({ key: 'grades.final', params: { value: final.total, max: split.semester + split.exam }, tone: examWordTone(final.word), word: final.word });
+  } else if (final.status === 'absent') lines.push({ key: 'grades.exam.absent', params: {}, tone: 'danger' });
+  else if (final.status === 'incomplete') lines.push({ key: 'grades.exam.incomplete', params: {}, tone: 'warning' });
+  else if (final.status === 'none') lines.push({ key: 'grades.exam.none', params: {}, tone: 'neutral' });
+  if (final.canRetake) lines.push({ key: 'grades.exam.canRetake', params: {}, tone: 'neutral' });
+  return lines;
+}
+
+// A state exam of the student: with a score, or «no result yet».
+export function stateExamLine(exam) {
+  const has = exam && exam.score !== null && exam.score !== undefined;
+  return has ? { key: 'grades.stateExam.score', params: { score: exam.score }, word: exam.word || null } : { key: 'grades.stateExam.none', params: {}, word: null };
+}

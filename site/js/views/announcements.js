@@ -26,6 +26,7 @@ export function leave() {
 export function render(root) {
   if (state.data === null && !state.loading && state.loadErrorKey === null) load();
   const write = state.data !== null && state.data.can.write === true;
+  if (!write && state.data !== null) root.append(el('a', { class: 'back-link', id: 'announce-back', href: '#/' }, icon('chevron'), t('common.toHome')));
   root.append(
     pageHeader({
       id: 'announce-heading', title: t('announce.title'), lead: state.data === null ? null : t(write ? 'announce.leadWrite' : 'announce.leadRead'),
