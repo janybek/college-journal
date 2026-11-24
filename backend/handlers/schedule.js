@@ -3,7 +3,7 @@ import { addDays, daysBetween, isDate, mondayOf } from '../../core/dates.js';
 import { checkPairChange, pairLock } from '../../core/schedule.js';
 import { NO_LESSON } from '../../core/topics.js';
 import { settleLessons } from '../lessonSettle.js';
-import { generateSchedule, loadSettings, pairViews, relayout, todayOf } from '../scheduleData.js';
+import { examOf, generateSchedule, loadSettings, pairViews, relayout, todayOf } from '../scheduleData.js';
 
 const MAX_RANGE_DAYS = 30;
 const NOTE_MAX = 200;
@@ -24,7 +24,7 @@ function list(data, ctx) {
   const { pairs: settled } = settleLessons(ctx.store, ctx.platform);
   const pairs = pairViews(ctx.store, (p) => p.date >= from && p.date <= to
     && (groupId === null || p.groupId === groupId) && (teacherId === null || p.teacherId === teacherId), { pairs: settled });
-  return { today, from, to, pairs };
+  return { today, from, to, pairs, exam: examOf(ctx.store) };
 }
 
 // The week of a student's group, or of the pairs a staff member teaches (a substitute sees the pairs they cover).
@@ -38,7 +38,7 @@ function mine(data, ctx, user) {
     ? (p) => p.groupId === user.row.groupId
     : (p) => p.teacherId === user.id;
   const { pairs } = settleLessons(ctx.store, ctx.platform);
-  return { today, from, to, pairs: pairViews(ctx.store, (p) => p.date >= from && p.date <= to && own(p), { pairs }) };
+  return { today, from, to, pairs: pairViews(ctx.store, (p) => p.date >= from && p.date <= to && own(p), { pairs }), exam: examOf(ctx.store) };
 }
 
 function findPair(pairs, id) {

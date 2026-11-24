@@ -1,11 +1,17 @@
 // Reading and writing semester pairs for the handlers. No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
 import { localDate, addMinutes } from '../core/dates.js';
-import { readSettings, PAIR_MINUTES } from '../core/settings.js';
+import { readSettings, readExtra, PAIR_MINUTES } from '../core/settings.js';
 import { isSubstitution, planGeneration } from '../core/schedule.js';
 import { NO_LESSON, controlMarks, layoutLessons, lessonKey, partsOf } from '../core/topics.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
 import { subjectScope, syllabusIndex } from '../core/syllabus.js';
+
+// The credit week as the screens get it: empty strings when there is none.
+export function examOf(store) {
+  const { examStart, examEnd } = readExtra(store.list('settings'));
+  return { start: examStart, end: examEnd };
+}
 
 export function todayOf(platform) {
   return localDate(platform.now());
@@ -53,7 +59,8 @@ export function relayout(store, subjectIds = null, rows = {}, also = []) {
 }
 
 export function generateSchedule(store, platform, { dryRun = false, restart = false } = {}) {
-  const settings = loadSettings(store);
+  const settingRows = store.list('settings');
+  const settings = { ...readSettings(settingRows), exam: readExtra(settingRows) };
   if (settings.semesterStart === '' || settings.semesterEnd === '') {
     throw new AppError('invalid', { fields: [{ field: 'semesterStart', code: 'required' }] });
   }
