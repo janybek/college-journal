@@ -142,3 +142,4 @@
 - N1 small round: 192bcbe accepted by coordinator (diff read; npm test 1172/1172; build:gas ok; probe-wave.mjs 5/5). Final fix wave closed. Next: step 3 show owner, step 4 docs.
 - Task 27 step 3: Ruling: no separate screen show — wave changed only error texts (held_closed, semester_closed), the checkbox layout back to the shared look (.task-check), focus and an error line; the owner sees them with the deploy check. Stand stopped.
 - 25.11.2026 Task 27 steps 1-4 done: findings copy + ledger snapshot + aidlc-state (docs commit). Next: step 5 deploy to test only on the owner's request.
+- 25.11.2026 Task 27 step 5: deployed to TEST on the owner's request («выкладывай»): server b829763 (was d07e157), backup journal-before-unit6-2026-11-25.sqlite, base upgraded + scheme moved; push d07e157..b829763; Pages deploy failed on GitHub side (artifact not found) -> re-trigger by the record push. Owner: «семестр не завершён» — no.
