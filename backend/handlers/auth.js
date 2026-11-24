@@ -1,7 +1,7 @@
 import { AppError } from '../../core/errors.js';
 import { LANGS } from '../../core/schema.js';
 import { loginKey } from '../../core/loginGuard.js';
-import { hashPassword, verifyPassword, passwordVersion, passwordProblem, issueToken } from '../../core/auth.js';
+import { hashPassword, verifyPassword, passwordVersion, passwordProblem, issueToken, needsRehash, HASH_ROUNDS, TEMP_HASH_ROUNDS } from '../../core/auth.js';
 import { USER_TABLES, isUsable, loginOf, publicUser } from '../users.js';
 
 const sameText = (a, b) => String(a ?? '').trim().toLowerCase() === b;
@@ -19,6 +19,20 @@ function sessionFor(ctx, row, kind) {
   return { token, user: publicUser(row, kind, ctx.store) };
 }
 
+// An old v1 hash is rewritten as scrypt after a good login (the typed password is known only now).
+// A failed write is no reason to refuse the login: the old hash still works and the token is made for it.
+function rehashed(password, found, ctx) {
+  const { row, kind } = found;
+  if (!needsRehash(ctx.platform, row.passwordHash)) return row;
+  try {
+    const rounds = row.mustChangePassword ? TEMP_HASH_ROUNDS : HASH_ROUNDS;
+    return ctx.store.update(USER_TABLES[kind], row.id, { passwordHash: hashPassword(ctx.platform, password, undefined, rounds) });
+  } catch (error) {
+    if (typeof ctx.log === 'function') ctx.log(error);
+    return row;
+  }
+}
+
 // ctx.loginGuard is optional: Apps Script has none and login works there as before.
 function login(data, ctx) {
   const guard = ctx.loginGuard;
@@ -33,7 +47,7 @@ function login(data, ctx) {
     throw new AppError('bad_credentials');
   }
   if (guard) guard.success(key);
-  return sessionFor(ctx, found.row, found.kind);
+  return sessionFor(ctx, rehashed(data.password, found, ctx), found.kind);
 }
 
 function me(data, ctx, user) {

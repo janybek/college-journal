@@ -7,7 +7,8 @@ import {
   passwordProblem, generateTempPassword, issueToken, readToken, needsRehash, SCRYPT,
 } from '../core/auth.js';
 
-const p = createNodePlatform({ now: () => 1000, secret: 's' });
+// The Node platform now has scrypt; `p` is the platform of Apps Script (no scryptHex), `ps` below adds scrypt.
+const p = { ...createNodePlatform({ now: () => 1000, secret: 's' }), scryptHex: undefined };
 
 test('constants', () => {
   assert.equal(HASH_ROUNDS, 100);

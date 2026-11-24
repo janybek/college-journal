@@ -1,0 +1,21 @@
+# The image gets only package.json, backend/, core/ and site/ (the Dockerfile copies those by name); the rest never goes to the build.
+.git
+.github
+node_modules
+dev
+tests
+aidlc-docs
+.superpowers
+.claude
+build
+scripts
+serve.local.json
+*.sqlite*
+**/*.sqlite*
+secret.key
+**/secret.key
+*.log
+**/*.log
+**/.env*
+DOCKER.md
+CLAUDE.md

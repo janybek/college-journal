@@ -3,7 +3,6 @@ import path from 'node:path';
 import { SCHEMA } from '../../core/schema.js';
 import { generateTempPassword } from '../../core/auth.js';
 import { localDate } from '../../core/dates.js';
-import { seedDemo } from '../../dev/seed.js';
 import { openBase } from './base.js';
 import { verifyCopy } from './backup.js';
 import { isOurSupervisor, answers } from './supervisor.js';
@@ -85,6 +84,14 @@ function passwordText(password) {
 // Returns { code }. The caller has checked nothing: the stop of the server, the settings, the empty base are all checked here.
 export async function runDemo(config, { out = console.log, now, logger, wipe = false }) {
   const clock = now ?? clockNow;
+  // dev/ is not in the container image: it is loaded here, not at the start of the server, so the server starts without it
+  let seedDemo;
+  try {
+    ({ seedDemo } = await import('../../dev/seed.js'));
+  } catch (error) {
+    out('Пробные данные недоступны: в этой установке нет папки dev. Ничего не изменено');
+    return { code: DEMO_EXIT.config };
+  }
   if (!config.alertDir) {
     out('Не указана папка тревог (alertDir) в настройках: пароль пробных людей некуда записать. Ничего не изменено');
     return { code: DEMO_EXIT.config };

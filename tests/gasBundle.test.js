@@ -168,7 +168,7 @@ test('hashes made inside the Apps Script bundle verify with the Node platform', 
   const [spreadsheet] = gas.spreadsheets.values();
   const header = spreadsheet.dump('Сотрудники')[0];
   const hashIndex = header.indexOf('хэш пароля');
-  const node = createNodePlatform({ now: () => 0, secret: 's' });
+  const node = { ...createNodePlatform({ now: () => 0, secret: 's' }), scryptHex: undefined };       // the v1 comparison: the bundle has no scrypt
   const storedHash = () => spreadsheet.dump('Сотрудники')[1][hashIndex];
   const sameHash = (password) => {
     const [, rounds, salt] = storedHash().split('$');

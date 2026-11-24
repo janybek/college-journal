@@ -154,7 +154,7 @@ export const login = (password, name = PERSON.login) => ({ action: 'auth.login',
 
 // A real working server on port 0 over a temporary base; post and raw send headers and path exactly as given.
 export async function start(t, options = {}) {
-  const { config } = tempBase(t);
+  const { config } = tempBase(t, options.config);
   const base = open(t, config, { now: options.now });
   base.upgrade();
   const logger = createLogger(config.logFile, { now: base.platform.now });

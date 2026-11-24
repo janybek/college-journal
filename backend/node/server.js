@@ -12,6 +12,7 @@ import { MAX_BODY_BYTES, TOO_LARGE, readBody, sendJson } from './http.js';
 import { createLogger } from './log.js';
 import { backupNow, startBackups } from './backup.js';
 import { createDiskFiles, sweepFiles, spaceAlarm } from './files.js';
+import { createSiteHandler } from './static.js';
 import { runDemo } from './demo.js';
 import { EXIT } from './exit.js';
 
@@ -39,6 +40,7 @@ export async function startServer({ config, base, logger, guard = createLoginGua
     res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end('Not found');
   };
+  const site = config.siteDir ? createSiteHandler(config.siteDir, { notFound }) : null;
 
   async function handleApi(req, res) {
     if (req.method !== 'POST' && req.method !== 'OPTIONS') {
@@ -77,8 +79,8 @@ export async function startServer({ config, base, logger, guard = createLoginGua
       // The path is cut by hand, never parsed as an address: the addresses '//' and '/\' make URL parsing throw.
       const pathname = String(req.url).split('?')[0];
       if (pathname === '/api') return await handleApi(req, res);
-      if (pathname === '/health' && req.method === 'GET') return sendJson(res, 200, { ok: true, data: 'journal' });
-      return notFound(res);
+      if (pathname === '/health') return req.method === 'GET' ? sendJson(res, 200, { ok: true, data: 'journal' }) : notFound(res);
+      return site ? site(req, res, String(req.url)) : notFound(res);
     } catch (error) {
       if (!req.destroyed) logger.error('request', error);
       try {
@@ -93,13 +95,16 @@ export async function startServer({ config, base, logger, guard = createLoginGua
   });
   server.on('connection', (socket) => socket.on('error', () => {}));
 
+  const host = config.host ?? '127.0.0.1';
+  // the address to knock at: a server on all addresses is reached through the loopback
+  const urlHost = host === '0.0.0.0' ? '127.0.0.1' : host === '::' || host === '::1' ? '[::1]' : host;
   await new Promise((resolve, reject) => {
     server.once('error', reject);
-    server.listen(config.port, '127.0.0.1', resolve);
+    server.listen(config.port, host, resolve);
   });
   const port = server.address().port;
   return {
-    url: `http://127.0.0.1:${port}`,
+    url: `http://${urlHost}:${port}`,
     port,
     address: server.address().address,
     close: () => new Promise((resolve) => {
@@ -116,6 +121,8 @@ const CONFIG_WORDS = {
   inside_repo: 'Папка данных или копий лежит внутри папки журнала: настоящие данные нельзя хранить рядом с кодом',
   bad_port: 'В настройках неверный порт',
   bad_origin: 'В настройках неверный адрес сайта (origins)',
+  bad_host: 'В настройках неверный адрес, на котором слушает сервер (host): нужен адрес вида 127.0.0.1, :: или ::1',
+  bad_site_dir: 'Папка сайта (siteDir) не найдена или это не папка',
 };
 const BASE_WORDS = {
   exists: 'База уже создана, второй раз первый запуск не делается',
@@ -134,7 +141,8 @@ function showPassword(out, { adminLogin, adminTempPassword }) {
   out('Запишите пароль: он показан один раз и нигде не сохранён. При первом входе журнал попросит его сменить.');
 }
 
-export async function main(argv, { env = process.env, root, out = console.log, now, nodeVersion = process.versions.node, stopCheckMs = 2000 } = {}) {
+export async function main(argv, { env = process.env, root, out: given, echo, now, nodeVersion = process.versions.node, stopCheckMs = 2000 } = {}) {
+  const out = given ?? console.log;
   if (Number.parseInt(nodeVersion, 10) < MIN_NODE) {
     out(`Нужен Node 24 или новее (сейчас ${nodeVersion})`);
     return { code: EXIT.config };
@@ -148,7 +156,9 @@ export async function main(argv, { env = process.env, root, out = console.log, n
   try {
     const config = readConfig({ env, root });
     const clock = createNodePlatform({ now }).now;
-    const logger = createLogger(config.logFile, { now: clock });
+    // in the container the work log goes to the console too; a test (it gives its own `out`) stays quiet unless it asks
+    const toConsole = !env.JOURNAL_DATA_DIR ? null : echo !== undefined ? echo : given === undefined ? (line) => process.stdout.write(line + '\n') : null;
+    const logger = createLogger(config.logFile, { now: clock, echo: toConsole });
     if (command === '--init') {
       const made = initBase(config);
       logger.info('base created');
@@ -176,6 +186,12 @@ export async function main(argv, { env = process.env, root, out = console.log, n
       }
     }
 
+    // the container makes its base by itself at the first start; the temporary password is thrown away, it is got with --admin-password
+    if (config.autoInit && !fs.existsSync(config.dbFile)) {
+      initBase(config);
+      logger.info('base created automatically; set the admin password with --admin-password');
+      out('База создана автоматически. Пароль администратора задайте командой: node backend/node/server.js --admin-password');
+    }
     const base = openBase(config, { now });
     const files = createDiskFiles(config.filesDir);
     // the sweep of the files and the look at the free space: a failure is a line in the log, never a stop
@@ -254,9 +270,16 @@ export async function main(argv, { env = process.env, root, out = console.log, n
   }
 }
 
+// SIGTERM (docker stop, a cluster) and SIGINT stop the server the same way the stop file does.
+export function installSignalHandlers(result, proc = process) {
+  if (typeof result?.stop !== 'function') return;
+  for (const signal of ['SIGTERM', 'SIGINT']) proc.once(signal, () => { result.stop(); });
+}
+
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   try {
     const result = await main(process.argv.slice(2));
+    installSignalHandlers(result);
     process.exit(result.done ? await result.done : result.code);
   } catch (error) {
     try {
