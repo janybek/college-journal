@@ -1,17 +1,23 @@
 import { hashPassword } from '../core/auth.js';
 import { addDays, addMinutes, localDate, localDateTime, localTime, minutesOf, mondayOf, parseLocalDateTime } from '../core/dates.js';
-import { DEFAULT_BELLS, settingsToRows } from '../core/settings.js';
+import { DEFAULT_BELLS, extraToRows, readSettings, settingsToRows } from '../core/settings.js';
+import { readSplit } from '../core/scoring.js';
+import { markText, pointsText } from '../core/requests.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { generateSchedule, relayout, todayOf } from '../backend/scheduleData.js';
 import { publishSyllabusDoc, uploadSyllabus } from '../backend/syllabusUpload.js';
 import { draftForm, saveSection, startDraft } from '../backend/syllabusDraft.js';
-import { journalView, readJournalRows, savePairMarks, saveUnitResults, writeMarks } from '../backend/journalData.js';
+import { journalView, lastOf, readJournalRows, savePairMarks, saveUnitResults, writeMarks, writeUnitResult } from '../backend/journalData.js';
 import { approveSyllabus, returnSyllabus, submitSyllabus } from '../backend/syllabusFlow.js';
 import { saveAssignment } from '../backend/workData.js';
 import { submitWork } from '../backend/workStudent.js';
 import { uploadFile } from '../backend/workFiles.js';
 import { gradeWork } from '../backend/workGrade.js';
 import { currentAttempt } from '../core/work.js';
+import { closeUnit } from '../backend/ledgerData.js';
+import { createRequest, decideRequest } from '../backend/requestData.js';
+import { saveStateExam, saveStateExamScores } from '../backend/stateExamData.js';
+import { saveAnnouncement } from '../backend/announceData.js';
 
 // One password for every fictional person of the dev stand.
 export const DEV_PASSWORD = 'journal2026';
@@ -234,6 +240,8 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin,
   seedPairs(store, platform);
   seedMarks(store, platform);
   seedWork(store, platform, files);
+  seedLedger(store, platform);
+  seedExam(store, platform);
 }
 
 // A small real PDF (one page, the text «Syllabus sample»), with a proper cross-reference table.
@@ -518,4 +526,145 @@ export function prepareLessonNow(store, platform) {
   if (!next) return null;
   store.update('pairs', next.id, { date: today, startTime: start, changed: true });
   return next.id;
+}
+
+// The person of the stand as the rules of the modules take him.
+const staffUser = (row) => ({ id: row.id, roles: String(row.roles).split(','), kind: 'staff', row });
+const byCard = (a, b) => a.cardNo.localeCompare(b.cardNo);
+
+// The ledger of the stand (all through the rules of the modules, by the people of the stand):
+//   the credit week (the last 7 days of the semester) and the name of the college;
+//   «Информатика» 01-1 (teacher1): unit 1 closed; four requests of teacher1 on it: the control of student 3 waits for the deanery, a mark of the
+//   first student who was absent on the first pair waits for the vice-rector, the control of student 7 is applied, the manual current of student 9 is rejected;
+//   three announcements; the state exam of 03-1 with 20 scores of 22.
+export function seedLedger(store, platform) {
+  const staff = (login) => {
+    const row = store.list('staff').find((p) => p.login === login);
+    if (!row) throw new Error(`seed: no person ${login} for the ledger`);
+    return staffUser(row);
+  };
+  const [teacher, dean, prorector, admin] = ['teacher1', 'dean', 'prorector', 'admin'].map(staff);
+  const today = todayOf(platform);
+  const groups = new Map(store.list('groups').map((g) => [g.name, g]));
+  const subject = store.list('subjects').find((s) => s.name === 'Информатика' && s.groupId === groups.get('01-1').id && s.teacherId === teacher.id);
+  if (!subject) throw new Error('seed: no «Информатика» of teacher1 in 01-1 for the ledger');
+
+  const { semesterEnd } = readSettings(store.list('settings'));
+  store.insertMany('settings', extraToRows({ examStart: addDays(semesterEnd, -6), examEnd: semesterEnd, collegeName: 'Учебный колледж (стенд)' }));
+
+  // unit 1: the control and the self-work of every student (the marks of the stand leave two students without them), then the closing
+  const students = store.list('students').filter((s) => s.groupId === subject.groupId).sort(byCard);
+  const missing = students.slice(-2);
+  const fill = (field, value) => saveUnitResults(store, platform, { subjectId: subject.id, unit: 1, field, items: missing.map((s, i) => ({ studentId: s.id, value: value(students.length - 2 + i) })) }, teacher);
+  fill('control', (i) => 22 + ((i * 5) % 19));
+  fill('self', (i) => 10 + ((i * 3) % 11));
+  closeUnit(store, platform, { subjectId: subject.id, unit: 1 }, teacher);
+
+  // the requests of teacher1 on unit 1
+  const view = journalView(readJournalRows(store), platform, subject.id, teacher);
+  const control = (student) => view.results[student.id].units[0].control;
+  const raise = (student) => Math.min(view.scheme.control, control(student) + 3);
+  const file = (data) => createRequest(store, platform, { subjectId: subject.id, unit: 1, ...data }, teacher).request.id;
+  const decide = (requestId, step, verdict, who, note = '') => decideRequest(store, platform, { requestId, step, verdict, note }, who);
+  const unitRequest = (student, reason) => file({ kind: 'control', studentId: student.id, before: pointsText(control(student)), after: pointsText(raise(student)), reason });
+
+  unitRequest(students[2], 'Рубежный проверен повторно: ошибка при подсчёте баллов');
+  const onFirst = view.pairs.find((p) => p.first);
+  const marks = store.list('attendance').filter((r) => r.pairId === onFirst.id);
+  const absent = students.find((s) => { const row = lastOf(marks.filter((r) => r.studentId === s.id), 'markedAt'); return row && row.status === 'absent'; });
+  if (!absent) throw new Error('seed: nobody was absent on the first pair of «Информатика» 01-1');
+  const was = { status: 'absent', noCoat: false, activity: null };
+  const markId = file({
+    kind: 'mark', pairId: onFirst.id, studentId: absent.id, before: markText(was), after: markText({ ...was, status: 'excused' }),
+    reason: 'Справка о болезни принесена после закрытия юнита',
+  });
+  decide(markId, 'dean', 'approve', dean);
+  const appliedId = unitRequest(students[6], 'Рубежный пересчитан по протоколу проверки');
+  decide(appliedId, 'dean', 'approve', dean);
+  decide(appliedId, 'prorector', 'approve', prorector);
+  const manual = lastOf(store.list('unitResults').filter((r) => r.subjectId === subject.id && r.studentId === students[8].id && r.unit === 1), 'updatedAt');
+  const rejectedId = file({ kind: 'current', studentId: students[8].id, before: pointsText(manual ? manual.currentManual : null), after: '30', reason: 'Прошу засчитать участие в олимпиаде' });
+  decide(rejectedId, 'dean', 'reject', dean, 'Нет подтверждающего документа');
+
+  // the announcements
+  const note = (who, data) => saveAnnouncement(store, platform, data, who);
+  note(dean, { audience: 'all', title: 'Субботник в пятницу', text: 'В пятницу после четвёртой пары убираем территорию колледжа. Приходите в рабочей одежде.' });
+  note(admin, { audience: 'teachers', title: 'Педсовет', text: 'Педсовет в четверг в 15:00 в актовом зале. Повестка у деканата.' });
+  note(teacher, { audience: 'group', groupId: groups.get('01-1').id, title: 'Консультация перед рубежным', text: 'Консультация по информатике в среду после пар, кабинет 204.' });
+
+  // the state exam of 03-1 three days ago: 20 scores of 22
+  const exam = saveStateExam(store, platform, { groupId: groups.get('03-1').id, name: 'Государственный экзамен по специальности', date: addDays(today, -3) }, dean).exam;
+  const third = store.list('students').filter((s) => s.groupId === groups.get('03-1').id).sort(byCard).slice(0, 20);
+  const score = (i) => (i === 0 ? 52 : i === 1 ? 96 : 53 + ((i * 13) % 43));
+  saveStateExamScores(store, platform, { examId: exam.id, items: third.map((s, i) => ({ studentId: s.id, score: score(i) })), reason: '' }, dean);
+}
+
+// The exam of «Информатика» 02-1 (teacher1; the pairs and the QR are tried on 01-1): both units closed, the head of the exam three days ago and the
+// first attempts. The ONLY place where the stand writes the new tables straight (insertMany): the semester of the stand is still going, the pairs
+// of unit 2 are ahead, so by the rules neither unit could be closed. The change log gets no line of the exam. The pairs of unit 2 stay planned in the
+// closed unit (a condition of the stand): they cannot be marked.
+//   unit 2 of the students: the manual current, the self-work and the control by the numbers of the scheme (the numbers are computed from the settings):
+//   two students fall to the admission threshold or below, one has no control of unit 2 (no result of the unit: not admitted); the others are admitted;
+//   the first attempts of the admitted by the semester points: excellent, good, fair and one fail by the best and the worst; two have nothing yet,
+//   one did not come, one is incomplete; the rest sit between fair and the maximum.
+export function seedExam(store, platform) {
+  const teacherRow = store.list('staff').find((p) => p.login === 'teacher1');
+  const group = store.list('groups').find((g) => g.name === '02-1');
+  const subject = teacherRow && group && store.list('subjects').find((s) => s.name === 'Информатика' && s.groupId === group.id && s.teacherId === teacherRow.id);
+  if (!subject) throw new Error('seed: no «Информатика» of teacher1 in 02-1 for the exam');
+  const teacher = staffUser(teacherRow);
+  const today = todayOf(platform);
+  const at = localDateTime(platform.now());
+  const students = store.list('students').filter((s) => s.groupId === group.id).sort(byCard);
+  const n = students.length;
+
+  const first = journalView(readJournalRows(store), platform, subject.id, teacher);
+  const { planSemester } = first.subject;
+  const { scheme, split } = first;
+  const put = (student, unit, field, value) => writeUnitResult(store, {
+    rows: store.list('unitResults'), subject, planSemester, unit, studentId: student.id, field, value, actorId: teacher.id, at,
+  });
+
+  // unit 1: the two last students have no control and no self-work yet
+  students.slice(-2).forEach((student, k) => {
+    put(student, 1, 'control', 22 + (((n - 2 + k) * 5) % 19));
+    put(student, 1, 'self', 10 + (((n - 2 + k) * 3) % 11));
+  });
+  // unit 2: n-3 and n-2 are low, n-1 has no control
+  students.forEach((student, i) => {
+    const low = i === n - 3 || i === n - 2;
+    const f = low ? 0 : 0.62 + ((i * 7) % 9) * 0.04;
+    put(student, 2, 'current', Math.round(scheme.current * f));
+    put(student, 2, 'self', Math.round(scheme.self * f));
+    if (i !== n - 1) put(student, 2, 'control', Math.round(scheme.control * f));
+  });
+
+  const view = journalView(readJournalRows(store), platform, subject.id, teacher);
+  const admitted = students.filter((s) => view.results[s.id].admitted === true)
+    .sort((a, b) => view.results[b.id].semester - view.results[a.id].semester || a.cardNo.localeCompare(b.cardNo));
+  const examFor = (student, target, atLeast = 0) => {
+    const own = view.results[student.id].semester;
+    return Math.min(split.exam, Math.max(0, target - own, atLeast - own));
+  };
+  const outcomes = new Map();
+  admitted.forEach((student, k) => {
+    if (k === 3 || k === 4) return;
+    if (k === 5) outcomes.set(student.id, { outcome: 'absent', score: null });
+    else if (k === 6) outcomes.set(student.id, { outcome: 'incomplete', score: null });
+    else if (k === 0) outcomes.set(student.id, { outcome: 'score', score: examFor(student, scheme.excellent + 1) });
+    else if (k === 1) outcomes.set(student.id, { outcome: 'score', score: examFor(student, scheme.good + 1) });
+    else if (k === 2) outcomes.set(student.id, { outcome: 'score', score: examFor(student, scheme.fair + 3) });
+    else if (k === admitted.length - 1) outcomes.set(student.id, { outcome: 'score', score: examFor(student, scheme.fair - 10) });
+    else outcomes.set(student.id, { outcome: 'score', score: examFor(student, Math.round(split.exam * (0.5 + ((k * 3) % 5) * 0.1)), scheme.fair) });
+  });
+
+  const date = addDays(today, -3);
+  const stamp = { updatedBy: teacher.id, updatedAt: `${date} 12:00:00` };
+  store.insertMany('closures', [[1, 6, '15:00:00'], [2, 5, '15:00:00']].map(([unit, ago, time]) => ({
+    subjectId: subject.id, planSemester, unit, closedBy: teacher.id, closedAt: `${addDays(today, -ago)} ${time}`, reopenedBy: '', reopenedAt: '',
+  })));
+  store.insertMany('subjectExams', [{ subjectId: subject.id, planSemester, date, examiner: '', assistants: 'Ассистент Стендовый', ...stamp }]);
+  store.insertMany('examAttempts', [...outcomes].map(([studentId, result]) => ({
+    subjectId: subject.id, planSemester, studentId, no: 1, date, outcome: result.outcome, score: result.score, commission: '', ...stamp,
+  })));
 }

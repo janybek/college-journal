@@ -114,17 +114,25 @@ function save(data, ctx) {
 // What blocks deleting a row: [sheet, test(row)] pairs, each sheet read once. A stored syllabus keeps its discipline and its teacher.
 const BLOCKERS = {
   disciplines: (id) => [['subjects', (r) => r.disciplineId === id], ['syllabi', (r) => r.disciplineId === id]],
-  groups: (id) => [['students', (r) => r.groupId === id], ['subjects', (r) => r.groupId === id], ['pairs', (r) => r.groupId === id]],
+  groups: (id) => [['students', (r) => r.groupId === id], ['subjects', (r) => r.groupId === id], ['pairs', (r) => r.groupId === id],
+    ['stateExams', (r) => r.groupId === id], ['announcements', (r) => r.groupId === id],
+  ],
   students: (id) => [
     ['attendance', (r) => r.studentId === id], ['checkins', (r) => r.studentId === id], ['unitResults', (r) => r.studentId === id], ['changeLog', (r) => r.studentId === id],
     ['submissions', (r) => r.studentId === id], ['files', (r) => r.ownerId === id],
+    ['requests', (r) => r.studentId === id], ['stateExamResults', (r) => r.studentId === id], ['examAttempts', (r) => r.studentId === id],
   ],
   staff: (id) => [
     ['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id], ['syllabi', (r) => r.teacherId === id],
     ['attendance', (r) => r.markedBy === id], ['unitResults', (r) => r.updatedBy === id], ['changeLog', (r) => r.actorId === id],
     ['assignments', (r) => r.createdBy === id], ['assignments', (r) => r.updatedBy === id], ['submissions', (r) => r.checkedBy === id],
+    ['closures', (r) => r.closedBy === id || r.reopenedBy === id], ['requests', (r) => r.authorId === id || r.deanBy === id || r.finalBy === id],
+    ['announcements', (r) => r.authorId === id || r.removedBy === id], ['stateExams', (r) => r.createdBy === id || r.updatedBy === id],
+    ['stateExamResults', (r) => r.updatedBy === id], ['subjectExams', (r) => r.updatedBy === id], ['examAttempts', (r) => r.updatedBy === id],
   ],
-  subjects: (id) => [['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id], ['unitResults', (r) => r.subjectId === id], ['assignments', (r) => r.subjectId === id]],
+  subjects: (id) => [['weekTemplate', (r) => r.subjectId === id], ['pairs', (r) => r.subjectId === id], ['unitResults', (r) => r.subjectId === id], ['assignments', (r) => r.subjectId === id],
+    ['closures', (r) => r.subjectId === id], ['requests', (r) => r.subjectId === id], ['subjectExams', (r) => r.subjectId === id], ['examAttempts', (r) => r.subjectId === id],
+  ],
   rooms: (id) => [['weekTemplate', (r) => r.roomId === id], ['pairs', (r) => r.roomId === id]],
 };
 

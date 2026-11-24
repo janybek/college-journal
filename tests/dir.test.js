@@ -180,3 +180,73 @@ test('remove: assignments, submissions and files keep students, staff and subjec
   store.insert('assignments', { subjectId: subject.id, kind: 'srs', title: 'T', dueAt: '2026-09-20 23:59:00', maxPoints: 5, createdBy: 'st_y' });
   assert.equal(gone('subjects', subject).error.code, 'in_use');
 });
+
+// Unit 6: the new tables keep the people, subjects and groups they point to.
+test('remove: requests, state exam results and exam attempts keep students', () => {
+  const { call, store, group, admin } = setup();
+  const mk = (n) => store.insert('students', { fullName: n, cardNo: n, groupId: group.id, passwordHash: 'x', active: true });
+  const withRequest = mk('u1');
+  store.insert('requests', { kind: 'control', subjectId: 'sb_x', studentId: withRequest.id, authorId: 'st_x', status: 'dean' });
+  assert.equal(call('dir.remove', { table: 'students', id: withRequest.id }, admin).error.code, 'in_use');
+  const withState = mk('u2');
+  store.insert('stateExamResults', { examId: 'se_x', studentId: withState.id, score: 70, updatedBy: 'st_x' });
+  assert.equal(call('dir.remove', { table: 'students', id: withState.id }, admin).error.code, 'in_use');
+  const withAttempt = mk('u3');
+  store.insert('examAttempts', { subjectId: 'sb_x', studentId: withAttempt.id, no: 1, outcome: 'score', score: 30, updatedBy: 'st_x' });
+  assert.equal(call('dir.remove', { table: 'students', id: withAttempt.id }, admin).error.code, 'in_use');
+  const clean = mk('u4');
+  assert.deepEqual(call('dir.remove', { table: 'students', id: clean.id }, admin).data, {});
+});
+
+test('remove: closings, requests, announcements, state exams and exam rows keep staff', () => {
+  const { call, store, admin } = setup();
+  const mk = (n) => store.insert('staff', { fullName: n, login: n, passwordHash: 'x', roles: 'teacher', active: true });
+  const cases = [
+    ['closures', { subjectId: 'sb_x', unit: 1, closedBy: '$' }],
+    ['closures', { subjectId: 'sb_x', unit: 1, closedBy: 'st_x', reopenedBy: '$' }],
+    ['requests', { kind: 'control', subjectId: 'sb_x', authorId: '$' }],
+    ['requests', { kind: 'control', subjectId: 'sb_x', authorId: 'st_x', deanBy: '$' }],
+    ['requests', { kind: 'control', subjectId: 'sb_x', authorId: 'st_x', finalBy: '$' }],
+    ['announcements', { authorId: '$', audience: 'all', title: 'T' }],
+    ['announcements', { authorId: 'st_x', audience: 'all', title: 'T', removedBy: '$' }],
+    ['stateExams', { groupId: 'g_x', name: 'E', createdBy: '$' }],
+    ['stateExams', { groupId: 'g_x', name: 'E', createdBy: 'st_x', updatedBy: '$' }],
+    ['stateExamResults', { examId: 'se_x', studentId: 'st_y', updatedBy: '$' }],
+    ['subjectExams', { subjectId: 'sb_x', updatedBy: '$' }],
+    ['examAttempts', { subjectId: 'sb_x', studentId: 'st_y', no: 1, updatedBy: '$' }],
+  ];
+  cases.forEach(([table, row], i) => {
+    const person = mk(`w${i}`);
+    store.insert(table, Object.fromEntries(Object.entries(row).map(([k, v]) => [k, v === '$' ? person.id : v])));
+    assert.equal(call('dir.remove', { table: 'staff', id: person.id }, admin).error.code, 'in_use', `${table} ${i}`);
+  });
+  const clean = mk('w_clean');
+  assert.deepEqual(call('dir.remove', { table: 'staff', id: clean.id }, admin).data, {});
+});
+
+test('remove: closed units, requests and exam rows keep subjects; state exams and announcements keep groups', () => {
+  const { call, store, admin } = setup();
+  const subject = () => store.insert('subjects', { name: 'Free', teacherId: 'nobody', groupId: 'nogroup', scheme: 'A' });
+  const owned = [
+    ['closures', (id) => ({ subjectId: id, unit: 1 })],
+    ['requests', (id) => ({ kind: 'control', subjectId: id })],
+    ['subjectExams', (id) => ({ subjectId: id })],
+    ['examAttempts', (id) => ({ subjectId: id, studentId: 'st_y', no: 1 })],
+  ];
+  for (const [table, row] of owned) {
+    const s = subject();
+    store.insert(table, row(s.id));
+    assert.equal(call('dir.remove', { table: 'subjects', id: s.id }, admin).error.code, 'in_use', table);
+  }
+  const free = subject();
+  assert.deepEqual(call('dir.remove', { table: 'subjects', id: free.id }, admin).data, {});
+
+  const withExam = store.insert('groups', { name: '77-1', course: 1 });
+  store.insert('stateExams', { groupId: withExam.id, name: 'E', date: '2026-11-01' });
+  assert.equal(call('dir.remove', { table: 'groups', id: withExam.id }, admin).error.code, 'in_use');
+  const withNote = store.insert('groups', { name: '78-1', course: 1 });
+  store.insert('announcements', { authorId: 'st_x', audience: 'group', groupId: withNote.id, title: 'T' });
+  assert.equal(call('dir.remove', { table: 'groups', id: withNote.id }, admin).error.code, 'in_use');
+  const clean = store.insert('groups', { name: '79-1', course: 1 });
+  assert.deepEqual(call('dir.remove', { table: 'groups', id: clean.id }, admin).data, {});
+});

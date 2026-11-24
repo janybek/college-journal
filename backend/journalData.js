@@ -532,6 +532,8 @@ export function changeLogView(store, platform, data, user) {
   const groups = store.list('groups');
   const pairs = store.list('pairs');
   const assignments = store.list('assignments');
+  const requests = store.list('requests');
+  const stateExams = store.list('stateExams');
 
   if (!viewer.manager && !viewer.reader) {
     const own = given('subjectId') && subjects.some((s) => s.id === data.subjectId && s.teacherId === user.id);
@@ -545,12 +547,17 @@ export function changeLogView(store, platform, data, user) {
   const groupOf = byId(groups);
   const pairOf = byId(pairs);
   const assignmentOf = byId(assignments);
+  const requestOf = byId(requests);
+  const examOf = byId(stateExams);
+
+  // the group of a line: the group of its subject, for a state exam the group of the exam
+  const groupIdOf = (r) => (r.entity === 'exam' ? (examOf.get(r.examId) || {}).groupId : (subjectOf.get(r.subjectId) || {}).groupId);
 
   const picked = changeLog.filter((r) => {
     if (given('subjectId') && r.subjectId !== data.subjectId) return false;
     if (given('pairId') && r.pairId !== data.pairId) return false;
     if (given('studentId') && r.studentId !== data.studentId) return false;
-    if (given('groupId') && (subjectOf.get(r.subjectId) || {}).groupId !== data.groupId) return false;
+    if (given('groupId') && groupIdOf(r) !== data.groupId) return false;
     const day = String(r.at || '').slice(0, 10);
     if (given('from') && day < data.from) return false;
     if (given('to') && day > data.to) return false;
@@ -572,6 +579,18 @@ export function changeLogView(store, platform, data, user) {
     if (r.entity === 'work') {
       row.assignmentId = r.assignmentId || '';
       row.assignmentTitle = (assignmentOf.get(r.assignmentId) || {}).title || '';
+    }
+    if (r.requestId) {
+      const request = requestOf.get(r.requestId) || {};
+      row.requestId = r.requestId;
+      row.approvedBy = [nameIn(staffOf, request.deanBy), nameIn(staffOf, request.finalBy)];
+    }
+    if (r.entity === 'exam') {
+      const exam = examOf.get(r.examId) || {};
+      const examGroup = groupOf.get(exam.groupId);
+      row.examId = r.examId || '';
+      row.examName = exam.name || '';
+      row.groupName = examGroup ? examGroup.name : '';
     }
     return row;
   });

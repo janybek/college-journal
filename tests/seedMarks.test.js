@@ -32,7 +32,8 @@ test('the stand carries marks: unit 1 of «Информатика» 01-1 is fini
   const j = journalView(readJournalRows(store), platform, informatics.id, adminOf(store));
   assert.equal(j.pairs.filter((p) => p.status === 'closed').length, 10);
   const totals = j.students.map((s) => j.results[s.id].units[0].total);
-  assert.deepEqual([totals.filter((x) => x === null).length, totals.filter((x) => Number.isInteger(x)).length], [2, 20]);
+  // the ledger of the stand fills the last two students before it closes unit 1
+  assert.deepEqual([totals.filter((x) => x === null).length, totals.filter((x) => Number.isInteger(x)).length], [0, 22]);
   assert.equal(j.students.every((s) => j.results[s.id].units[1].total === null && j.results[s.id].units[1].current !== null), true);
   assert.equal(Object.values(j.results).some((r) => r.units[0].controlLow), true);
 });
@@ -48,11 +49,11 @@ test('no mark on the pairs of today and later; one unfilled past pair of «Ан�
   assert.equal(store.list('pairs').length, 159);
 });
 
-test('the change log: three corrections with reasons, the late one gives a status row and an activity row', () => {
+test('the change log: three corrections and one applied request with reasons, the late one gives a status row and an activity row', () => {
   const { store } = stand();
   const log = store.list('changeLog');
   assert.deepEqual([...new Set(log.map((x) => x.reason).filter((x) => x !== ''))].sort(),
-    ['Отработал тему на консультации', 'Ошибка при заполнении', 'Участие в олимпиаде'].sort());
+    ['Отработал тему на консультации', 'Ошибка при заполнении', 'Участие в олимпиаде', 'Рубежный пересчитан по протоколу проверки'].sort());
   assert.equal(log.filter((x) => x.reason === 'Отработал тему на консультации').length, 2);
   assert.equal(log.filter((x) => x.reason === 'Ошибка при заполнении').length, 1);
   assert.equal(log.some((x) => x.late === true), true);

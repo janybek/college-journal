@@ -62,3 +62,76 @@ test('student.grades: a transferred student sees only the current group; a disab
   assert.equal(gone.ok, false);
   assert.equal(gone.error.code, 'unauthorized');
 });
+
+// Unit 6: the lines of requests, closings and exams.
+function logWorld() {
+  const s = setup();
+  const { store, ids, sb1, g1, g2, at, request } = s;
+  at('2026-12-20', '12:00');
+  const requestId = request({ status: 'applied', deanBy: ids.dean, deanAt: '2026-10-02 10:00:00', finalBy: ids.prorector, finalAt: '2026-10-03 10:00:00', closedAt: '2026-10-03 10:00:00' });
+  const lone = request({ unit: 2, studentId: ids.a3, status: 'prorector', deanBy: ids.dean, deanAt: '2026-10-02 10:00:00' });
+  const exam = store.insert('stateExams', { groupId: g2, name: 'Государственный экзамен по специальности', date: '2026-12-10', createdBy: ids.dean, createdAt: '2026-12-01 10:00:00', updatedBy: '', updatedAt: '' });
+  const base = { actorId: ids.dean, studentId: '', pairId: '', unit: null, before: '', after: '', reason: '', late: false };
+  store.insertMany('changeLog', [
+    { ...base, at: '2026-12-11 10:00:00', entity: 'unit', subjectId: sb1, studentId: ids.a1, unit: 1, field: 'control', before: '30', after: '33', reason: 'r', requestId },
+    { ...base, at: '2026-12-11 10:00:01', entity: 'mark', subjectId: sb1, studentId: ids.a1, field: 'status', before: 'absent', after: 'excused', reason: 'r' },
+    { ...base, at: '2026-12-11 10:00:02', entity: 'unit', subjectId: sb1, studentId: ids.a1, unit: 1, field: 'self', before: '10', after: '12', reason: 'r' },
+    { ...base, at: '2026-12-11 10:00:03', entity: 'ledger', subjectId: sb1, unit: 1, field: 'closed', before: 'open', after: 'closed' },
+    { ...base, at: '2026-12-11 10:00:04', entity: 'exam', examId: exam.id, studentId: ids.b1, field: 'score', before: '60', after: '64', reason: 'r' },
+    { ...base, at: '2026-12-11 10:00:05', entity: 'subjectExam', subjectId: sb1, studentId: ids.a2, field: 'try1', before: '', after: '31' },
+    { ...base, at: '2026-12-11 10:00:06', entity: 'subjectExam', subjectId: sb1, studentId: ids.a2, field: 'try1', before: '31', after: '33', reason: 'опечатка', requestId: lone },
+  ]);
+  return { ...s, requestId, lone, examId: exam.id };
+}
+
+test('journal.log: a line of a request carries the request and the two who approved it; the other lines have no new keys', () => {
+  const { call, t, ids, requestId, lone } = logWorld();
+  const rows = call('journal.log', {}, t.dean).data.rows;
+  const byRequest = rows.find((r) => r.requestId === requestId);
+  assert.equal(byRequest.entity, 'unit');
+  assert.deepEqual(byRequest.approvedBy, ['Деканова Айгуль', 'Проректоров Талант']);
+  const half = rows.find((r) => r.requestId === lone);
+  assert.deepEqual(half.approvedBy, ['Деканова Айгуль', '']);
+  const mark = rows.find((r) => r.entity === 'mark');
+  assert.deepEqual(Object.keys(mark).sort(), ['actorName', 'after', 'at', 'before', 'entity', 'field', 'groupName', 'id', 'late', 'pairDate', 'pairId', 'pairSlot', 'reason', 'studentId', 'studentName', 'subjectId', 'subjectName', 'unit'].sort());
+  const plain = rows.find((r) => r.entity === 'unit' && !r.requestId);
+  assert.equal('requestId' in plain || 'approvedBy' in plain || 'examId' in plain, false);
+  const ledger = rows.find((r) => r.entity === 'ledger');
+  assert.equal(ledger.field, 'closed');
+  assert.equal(ledger.unit, 1);
+  assert.equal('requestId' in ledger, false);
+  assert.ok(ids.dean);
+});
+
+test('journal.log: a line of a state exam has the name and the group; the group filter uses the group of the exam', () => {
+  const { call, t, g1, g2, examId } = logWorld();
+  const rows = call('journal.log', {}, t.dean).data.rows;
+  const line = rows.find((r) => r.entity === 'exam');
+  assert.equal(line.examId, examId);
+  assert.equal(line.examName, 'Государственный экзамен по специальности');
+  assert.equal(line.groupName, '02-1');
+  assert.equal(line.subjectId, '');
+  assert.equal(call('journal.log', { groupId: g2 }, t.dean).data.rows.some((r) => r.entity === 'exam'), true);
+  assert.equal(call('journal.log', { groupId: g1 }, t.dean).data.rows.some((r) => r.entity === 'exam'), false);
+  assert.equal(call('journal.log', { groupId: g2 }, t.prorector).data.rows.some((r) => r.entity === 'exam'), true);
+});
+
+test('journal.log: the teacher reads the requests, closings and exam of his subject, not the state exams', () => {
+  const { call, t, sb1, requestId } = logWorld();
+  const rows = call('journal.log', { subjectId: sb1 }, t.teacher1).data.rows;
+  assert.equal(rows.some((r) => r.requestId === requestId), true);
+  assert.equal(rows.some((r) => r.entity === 'ledger'), true);
+  assert.equal(rows.some((r) => r.entity === 'exam'), false);
+  assert.equal(rows.filter((r) => r.entity === 'subjectExam').length, 2);
+  assert.equal(JSON.stringify(rows).includes('Государственный'), false);
+  assert.equal(call('journal.log', {}, t.teacher1).error.code, 'forbidden');
+});
+
+test('journal.log: the retake line of the exam of a subject: field try1, the result as text; seen by the deanery and the own teacher, not by another teacher', () => {
+  const { call, t, sb1 } = logWorld();
+  const line = call('journal.log', { subjectId: sb1 }, t.dean).data.rows.find((r) => r.entity === 'subjectExam' && r.before === '31');
+  assert.deepEqual([line.field, line.before, line.after, line.reason], ['try1', '31', '33', 'опечатка']);
+  assert.equal(line.subjectName, 'Информатика');
+  assert.equal(call('journal.log', { subjectId: sb1 }, t.teacher1).data.rows.some((r) => r.entity === 'subjectExam'), true);
+  assert.equal(call('journal.log', { subjectId: sb1 }, t.teacher2).error.code, 'forbidden');
+});
