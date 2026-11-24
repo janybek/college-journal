@@ -17,7 +17,7 @@ export const LEDGER_TABLES = [...JOURNAL_TABLES, 'subjectExams', 'examAttempts']
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const nameOf = (list, id) => (list.find((r) => r.id === id) || { fullName: '' }).fullName;
 const isAdmin = (user) => Array.isArray(user.roles) && user.roles.includes('admin');
-const isOwner = (viewer, subject) => viewer.teacher && subject.teacherId === viewer.id;
+export const isOwner = (viewer, subject) => viewer.teacher && subject.teacherId === viewer.id;
 
 // Every table of the ledger, each read once; the started pairs are settled in the same request.
 export function readLedgerRows(store, platform) {
@@ -140,7 +140,7 @@ export function ledgerView(rows, platform, subjectId, user) {
   };
 }
 
-function findSubject(rows, subjectId) {
+export function findSubject(rows, subjectId) {
   const subject = typeof subjectId === 'string' ? rows.subjects.find((s) => s.id === subjectId) : undefined;
   if (!subject) throw new AppError('not_found');
   return subject;
