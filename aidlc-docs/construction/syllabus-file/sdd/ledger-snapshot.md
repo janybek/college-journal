@@ -34,3 +34,5 @@ Final review (opus): готово, 0 code fixes; 3 minor + 2 notes — aidlc-doc
 Ruling: stand keeps the sample PDF only on approved v1 «Информатики» (returned v2 without file), contrary to plan.md:416 — the owner accepted screenshots built on this; code and test agree — cost if wrong: on the stand the teacher's returned copy shows no file (cosmetic, stand only).
 Ruling: rollback note rewritten by the final review (old sweep deletes syllabus files at the first start, serve:backup before rollback) — goes into aidlc-state at deploy — cost if wrong: files restored from C:\JournalBackups\files.
 Ruling: `.doc` checked only by the common Office header, PDF by `%PDF-` — known limit, same rule as unit 5 — cost: an Excel named .doc is accepted and Word cannot open it.
+Deployed 24.11 on the owner's «Выкладывай»: server and site caf33d8 (prior 72fb36b); base got syllabi.fileId; recorded in aidlc-state (1f2c40e, not pushed).
+RESUME HERE: plan finished (built, accepted, deployed). Nothing left in this plan. Next work: unit 6 plan — ask the owner about the credit week and state exams first.
