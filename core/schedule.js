@@ -2,20 +2,21 @@
 import { addDays, daysBetween, isDate, weekday } from './dates.js';
 import { pairSlots, busyCodes } from './busy.js';
 import { AppError } from './errors.js';
+import { inExam } from './settings.js';
 import { NO_LESSON } from './topics.js';
 import { FIXED_STATUSES } from './schema.js';
 
 const NOTE_MAX = 200;
 const BUSY_FIELD = { group_busy: 'slot', teacher_busy: 'teacherId', room_busy: 'roomId' };
 
-// Dates Monday-Friday from `from` to semesterEnd inclusive, without holidays.
+// Dates Monday-Friday from `from` to semesterEnd inclusive, without holidays and the credit week (settings.exam).
 export function workingDays(settings, from = settings.semesterStart) {
   const start = from < settings.semesterStart ? settings.semesterStart : from;
   const holidays = new Set(settings.holidays || []);
   const days = [];
   for (let n = daysBetween(start, settings.semesterEnd), i = 0; i <= n; i++) {
     const date = addDays(start, i);
-    if (weekday(date) <= 5 && !holidays.has(date)) days.push(date);
+    if (weekday(date) <= 5 && !holidays.has(date) && !inExam(date, settings.exam)) days.push(date);
   }
   return days;
 }

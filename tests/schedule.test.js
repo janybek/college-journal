@@ -234,3 +234,17 @@ test('teacherHandover: three kinds of patches', () => {
     { id: 'past', patch: { substitute: false } },
   ], skippedBusy: 1 });
 });
+
+test('workingDays and planGeneration skip the credit week', () => {
+  const X = { ...S, exam: { examStart: '2026-09-09', examEnd: '2026-09-11' } };
+  assert.deepEqual(workingDays(X), ['2026-09-01', '2026-09-02', '2026-09-03', '2026-09-04', '2026-09-08']);
+  assert.deepEqual(workingDays({ ...S, exam: { examStart: '', examEnd: '' } }), workingDays(S));
+  const t = [{ id: 'wt_x', weekday: 4, slot: 1, subjectId: 'sb_1', roomId: '' }];
+  const base = planGeneration({ template: t, subjects, settings: S, pairs: [], from: '2026-09-01' });
+  assert.ok(base.toInsert.some((p) => p.date === '2026-09-10'));
+  assert.deepEqual(planGeneration({ template: t, subjects, settings: X, pairs: [], from: '2026-09-01' }).toInsert.map((p) => p.date), ['2026-09-03']);
+  const mk = (id, extra) => ({ ...base.toInsert.find((p) => p.date === '2026-09-10'), id, ...extra });
+  const pairs = [mk('a', {}), mk('b', { status: 'closed' }), mk('c', { status: 'running' }), mk('d', { changed: true })];
+  const plan = planGeneration({ template: t, subjects, settings: X, pairs, from: '2026-09-01' });
+  assert.deepEqual(plan.toRemove, ['a']);
+});

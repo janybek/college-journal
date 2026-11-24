@@ -87,3 +87,66 @@ export function settingsToRows(value) {
   return SETTING_KEYS.filter((key) => key in value)
     .map((key) => ({ key, value: Array.isArray(value[key]) ? value[key].join(',') : String(value[key]) }));
 }
+
+// Credit week (the exam days off the timetable) and the college name, kept in the same settings rows.
+export const EXTRA_KEYS = ['examStart', 'examEnd', 'collegeName'];
+export const MAX_EXAM_DAYS = 31;
+export const COLLEGE_NAME_MAX = 200;
+
+export function readExtra(rows) {
+  const byKey = {};
+  for (const row of Array.isArray(rows) ? rows : []) {
+    if (row && EXTRA_KEYS.includes(row.key)) byKey[row.key] = typeof row.value === 'string' ? row.value : String(row.value ?? '');
+  }
+  const week = isDate(byKey.examStart) && isDate(byKey.examEnd) && byKey.examStart <= byKey.examEnd;
+  return {
+    examStart: week ? byKey.examStart : '',
+    examEnd: week ? byKey.examEnd : '',
+    collegeName: (byKey.collegeName || '').trim().slice(0, COLLEGE_NAME_MAX).trim(),
+  };
+}
+
+export function validateExtra(input, settings) {
+  const src = input && typeof input === 'object' ? input : {};
+  const errors = [];
+  const value = {};
+  const text = (key) => (typeof src[key] === 'string' ? src[key].trim() : '');
+  value.examStart = text('examStart');
+  value.examEnd = text('examEnd');
+  const code = {};
+  if (value.examStart !== '' || value.examEnd !== '') {
+    for (const field of ['examStart', 'examEnd']) {
+      if (value[field] === '') code[field] = 'required';
+      else if (!isDate(value[field])) code[field] = 'bad_value';
+    }
+    if (!code.examStart && !code.examEnd) {
+      const days = daysBetween(value.examStart, value.examEnd);
+      if (days < 0) code.examEnd = 'bad_value';
+      else if (days + 1 > MAX_EXAM_DAYS) code.examEnd = 'too_long';
+    }
+    const { semesterStart, semesterEnd } = settings || {};
+    if (isDate(semesterStart) && isDate(semesterEnd)) {
+      for (const field of ['examStart', 'examEnd']) {
+        if (!code[field] && (value[field] < semesterStart || value[field] > semesterEnd)) code[field] = 'out_of_semester';
+      }
+    }
+  }
+  for (const field of ['examStart', 'examEnd']) if (code[field]) errors.push({ field, code: code[field] });
+
+  if (src.collegeName !== undefined && typeof src.collegeName !== 'string') {
+    value.collegeName = '';
+    errors.push({ field: 'collegeName', code: 'bad_value' });
+  } else {
+    value.collegeName = text('collegeName');
+    if (value.collegeName.length > COLLEGE_NAME_MAX) errors.push({ field: 'collegeName', code: 'too_long' });
+  }
+  return { value, errors };
+}
+
+export function extraToRows(value) {
+  return EXTRA_KEYS.map((key) => ({ key, value: String(value[key] ?? '') }));
+}
+
+export function inExam(date, extra) {
+  return !!extra && extra.examStart !== '' && date >= extra.examStart && date <= extra.examEnd;
+}
