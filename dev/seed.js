@@ -675,14 +675,15 @@ export function seedExam(store, platform) {
 
 // The repeat courses of «Информатика» 02-1 (teacher1) on the stand: every state of the card, found by the result of seedExam.
 // Like seedExam it writes the OLD tables straight (the semester of the stand is still going): the retakes and the closing of the final sheet
-// (unit 0, teacher1, 9 days ago); the cards and their scores go only through the functions of repeatData / repeatScores, by dean and teacher1.
+// (unit 0, teacher1, 3 days ago, after the first sits); the cards and their scores go only through the functions of repeatData / repeatScores, by dean and teacher1.
 // The students are taken by their result, not by the number of the card; with the stand as it is now (22 students of 02-1, card numbers):
-//   S2001 «неуд.» after three sits (the retakes 7 and 5 days ago, the second by the commission «Комиссия Стендовая»): card «весь предмет», open, works 3/4 of the maximum;
-//   S2003 «не явился(ась)»: card «только экзамен», open, one try 2 days ago, the total «удовл.» (preliminary);
+//   S2001 «неуд.» after three sits (the retakes 2 days and 1 day ago, the second by the commission «Комиссия Стендовая»): card «весь предмет», open, works 3/4 of the maximum;
+//   S2003 «не явился(ась)»: card «только экзамен», open, one try today, the total «удовл.» (preliminary);
 //   S2020 not admitted: card «весь предмет», closed «сдал» (works 4/5 of the maximum, the exam to «хорошо»);
 //   S2006 «неуд.» after one sit: card «весь предмет», teacher3, the deadline 2 days ago («срок вышел»), no works;
 //   S2007 «неуд.» after one sit and S2008 «I»: no card (the owner enrols them himself). The others passed.
-// The cards are written by a clock 4 days back: the order «12-с» of that day; the deadline 30 days ahead (S2006: 2 days ago).
+// The chain of dates (days from today): first sits and the head of the exam -3 -> the final sheet closed -3 -> retakes -2, -1 -> the orders «12-с»:
+// S2006 -3 (deadline -2), S2003 and S2020 -1, S2001 today -> the tries and works of the repeat today; the deadline of the others is 30 days ahead.
 // The pairs of the closed units stay planned (a condition of the stand): they cannot be marked.
 export function seedRepeat(store, platform) {
   const find = (login) => {
@@ -722,37 +723,37 @@ export function seedRepeat(store, platform) {
   const failExam = (student) => Math.min(split.exam, Math.max(0, scheme.fair - 8 - student.semester));
   const again = (student, k) => Math.min(split.exam, student.exam + k, Math.max(student.exam, scheme.fair - 1 - student.semester));
   store.insertMany('examAttempts', [
-    sit(failed, 2, 7, again(failed, 1)),
-    sit(failed, 3, 5, again(failed, 2), 'Комиссия Стендовая'),
+    sit(failed, 2, 2, again(failed, 1)),
+    sit(failed, 3, 1, again(failed, 2), 'Комиссия Стендовая'),
     sit(oneSitA, 1, 3, failExam(oneSitA)),
     sit(oneSitB, 1, 3, failExam(oneSitB)),
   ]);
   store.insertMany('closures', [{
-    subjectId: subject.id, planSemester, unit: 0, closedBy: teacher.id, closedAt: `${addDays(today, -9)} 15:00:00`, reopenedBy: '', reopenedAt: '',
+    subjectId: subject.id, planSemester, unit: 0, closedBy: teacher.id, closedAt: `${addDays(today, -3)} 15:00:00`, reopenedBy: '', reopenedAt: '',
   }]);
 
-  // the cards
-  const back = platform.now() - 4 * 86400000;
-  const clock = Object.assign(Object.create(platform), { now: () => back });
-  const order = { orderNo: '12-с', orderDate: addDays(today, -4) };
-  const card = (student, kind, deadline, teacherId = teacherRow.id) => enrol(store, clock, {
-    subjectId: subject.id, planSemester, studentId: student.id, kind, ...order, deadline, teacherId,
-  }, dean).repeat.id;
+  // the cards: each is written by a clock of the day of its order (after the closing of the final sheet and the sit before it)
+  const card = (student, kind, ago, deadline, teacherId = teacherRow.id) => {
+    const at = ago === 0 ? platform : Object.assign(Object.create(platform), { now: () => parseLocalDateTime(`${addDays(today, -ago)} 16:00:00`) });
+    return enrol(store, at, {
+      subjectId: subject.id, planSemester, studentId: student.id, kind, orderNo: '12-с', orderDate: addDays(today, -ago), deadline, teacherId,
+    }, dean).repeat.id;
+  };
   const ahead = addDays(today, 30);
   const score = (repeatId, date, exam) => saveAttempt(store, platform, { repeatId, date, outcome: 'score', score: exam }, teacher);
 
   const worksFull = (share) => Math.round(split.semester * share);
-  const fullId = card(failed, 'full', ahead);
+  const fullId = card(failed, 'full', 0, ahead);
   saveWorks(store, platform, { repeatId: fullId, works: worksFull(0.75), note: 'Реферат и две практические работы' }, teacher);
 
-  const examId = card(absent, 'exam', ahead);
-  score(examId, addDays(today, -2), Math.min(split.exam, Math.max(0, scheme.fair + 2 - absent.semester)));
+  const examId = card(absent, 'exam', 1, ahead);
+  score(examId, today, Math.min(split.exam, Math.max(0, scheme.fair + 2 - absent.semester)));
 
-  const passedId = card(notAdmitted, 'full', ahead);
+  const passedId = card(notAdmitted, 'full', 1, ahead);
   const works = worksFull(0.8);
   saveWorks(store, platform, { repeatId: passedId, works, note: 'Реферат и практические работы' }, teacher);
-  score(passedId, addDays(today, -3), Math.min(split.exam, Math.max(0, scheme.good + 1 - works)));
+  score(passedId, today, Math.min(split.exam, Math.max(0, scheme.good + 1 - works)));
   closeRepeat(store, platform, { repeatId: passedId }, teacher);
 
-  card(oneSitA, 'full', addDays(today, -2), teacher3.id);
+  card(oneSitA, 'full', 3, addDays(today, -2), teacher3.id);
 }

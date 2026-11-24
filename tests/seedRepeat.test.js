@@ -42,7 +42,7 @@ for (const [label, settings] of [['default numbers', []], ['50 / 50 / 25', NUMBE
     const { store, call, subject, cardNo, cardOf } = stand(settings);
     const cards = store.list('repeats');
     assert.deepEqual(cards.map((c) => c.status).sort(), ['open', 'open', 'open', 'passed']);
-    assert.equal(cards.every((c) => c.orderNo === '12-с' && c.orderDate === addDays(TODAY, -4) && c.createdAt.startsWith(addDays(TODAY, -4))), true);
+    assert.equal(cards.every((c) => c.orderNo === '12-с' && c.createdAt.startsWith(c.orderDate)), true);
     assert.equal(cards.filter((c) => c.deadline < TODAY).length, 1);
 
     const list = (who) => call('repeat.list', {}, who);
@@ -52,11 +52,30 @@ for (const [label, settings] of [['default numbers', []], ['50 / 50 / 25', NUMBE
     // the old tables got only what the repeat needs: the final sheet closed, the retakes
     const final = store.list('closures').filter((c) => c.subjectId === subject.id && c.unit === 0);
     assert.equal(final.length, 1);
-    assert.equal(final[0].closedAt.startsWith(addDays(TODAY, -9)), true);
+    assert.equal(final[0].closedAt.startsWith(addDays(TODAY, -3)), true);
     const tries = new Map();
     for (const a of store.list('examAttempts').filter((r) => r.subjectId === subject.id)) tries.set(a.studentId, (tries.get(a.studentId) || 0) + 1);
     assert.deepEqual([...tries.values()].filter((n) => n > 1), [3]);
     assert.equal(store.list('examAttempts').some((a) => a.commission === 'Комиссия Стендовая' && a.no === 3), true);
+
+    // the chain of dates: sit -> closing of the final sheet -> retake -> retake -> order -> try of the repeat; nothing after today
+    const sits = store.list('examAttempts').filter((a) => a.subjectId === subject.id);
+    const closedDay = final[0].closedAt.slice(0, 10);
+    const head = store.list('subjectExams').find((r) => r.subjectId === subject.id).date;
+    for (const a of sits.filter((x) => x.no === 1)) assert.equal(a.date <= closedDay, true);
+    for (const a of sits.filter((x) => x.no > 1)) assert.equal(a.date >= closedDay && a.date <= TODAY, true);
+    const retake = sits.filter((x) => x.no === 3)[0];
+    assert.equal(sits.find((x) => x.studentId === retake.studentId && x.no === 2).date < retake.date, true);
+    assert.equal(head <= closedDay, true);
+    for (const c of cards) {
+      assert.equal(c.orderDate >= closedDay && c.orderDate <= TODAY && c.deadline >= c.orderDate, true);
+      assert.equal(c.createdAt.slice(0, 10) >= closedDay, true);
+      if (c.studentId === retake.studentId) assert.equal(c.orderDate >= retake.date, true);
+    }
+    for (const a of store.list('repeatAttempts')) {
+      const c = cards.find((x) => x.id === a.repeatId);
+      assert.equal(a.date >= c.orderDate && a.date <= TODAY, true);
+    }
 
     // the candidates: by the result of the exam
     const half = call('repeat.candidates', { subjectId: subject.id }, 'dean').data.halves;
@@ -79,7 +98,7 @@ for (const [label, settings] of [['default numbers', []], ['50 / 50 / 25', NUMBE
     const fullView = call('repeat.get', { repeatId: full.id }, 'teacher1').data.repeat;
     assert.deepEqual([fullView.works.value, fullView.works.note, fullView.result.status, fullView.status], [Math.round(fullView.split.semester * 0.75), 'Реферат и две практические работы', 'none', 'open']);
     const exam = call('repeat.get', { repeatId: examCard.id }, 'teacher1').data.repeat;
-    assert.deepEqual([exam.result.word, exam.attempts.length, exam.attempts[0].date], ['fair', 1, addDays(TODAY, -2)]);
+    assert.deepEqual([exam.result.word, exam.attempts.length, exam.attempts[0].date], ['fair', 1, TODAY]);
     assert.equal(call('repeat.get', { repeatId: overdue.id }, 'teacher3').data.repeat.overdue, true);
 
     // the student sees only his own card
