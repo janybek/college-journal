@@ -29,7 +29,7 @@ export function normalizeMark(input) {
 
 const same = (a, b) => a.status === b.status && a.noCoat === b.noCoat && a.activity === b.activity;
 
-function limitedAllowed(old, next) {
+export function limitedAllowed(old, next) {
   if (!old || old.noCoat !== next.noCoat) return false;
   if (old.status === 'absent' && next.status === 'excused') return true;
   return (old.status === 'absent' || old.status === 'excused') && next.status === 'madeup';
