@@ -5187,6 +5187,9 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
 /* Print: black on white in either theme. The passwords of an import print alone, as strips to cut apart
    along the dashed lines; any other screen prints without the sidebar and the bars. */
 
+/* The block of a printed sheet (the ledger, the exam sheet) is built at the press of the button and is not seen on the screen. */
+.print-sheet { display: none; }
+
 @media print {
   @page { margin: 12mm; }
 
@@ -5254,6 +5257,75 @@ button.group-chip:focus-visible .group-chip__icon { opacity: 1; }
   .table--slips tbody tr:last-child td { border-bottom: 1px dashed #000000; }
 
   .table--slips tr { break-inside: avoid; }
+
+  /* The ledger and the exam sheet: black on white, the head of the table on every page, a student's row in one piece. */
+  .ledger.has-printable { display: block; }
+
+  .print-sheet {
+    display: block;
+    color: #000000;
+    font-size: 9.5pt;
+    line-height: 1.25;
+  }
+
+  .print-college { margin: 0 0 1mm; text-align: center; font-size: 11pt; font-weight: 700; }
+
+  .print-title { margin: 0 0 2mm; text-align: center; font-size: 14pt; font-weight: 700; letter-spacing: 0.06em; }
+
+  .print-draft { margin: 0 0 2mm; text-align: center; font-weight: 700; text-decoration: underline; }
+
+  .print-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.5mm 8mm;
+    margin: 0 0 3mm;
+  }
+
+  .print-facts div { display: flex; gap: 2mm; }
+
+  .print-facts dt { font-weight: 700; }
+
+  .print-facts dt::after { content: ':'; }
+
+  .print-facts dd { margin: 0; }
+
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 8.5pt;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .print-table th,
+  .print-table td {
+    padding: 0.6mm 1.2mm;
+    border: 0.3mm solid #000000;
+    background: none;
+    color: #000000;
+    text-align: center;
+    vertical-align: middle;
+  }
+
+  .print-table thead { display: table-header-group; }
+
+  .print-table tr { break-inside: avoid; }
+
+  .print-table tbody th,
+  .print-table .print-text { text-align: left; font-weight: 400; }
+
+  .print-table tbody th { white-space: nowrap; }
+
+  .print-table .print-low { font-weight: 700; text-decoration: underline; }
+
+  .print-counts { margin: 3mm 0 0; font-weight: 700; }
+
+  .print-subtitle { margin: 4mm 0 1mm; font-size: 10pt; }
+
+  .print-retakes ul { margin: 0; padding-left: 5mm; }
+
+  .print-signs { display: flex; flex-wrap: wrap; gap: 7mm 16mm; margin-top: 8mm; break-inside: avoid; }
+
+  .print-sign { margin: 0; }
 }
 
 /* Task 44: the review queue and the syllabus marks of the subject lists. A version under review is the primary blue
@@ -7743,7 +7815,7 @@ a.gr-card:hover { border-color: var(--primary-line); }
 /* The grid. */
 .lg-card-grid { width: fit-content; min-width: 0; max-width: 100%; overflow: hidden; padding: 0; }
 
-.lg-scroll { max-width: 100%; }
+.lg-scroll { max-width: 100%; scroll-padding-left: 18rem; }
 
 .lg-scroll:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
 
@@ -7794,6 +7866,11 @@ a.gr-card:hover { border-color: var(--primary-line); }
 }
 
 .lg-grid thead .lg-name { z-index: 3; }
+
+/* The pinned column is a layer of its own: opaque in every state, with an edge, so the cells that pass under it are cut cleanly. */
+.lg-grid .lg-name { background-color: var(--surface); box-shadow: 4px 0 6px -3px rgba(0, 0, 0, 0.35); }
+
+.lg-grid thead .lg-name { background-color: var(--surface-raised); }
 
 .lg-name__no { display: inline-block; min-width: 1.5rem; color: var(--text-muted); font-weight: 400; }
 
@@ -7868,6 +7945,15 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .lg-draft { margin-left: var(--space-2); color: var(--text-muted); font-size: 0.75rem; font-style: italic; }
 
 .lg-dialog__text { margin: 0; color: var(--text-muted); }
+
+/* «Печать» and «Скачать (Excel)» over a sheet. */
+.lg-tools { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); min-width: 0; }
+
+.lg-tools__buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.lg-tools__error { display: flex; align-items: center; gap: var(--space-2); margin: 0; color: var(--danger); font-size: 0.875rem; }
+
+.lg-tools__error[hidden] { display: none; }
 
 .lg-dialog__warn { color: var(--warning); font-weight: 500; }
 

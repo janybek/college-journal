@@ -3,8 +3,11 @@ import { t } from '../i18n.js';
 import { el, errorKey, hasText, badge, focusById, focusFirstInvalid, holdOnLeave, markBusy, modal, note } from '../ui.js';
 import { icon } from '../icons.js';
 import {
-  examDraft, examItems, examNeedsReason, finalNote, attemptLines, nextLabel, wordCounts, wordTone,
+  examDraft, examItems, examNeedsReason, closeFinalState, attemptLines, nextLabel, wordCounts, wordTone, examModeOf, examFieldTarget,
 } from '../ledger.js';
+import { loadXlsx } from '../xlsxLoader.js';
+import { printSheet } from '../print.js';
+import { examSheet, examSheetBook, examSheetFileName } from '../ledgerFile.js';
 
 // The exam part of the ledger screen: the head of the exam, entering the results of the first sitting, closing the final
 // sheet and the new tries after it. Every number and word that is counted is the server's: the screen sends what the person
@@ -26,7 +29,7 @@ const dayShort = (date) => (typeof date === 'string' && date.length >= 10 ? `${d
 const dayFull = (date) => (typeof date === 'string' && date.length >= 10 ? `${date.slice(8, 10)}.${date.slice(5, 7)}.${date.slice(0, 4)}` : '');
 const firstTry = (student) => student.attempts.find((a) => a.no === 1);
 const hasRetake = (student) => student.attempts.some((a) => a.no > 1);
-const modeOf = (text) => (text === 'absent' || text === 'incomplete' ? text : 'score');
+const modeOf = examModeOf;
 
 const params = (view) => ({ max: view.split.exam, from: dayShort(view.examWeek.start), to: dayShort(view.examWeek.end) });
 
@@ -130,6 +133,11 @@ export function examSection(view, host) {
     parts.push(el('p', { class: 'lg-exam__wait', id: 'ledger-exam-wait' }, t('ledger.exam.notReady')));
   } else {
     parts.push(facts(view), headBlock(view, e, host));
+    if (view.exam.date) parts.push(sheetTools({
+      id: 'ledger-exam-sheet', printKey: 'ledger.exam.print', host: 'ledger-root',
+      sheet: () => examSheet(view, textLabels('ledger.exam.file.sheet')), orientation: 'portrait',
+      file: (XLSX) => ({ book: examSheetBook(XLSX, view, textLabels('ledger.exam.file.sheet')), name: examSheetFileName(view, t('ledger.exam.file.prefix')) }),
+    }));
     if (view.can.exam && !view.final.closed) parts.push(actions(view, e, host));
   }
   return el('section', { class: 'card lg-exam', id: 'ledger-exam', 'aria-labelledby': 'ledger-exam-title' }, parts);
@@ -317,15 +325,20 @@ export function examTd(view, student, host) {
     MODES.map((mode) => el('option', { value: mode }, mode === 'score' ? t('ledger.exam.modeScore') : t(mode === 'absent' ? 'ledger.exam.absent' : 'ledger.exam.incomplete'))));
   select.value = modeOf(text);
   const error = el('p', { class: 'lg-ex-error', id: id + '-error', hidden: true });
+  // The field keeps showing what the draft holds, which is what goes to the server; the error is told on the control that is shown.
   const spot = {
     set(message) {
-      if (message === null) { error.hidden = true; error.replaceChildren(); input.removeAttribute('aria-invalid'); input.removeAttribute('aria-describedby'); return; }
+      if (message === null) {
+        error.hidden = true;
+        error.replaceChildren();
+        for (const control of [input, select]) { control.removeAttribute('aria-invalid'); control.removeAttribute('aria-describedby'); }
+        return;
+      }
       error.replaceChildren(icon('alert'), message);
       error.hidden = false;
-      input.hidden = false;
-      select.value = 'score';
-      input.setAttribute('aria-invalid', 'true');
-      input.setAttribute('aria-describedby', error.id);
+      const control = examFieldTarget(e.draft.get(student.id) ?? '') === 'input' ? input : select;
+      control.setAttribute('aria-invalid', 'true');
+      control.setAttribute('aria-describedby', error.id);
     },
   };
   e.ui.students.set(student.id, spot);
@@ -453,9 +466,9 @@ function openAttempt(view, student, host) {
 // Above the exam part: the button, or the reason it is not there yet.
 function closeControl(view, host) {
   const { final } = view;
-  if (final.closed || !view.can.close || !view.exam.ready) return null;
-  const stop = finalNote(final);
-  if (stop) return el('p', { class: 'lg-exam__stop', id: 'ledger-final-stop' }, icon('clock'), t(stop.key, stop.params));
+  const state = closeFinalState(view);
+  if (state.kind === 'none') return null;
+  if (state.kind === 'stop') return el('p', { class: 'lg-exam__stop', id: 'ledger-final-stop' }, icon('clock'), t(state.note.key, state.note.params));
   const early = final.early === true;
   const button = el('button', {
     type: 'button', class: 'button button--primary', id: 'ledger-final-close', 'aria-disabled': early ? 'true' : null,
@@ -464,6 +477,32 @@ function closeControl(view, host) {
   }, t('ledger.final.close'));
   return el('div', { class: 'lg-exam__close' }, button,
     early ? el('span', { class: 'lg-exam__stop', id: 'ledger-final-early' }, t('ledger.final.early', { date: dayShort(view.examWeek.start) })) : null);
+}
+
+// ---- Print and Excel of a sheet ----
+
+export const textLabels = (sheetKey) => ({ t, sheet: t(sheetKey) });
+
+// The two buttons over a sheet. print: the sheet is built when the button is pressed (from the ledger as it is then); the file
+// needs the library of Excel, and when it does not load the line beside the button says so.
+export function sheetTools({ id, printKey, host, sheet, orientation, file }) {
+  const problem = el('p', { class: 'lg-tools__error', id: id + '-error', role: 'alert', hidden: true });
+  const fail = (key) => { problem.replaceChildren(icon('alert'), t(key)); problem.hidden = false; };
+  const printButton = el('button', {
+    type: 'button', class: 'button button--secondary', id: id + '-print',
+    onclick: () => { problem.hidden = true; printSheet(document.getElementById(host), sheet(), typeof orientation === 'function' ? orientation() : orientation); },
+  }, icon('printer'), t(printKey));
+  const fileButton = el('button', { type: 'button', class: 'button button--secondary', id: id + '-excel' }, icon('download'), t('ledger.file.excel'));
+  fileButton.addEventListener('click', async () => {
+    problem.hidden = true;
+    let XLSX;
+    try { XLSX = await loadXlsx(); } catch (error) { fail('import.error.library'); return; }
+    try {
+      const { book, name } = file(XLSX);
+      XLSX.writeFile(book, name);
+    } catch (error) { fail(errorKey('internal')); }
+  });
+  return el('div', { class: 'lg-tools no-print', id: id + '-tools' }, el('div', { class: 'lg-tools__buttons' }, printButton, fileButton), problem);
 }
 
 // The chips of the words of the group (the line above the grid and the summary in the closing window).

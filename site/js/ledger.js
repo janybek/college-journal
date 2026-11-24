@@ -109,6 +109,12 @@ const textOfTry = (attempt) => {
 };
 const canEnter = (student) => student.admitted === true && !student.left;
 
+// What a field of the exam column holds: «score» (digits), «absent» or «incomplete». The field shows what the draft holds, which is what goes to the server.
+export const examModeOf = (text) => (text === ABSENT || text === INCOMPLETE ? text : 'score');
+
+// Which control carries the error of a field: the box of digits while it is shown, otherwise the list of words.
+export const examFieldTarget = (text) => (examModeOf(text) === 'score' ? 'input' : 'select');
+
 // The fields of the exam column: the first try of those who may sit it. A score as digits, «absent», «incomplete» or ''.
 export function examDraft(students) {
   const draft = new Map();
@@ -145,6 +151,15 @@ export function examNeedsReason(items, students) {
 export function finalNote(final) {
   const [first] = final && Array.isArray(final.blocking) ? final.blocking : [];
   return first ? { key: 'ledger.final.block.' + first.code, params: { n: first.n } } : null;
+}
+
+// Above the exam part: nothing, the reason the final sheet cannot be closed yet (also while units are still open: how many), or the button.
+export function closeFinalState(view) {
+  const { final } = view;
+  if (final.closed || !view.can.close) return { kind: 'none' };
+  const stop = finalNote(final);
+  if (stop) return { kind: 'stop', note: stop };
+  return view.exam.ready ? { kind: 'button' } : { kind: 'none' };
 }
 
 // The title of a try in the history. index: how many sittings (a score or «did not come») came before it; «I» is not a sitting.

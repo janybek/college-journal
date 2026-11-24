@@ -101,3 +101,127 @@ test('a refused closing of a unit is told with the number from the screen', () =
   assert.equal(unitBlockNote(error('bad_value'), units, 1), null);
   assert.equal(unitBlockNote({ code: 'forbidden' }, units, 1), null);
 });
+
+// ---- Task 20: print and files ----
+
+const { translate } = await import('../site/js/i18n.js');
+const { default: ruDict } = await import('../site/js/i18n/ru.js');
+const { pageRule, ledgerOrientation } = await import('../site/js/print.js');
+const { safeFilePart, ledgerFileName, ledgerRows, examHeadLines, examSheetRows, examSheetFileName } = await import('../site/js/ledgerFile.js');
+const labels = { t: (key, params) => translate({ ru: ruDict }, 'ru', key, params), sheet: 'Ведомость' };
+
+test('the page rule and the orientation: one unit stands upright, more lie down', () => {
+  assert.equal(pageRule('landscape'), '@page { size: A4 landscape; margin: 12mm; }');
+  assert.equal(pageRule('x'), '@page { size: A4 portrait; margin: 12mm; }');
+  assert.deepEqual([1, 2, 3, 4].map(ledgerOrientation), ['portrait', 'landscape', 'landscape', 'landscape']);
+});
+
+test('a part of a file name: bad signs, an empty text and a long text', () => {
+  assert.equal(safeFilePart('Анатомия: часть 1/2'), 'Анатомия_ часть 1_2');
+  assert.equal(safeFilePart('  '), '_');
+  assert.equal(safeFilePart('я'.repeat(60)).length, 40);
+  assert.equal(safeFilePart('a\u0001b'), 'a_b');
+});
+
+const UNITS = [{ unit: 1, title: 'Основы', closed: true }, { unit: 2, title: '', closed: true }];
+const SR = (id, name, over = {}) => ({
+  id, fullName: name, left: false, semester: 47, complete: true, admitted: true, status: 'done', exam: 35, total: 82, word: 'good', attempts: [],
+  units: [{ unit: 1, current: 38, self: 16, control: 30, total: 84, word: 'good', currentLow: false, controlLow: false, selfPending: 0, manual: false },
+    { unit: 2, current: 20, self: null, control: 12, total: 40, word: 'fail', currentLow: true, controlLow: true, selfPending: 0, manual: false }],
+  ...over,
+});
+const TA = (no, outcome, score, date, commission = '') => ({ id: 'x' + no, no, date, outcome, score, commission });
+const VIEW = (over = {}) => ({
+  today: '2026-12-15', collegeName: 'Колледж Вымышленный', examWeek: { start: '', end: '' },
+  subject: { id: 's1', name: 'Информатика', groupName: '02-1', course: 1, teacherName: 'Преподаватель Первый', semester: 1, planSemester: 1 },
+  scheme: { current: 40, self: 20, control: 40, minimum: 60, fair: 60, good: 80, excellent: 90 }, split: SP,
+  units: UNITS.map((u) => ({ ...u, blocking: [], missing: 0 })),
+  exam: { ready: true, date: '2026-12-15', examiner: '', assistants: 'Ассистент Первый', strict: false },
+  final: { closed: true, blocking: [] },
+  students: [
+    SR('a', 'Студент Первый'),
+    SR('b', 'Студент Второй', { admitted: false, semester: 25, status: 'not_admitted', exam: null, total: null, word: null }),
+    SR('c', 'Студент Третий', { status: 'absent', exam: null, total: null, word: null, attempts: [TA(1, 'absent', null, '2026-12-15')] }),
+    SR('d', 'Студент Четвёртый', { status: 'incomplete', exam: null, total: null, word: null, attempts: [TA(1, 'incomplete', null, '2026-12-15')] }),
+    SR('e', 'Студент Пятый', { exam: 30, total: 77, word: 'fair', attempts: [TA(1, 'score', 10, '2026-12-15'), TA(2, 'score', 30, '2027-01-12')] }),
+    SR('f', 'Студент Выбывший', { left: true }),
+  ],
+  ...over,
+});
+
+test('the rows of the ledger: numbers are numbers, a dash is an empty cell, those who left are not there', () => {
+  const rows = ledgerRows(VIEW(), labels);
+  assert.equal(rows[0][0], 'Колледж Вымышленный');
+  assert.equal(rows[1][0], 'ВЕДОМОСТЬ');
+  assert.ok(rows.some((r) => r[1] === 'Дисциплина' && r[2] === 'Информатика'));
+  const first = rows.find((r) => r[1] === 'Студент Первый');
+  assert.deepEqual(first, [1, 'Студент Первый', 38, 16, 30, 84, 20, '', 12, 40, 47, 'допущен', 35, 82, 'хорошо']);
+  const rejected = rows.find((r) => r[1] === 'Студент Второй');
+  assert.deepEqual(rejected.slice(-5), [25, 'не допущен: за семестр нужно больше 30', '', '', 'не допущен']);
+  assert.deepEqual(rows.find((r) => r[1] === 'Студент Третий').slice(-3), ['не явился(ась)', '', 'не явился(ась)']);
+  assert.deepEqual(rows.find((r) => r[1] === 'Студент Четвёртый').slice(-3), ['I', '', 'I']);
+  assert.ok(!rows.some((r) => r.includes('Студент Выбывший')));
+  const counts = rows.find((r) => typeof r[0] === 'string' && r[0].startsWith('отлично: '));
+  assert.equal(counts[0], 'отлично: 0 · хорошо: 1 · удовлетворительно: 1 · неудовлетворительно: 0 · не явилось: 1 · I: 1 · не допущено: 1');
+  assert.ok(rows.some((r) => r[0] === 'Преподаватель ____________ / Преподаватель Первый'));
+  assert.ok(rows.some((r) => r[0] === 'Деканат ____________'));
+  assert.ok(!rows.some((r) => r[0] === 'Предварительная'));
+  assert.ok(ledgerRows(VIEW({ final: { closed: false, blocking: [] } }), labels).some((r) => r[0] === 'Предварительная'));
+  assert.equal(ledgerRows(VIEW({ collegeName: '' }), labels)[0][0], 'ВЕДОМОСТЬ');
+});
+
+test('file names: the subject, the group and the date, no name of a student', () => {
+  const view = VIEW({ subject: { ...VIEW().subject, name: 'Информатика', groupName: '01-1' } });
+  assert.equal(ledgerFileName(view, 'Ведомость'), 'Ведомость_Информатика_01-1_2026-12-15.xlsx');
+  assert.equal(examSheetFileName(VIEW(), 'Экзамен'), 'Экзамен_Информатика_02-1_2026-12-15.xlsx');
+  assert.equal(examSheetFileName(VIEW({ exam: { ...VIEW().exam, date: '' } }), 'Экзамен').endsWith('_2026-12-15.xlsx'), true);
+  assert.ok(!ledgerFileName(VIEW(), 'Ведомость').includes('Студент'));
+});
+
+test('the head of the exam sheet: eight lines, seven without a college name; the examiner is the teacher of the subject by default', () => {
+  const lines = examHeadLines(VIEW(), labels);
+  assert.deepEqual(lines.map((l) => l[0]), ['Колледж', 'Дисциплина', 'Курс', 'Группа', 'Семестр', 'Дата экзамена', 'Экзаменатор', 'Ассистенты']);
+  assert.deepEqual(lines.map((l) => l[1]), ['Колледж Вымышленный', 'Информатика', '1', '02-1', '1', '15.12.2026', 'Преподаватель Первый', 'Ассистент Первый']);
+  assert.equal(examHeadLines(VIEW({ collegeName: '' }), labels).length, 7);
+  assert.equal(examHeadLines(VIEW({ exam: { ...VIEW().exam, examiner: 'Другой Экзаменатор', assistants: '', date: '' } }), labels).slice(-3).map((l) => l[1]).join('|'), '|Другой Экзаменатор|');
+});
+
+test('the rows of the exam sheet: the last try in the table, the retakes under it, empty cells before the exam', () => {
+  const rows = examSheetRows(VIEW(), labels);
+  assert.equal(rows[0][0], 'Экзаменационная ведомость');
+  assert.deepEqual(rows.find((r) => r[0] === '№'), ['№', 'ФИО', 'Семестр (из 60)', 'Экзамен (из 40)', 'Итог (из 100)', 'Оценка']);
+  assert.deepEqual(rows.find((r) => r[1] === 'Студент Пятый' && r.length === 6), [5, 'Студент Пятый', 47, 30, 77, 'удовлетворительно']);
+  assert.deepEqual(rows.find((r) => r[1] === 'Студент Второй'), [2, 'Студент Второй', 25, '', '', 'не допущен']);
+  assert.deepEqual(rows.find((r) => r[1] === 'Студент Третий').slice(3), ['', '', 'не явился(ась)']);
+  assert.deepEqual(rows.find((r) => r[1] === 'Студент Четвёртый').slice(3), ['', '', 'I']);
+  const at = rows.findIndex((r) => r[0] === 'Пересдачи');
+  assert.ok(at > 0);
+  assert.deepEqual(rows[at + 1], ['', 'Студент Пятый', '12.01.2027', 'пересдача 1', 30, '']);
+  assert.ok(rows.some((r) => r[0] === 'Директор / заместитель директора по учебной работе ____________'));
+  assert.ok(rows.some((r) => r[0] === 'Экзаменатор ____________ / Преподаватель Первый'));
+  const before = VIEW({
+    students: [SR('a', 'Студент Первый', { status: 'none', exam: null, total: null, word: null }), VIEW().students[1]],
+    final: { closed: false, blocking: [] },
+  });
+  const empty = examSheetRows(before, labels);
+  assert.deepEqual(empty.find((r) => r[1] === 'Студент Первый'), [1, 'Студент Первый', 47, '', '', '']);
+  assert.ok(empty.some((r) => r[0] === 'не допущено: 1'));   // nothing to count before the exam but those who are not admitted
+  assert.ok(!empty.some((r) => r[0] === 'Пересдачи'));
+});
+
+const { closeFinalState, examModeOf, examFieldTarget } = await import('../site/js/ledger.js');
+
+test('above the exam part: with open units the button is replaced by the number of units that are not closed', () => {
+  const view = (over) => ({ final: { closed: false, blocking: [{ code: 'units_open', n: 2 }, { code: 'no_date', n: 0 }] }, can: { close: true }, exam: { ready: false }, ...over });
+  assert.deepEqual(closeFinalState(view()), { kind: 'stop', note: { key: 'ledger.final.block.units_open', params: { n: 2 } } });
+  assert.deepEqual(closeFinalState(view({ final: { closed: false, blocking: [{ code: 'exam_missing', n: 1 }] }, exam: { ready: true } })).kind, 'stop');
+  assert.equal(closeFinalState(view({ final: { closed: false, blocking: [] }, exam: { ready: true } })).kind, 'button');
+  assert.equal(closeFinalState(view({ final: { closed: false, blocking: [] } })).kind, 'none');
+  assert.equal(closeFinalState(view({ can: { close: false } })).kind, 'none');
+  assert.equal(closeFinalState(view({ final: { closed: true, blocking: [] } })).kind, 'none');
+});
+
+test('a field of the exam column is shown as its draft says; its error sits on the control that is shown', () => {
+  assert.deepEqual(['', '35', 'absent', 'incomplete'].map(examModeOf), ['score', 'score', 'absent', 'incomplete']);
+  assert.deepEqual(['', '35', 'x1', 'absent', 'incomplete'].map(examFieldTarget), ['input', 'input', 'input', 'select', 'select']);
+});

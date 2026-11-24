@@ -517,3 +517,20 @@ test('unit 6 task 19: the exam of the ledger has its texts in every language, th
     assert.ok(dict['ledger.final.block.units_open'].includes('{n}'), lang);
   }
 });
+
+test('unit 6 task 20: print and Excel of the ledger and of the exam sheet have their texts in every language, no regulation numbers', () => {
+  const keys = ['button', 'title', 'draft', 'no', 'fullName', 'college', 'teacher', 'date', 'count.absent', 'count.incomplete', 'count.notAdmitted', 'signTeacher', 'signDean', 'signExaminer', 'signAssistants', 'signDirector', 'retakes']
+    .map((k) => 'ledger.print.' + k);
+  keys.push('ledger.file.excel', 'ledger.file.prefix', 'ledger.file.sheet', 'ledger.exam.sheetTitle', 'ledger.exam.print', 'ledger.exam.file.prefix', 'ledger.exam.file.sheet');
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) {
+    for (const key of keys) {
+      assert.ok(dict[key], lang + ' ' + key);
+      assert.ok(!/(^|\D)(30|40|60|80|90)(\D|$)/.test(dict[key]), lang + ' ' + key + ' has a regulation number');
+    }
+    // the name of a sheet of Excel: at most 31 signs and none of  \ / ? * [ ] :
+    for (const key of ['ledger.file.sheet', 'ledger.exam.file.sheet']) {
+      assert.ok(dict[key].length <= 31 && !/[\/?*[\]:]/.test(dict[key]), lang + ' ' + key);
+    }
+    for (const key of ['ledger.file.prefix', 'ledger.exam.file.prefix']) assert.ok(!/[\/:*?"<>|]/.test(dict[key]), lang + ' ' + key);
+  }
+});

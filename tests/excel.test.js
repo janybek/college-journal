@@ -321,3 +321,65 @@ test('draftFileData: the downloaded draft, uploaded back, changes nothing', () =
   const back = send('syllabus.preview', sb1, sheets, dean).data;
   assert.deepEqual([back.ok, back.errors, back.summaries.map((s) => [s.semester, s.replaces, s.added, s.changed, s.removed])], [true, [], [[1, true, 0, 0, 0]]]);
 });
+
+// ---- Task 20: the files of the ledger and of the exam sheet ----
+
+import { translate } from '../site/js/i18n.js';
+import { ledgerBook, examSheetBook } from '../site/js/ledgerFile.js';
+
+const ledgerLabels = { t: (key, params) => translate({ ru }, 'ru', key, params), sheet: 'Ведомость' };
+const attempt = (no, outcome, score, date, commission = '') => ({ id: 'x' + no, no, date, outcome, score, commission });
+const unitRow = (unit, over = {}) => ({ unit, current: 38, self: 16, control: 30, total: 84, word: 'good', currentLow: false, controlLow: false, selfPending: 0, manual: false, ...over });
+const ledgerView = (over = {}) => ({
+  today: '2026-12-15', collegeName: 'Колледж Вымышленный', examWeek: { start: '', end: '' },
+  subject: { id: 's1', name: 'Информатика', groupName: '02-1', course: 1, teacherName: 'Преподаватель Первый', semester: 1, planSemester: 1 },
+  split: { semester: 60, exam: 40, admission: 30 },
+  units: [{ unit: 1, title: '', closed: true, blocking: [], missing: 0 }],
+  exam: { ready: true, date: '2026-12-15', examiner: '', assistants: '=1+1', strict: false },
+  final: { closed: true, blocking: [] },
+  students: [
+    { id: 'a', fullName: '=СУММ(A1)', left: false, semester: 47, complete: true, admitted: true, status: 'done', exam: 35, total: 82, word: 'good', units: [unitRow(1)], attempts: [attempt(1, 'score', 10, '2026-12-14'), attempt(2, 'score', 35, '2027-01-12', '=2+2')] },
+  ],
+  ...over,
+});
+const read = (book) => {
+  const back = XLSX.read(XLSX.write(book, { type: 'array', bookType: 'xlsx' }), { type: 'array' });
+  return back.Sheets[back.SheetNames[0]];
+};
+const findCell = (sheet, value) => Object.entries(sheet).find(([ref, cell]) => !ref.startsWith('!') && cell.v === value);
+
+test('ledgerBook: one sheet; a name that looks like a formula stays a text, the points stay numbers', () => {
+  const book = ledgerBook(XLSX, ledgerView(), ledgerLabels);
+  assert.deepEqual(book.SheetNames, ['Ведомость']);
+  const sheet = read(book);
+  const [, name] = findCell(sheet, '=СУММ(A1)');
+  assert.equal(name.t, 's');
+  assert.equal(name.f, undefined);
+  const [, current] = findCell(sheet, 38);
+  assert.equal(current.t, 'n');
+  assert.equal(findCell(sheet, 47)[1].t, 'n');
+  assert.equal(findCell(sheet, 82)[1].t, 'n');
+  assert.ok(sheet['!merges'].length >= 6);
+  assert.equal(book.Sheets.Ведомость['!cols'][1].wch, 32);
+});
+
+test('examSheetBook: the assistants and the commission are texts, the points of the exam are numbers', () => {
+  const book = examSheetBook(XLSX, ledgerView(), { ...ledgerLabels, sheet: 'Экзамен' });
+  assert.deepEqual(book.SheetNames, ['Экзамен']);
+  const sheet = read(book);
+  const assistants = findCell(sheet, '=1+1')[1];
+  assert.equal(assistants.t, 's');
+  assert.equal(assistants.f, undefined);
+  assert.equal(findCell(sheet, 'Колледж Вымышленный')[1].t, 's');
+  assert.equal(findCell(sheet, 35)[1].t, 'n');
+  assert.equal(findCell(sheet, 82)[1].t, 'n');
+});
+
+test('examSheetBook: a retake by a commission is listed with the composition as a text', () => {
+  const view = ledgerView();
+  view.students[0].attempts = [attempt(1, 'score', 10, '2026-12-14'), attempt(2, 'score', 12, '2026-12-20'), attempt(3, 'score', 35, '2027-01-12', '=2+2')];
+  const sheet = read(examSheetBook(XLSX, view, { ...ledgerLabels, sheet: 'Экзамен' }));
+  const commission = findCell(sheet, '=2+2')[1];
+  assert.equal(commission.t, 's');
+  assert.equal(commission.f, undefined);
+});

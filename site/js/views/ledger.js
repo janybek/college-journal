@@ -7,7 +7,9 @@ import { permissions } from '../shell.js';
 import {
   ledgerColumns, unitCellText, isLow, admissionCell, examCell, finalCell, closeNote, canCloseUnit, examNote, unitBlockNote,
 } from '../ledger.js';
-import { examSection, examTd as examEditTd, studentExtra, countsList, reset as resetExam } from './ledgerExam.js';
+import { examSection, examTd as examEditTd, studentExtra, countsList, reset as resetExam, sheetTools, textLabels } from './ledgerExam.js';
+import { ledgerOrientation } from '../print.js';
+import { ledgerSheet, ledgerBook, ledgerFileName } from '../ledgerFile.js';
 
 // The ledger of a subject (#/ledger/<subjectId>, ledger.get): the numbers of the journal for every unit, then the semester
 // points, the admission, the exam, the total and the grade. Every number is the server's; the screen only chooses words
@@ -35,14 +37,14 @@ export function render(root, params) {
   if (state.subjectId !== params.subjectId) state = blank(params.subjectId);
   if (state.data === null && !state.loading && state.errorCode === null) load();
   const view = state.data;
-  root.append(
-    pageHeader({
-      id: 'ledger-title',
-      title: view ? `${view.subject.name} · ${view.subject.groupName}` : t('ledger.title'),
-      lead: view ? t('ledger.leadSemester', { teacher: view.subject.teacherName || '—', n: view.subject.planSemester ?? view.subject.semester }) : null,
-      actions: view ? links(view) : null,
-    }),
-    view === null ? loadingBody() : body(view));
+  const header = pageHeader({
+    id: 'ledger-title',
+    title: view ? `${view.subject.name} · ${view.subject.groupName}` : t('ledger.title'),
+    lead: view ? t('ledger.leadSemester', { teacher: view.subject.teacherName || '—', n: view.subject.planSemester ?? view.subject.semester }) : null,
+    actions: view ? links(view) : null,
+  });
+  header.classList.add('no-print');
+  root.append(header, view === null ? loadingBody() : body(view));
 }
 
 function links(view) {
@@ -95,11 +97,11 @@ function body(view) {
   const parts = [week ? note('info', t(week.key, week.params), { id: 'ledger-exam-note' }) : null];
   if (!view.subject.hasSyllabus || view.units.length === 0) {
     parts.push(note('warning', t('ledger.noSyllabus'), { id: 'ledger-no-syllabus' }));
-    return el('div', { class: 'ledger' }, parts);
+    return el('div', { class: 'ledger', id: 'ledger-root' }, parts);
   }
   if (view.students.length === 0) {
     parts.push(emptyState('table', el('p', { class: 'empty__title' }, t('ledger.emptyStudents'))));
-    return el('div', { class: 'ledger' }, parts);
+    return el('div', { class: 'ledger', id: 'ledger-root' }, parts);
   }
   const owner = state;
   const host = {
@@ -109,8 +111,18 @@ function body(view) {
     redraw: refresh,
     dialogShell,
   };
-  parts.push(summary(view), finalBar(view), grid(view, host), examSection(view, host));
-  return el('div', { class: 'ledger' }, parts);
+  parts.push(summary(view), finalBar(view), tools(view), grid(view, host), examSection(view, host));
+  return el('div', { class: 'ledger', id: 'ledger-root' }, parts);
+}
+
+// ---- Print and Excel of the ledger ----
+
+function tools(view) {
+  return sheetTools({
+    id: 'ledger-sheet', printKey: 'ledger.print.button', host: 'ledger-root',
+    sheet: () => ledgerSheet(view, textLabels('ledger.file.sheet')), orientation: () => ledgerOrientation(view.units.length),
+    file: (XLSX) => ({ book: ledgerBook(XLSX, view, textLabels('ledger.file.sheet')), name: ledgerFileName(view, t('ledger.file.prefix')) }),
+  });
 }
 
 // ---- The line of the group: how many have each word (only when every unit is closed) ----
