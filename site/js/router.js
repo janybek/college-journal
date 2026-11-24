@@ -46,6 +46,10 @@ export function resolveRoute(hash, user) {
   if (path === '/journal' && permissions.includes('journal.list')) return { view: 'journalList', params: {} };
   const journal = /^\/journal\/([^/]+)$/.exec(path);
   if (journal && permissions.includes('journal.get') && idOf(journal[1]) !== null) return { view: 'journal', params: { subjectId: idOf(journal[1]) } };
+  // «Ведомости»: the list; #/ledger/<subjectId>: the ledger of a subject (semester points, admission, exam). The server checks every right itself.
+  if (path === '/ledger' && permissions.includes('ledger.list')) return { view: 'ledgerList', params: {} };
+  const ledger = /^\/ledger\/([^/]+)$/.exec(path);
+  if (ledger && permissions.includes('ledger.get') && idOf(ledger[1]) !== null) return { view: 'ledger', params: { subjectId: idOf(ledger[1]) } };
   // «Задания»: the subjects with their assignments (teacher, office) or the student's own list; #/tasks/<subjectId>: the
   // assignments of a subject; #/task/<assignmentId>: one assignment. The server checks every right itself.
   if (path === '/tasks' && (permissions.includes('work.overview') || permissions.includes('work.mine'))) return { view: 'tasks', params: {} };

@@ -44,12 +44,14 @@ export function navFor(permissionList, role) {
     if (list.includes('schedule.mine')) items.push({ name: 'mySchedule', href: '#/my', textKey: 'my.title', icon: 'calendar' });
     if (list.includes('journal.list')) items.push({ name: 'journalList', href: '#/journal', textKey: 'journal.title', icon: 'table' });
     if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard' });
+    if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet' });
     return [{ titleKey: 'nav.teaching', items }];
   }
   const groups = [{ titleKey: null, items: [HOME] }];
   if (!parts.includes('office')) return groups;
   if (list.includes('journal.list')) {
     const items = [{ name: 'journalList', href: '#/journal', textKey: 'journal.list.title', icon: 'table', hintKey: 'journal.hint' }];
+    if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet', hintKey: 'ledger.hint' });
     if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard', hintKey: 'tasks.hint' });
     if (list.includes('journal.log')) items.push({ name: 'journalLog', href: '#/journal-log', textKey: 'journalLog.title', icon: 'clipboard', hintKey: 'journalLog.hint' });
     groups.push({ titleKey: 'nav.journal', items });
@@ -215,6 +217,7 @@ function currentName(view, params, role) {
   // A journal of a subject belongs to the list of journals.
   if (view === 'journal') return 'journalList';
   if (view === 'task') return 'tasks';
+  if (view === 'ledger') return 'ledgerList';
   if (view === 'journalLog') return menuParts(role).includes('office') ? 'journalLog' : 'journalList';
   if (view === 'syllabus' || view === 'syllabusForm') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;

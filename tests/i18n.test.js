@@ -479,3 +479,23 @@ test('unit 6 task 9: the new scale texts exist in every language and carry the n
     assert.ok(!('grades.preliminary' in dict), lang + ' grades.preliminary is gone');
   }
 });
+
+test('unit 6 task 18: the ledger screens have their texts in every language', () => {
+  const keys = ['title', 'hint', 'loading', 'back', 'notFound', 'noSyllabus', 'emptyStudents', 'leadSemester', 'link.journal', 'low', 'draft', 'left', 'manual', 'selfPending',
+    'list.leadTeacher', 'list.leadOffice', 'list.empty', 'list.allGroups', 'list.search', 'list.noMatch', 'list.noSyllabus',
+    'list.col.subject', 'list.col.group', 'list.col.teacher', 'list.col.units',
+    'state.unitClosed', 'state.unitOpen', 'state.finalClosed', 'state.finalOpen', 'exam.now', 'exam.from', 'exam.absent', 'exam.incomplete', 'exam.incompleteTip',
+    'col.student', 'col.semester', 'col.admission', 'col.exam', 'col.final', 'col.word', 'unit.head', 'unit.headPlain', 'unit.closed', 'unit.open', 'unit.closedAt',
+    'block.pairs_not_held', 'block.self_pending', 'missing', 'counts.label', 'count.absent', 'count.incomplete', 'count.notAdmitted', 'menu',
+    'close.button', 'close.title', 'close.body', 'close.missing', 'close.accept', 'close.confirm', 'close.busy', 'close.needAccept',
+    'reopen.item', 'reopen.title.unit', 'reopen.title.final', 'reopen.body.unit', 'reopen.body.final', 'reopen.reason', 'reopen.reasonHint', 'reopen.confirm', 'reopen.busy',
+    'final.stateClosed', 'final.stateOpen', 'final.notAdmitted', 'final.absent', 'final.incomplete', 'admission.yes', 'admission.noUnit', 'admission.low']
+    .map((k) => 'ledger.' + k);
+  keys.push('error.unit_closed', 'error.already_closed', 'error.not_closed', 'error.exam_not_started');
+  for (const [lang, dict] of Object.entries({ ru, ky, en })) for (const key of keys) assert.ok(dict[key], lang + ' ' + key);
+  for (const dict of [ru, ky, en]) {
+    assert.ok(dict['ledger.admission.low'].includes('{need}'));
+    for (const key of ['ledger.col.semester', 'ledger.col.exam', 'ledger.col.final']) assert.ok(dict[key].includes('{max}'), key);
+    assert.ok(dict['ledger.low'].includes('{min}'));
+  }
+});

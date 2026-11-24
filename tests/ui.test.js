@@ -174,3 +174,15 @@ test('navFor: «Задания» follows «Журнал» for the teacher and si
   assert.equal(office.items[1].href, '#/tasks');
   assert.equal(navFor(['work.mine', 'schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'tasks'), false);
 });
+
+test('navFor: «Ведомости» follow «Задания» for the teacher and «Журналы» in the group of the office, with the right ledger.list', () => {
+  const teacher = navFor([...DEAN, 'schedule.mine', 'journal.list', 'work.overview', 'ledger.list'], 'teacher')[0].items;
+  assert.deepEqual(teacher.map((i) => i.name), ['home', 'mySchedule', 'journalList', 'tasks', 'ledgerList']);
+  assert.deepEqual(teacher[4], { name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet' });
+  assert.equal(navFor([...DEAN, 'journal.list'], 'teacher')[0].items.some((i) => i.name === 'ledgerList'), false);
+  const office = navFor(['journal.list', 'journal.log', 'work.overview', 'ledger.list'], 'dean').find((g) => g.titleKey === 'nav.journal');
+  assert.deepEqual(office.items.map((i) => i.name), ['journalList', 'ledgerList', 'tasks', 'journalLog']);
+  assert.equal(office.items[1].href, '#/ledger');
+  assert.equal(office.items[1].hintKey, 'ledger.hint');
+  assert.equal(navFor(['schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'ledgerList'), false);
+});

@@ -7586,3 +7586,289 @@ a.gr-card:hover { border-color: var(--primary-line); }
 
   .student .syllabus-head__file { justify-self: stretch; justify-content: center; width: 100%; }
 }
+
+/* Task 18 (unit 6): «Ведомости». The list: cards for a teacher, a table for the office; the ledger of a subject: a grid like the
+   journal's, a group of four columns per unit, then the semester, the admission, the exam, the total and the grade. The first
+   column stays while the table scrolls inside its block; the page itself never scrolls sideways. */
+
+.ledgers,
+.ledger { display: grid; gap: var(--space-4); min-width: 0; }
+
+.lg-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-3); border-bottom: 1px solid var(--border); }
+
+.lg-toolbar .field { min-width: 12rem; }
+
+.lg-nomatch { margin: 0; padding: var(--space-6) var(--space-4); color: var(--text-muted); }
+
+.lg-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(17rem, 1fr));
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.lg-card {
+  position: relative;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  transition: border-color 0.15s ease-out, background-color 0.15s ease-out;
+}
+
+.lg-card:hover { border-color: var(--primary-line); background: var(--surface-raised); }
+
+.lg-card__link {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  color: var(--text);
+  text-decoration: none;
+  border-radius: var(--radius-card);
+}
+
+.lg-card__link:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+.lg-card__top { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); font-weight: 600; }
+
+.lg-card__chevron { flex: none; width: 1rem; height: 1rem; color: var(--text-muted); }
+
+.lg-card:hover .lg-card__chevron { color: var(--primary-ink); }
+
+.lg-marks { display: inline-flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.lg-marks .badge { white-space: nowrap; }
+
+.lg-table { min-width: 44rem; }
+
+.lg-table tbody .lg-row { position: relative; }
+
+.lg-table__subject { font-weight: 600; }
+
+.lg-table__link { color: var(--text); text-decoration: none; }
+
+.lg-table__link::after { content: ""; position: absolute; inset: 0; }
+
+.lg-table__link:focus-visible { outline: none; }
+
+.lg-table__link:focus-visible::after { outline: 2px solid var(--primary); outline-offset: -2px; border-radius: var(--radius-inner); }
+
+.lg-row:hover .lg-table__link .discipline__name { text-decoration: underline; }
+
+.lg-table .lg-table__go { width: 1%; text-align: right; white-space: nowrap; }
+
+.lg-table__chevron { width: 1rem; height: 1rem; color: var(--text-muted); }
+
+.lg-row:hover .lg-table__chevron { color: var(--primary-ink); }
+
+/* The line of the group under the heading and the state of the final sheet. */
+.lg-counts { display: flex; flex-wrap: wrap; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.lg-final {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 0.875rem;
+}
+
+.lg-final.is-closed { border-color: var(--success-line); background: var(--success-wash); color: var(--success); }
+
+.lg-final__icon { flex: none; width: 1.125rem; height: 1.125rem; }
+
+.lg-final__text { flex: 1 1 auto; }
+
+/* The «…» menu of a closed unit or final sheet. */
+.lg-menu { position: relative; display: inline-block; }
+
+.lg-menu__button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.75rem;
+  height: 1.75rem;
+  padding: 0 var(--space-2);
+  border: 1px solid transparent;
+  border-radius: var(--radius-inner);
+  color: var(--text-muted);
+  font-size: 1rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  list-style: none;
+}
+
+.lg-menu__button::-webkit-details-marker { display: none; }
+
+.lg-menu__button:hover,
+.lg-menu[open] > .lg-menu__button { border-color: var(--border-strong); background: var(--muted); color: var(--text); }
+
+.lg-menu__button:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
+
+.lg-menu__list {
+  position: absolute;
+  z-index: 6;
+  top: calc(100% + 4px);
+  right: 0;
+  min-width: 11rem;
+  padding: var(--space-1);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-inner);
+  background: var(--surface-raised);
+  box-shadow: var(--shadow-pop);
+}
+
+.lg-menu__item {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 0.875rem;
+  text-align: left;
+  cursor: pointer;
+}
+
+.lg-menu__item:hover,
+.lg-menu__item:focus-visible { background: var(--muted); outline: none; }
+
+/* The grid. */
+.lg-card-grid { width: fit-content; min-width: 0; max-width: 100%; overflow: hidden; padding: 0; }
+
+.lg-scroll { max-width: 100%; }
+
+.lg-scroll:focus-visible { outline: 2px solid var(--primary); outline-offset: -2px; }
+
+.lg-grid {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: max-content;
+  font-size: 0.875rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.lg-grid th,
+.lg-grid td {
+  padding: 0 var(--space-2);
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  text-align: center;
+  vertical-align: middle;
+  white-space: nowrap;
+  background: var(--surface);
+}
+
+.lg-grid tbody tr { height: 2.5rem; }
+
+.lg-grid tbody tr:last-child th,
+.lg-grid tbody tr:last-child td { border-bottom: 0; }
+
+.lg-grid tbody tr:hover td,
+.lg-grid tbody tr:hover th { background-color: var(--muted); }
+
+.lg-grid thead th {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--surface-raised);
+}
+
+.lg-grid .lg-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 14rem;
+  max-width: 18rem;
+  padding: 0 var(--space-4);
+  border-right: 1px solid var(--border-strong);
+  text-align: left;
+  font-weight: 500;
+}
+
+.lg-grid thead .lg-name { z-index: 3; }
+
+.lg-name__no { display: inline-block; min-width: 1.5rem; color: var(--text-muted); font-weight: 400; }
+
+.lg-name__text { display: inline-block; max-width: 12rem; overflow: hidden; text-overflow: ellipsis; vertical-align: bottom; }
+
+.lg-name__left {
+  margin-left: var(--space-2);
+  padding: 1px var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  color: var(--text-muted);
+  font-size: 0.6875rem;
+  font-weight: 500;
+}
+
+.lg-grid .is-left td,
+.lg-grid .is-left th { color: var(--text-muted); }
+
+.lg-grid .is-left .lg-name__text { text-decoration: line-through; text-decoration-color: var(--border-strong); }
+
+/* The head of a unit: name, state, then the button or the note. It may wrap, unlike the number columns. */
+.lg-grid thead .lg-unit-head {
+  min-width: 15rem;
+  padding: var(--space-3) var(--space-3);
+  border-left: 1px solid var(--border-strong);
+  white-space: normal;
+  text-align: left;
+  vertical-align: top;
+}
+
+.lg-unit-head > * + * { margin-top: var(--space-2); }
+
+.lg-unit-head__title { display: block; color: var(--text); font-size: 0.875rem; font-weight: 600; }
+
+.lg-unit-head__state { display: flex; align-items: center; gap: var(--space-2); }
+
+.lg-unit-head__note { display: block; font-size: 0.8125rem; font-weight: 500; }
+
+.lg-unit-head__note--warning { color: var(--warning); }
+
+.lg-unit-head__note--success { color: var(--success); }
+
+.lg-unit-head__note--neutral { color: var(--text-muted); }
+
+.lg-close { min-height: 2.25rem; padding-top: 0; padding-bottom: 0; font-size: 0.8125rem; }
+
+.lg-field { min-width: 3.5rem; border-left: 1px solid var(--border); }
+
+.lg-grid .lg-pts { background: var(--primary-wash); font-weight: 500; }
+
+.lg-grid tbody tr:hover .lg-pts { background: var(--primary-line); }
+
+.lg-grid .lg-pts.is-low,
+.lg-grid .lg-sum.is-low { color: var(--danger); font-weight: 700; }
+
+.lg-grid .lg-pts.is-provisional { color: var(--text-muted); font-style: italic; }
+
+.lg-total { font-weight: 700; }
+
+.lg-empty { color: var(--text-muted); }
+
+.lg-grid thead .lg-sum-head { min-width: 6.5rem; border-left: 1px solid var(--border-strong); white-space: normal; }
+
+.lg-grid .lg-sum--semester { border-left: 1px solid var(--border-strong); font-weight: 600; }
+
+.lg-grid .lg-sum.is-draft { color: var(--text-muted); }
+
+.lg-grid .lg-adm { text-align: left; }
+
+.lg-grid .lg-word { min-width: 9rem; text-align: left; }
+
+.lg-draft { margin-left: var(--space-2); color: var(--text-muted); font-size: 0.75rem; font-style: italic; }
+
+.lg-dialog__text { margin: 0; color: var(--text-muted); }
+
+.lg-dialog__warn { color: var(--warning); font-weight: 500; }
+
+.lg-accept { display: flex; align-items: center; gap: var(--space-3); min-height: 2.75rem; cursor: pointer; font-weight: 500; }

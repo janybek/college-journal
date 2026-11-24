@@ -184,3 +184,18 @@ test('resolveRoute: the assignments screens', () => {
   assert.equal(resolveRoute('#/task/%E0%A4%A', teacher).view, 'home');
   assert.equal(resolveRoute('#/tasks/%E0%A4%A', teacher).view, 'home');
 });
+
+test('resolveRoute: the list of ledgers needs ledger.list, the ledger of a subject ledger.get', () => {
+  const teacher = { mustChangePassword: false, permissions: ['ledger.list', 'ledger.get'] };
+  const office = { mustChangePassword: false, roles: ['dean'], permissions: ['ledger.list', 'ledger.get', 'journal.list'] };
+  const student = { mustChangePassword: false, permissions: ['schedule.mine', 'syllabus.get'] };
+  assert.deepEqual(resolveRoute('#/ledger', teacher), { view: 'ledgerList', params: {} });
+  assert.deepEqual(resolveRoute('#/ledger', office), { view: 'ledgerList', params: {} });
+  assert.deepEqual(resolveRoute('#/ledger/sb_1', teacher), { view: 'ledger', params: { subjectId: 'sb_1' } });
+  assert.equal(resolveRoute('#/ledger', student).view, 'home');
+  assert.equal(resolveRoute('#/ledger/sb_1', student).view, 'home');
+  assert.equal(resolveRoute('#/ledger', { mustChangePassword: false, permissions: ['ledger.get'] }).view, 'home');
+  assert.equal(resolveRoute('#/ledger/sb_1', { mustChangePassword: false, permissions: ['ledger.list'] }).view, 'home');
+  assert.equal(resolveRoute('#/ledger/%E0%A4%A', teacher).view, 'home');
+  assert.equal(resolveRoute('#/ledger/sb_1/x', teacher).view, 'home');
+});
