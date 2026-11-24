@@ -1,0 +1,49 @@
+Привет! Образ журнала готов.
+
+ОБРАЗ
+ghcr.io/janybek/college-journal:latest
+(конкретная версия: ghcr.io/janybek/college-journal:d07e157)
+Страница пакета: https://github.com/janybek/college-journal/pkgs/container/college-journal
+Подробная инструкция: https://github.com/janybek/college-journal/blob/main/DOCKER.md
+Код: https://github.com/janybek/college-journal (Dockerfile в корне)
+
+Образ собирается сам после каждого коммита в main (GitHub Actions), теги latest и короткий хеш коммита.
+
+ГЛАВНОЕ
+- Внутри: Node.js 24 + база SQLite. Один контейнер отдаёт и сайт (/), и API (/api).
+- Порт: 5373.
+- Работает от пользователя node (uid 1000), не от root.
+- Реплика строго ОДНА (SQLite, второй экземпляр на той же базе нельзя).
+- Проверка работы: GET /health → {"ok":true,"data":"journal"}. HEALTHCHECK в образе уже есть.
+- Перед контейнером нужен HTTPS (ingress/прокси), лимит размера запроса не меньше 20 МБ (студенты сдают файлы).
+- Почты и внешних сервисов нет. Паролей, ключей и secret.key в образе нет.
+
+ТОМА (оба постоянные, запись для uid 1000, в Kubernetes fsGroup: 1000)
+- /data — база journal.sqlite, ключ secret.key, папка files/ (работы студентов). Этот том надо бэкапить; secret.key терять нельзя.
+- /backup — ежедневные копии базы (хранятся 30 дней). Лучше на другом диске.
+
+ПЕРЕМЕННЫЕ (значения по умолчанию уже стоят в образе)
+- JOURNAL_ORIGINS — ОБЯЗАТЕЛЬНО задать адрес сайта, например https://journal.college.kg (только https, без пути; несколько — через запятую). Без этого вход не заработает (ответ forbidden_origin).
+- JOURNAL_DATA_DIR=/data
+- JOURNAL_BACKUP_DIR=/backup
+- JOURNAL_HOST=0.0.0.0 (оставить так: встроенная проверка ходит на 127.0.0.1)
+- JOURNAL_PORT=5373
+- JOURNAL_SITE_DIR=/app/site
+- JOURNAL_AUTO_INIT=1 (база создаётся сама при первом запуске)
+
+ПЕРВЫЙ ЗАПУСК
+1. Запустить с пустыми томами — база и ключ создадутся сами (в логе строка "base created automatically"). Пароль администратора при этом нигде не печатается.
+2. Получить временный пароль admin (показывается один раз):
+   docker exec -it <контейнер> node backend/node/server.js --admin-password
+   или
+   kubectl exec -it <под> -- node backend/node/server.js --admin-password
+3. Войти на сайте логином admin с этим паролем — журнал сразу попросит его сменить.
+Пароль admin, пожалуйста, передай мне лично, не в общий чат.
+
+Пример запуска для проверки:
+docker run -d --init --name journal -p 5373:5373 -v journal-data:/data -v journal-backup:/backup -e JOURNAL_ORIGINS=https://journal.college.kg ghcr.io/janybek/college-journal:latest
+
+ОБНОВЛЕНИЕ
+Сделать копию тома /data → поставить новый тег образа → перезапустить реплику. Сервер сам достраивает таблицы базы. Откат — прежний тег; при порче данных — копия из /backup.
+
+Когда будет домен — напиши его мне, больше в коде ничего менять не нужно.
