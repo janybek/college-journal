@@ -4,11 +4,14 @@ import fs from 'node:fs';
 
 // config.js reads the page address when it loads, so the site modules are imported after the address is set.
 globalThis.location = { hostname: 'localhost' };
-const { apiUrlFor, API_URL, PRODUCTION_API_URL } = await import('../site/config.js');
+const { apiUrlFor, API_URL, PRODUCTION_API_URL, GITHUB_PAGES_HOST } = await import('../site/config.js');
 
-test('the stand talks to its own stand, any other page to the journal server; a wrong address means «not configured»', () => {
+test('the stand and a copy served by the journal server use their own /api, GitHub Pages the owner computer; a wrong address means «not configured»', () => {
   const live = 'https://journal.example.ts.net/api';
-  assert.deepEqual([apiUrlFor('localhost', live), apiUrlFor('127.0.0.1', live), apiUrlFor('janybek.github.io', live), apiUrlFor('evil.example', live)], ['/api', '/api', live, live]);
+  assert.equal(GITHUB_PAGES_HOST, 'janybek.github.io');
+  assert.deepEqual([apiUrlFor('localhost', live), apiUrlFor('127.0.0.1', live), apiUrlFor('janybek.github.io', live), apiUrlFor('journal.college.example', live)], ['/api', '/api', live, '/api']);
+  // look-alike hosts get their own origin (the server refuses them anyway); no address of ours leaks to them
+  assert.deepEqual([apiUrlFor('evil.github.io', live), apiUrlFor('janybek.github.io.evil.com', live)], ['/api', '/api']);
   for (const bad of ['', 'http://journal.example.ts.net/api', 'https://journal.example.ts.net', 'https://journal.example.ts.net/api?x=1', 'https://journal.example.ts.net/api#x',
     '//journal.example.ts.net/api', 'javascript:alert(1)', ' https://journal.example.ts.net/api', 'https://a b/api'])
     assert.equal(apiUrlFor('janybek.github.io', bad), '', bad);
