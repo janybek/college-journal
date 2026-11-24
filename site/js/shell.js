@@ -14,6 +14,7 @@ const DIR_ICONS = { groups: 'layers', students: 'cap', staff: 'briefcase', disci
 // Menu parts each staff role works with; inside a part only what `permissions` allow is shown.
 const MENU_BY_ROLE = new Map([['admin', ['office']], ['dean', ['office']], ['prorector', ['office']], ['teacher', ['subjects']]]);
 const HOME = { name: 'home', href: '#/', textKey: 'nav.home', icon: 'home' };
+const ANNOUNCEMENTS = { name: 'announcements', href: '#/announcements', textKey: 'announce.title', icon: 'bell' };
 // Keep in step with the breakpoint in app.css where the sidebar becomes a drawer.
 const WIDE = '(min-width: 900px)';
 
@@ -47,10 +48,12 @@ export function navFor(permissionList, role) {
     if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet' });
     if (list.includes('request.mine')) items.push({ name: 'requests', href: '#/requests', textKey: 'request.mine.title', icon: 'clipboard' });
     if (list.includes('stateExam.list')) items.push({ name: 'stateExams', href: '#/state-exams', textKey: 'stateExam.title', icon: 'sheet' });
+    if (list.includes('announce.list')) items.push(ANNOUNCEMENTS);
     return [{ titleKey: 'nav.teaching', items }];
   }
   const groups = [{ titleKey: null, items: [HOME] }];
   if (!parts.includes('office')) return groups;
+  if (list.includes('announce.list')) groups[0].items.push(ANNOUNCEMENTS);
   if (list.includes('journal.list')) {
     const items = [{ name: 'journalList', href: '#/journal', textKey: 'journal.list.title', icon: 'table', hintKey: 'journal.hint' }];
     if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet', hintKey: 'ledger.hint' });

@@ -211,3 +211,14 @@ test('navFor: «Гос. экзамены» come after «Заявки», in the j
   assert.equal(navFor(['journal.list'], 'dean').flatMap((g) => g.items).some((i) => i.name === 'stateExams'), false);
   assert.equal(navFor(['schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'stateExams'), false);
 });
+
+test('navFor: «Объявления» come right after home for the office and after the state exams for the teacher', () => {
+  const office = navFor(['journal.list', 'stateExam.list', 'announce.list'], 'dean');
+  assert.deepEqual(office[0].items.map((i) => i.name), ['home', 'announcements']);
+  assert.deepEqual(office[0].items[1], { name: 'announcements', href: '#/announcements', textKey: 'announce.title', icon: 'bell' });
+  assert.deepEqual(navFor(['announce.list'], 'prorector')[0].items.map((i) => i.name), ['home', 'announcements']);
+  const teacher = navFor(['teacher.mySubjects', 'schedule.mine', 'stateExam.list', 'announce.list'], 'teacher')[0].items;
+  assert.deepEqual(teacher.map((i) => i.name), ['home', 'mySchedule', 'stateExams', 'announcements']);
+  assert.equal(navFor(['journal.list'], 'dean').flatMap((g) => g.items).some((i) => i.name === 'announcements'), false);
+  assert.equal(navFor(['announce.list'], 'student').flatMap((g) => g.items).some((i) => i.name === 'announcements'), false);
+});

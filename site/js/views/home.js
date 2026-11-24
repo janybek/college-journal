@@ -9,6 +9,7 @@ import { inExamWeek } from '../pairs.js';
 import { teacherBadge } from '../subjects.js';
 import { todayAction, clockText, cameMark } from '../lesson.js';
 import { homeCardLines } from '../work.js';
+import { topItems, firstLine } from '../announce.js';
 
 // Sections later units fill in; for now the student sees what is coming.
 const STUDENT_SECTIONS = [
@@ -283,6 +284,7 @@ function renderStaff(root, user) {
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   const parts = menuParts(role);
   const sections = [];
+  if (permissions.includes('announce.list')) sections.push(announceBlock(user));
   if (parts.includes('office')) {
     if (permissions.includes('request.queue')) sections.push(requestsBlock(user));
     for (const group of navFor(permissions, role).filter((candidate) => candidate.titleKey)) {
@@ -319,6 +321,7 @@ export function leave() {
   clearInterval(here.clock);
   here.pair = null;
   Object.assign(requestCount, { owner: null, n: null, pending: null });
+  Object.assign(announceHome, { owner: null, items: null, pending: null });
 }
 
 // The section appears only when there are pairs today; it asks again every minute while the page is open and visible.
@@ -420,6 +423,37 @@ function requestsBlock(user) {
       .then((data) => { if (requestCount.owner === owner) requestCount.n = Number.isInteger(data.waiting) ? data.waiting : 0; }, () => {})
       .finally(() => { if (requestCount.owner === owner) requestCount.pending = null; });
     requestCount.pending.then(draw);
+  }
+  draw();
+  return holder;
+}
+
+// «Объявления»: the last three at the top of the home screen, one announce.list each time the screen is opened (leave() forgets them);
+// with none, or no answer, there is no block. Title and the first line are only text.
+const announceHome = { owner: null, items: null, pending: null };
+
+function announceBlock(user) {
+  const holder = el('div', { class: 'home-announce', id: 'home-announce' });
+  const draw = () => {
+    holder.replaceChildren();
+    if (!announceHome.items || announceHome.items.length === 0) return;
+    holder.append(el('section', { class: 'card home-announce__card', 'aria-labelledby': 'home-announce-title' },
+      el('header', { class: 'home-announce__head' },
+        el('span', { class: 'tile__icon' }, icon('bell')),
+        el('h2', { class: 'section__title home-announce__title', id: 'home-announce-title' }, t('announce.title'))),
+      el('ul', { class: 'home-announce__list' }, topItems(announceHome.items).map((item) => el('li', { class: 'home-announce__item' },
+        el('a', { class: 'home-announce__link', href: '#/announcements' },
+          el('span', { class: 'home-announce__name' }, item.title),
+          firstLine(item.text) ? el('span', { class: 'home-announce__line' }, firstLine(item.text)) : null)))),
+      el('a', { class: 'home-announce__all', id: 'home-announce-all', href: '#/announcements' }, t('announce.home.all'), icon('chevron'))));
+  };
+  if (announceHome.owner !== user.id) Object.assign(announceHome, { owner: user.id, items: null, pending: null });
+  if (announceHome.items === null && !announceHome.pending) {
+    const owner = user.id;
+    announceHome.pending = call('announce.list', {})
+      .then((data) => { if (announceHome.owner === owner) announceHome.items = Array.isArray(data.items) ? data.items : []; }, () => {})
+      .finally(() => { if (announceHome.owner === owner) announceHome.pending = null; });
+    announceHome.pending.then(draw);
   }
   draw();
   return holder;

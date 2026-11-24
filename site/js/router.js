@@ -75,6 +75,8 @@ export function resolveRoute(hash, user) {
   if (path === '/state-exams' && permissions.includes('stateExam.list')) return { view: 'stateExams', params: {} };
   const stateExam = /^\/state-exam\/([^/]+)$/.exec(path);
   if (stateExam && permissions.includes('stateExam.get') && idOf(stateExam[1]) !== null) return { view: 'stateExam', params: { examId: idOf(stateExam[1]) } };
+  // «Объявления»: what the person may read (and, for the teachers and the deanery, write). The server decides who sees which.
+  if (path === '/announcements' && permissions.includes('announce.list')) return { view: 'announcements', params: {} };
   if (path === '/settings' && permissions.includes('settings.get')) return { view: 'settings', params: {} };
   if (path === '/my' && permissions.includes('schedule.mine')) return { view: 'mySchedule', params: {} };
   // «Я на паре»: the check-in of a student (a pass from a QR link also lands here).

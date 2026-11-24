@@ -222,3 +222,12 @@ test('resolveRoute: the state exams need stateExam.list, one exam needs stateExa
   assert.equal(resolveRoute('#/state-exam/%E0%A4%A', staff).view, 'home');
   assert.equal(resolveRoute('#/state-exam/a/b', staff).view, 'home');
 });
+
+test('resolveRoute: the announcements need announce.list, every role has it', () => {
+  for (const role of ['admin', 'dean', 'prorector', 'teacher', 'student']) {
+    const user = { mustChangePassword: false, roles: [role], permissions: ['announce.list'] };
+    assert.deepEqual(resolveRoute('#/announcements', user), { view: 'announcements', params: {} }, role);
+  }
+  assert.equal(resolveRoute('#/announcements', { mustChangePassword: false, permissions: [] }).view, 'home');
+  assert.equal(resolveRoute('#/announcements', null).view, 'login');
+});
