@@ -629,3 +629,21 @@ function changePairStatus(store, platform, data, user, reopen) {
 
 export const missPair = (store, platform, data, user) => changePairStatus(store, platform, data, user, false);
 export const reopenPair = (store, platform, data, user) => changePairStatus(store, platform, data, user, true);
+
+// For the request of a unit result (task 14): the live row "subject + student + half of the plan + unit" gets the new value, or a row is added.
+// `rows` are the rows of 'Итоги юнитов' as the request read them. Low level: no rights, no term, no log. -> { old (number | null) }
+export function writeUnitResult(store, { rows, subject, planSemester, unit, studentId, field, value, actorId, at }) {
+  const column = COLUMN_OF[field];
+  const mine = rows.filter((r) => r.subjectId === subject.id && r.studentId === studentId && (r.planSemester ?? null) === planSemester && r.unit === unit);
+  const row = lastOf(mine, 'updatedAt');
+  const old = row && row[column] !== undefined ? row[column] : null;
+  const stamp = { updatedBy: actorId, updatedAt: at };
+  if (row) {
+    store.updateMany('unitResults', [{ id: row.id, patch: { [column]: value, ...stamp } }]);
+  } else {
+    store.insertMany('unitResults', [{
+      subjectId: subject.id, studentId, planSemester, unit, control: null, self: null, currentManual: null, [column]: value, ...stamp,
+    }]);
+  }
+  return { old };
+}

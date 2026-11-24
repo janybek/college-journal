@@ -71,3 +71,17 @@ export function gradeWork(store, platform, data, user) {
   if (log.length > 0) store.insertMany('changeLog', log);
   return { work: staffWorkView({ ...rows, submissions: rows.submissions.map((r) => (r.id === current.id ? saved : r)) }, platform, assignment, user) };
 }
+
+// For the request of work points (task 14): the points of the current attempt, or a paper attempt when there is none.
+// Low level: no rights, no log. -> { before (number | null), statusBefore ('' | status), created }
+export function applyPoints(store, { assignment, studentId, current, points, actorId, at }) {
+  if (!current) {
+    store.insertMany('submissions', [{
+      assignmentId: assignment.id, studentId, n: 1, text: '', paper: true, submittedAt: at, status: 'checked',
+      points, comment: '', checkedBy: actorId, checkedAt: at,
+    }]);
+    return { before: null, statusBefore: '', created: true };
+  }
+  store.updateMany('submissions', [{ id: current.id, patch: { status: 'checked', points, checkedBy: actorId, checkedAt: at } }]);
+  return { before: current.points ?? null, statusBefore: current.status, created: false };
+}
