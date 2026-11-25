@@ -129,19 +129,29 @@ function summary(subject, scheme, split, detail) {
     blocks.push(el('p', { class: 'gr-outside' }, t('grades.outside', { earned: subject.outside.earned, possible: subject.outside.possible })));
   }
   if (blocks.length === 0) blocks.push(el('p', { class: 'muted gr-none' }, t('grades.cardEmpty')));
-  const out = [el('div', { class: 'gr-units' }, blocks)];
+  const unitsEl = el('div', { class: 'gr-units' }, blocks);
+  const out = [unitsEl];
+  let semesterEl = null;
   const semester = semesterLine(subject, split);
   const admission = admissionLine(subject, split);
   const repeat = finalWithRepeat(subject, split);
   if (semester) {
-    out.unshift(el('div', { class: 'gr-semester' + (repeat && repeat.key !== 'grades.repeat.pending' ? ' gr-semester--before' : '') },
+    semesterEl = el('div', { class: 'gr-semester' },
       el('p', { class: 'gr-final' }, el('span', { class: 'gr-final__text' }, t(semester.key, semester.params))),
       admission ? el('p', { class: `gr-admission gr-admission--${admission.tone}` }, t(admission.key, admission.params)) : null,
       ...examLines(subject, split).map((line) => el('p', { class: `gr-admission gr-admission--${line.tone} gr-exam`, 'data-line': line.key },
         t(line.key, line.params), line.word ? [' ', badge(t('journal.grade.' + line.word), wordTone(line.word))] : null)),
-      detail ? attemptHistory(subject) : null));
+      detail ? attemptHistory(subject) : null);
+    out.unshift(semesterEl);
   }
-  if (repeat) out.unshift(repeatTotal(repeat));
+  if (repeat) {
+    if (repeat.key === 'grades.repeat.pending') out.unshift(repeatTotal(repeat));
+    else {
+      // the closed repeat is the main total; the old result goes small and grey in one block (no tones, no warnings)
+      out.splice(0, out.length, repeatTotal(repeat),
+        el('div', { class: 'gr-before' }, el('p', { class: 'gr-before__title' }, t('grades.repeat.before')), ...[semesterEl, unitsEl].filter(Boolean)));
+    }
+  }
   const a = subject.attendance;
   if (a && a.marked > 0) out.push(el('p', { class: 'gr-attendance' }, t('grades.attendance', { attended: a.attended, marked: a.marked, missed: a.absent + a.excused })));
   return el('div', { class: 'gr-summary' }, out);
@@ -152,8 +162,7 @@ function repeatTotal(repeat) {
   if (repeat.key === 'grades.repeat.pending') return el('p', { class: 'gr-admission gr-admission--primary gr-repeat-note', 'data-line': repeat.key }, t(repeat.key, repeat.params));
   return el('div', { class: 'gr-repeat-main', 'data-line': repeat.key },
     el('p', { class: 'gr-final' }, el('span', { class: 'gr-final__text' }, t(repeat.key, repeat.params)),
-      repeat.word ? badge(t('journal.grade.' + repeat.word), wordTone(repeat.word)) : null, badge(t('grades.repeat.tag'), 'primary')),
-    el('p', { class: 'gr-repeat-before' }, t('grades.repeat.before')));
+      repeat.word ? badge(t('journal.grade.' + repeat.word), wordTone(repeat.word)) : null, badge(t('grades.repeat.tag'), 'primary')));
 }
 
 const wordTone = (word) => (word === 'excellent' ? 'success' : word === 'good' ? 'primary' : word === 'fair' ? 'warning' : 'danger');
