@@ -1873,6 +1873,7 @@ export default {
   'ledger.exam.error.studentId.has_retake': 'Кайра тапшыруу бар: биринчи тапшырууну арыз менен гана өзгөртүшөт',
   'ledger.exam.error.studentId.bad_ref': 'Бул студент ведомостто жок: бетти жаңыртыңыз',
   'ledger.exam.error.studentId.not_allowed': 'Бул студентке азыр жаңы аракет керек эмес',
+  'ledger.exam.error.studentId.on_repeat': 'Студент кайра окуу курсуна жазылган — ведомостто кайра тапшыруу кошулбайт',
   'ledger.exam.error.commission.required': 'Комиссиянын курамын жазыңыз',
   'ledger.exam.error.commission.too_long': 'Өтө узун: 300 белгиден ашпасын',
   'ledger.final.block.units_open': 'Бардык юниттер жабыла элек: {n}',

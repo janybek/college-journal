@@ -542,7 +542,9 @@ export function changeLogView(store, platform, data, user) {
   const repeats = store.list('repeats');
 
   // the lines of a repeat course: the office and the teacher of that repeat (a card not cancelled of the same student and subject)
-  const ofRepeatTeacher = (r) => repeats.some((c) => c.status !== 'cancelled' && c.teacherId === user.id && c.studentId === r.studentId && c.subjectId === r.subjectId);
+  // and only the lines of the life of his own card: from its creation to its closing (a reopened card has no closing)
+  const ofRepeatTeacher = (r) => repeats.some((c) => c.status !== 'cancelled' && c.teacherId === user.id && c.studentId === r.studentId && c.subjectId === r.subjectId
+    && cmp(r.at || '', c.createdAt || '') >= 0 && (!c.closedAt || cmp(r.at || '', c.closedAt) <= 0));
   const seesRepeat = (r) => viewer.manager || viewer.reader || ofRepeatTeacher(r);
   let repeatOnly = false;
   if (!viewer.manager && !viewer.reader) {

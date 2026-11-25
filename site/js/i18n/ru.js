@@ -1873,6 +1873,7 @@ export default {
   'ledger.exam.error.studentId.has_retake': 'Есть пересдача: первую сдачу меняют только заявкой',
   'ledger.exam.error.studentId.bad_ref': 'Этого студента нет в ведомости: обновите страницу',
   'ledger.exam.error.studentId.not_allowed': 'Новая попытка этому студенту сейчас не нужна',
+  'ledger.exam.error.studentId.on_repeat': 'Студент записан на повторный курс — пересдача в ведомости не добавляется',
   'ledger.exam.error.commission.required': 'Укажите состав комиссии',
   'ledger.exam.error.commission.too_long': 'Слишком длинно: не больше 300 знаков',
   'ledger.final.block.units_open': 'Закрыты не все юниты: {n}',

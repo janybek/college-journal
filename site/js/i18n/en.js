@@ -1873,6 +1873,7 @@ export default {
   'ledger.exam.error.studentId.has_retake': 'There is a retake: the first sitting changes only by a request',
   'ledger.exam.error.studentId.bad_ref': 'This student is not in the ledger: refresh the page',
   'ledger.exam.error.studentId.not_allowed': 'This student needs no new try now',
+  'ledger.exam.error.studentId.on_repeat': 'The student is enrolled in a repeat course: a retake is not added in the ledger',
   'ledger.exam.error.commission.required': 'Enter the members of the commission',
   'ledger.exam.error.commission.too_long': 'Too long: at most 300 characters',
   'ledger.final.block.units_open': 'Not all units are closed: {n}',

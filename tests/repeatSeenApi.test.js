@@ -233,3 +233,42 @@ test('a card blocks the deletion of its student, subject and staff; others are d
   for (const id of [t1, t2, t3, t4]) assert.equal(remove('staff', id).error.code, 'in_use', id);
   assert.equal(remove('staff', t5).ok, true);
 });
+
+test('the change log: a teacher of a repeat sees only the lines of the life of his own card', () => {
+  const s = setup();
+  s.failed();
+  const enrol = (teacherId) => s.call('repeat.enrol', { subjectId: s.sb1, planSemester: 1, studentId: s.ids.a2, kind: 'full', orderNo: '1', orderDate: '2026-12-21', deadline: '2027-02-01', teacherId }, s.t.dean).data.repeat.id;
+  const rows = (token) => s.call('journal.log', { subjectId: s.sb1 }, token).data.rows.filter((x) => x.entity === 'repeat').map((x) => `${x.field}:${x.after}`);
+  s.at('2026-12-21');
+  const a = enrol(s.ids.teacher3);
+  s.at('2026-12-22');
+  assert.equal(s.call('repeat.saveWorks', { repeatId: a, works: 20, note: 'card A' }, s.t.teacher3).ok, true);
+  s.at('2026-12-23');
+  assert.equal(s.call('repeat.close', { repeatId: a }, s.t.teacher3).ok, true);
+  s.at('2026-12-24');
+  const b = enrol(s.ids.teacher2);
+  s.at('2027-01-10');
+  assert.equal(s.call('repeat.saveWorks', { repeatId: b, works: 50, note: 'card B' }, s.t.teacher2).ok, true);
+  assert.equal(s.call('repeat.saveAttempt', { repeatId: b, date: '2027-01-10', outcome: 'score', score: 5 }, s.t.teacher2).ok, true);
+  assert.equal(s.call('repeat.get', { repeatId: b }, s.t.teacher3).error.code, 'forbidden');
+  const t3 = rows(s.t.teacher3);
+  const t2 = rows(s.t.teacher2);
+  assert.ok(t3.includes('works:20') && !t3.includes('works:50') && !t3.some((x) => x.startsWith('try1')), t3.join());
+  assert.ok(t2.includes('works:50') && t2.some((x) => x.startsWith('try1')) && !t2.includes('works:20'), t2.join());
+  // the deanery sees both
+  const d = rows(s.t.dean);
+  assert.ok(d.includes('works:20') && d.includes('works:50'));
+  // a reopened card has no closing: the teacher sees the later lines
+  const z = setup();
+  z.failed();
+  z.at('2026-12-21');
+  const c = z.call('repeat.enrol', { subjectId: z.sb1, planSemester: 1, studentId: z.ids.a2, kind: 'full', orderNo: '1', orderDate: '2026-12-21', deadline: '2027-02-01', teacherId: z.ids.teacher3 }, z.t.dean).data.repeat.id;
+  z.at('2026-12-22');
+  z.store.update('repeats', c, { status: 'failed', closedBy: z.ids.teacher3, closedAt: '2026-12-22 09:00:00' });
+  z.at('2026-12-23');
+  assert.equal(z.call('repeat.reopen', { repeatId: c, reason: 'check' }, z.t.admin).ok, true);
+  z.at('2026-12-24');
+  assert.equal(z.call('repeat.saveWorks', { repeatId: c, works: 25, note: 'again' }, z.t.teacher3).ok, true);
+  const seen = z.call('journal.log', { subjectId: z.sb1 }, z.t.teacher3).data.rows.map((x) => `${x.field}:${x.after}`);
+  assert.ok(seen.includes('works:25'), seen.join());
+});
