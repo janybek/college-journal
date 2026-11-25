@@ -41,3 +41,22 @@
 - Task 8: проба отката — принять (journal-reviewer sonnet; t8.mjs в scratchpad координатора\probe): прежний b829763 на новой базе — 0 internal, строки repeats/repeatAttempts/entity 'repeat' не изменились (и после backup/restore); addAttempt студенту с карточкой проходит; dir.remove студента/предмета с карточкой — in_use, преподавателя только повтора — удаляет (новый код показывает пустое имя); demo-wipe оставляет 4 карточки-сироты, новый код читает без ошибок; снимок prevAttempts не меняется от пересдачи прежним кодом.
 - Task 8: complete (проба, кода нет)
 - Ruling: серверная часть (задачи 1–8) закончена — по правилу 6б итоги в aidlc-state.md и копию журнала, затем новый чат координатора для блока экранов 1 (задачи 9–11).
+- Task 9: dispatched journal-screens (sonnet), BASE 0dfaa56; проверка ИИ строгая (права, данные студентов); стенд-люди по задаче 7, ошибки repeat_closed/deadline_passed в словари
+- Task 9: implementer DONE_WITH_CONCERNS (56e3af5, 1253 теста, стенд по PID остановлен). Отступления: окно записи зовёт scoring.get ради max; «остались пересдачи» = EXAM_TRIES_MAX − prev.tries на сайте; «Баллы за семестр N»; заголовок «Преподаватель». Строгая проверка: journal-reviewer (sonnet).
+- Task 9: review — вернуть (strict, probe.mjs в scratchpad координатора). Important: «остались пересдачи» = 3 − tries, у «I» без сдач (tries 0) пишет 3, по core/exam.js — 2.
+- Ruling: правка на сайте, не на сервере — число пересдач = max(0, min(max−1, max − tries)) (tries 0 -> 2, 1 -> 2, 3 -> 0); сервер не трогаем, задача экранная — если сервер изменит правило попыток, тест равенства констант не поймает (стоимость — одна строка).
+- Task 9: minor (в тот же круг, тот же агент): repeats.js — фильтр own вручную вместо filterRepeats(…, { own }).
+- Task 9: minor (deferred): repeatEnrol.js — scoring.get в Promise.all роняет окно при сбое сети; чище split в repeat.candidates — на общую проверку (задача 13).
+- Task 9: fix round 1/5 (1 addressed, 0 open — retakesLeft tries 0 -> 2; own через filterRepeats; commits 56e3af5..d9a4556). Круг маленький — координатор принял сам: diff прочитан, npm test 1253/1253.
+- Task 9: complete (commits 0dfaa56..d9a4556, review clean)
+- Task 10: dispatched journal-screens (sonnet, новый), BASE d9a4556; проверка ИИ строгая (права, баллы); люди стенда переложены на данные задачи 7
+- Task 10: implementer DONE_WITH_CONCERNS (2f7e907, 1261 тест). fixTarget по can.close && !overdue вместо can.attempt (после сдачи next=null, can.attempt false, а сервер ещё правит последнюю попытку); итог перенесён в блок «Итог и закрытие»; чужая карточка — текст error.forbidden. Строгая проверка: journal-reviewer (sonnet).
+- Task 10: review — принять (strict, probe_t10b.test.js в scratchpad координатора; fixTarget совпал с сервером во всех 7 случаях). minor (deferred): views/repeat.js:337,457 — busy не сбрасывается при уходе с экрана до ответа (безвредно); views/repeat.js:386 — подпись «Сдачу комиссией вносит деканат» по can.attempt (совпадает с правами).
+- Ruling: fixTarget по can.close && !overdue (+ commission) вместо can.attempt из плана — принято, проба показала совпадение с сервером; по плану нельзя было бы исправить первую сдачу после «сдал».
+- Task 10: complete (commits d9a4556..2f7e907, review clean)
+- Task 11: проверка ИИ — нет (по плану), владелец принимает блок 1
+- Task 11: dispatched journal-screens (sonnet, новый), BASE 2f7e907; без проверки ИИ
+- Task 11: implementer DONE_WITH_CONCERNS (feff0b7, 1269 тестов, PDF 1 стр. книжный, ведомость 4 метки, журнал: dean 9 строк повтора, teacher1 8 без S2006). Добавлен ключ journal.log.repeat.worksNote (иначе строка сырая). Строки try/status по интерфейсу: «сдача 1: — → 33», «Повтор: идёт → сдал» (не «Повтор закрыт: сдал» из примера).
+- Ruling: формулировки строк журнала по интерфейсу плана принимаем; подпись листа «Деканат» вместо «Декан» — покажем владельцу. Координатор посмотрел sheet-closed.png и log-dean.png.
+- Task 11: complete (commits 2f7e907..feff0b7, без проверки ИИ по плану)
+- Ruling: блок экранов 1 (задачи 9–11) собран — стоп, приёмка владельцем на стенде; итоги в aidlc-state.md и копию журнала.
