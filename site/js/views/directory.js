@@ -97,6 +97,8 @@ async function reloadSummary(owner) {
 function applyAddress(params) {
   if (state.rows === null) return;
   const { table } = state;
+  // Browser «Back» from the edit address: the window opened by it goes away with it.
+  if (params.editId === undefined && state.dialog?.back) state.dialog = null;
   if (params.editId === undefined) state.askedEdit = null;
   else if (state.askedEdit !== params.editId) {
     state.askedEdit = params.editId;

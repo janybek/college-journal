@@ -14,7 +14,7 @@ function checkTable(table) {
 }
 
 // The moment, the term and the settings every answer needs. `read(name)` reads a sheet once per request.
-function context(store, platform, user) {
+function context(store, platform, user, table) {
   const sheets = {};
   const read = (name) => {
     if (!(name in sheets)) sheets[name] = store.list(name);
@@ -26,7 +26,8 @@ function context(store, platform, user) {
   const settingsRows = read('settings');
   const settings = readSettings(settingsRows);
   const extra = readExtra(settingsRows);
-  const term = termOf({ settings, extra, today, hasPairs: read('pairs').length > 0 });
+  // Only groups and rooms say anything about the term (and read the big sheet of pairs for it).
+  const term = table === 'disciplines' ? undefined : termOf({ settings, extra, today, hasPairs: read('pairs').length > 0 });
   const viewer = { id: user.id, roles: Array.isArray(user.roles) ? user.roles : [] };
   return { read, today, time, term, settings, extra, viewer };
 }
@@ -140,7 +141,7 @@ function disciplinesSummary(c) {
 
 export function dirSummary(store, platform, user, table) {
   checkTable(table);
-  const c = context(store, platform, user);
+  const c = context(store, platform, user, table);
   if (table === 'groups') return groupsSummary(c);
   if (table === 'rooms') return roomsSummary(c);
   return disciplinesSummary(c);
@@ -261,7 +262,7 @@ export function dirCard(store, platform, user, data) {
   checkTable(table);
   if (typeof id !== 'string' || id === '') throw new AppError('bad_request');
   if (table === 'rooms' && from !== undefined && !isDate(from)) throw new AppError('bad_request');
-  const c = context(store, platform, user);
+  const c = context(store, platform, user, table);
   const row = c.read(table).find((r) => r.id === id);
   if (!row) throw new AppError('not_found');
   if (table === 'groups') return groupCard(c, row);

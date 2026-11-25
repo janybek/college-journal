@@ -39,8 +39,12 @@ export function render(root, params) {
     root.append(state.errorCode === null ? el('p', { class: 'loading' }, t('common.loading')) : failure());
     return;
   }
-  root.append(pageHeader({ id: 'card-title', title: t(`dir.card.${table}.title`, { name: nameOf(state.data) }), lead: lead(), actions: actions() }),
-    ...BODIES[table](state.data).filter(Boolean));
+  // A failed change of the week keeps the old week on the screen and says so above it.
+  root.append(...[
+    pageHeader({ id: 'card-title', title: t(`dir.card.${table}.title`, { name: nameOf(state.data) }), lead: lead(), actions: actions() }),
+    state.errorCode === null ? null : note('error', t(errorKey(state.errorCode)), { role: 'alert' }),
+    ...BODIES[table](state.data),
+  ].filter(Boolean));
 }
 
 async function load() {
@@ -185,6 +189,7 @@ function groupBody(data) {
 
 function changeWeek(from) {
   state.from = from;
+  state.errorCode = null;
   load();
 }
 

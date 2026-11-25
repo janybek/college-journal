@@ -225,6 +225,17 @@ test('nothing is written, each table is read once', () => {
   }
 });
 
+test('disciplines do not read the pairs sheet', () => {
+  const s = setup();
+  const { call, t, spy } = s;
+  rooms(s);
+  for (const [action, data] of [['dir.summary', { table: 'disciplines' }], ['dir.card', { table: 'disciplines', id: s.ds1 }]]) {
+    spy.reset();
+    assert.equal(call(action, data, t.dean).ok, true, action);
+    assert.equal(spy.lists.pairs, undefined, action);
+  }
+});
+
 test('the old answers do not change', () => {
   const s = setup();
   const { call, t, store } = s;
