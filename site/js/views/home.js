@@ -10,6 +10,7 @@ import { teacherBadge } from '../subjects.js';
 import { todayAction, clockText, cameMark } from '../lesson.js';
 import { homeCardLines } from '../work.js';
 import { topItems, firstLine, dayText } from '../announce.js';
+import { homeRepeats } from '../repeat.js';
 
 // Last known subjects of the signed-in teacher: shown at once, refreshed in the background on every visit.
 const subjects = { owner: null, list: null, errorKey: null, pending: null };
@@ -284,6 +285,7 @@ function renderStaff(root, user) {
   }
   if (parts.includes('subjects') && permissions.includes('schedule.mine')) sections.push(examDayCard(user));
   if (parts.includes('subjects') && permissions.includes('lesson.mine')) sections.push(lessonsSection(user));
+  if (parts.includes('subjects') && permissions.includes('repeat.list')) sections.push(repeatsBlock(user));
   if (parts.includes('subjects') && permissions.includes('teacher.mySubjects')) sections.push(subjectsSection(user));
   root.append(
     pageHeader({ id: 'home-name', title: user.fullName, lead: role ? t('role.' + role) : null }),
@@ -312,6 +314,7 @@ export function leave() {
   clearInterval(here.clock);
   here.pair = null;
   Object.assign(requestCount, { owner: null, n: null, pending: null });
+  Object.assign(repeatHome, { owner: null, count: null, pending: null });
   Object.assign(announceHome, { owner: null, items: null, error: null, pending: null });
 }
 
@@ -414,6 +417,34 @@ function requestsBlock(user) {
       .then((data) => { if (requestCount.owner === owner) requestCount.n = Number.isInteger(data.waiting) ? data.waiting : 0; }, () => {})
       .finally(() => { if (requestCount.owner === owner) requestCount.pending = null; });
     requestCount.pending.then(draw);
+  }
+  draw();
+  return holder;
+}
+
+// «Мои повторники: N (срок вышел: M)»: one repeat.list each time the home screen is opened (leave() forgets the answer); with no open
+// cards of their own, or no answer, there is no block.
+const repeatHome = { owner: null, count: null, pending: null };
+
+function repeatsBlock(user) {
+  const holder = el('div', { class: 'home-requests', id: 'home-repeats' });
+  const draw = () => {
+    holder.replaceChildren();
+    if (repeatHome.count && repeatHome.count.open > 0) {
+      const { open, overdue } = repeatHome.count;
+      holder.append(el('a', { class: 'card home-requests__link', id: 'home-repeats-link', href: '#/repeats' },
+        el('span', { class: 'tile__icon' }, icon('sheet')),
+        el('span', { class: 'home-requests__text' }, t('home.repeat.mine', { n: open }), overdue > 0 ? ' ' + t('home.repeat.overdue', { n: overdue }) : null),
+        icon('chevron', 'tile__go')));
+    }
+  };
+  if (repeatHome.owner !== user.id) Object.assign(repeatHome, { owner: user.id, count: null, pending: null });
+  if (repeatHome.count === null && !repeatHome.pending) {
+    const owner = user.id;
+    repeatHome.pending = call('repeat.list', {})
+      .then((data) => { if (repeatHome.owner === owner) repeatHome.count = homeRepeats(Array.isArray(data.repeats) ? data.repeats : []); }, () => {})
+      .finally(() => { if (repeatHome.owner === owner) repeatHome.pending = null; });
+    repeatHome.pending.then(draw);
   }
   draw();
   return holder;

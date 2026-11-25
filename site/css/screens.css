@@ -8433,6 +8433,7 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .rp-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
 
 .rp-head,
+.rp-block,
 .rp-prev { display: grid; gap: var(--space-4); padding: var(--space-5); }
 
 .rp-prev__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
@@ -8510,3 +8511,58 @@ a.gr-card:hover { border-color: var(--primary-line); }
 @media (max-width: 30rem) {
   .rp-pair { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* The card of the teacher of the repeat: the works, the exam, the result and the closing. */
+
+.rp-block { display: grid; gap: var(--space-4); padding: var(--space-5); }
+
+.rp-block__lead { margin: 0; color: var(--text-muted); }
+
+.rp-form { display: grid; gap: var(--space-4); max-width: 34rem; }
+
+.rp-score { width: 6rem; font-variant-numeric: tabular-nums; }
+
+.rp-block__actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+
+.rp-saved { display: inline-flex; align-items: center; gap: var(--space-2); color: var(--success); font-weight: 500; }
+
+.rp-saved .icon { width: 1.125rem; height: 1.125rem; }
+
+.rp-tries { display: grid; gap: var(--space-2); margin: 0; padding: 0; list-style: none; }
+
+.rp-try {
+  display: grid;
+  grid-template-columns: 3.5rem minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--muted);
+}
+
+.rp-try__date { color: var(--text-muted); font-variant-numeric: tabular-nums; }
+
+.rp-try__result { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.rp-try__commission { grid-column: 2 / -1; color: var(--text-muted); font-size: 0.875rem; overflow-wrap: anywhere; }
+
+.rp-finish__total { display: grid; gap: var(--space-1); }
+
+.rp-finish__label { color: var(--text-muted); font-size: 0.8125rem; }
+
+.rp-finish__value { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+
+.rp-finish__value .badge { font-size: 0.875rem; letter-spacing: 0; }
+
+.rp-finish__prev { margin: 0; color: var(--text-muted); font-size: 0.875rem; }
+
+.rp-close__result { margin: 0; font-size: 1.125rem; font-weight: 600; }
+
+@media (max-width: 40rem) {
+  .rp-try { grid-template-columns: 3.5rem minmax(0, 1fr) auto; }
+  .rp-try .button { grid-column: 1 / -1; justify-self: start; }
+  .rp-block { padding: var(--space-4); }
+}
+
+.rp-form .field[hidden] { display: none; }

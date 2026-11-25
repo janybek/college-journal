@@ -63,5 +63,57 @@ export const enrolDraft = (candidate, subject, today) => ({
 // The first sitting is not a retake, so at most EXAM_TRIES_MAX - 1 remain: tries 0 -> 2, 1 -> 2, 2 -> 1, 3 -> 0.
 export const retakesLeft = (prev) => (prev.retakesLeft === true ? Math.max(0, Math.min(EXAM_TRIES_MAX - 1, EXAM_TRIES_MAX - (prev.tries || 0))) : 0);
 
+// ---- The card of the teacher of the repeat: the works, the exam, the closing ----
+
+// The block «Работы повтора»: only for the whole subject; the maximum is the answer's, a number that stands needs a reason to change.
+export const worksState = (view) => ({
+  show: view.kind === 'full', value: view.works.value, note: view.works.note, max: view.split.semester,
+  edit: view.can.works === true, needReason: Number.isInteger(view.works.value),
+});
+
+// The line under the works: admitted or not, from the answer's `admitted`; no line for «только экзамен» or without works.
+export function admissionLine(view) {
+  if (view.kind !== 'full' || !Number.isInteger(view.works.value)) return null;
+  if (view.result.admitted === true) return { key: 'repeat.admission.yes', params: {}, tone: 'success' };
+  return { key: 'repeat.admission.low', params: { need: view.split.admission }, tone: 'danger' };
+}
+
+// What the exam block offers to enter: null when there is nothing to enter; canEnter — this person may enter it
+// (the sitting by a commission is the deanery's).
+export function attemptForm(view) {
+  const { next } = view.result;
+  if (next === null || next === undefined || view.result.admitted !== true) return null;
+  return { no: next.no, retake: next.retake === true, commission: next.commission === true, canEnter: view.can.attempt === true && (!next.commission || view.can.commission === true) };
+}
+
+// The last sitting that may be corrected. can.attempt goes false once the exam is passed (nothing is left to enter), but the server
+// still corrects the last one until the card is closed: so the right is `can.close` (may score, open) without the overdue deadline.
+export function fixTarget(view) {
+  if (view.can.close !== true || view.overdue === true || view.attempts.length === 0) return null;
+  const last = view.attempts[view.attempts.length - 1];
+  if (last.commission && view.can.commission !== true) return null;
+  return last;
+}
+
+// The line of the closing block: who closed it, what stops it, or what the closing will give.
+export function closeNote(view) {
+  if (view.status === 'passed' || view.status === 'failed') {
+    return { key: 'repeat.closed.' + view.status, params: { date: dayOf((view.closedAt || '').slice(0, 10)), name: view.closedByName || DASH }, tone: view.status === 'passed' ? 'success' : 'danger' };
+  }
+  if (view.status !== 'open') return null;
+  const { blocking, outcome, retakesLeft: left } = view.close;
+  if (blocking.length > 0) return { key: 'repeat.block.' + blocking[0].code, params: {}, tone: 'warning' };
+  if (left === true) return { key: 'repeat.close.retakesLeft', params: {}, tone: 'warning' };
+  return { key: 'repeat.close.ready.' + outcome, params: {}, tone: 'neutral' };
+}
+
+export const canClose = (view) => view.can.close === true && (view.close.blocking.length === 0 || view.can.force === true);
+
+// The block of the home screen of the teacher: their own open cards and how many of them are past the deadline.
+export function homeRepeats(repeats) {
+  const open = repeats.filter((row) => row.own === true && row.status === 'open');
+  return { open: open.length, overdue: open.filter((row) => row.overdue === true).length };
+}
+
 export const dayOf = (date) => (typeof date === 'string' && date.length >= 10 ? `${date.slice(8, 10)}.${date.slice(5, 7)}.${date.slice(0, 4)}` : '');
 export const orderLine = (no, date) => (no ? { key: 'repeat.order', params: { no, date: dayOf(date) } } : null);
