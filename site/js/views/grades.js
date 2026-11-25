@@ -5,6 +5,7 @@ import { icon } from '../icons.js';
 import { unitLine, absenceList, pointsText, semesterLine, admissionLine, examLines, stateExamLine } from '../journal.js';
 import { attemptLines, SCORE_MAX } from '../ledger.js';
 import { dayText } from '../announce.js';
+import { studentCard, finalWithRepeat } from '../repeat.js';
 import { weekdayDate } from './pairParts.js';
 
 // «Оценки» of a student (#/grades, #/grades/<subjectId>): the points and absences of the person who asks, from
@@ -27,8 +28,8 @@ export function render(root, params = {}) {
     root.append(pageHeader({ id: 'gr-title', title: t('grades.title') }), failedOrLoading());
     return;
   }
-  const { scheme, subjects, split, stateExams } = state.data;
-  if (!detail) root.append(listScreen(subjects, scheme, split, Array.isArray(stateExams) ? stateExams : []));
+  const { scheme, subjects, split, stateExams, repeats } = state.data;
+  if (!detail) root.append(listScreen(subjects, scheme, split, Array.isArray(stateExams) ? stateExams : [], Array.isArray(repeats) ? repeats : []));
   else {
     const subject = subjects.find((s) => s.subjectId === params.subjectId);
     root.append(subject ? detailScreen(subject, scheme, split) : notFound());
@@ -63,9 +64,9 @@ function failedOrLoading() {
 
 // ---- #/grades: a card for each subject ----
 
-function listScreen(subjects, scheme, split, stateExams) {
+function listScreen(subjects, scheme, split, stateExams, repeats) {
   const head = pageHeader({ id: 'gr-title', title: t('grades.title'), lead: t('home.gradesLead') });
-  if (subjects.length === 0) return el('div', { class: 'gr' }, head, emptyState('chart', el('p', {}, t('grades.empty'))), stateExamBlock(stateExams));
+  if (subjects.length === 0) return el('div', { class: 'gr' }, head, emptyState('chart', el('p', {}, t('grades.empty'))), repeatBlock(repeats, split), stateExamBlock(stateExams));
   return el('div', { class: 'gr' }, head,
     el('ul', { class: 'gr-list' }, subjects.map((subject) => el('li', {},
       el('a', { class: 'card gr-card', href: '#/grades/' + encodeURIComponent(subject.subjectId) },
@@ -76,6 +77,7 @@ function listScreen(subjects, scheme, split, stateExams) {
           icon('chevron', 'gr-card__go')),
         summary(subject, scheme, split, false))))),
     subjects.some((subject) => subject.units.some((unit) => unit.selfWork)) ? el('a', { class: 'button button--secondary gr-tasks', id: 'gr-tasks', href: '#/tasks' }, t('grades.myTasks')) : null,
+    repeatBlock(repeats, split),
     stateExamBlock(stateExams),
     howBlock(scheme));
 }
@@ -130,17 +132,28 @@ function summary(subject, scheme, split, detail) {
   const out = [el('div', { class: 'gr-units' }, blocks)];
   const semester = semesterLine(subject, split);
   const admission = admissionLine(subject, split);
+  const repeat = finalWithRepeat(subject, split);
   if (semester) {
-    out.unshift(el('div', { class: 'gr-semester' },
+    out.unshift(el('div', { class: 'gr-semester' + (repeat && repeat.key !== 'grades.repeat.pending' ? ' gr-semester--before' : '') },
       el('p', { class: 'gr-final' }, el('span', { class: 'gr-final__text' }, t(semester.key, semester.params))),
       admission ? el('p', { class: `gr-admission gr-admission--${admission.tone}` }, t(admission.key, admission.params)) : null,
       ...examLines(subject, split).map((line) => el('p', { class: `gr-admission gr-admission--${line.tone} gr-exam`, 'data-line': line.key },
         t(line.key, line.params), line.word ? [' ', badge(t('journal.grade.' + line.word), wordTone(line.word))] : null)),
       detail ? attemptHistory(subject) : null));
   }
+  if (repeat) out.unshift(repeatTotal(repeat));
   const a = subject.attendance;
   if (a && a.marked > 0) out.push(el('p', { class: 'gr-attendance' }, t('grades.attendance', { attended: a.attended, marked: a.marked, missed: a.absent + a.excused })));
   return el('div', { class: 'gr-summary' }, out);
+}
+
+// The total of a subject with a repeat card: the repeat is the main total once closed (the earlier result goes small below), else it goes.
+function repeatTotal(repeat) {
+  if (repeat.key === 'grades.repeat.pending') return el('p', { class: 'gr-admission gr-admission--primary gr-repeat-note', 'data-line': repeat.key }, t(repeat.key, repeat.params));
+  return el('div', { class: 'gr-repeat-main', 'data-line': repeat.key },
+    el('p', { class: 'gr-final' }, el('span', { class: 'gr-final__text' }, t(repeat.key, repeat.params)),
+      repeat.word ? badge(t('journal.grade.' + repeat.word), wordTone(repeat.word)) : null, badge(t('grades.repeat.tag'), 'primary')),
+    el('p', { class: 'gr-repeat-before' }, t('grades.repeat.before')));
 }
 
 const wordTone = (word) => (word === 'excellent' ? 'success' : word === 'good' ? 'primary' : word === 'fair' ? 'warning' : 'danger');
@@ -169,6 +182,27 @@ function attemptHistory(subject) {
     el('p', { class: 'gr-attempts__title' }, t('grades.attempts')),
     el('ul', { class: 'gr-attempts__list' }, attemptLines(attempts).map((line) => el('li', {},
       [dayText(line.date).slice(0, 5), t(line.label.key, line.label.params), line.result.key ? t(line.result.key) : line.result.text].join(' · ')))));
+}
+
+// ---- «Повторный курс»: a card for each repeat of the student (only the own ones; the server gives no ids and no commission) ----
+
+function repeatBlock(repeats, split) {
+  if (repeats.length === 0) return null;
+  return el('section', { class: 'gr-section gr-repeat', id: 'gr-repeat', 'aria-labelledby': 'gr-repeat-title' },
+    el('h2', { class: 'gr-section__title', id: 'gr-repeat-title' }, t('grades.repeat.title')),
+    el('ul', { class: 'gr-pairs' }, repeats.map((item) => {
+      const card = studentCard(item, split);
+      const [kind, ...rest] = card.lines;
+      const attempts = item.attempts.length > 0 ? attemptLines(item.attempts) : [];
+      return el('li', { class: 'gr-pair gr-repeat__card' + (item.status === 'open' && item.overdue ? ' is-overdue' : ''), 'data-status': item.status },
+        el('div', { class: 'gr-pair__top' }, el('span', { class: 'gr-pair__date' }, card.title), badge(t(kind.key), kind.tone)),
+        el('ul', { class: 'gr-repeat__lines' }, rest.map((line) => el('li', { class: `gr-repeat__line gr-repeat__line--${line.tone}`, 'data-line': line.key },
+          t(line.key, line.params), line.word ? [' ', badge(t('journal.grade.' + line.word), wordTone(line.word))] : null))),
+        attempts.length > 0 ? el('div', { class: 'gr-attempts' },
+          el('p', { class: 'gr-attempts__title' }, t('grades.repeat.attempts')),
+          el('ul', { class: 'gr-attempts__list' }, attempts.map((line) => el('li', {},
+            [dayText(line.date).slice(0, 5), t(line.label.key, line.label.params), line.result.key ? t(line.result.key) : line.result.text].join(' · '))))) : null);
+    })));
 }
 
 // ---- «Государственные экзамены»: only the own result ----

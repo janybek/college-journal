@@ -178,3 +178,60 @@ export function repeatSheet(view, labels) {
     signs: [signLine(t('ledger.print.signTeacher'), view.teacher.fullName), signLine(t('repeat.print.signDean'), '')],
   };
 }
+
+// ---- The student: the card on the home screen and in «Оценки» ----
+
+const fullMax = (split) => split.semester + split.exam;
+
+// One own card of a student (an item of `repeats` of student.grades / repeat.mine) as lines of text, in the order of the screen.
+// The maxima come from `split`; the attempts are drawn by the screen with attemptLines (ledger.js).
+export function studentCard(item, split) {
+  const lines = [{ key: 'grades.repeat.kind.' + item.kind, params: {}, tone: 'primary' }];
+  const order = item.orderNo ? { key: 'grades.repeat.order', params: { no: item.orderNo, date: dayOf(item.orderDate) }, tone: 'neutral' } : null;
+  if (order) lines.push(order);
+  if (item.deadline) {
+    const late = item.status === 'open' && item.overdue === true;
+    lines.push({ key: late ? 'grades.repeat.overdue' : 'grades.repeat.deadline', params: { date: dayOf(item.deadline) }, tone: late ? 'warning' : 'neutral' });
+  }
+  if (item.teacherName) lines.push({ key: 'grades.repeat.teacher', params: { name: item.teacherName }, tone: 'neutral' });
+  if (item.kind === 'full') {
+    const has = Number.isInteger(item.works.value);
+    if (has) {
+      lines.push({ key: 'grades.repeat.works', params: { value: item.works.value, max: split.semester }, tone: 'neutral' });
+      if (item.works.note) lines.push({ key: 'grades.repeat.worksNote', params: { note: item.works.note }, tone: 'neutral' });
+    } else lines.push({ key: 'grades.repeat.worksNone', params: {}, tone: 'neutral' });
+  } else if (Number.isInteger(item.prev.semester)) {
+    lines.push({ key: 'grades.repeat.prevSemester', params: { value: item.prev.semester, max: split.semester }, tone: 'neutral' });
+  }
+  const hasTotal = Number.isInteger(item.total);
+  if (item.attempts.length === 0 && item.status === 'open') lines.push({ key: 'grades.repeat.examNone', params: {}, tone: 'neutral' });
+  if (hasTotal) {
+    lines.push({
+      key: item.status === 'open' ? 'grades.repeat.totalPreliminary' : 'grades.repeat.total', params: { total: item.total, max: fullMax(split) },
+      tone: wordTone(item.word), word: item.word,
+    });
+  } else if (item.status === 'failed') lines.push({ key: 'grades.repeat.failedNoTotal', params: {}, tone: 'danger' });
+  lines.push(Number.isInteger(item.prev.total)
+    ? { key: 'grades.repeat.prev', params: { total: item.prev.total, max: fullMax(split) }, tone: 'muted' }
+    : { key: 'grades.repeat.prevNone', params: {}, tone: 'muted' });
+  return { title: item.subjectName, lines };
+}
+
+// «Оценки», the total of a subject that has a repeat card: the repeat is the main total once it is closed (main), else it only «goes».
+export function finalWithRepeat(subject, split) {
+  const repeat = subject.repeat;
+  if (!repeat) return null;
+  const max = fullMax(split);
+  if (!repeat.main) return { key: 'grades.repeat.pending', params: { total: repeat.total, max }, tone: 'primary', word: null };
+  if (!Number.isInteger(repeat.total)) return { key: 'grades.repeat.mainNone', params: {}, tone: 'danger', word: null };
+  return { key: 'grades.repeat.main', params: { total: repeat.total, max }, tone: wordTone(repeat.word), word: repeat.word };
+}
+
+// The home screen of a student: how many repeats go and the nearest deadline (an overdue one is the nearest), or null.
+export function homeRepeat(repeats) {
+  const open = repeats.filter((row) => row.status === 'open')
+    .sort((a, b) => (a.deadline || '9999').localeCompare(b.deadline || '9999'));
+  if (open.length === 0) return null;
+  const [first] = open;
+  return { count: open.length, nearest: { subjectName: first.subjectName, deadline: first.deadline, overdue: first.overdue === true } };
+}

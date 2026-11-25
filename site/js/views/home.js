@@ -10,7 +10,7 @@ import { teacherBadge } from '../subjects.js';
 import { todayAction, clockText, cameMark } from '../lesson.js';
 import { homeCardLines } from '../work.js';
 import { topItems, firstLine, dayText } from '../announce.js';
-import { homeRepeats } from '../repeat.js';
+import { homeRepeats, homeRepeat, dayOf } from '../repeat.js';
 
 // Last known subjects of the signed-in teacher: shown at once, refreshed in the background on every visit.
 const subjects = { owner: null, list: null, errorKey: null, pending: null };
@@ -39,6 +39,7 @@ function renderStudent(root, user) {
           user.groupName ? badge(user.groupName, 'primary') : el('span', { class: 'muted' }, t('home.noGroup'))))),
     hereSection(user),
     studentAnnounce(user),
+    studentRepeat(user),
     homeworkSection(user),
     todaySection(user),
     studentSubjectsSection(user),
@@ -315,6 +316,7 @@ export function leave() {
   here.pair = null;
   Object.assign(requestCount, { owner: null, n: null, pending: null });
   Object.assign(repeatHome, { owner: null, count: null, pending: null });
+  Object.assign(repeatOwn, { owner: null, home: undefined, pending: null });
   Object.assign(announceHome, { owner: null, items: null, error: null, pending: null });
 }
 
@@ -445,6 +447,35 @@ function repeatsBlock(user) {
       .then((data) => { if (repeatHome.owner === owner) repeatHome.count = homeRepeats(Array.isArray(data.repeats) ? data.repeats : []); }, () => {})
       .finally(() => { if (repeatHome.owner === owner) repeatHome.pending = null; });
     repeatHome.pending.then(draw);
+  }
+  draw();
+  return holder;
+}
+
+// The student's card «Повторный курс»: only while a repeat goes; one repeat.mine each time the home screen is opened (leave() forgets it).
+const repeatOwn = { owner: null, home: undefined, pending: null };
+
+function studentRepeat(user) {
+  const holder = el('div', { class: 'home-repeat', id: 'home-repeat' });
+  const draw = () => {
+    holder.replaceChildren();
+    const info = repeatOwn.home;
+    if (!info) return;
+    const { subjectName, deadline, overdue } = info.nearest;
+    holder.append(el('section', { class: 'card home-repeat__card' + (overdue ? ' is-overdue' : ''), 'aria-labelledby': 'home-repeat-title' },
+      el('h2', { class: 'section__title home-repeat__title', id: 'home-repeat-title' }, t('home.repeat.title')),
+      el('p', { class: 'home-repeat__subject' }, subjectName),
+      el('p', { class: 'home-repeat__deadline' }, overdue ? badge(t('home.repeat.late'), 'warning') : t('home.repeat.until', { date: dayOf(deadline) })),
+      info.count > 1 ? el('p', { class: 'muted home-repeat__others' }, t('home.repeat.others', { n: info.count - 1 })) : null,
+      el('a', { class: 'button button--secondary home-repeat__more', id: 'home-repeat-more', href: '#/grades' }, t('home.repeat.more'), icon('chevron'))));
+  };
+  if (repeatOwn.owner !== user.id) Object.assign(repeatOwn, { owner: user.id, home: undefined, pending: null });
+  if (repeatOwn.home === undefined && !repeatOwn.pending) {
+    const owner = user.id;
+    repeatOwn.pending = call('repeat.mine', {})
+      .then((data) => { if (repeatOwn.owner === owner) repeatOwn.home = homeRepeat(Array.isArray(data.repeats) ? data.repeats : []); }, () => {})
+      .finally(() => { if (repeatOwn.owner === owner) repeatOwn.pending = null; });
+    repeatOwn.pending.then(draw);
   }
   draw();
   return holder;

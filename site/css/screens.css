@@ -8574,3 +8574,56 @@ a.gr-card:hover { border-color: var(--primary-line); }
 @media print {
   .print-table tbody tr:only-child > * { height: 8mm; }
 }
+
+/* ---- The student: the repeat course (the home card and the block in «Оценки») ---- */
+
+.home-repeat:empty { display: none; }
+
+.home-repeat { margin-bottom: var(--space-4); }
+
+.home-repeat__card {
+  display: grid;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-inline-start: 3px solid var(--primary);
+}
+
+.home-repeat__card.is-overdue { border-inline-start-color: var(--warning); }
+
+.home-repeat__title, .home-repeat__subject, .home-repeat__deadline, .home-repeat__others { margin: 0; }
+
+.home-repeat__subject { font-size: 1.125rem; font-weight: 700; overflow-wrap: anywhere; }
+
+.home-repeat__deadline { font-size: 1rem; font-weight: 600; }
+
+.home-repeat__more { justify-self: start; min-height: 2.75rem; }
+
+.gr-repeat { margin-top: var(--space-6); }
+
+.gr-repeat__card { display: grid; gap: var(--space-2); border-inline-start: 3px solid var(--primary); }
+
+.gr-repeat__card.is-overdue { border-inline-start-color: var(--warning); }
+
+.gr-repeat__card[data-status="passed"] { border-inline-start-color: var(--success); }
+
+.gr-repeat__card[data-status="failed"] { border-inline-start-color: var(--danger); }
+
+.gr-repeat__lines { display: grid; gap: var(--space-1); margin: 0; padding: 0; list-style: none; font-size: 1rem; line-height: 1.4; overflow-wrap: anywhere; }
+
+.gr-repeat__line--warning { color: var(--warning); font-weight: 600; }
+
+.gr-repeat__line--danger { color: var(--danger); font-weight: 600; }
+
+.gr-repeat__line--success { color: var(--success); font-weight: 600; }
+
+.gr-repeat__line--primary { color: var(--primary-ink); font-weight: 600; }
+
+.gr-repeat__line--muted { color: var(--text-muted); }
+
+.gr-repeat-note { margin: 0; }
+
+.gr-repeat-main { display: grid; gap: var(--space-1); }
+
+.gr-repeat-before { margin: 0; color: var(--text-muted); font-size: 1rem; }
+
+.gr-semester--before { opacity: 0.8; }

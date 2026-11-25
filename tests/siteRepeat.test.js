@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { REPEAT_STATES, EXAM_TRIES_MAX, stateOf, stateBadge, filterOptions, filterRepeats, prevLine, totalLine, enrolDraft, retakesLeft, orderLine,
-  worksState, admissionLine, attemptForm, fixTarget, closeNote, canClose, homeRepeats } from '../site/js/repeat.js';
+  worksState, admissionLine, attemptForm, fixTarget, closeNote, canClose, homeRepeats, studentCard, finalWithRepeat, homeRepeat } from '../site/js/repeat.js';
 import { EXAM } from '../core/exam.js';
 import ru from '../site/js/i18n/ru.js';
 import ky from '../site/js/i18n/ky.js';
@@ -294,4 +294,101 @@ test('the print and the Excel sheet of the ledger do not change when a student h
   const labels = { t: sheetT, sheet: 'Ведомость' };
   assert.deepEqual(ledgerSheet(marked, labels), ledgerSheet(plain, labels));
   assert.deepEqual(examSheet(marked, labels), examSheet(plain, labels));
+});
+
+// ---- The student: the card on the home screen and in «Оценки» ----
+
+const item = (over = {}) => ({
+  subjectName: 'Информатика', planSemester: 1, kind: 'full', orderNo: '12-с', orderDate: '2026-11-24', deadline: '2027-02-01', overdue: false, status: 'open',
+  teacherName: 'Иванов И.', works: { value: 45, note: '', max: 60 }, attempts: [{ no: 1, date: '2026-12-01', outcome: 'score', score: 30 }],
+  exam: 30, total: 75, word: 'good', preliminary: true, prev: { semester: 40, status: 'done', exam: 18, total: 58, word: 'fail' }, ...over,
+});
+const keysOf = (card) => card.lines.map((l) => l.key);
+
+test('studentCard: the whole subject, open: the lines in order, the preliminary total, the previous total last', () => {
+  const card = studentCard(item(), SPLIT);
+  assert.equal(card.title, 'Информатика');
+  assert.deepEqual(keysOf(card), ['grades.repeat.kind.full', 'grades.repeat.order', 'grades.repeat.deadline', 'grades.repeat.teacher', 'grades.repeat.works',
+    'grades.repeat.totalPreliminary', 'grades.repeat.prev']);
+  assert.deepEqual(card.lines[1].params, { no: '12-с', date: '24.11.2026' });
+  assert.deepEqual(card.lines[2].params, { date: '01.02.2027' });
+  assert.deepEqual(card.lines[3].params, { name: 'Иванов И.' });
+  assert.deepEqual(card.lines[4].params, { value: 45, max: 60 });
+  const total = card.lines[5];
+  assert.deepEqual(total.params, { total: 75, max: 100 });
+  assert.equal(total.word, 'good');
+  assert.equal(total.tone, 'primary');
+  assert.deepEqual(card.lines[6].params, { total: 58, max: 100 });
+});
+
+test('studentCard: works with a note, no works yet, no try yet', () => {
+  assert.ok(keysOf(studentCard(item({ works: { value: 45, note: 'Три работы', max: 60 } }), SPLIT)).includes('grades.repeat.worksNote'));
+  const bare = studentCard(item({ works: { value: null, note: '', max: 60 }, attempts: [], exam: null, total: null, word: null }), SPLIT);
+  assert.ok(keysOf(bare).includes('grades.repeat.worksNone'));
+  assert.ok(keysOf(bare).includes('grades.repeat.examNone'));
+  assert.ok(!keysOf(bare).includes('grades.repeat.totalPreliminary'));
+});
+
+test('studentCard: failed without a total, passed with a total, no previous total', () => {
+  const failed = studentCard(item({ status: 'failed', preliminary: false, total: null, word: null, exam: null, attempts: [] }), SPLIT);
+  assert.ok(keysOf(failed).includes('grades.repeat.failedNoTotal'));
+  assert.ok(!keysOf(failed).includes('grades.repeat.examNone'));
+  const passed = studentCard(item({ status: 'passed', preliminary: false, total: 80, word: 'good' }), SPLIT);
+  const line = passed.lines.find((l) => l.key === 'grades.repeat.total');
+  assert.deepEqual(line.params, { total: 80, max: 100 });
+  assert.equal(line.word, 'good');
+  const none = studentCard(item({ prev: { semester: null, status: 'incomplete', exam: null, total: null, word: null } }), SPLIT);
+  assert.equal(keysOf(none).at(-1), 'grades.repeat.prevNone');
+});
+
+test('studentCard: exam only shows the previous semester, no works; overdue is a warning', () => {
+  const card = studentCard(item({ kind: 'exam', works: { value: null, note: '', max: 60 }, overdue: true }), SPLIT);
+  const keys = keysOf(card);
+  assert.equal(keys[0], 'grades.repeat.kind.exam');
+  assert.ok(!keys.includes('grades.repeat.works') && !keys.includes('grades.repeat.worksNone'));
+  const prevSemester = card.lines.find((l) => l.key === 'grades.repeat.prevSemester');
+  assert.deepEqual(prevSemester.params, { value: 40, max: 60 });
+  const late = card.lines.find((l) => l.key === 'grades.repeat.overdue');
+  assert.equal(late.tone, 'warning');
+  assert.ok(!keys.includes('grades.repeat.deadline'));
+  assert.equal(studentCard(item({ overdue: true, status: 'passed' }), SPLIT).lines.some((l) => l.key === 'grades.repeat.overdue'), false);
+});
+
+test('studentCard: the maxima come from split', () => {
+  const card = studentCard(item(), { semester: 50, exam: 50, admission: 25 });
+  assert.equal(card.lines.find((l) => l.key === 'grades.repeat.works').params.max, 50);
+  assert.equal(card.lines.find((l) => l.key === 'grades.repeat.totalPreliminary').params.max, 100);
+});
+
+test('finalWithRepeat: no card is null, main and pending', () => {
+  assert.equal(finalWithRepeat({}, SPLIT), null);
+  const main = finalWithRepeat({ repeat: { kind: 'full', status: 'passed', total: 80, word: 'good', main: true } }, SPLIT);
+  assert.deepEqual(main, { key: 'grades.repeat.main', params: { total: 80, max: 100 }, tone: 'primary', word: 'good' });
+  const pending = finalWithRepeat({ repeat: { kind: 'full', status: 'open', total: 75, word: 'good', main: false } }, SPLIT);
+  assert.equal(pending.key, 'grades.repeat.pending');
+  assert.deepEqual(pending.params, { total: 75, max: 100 });
+  const failed = finalWithRepeat({ repeat: { kind: 'full', status: 'failed', total: null, word: null, main: true } }, SPLIT);
+  assert.equal(failed.key, 'grades.repeat.mainNone');
+});
+
+test('homeRepeat: closed do not count, the nearest deadline first', () => {
+  assert.equal(homeRepeat([]), null);
+  assert.equal(homeRepeat([item({ status: 'passed' }), item({ status: 'failed' })]), null);
+  const home = homeRepeat([item({ subjectName: 'Физика', deadline: '2027-03-01' }), item({ status: 'passed' }),
+    item({ subjectName: 'Химия', deadline: '2027-02-01', overdue: true })]);
+  assert.deepEqual(home, { count: 2, nearest: { subjectName: 'Химия', deadline: '2027-02-01', overdue: true } });
+});
+
+test('the dictionaries have the grades.repeat.* and home.repeat.* keys in three languages, with no scale numbers in the texts', () => {
+  const keys = ['grades.repeat.title', 'grades.repeat.kind.full', 'grades.repeat.kind.exam', 'grades.repeat.order', 'grades.repeat.deadline', 'grades.repeat.overdue',
+    'grades.repeat.teacher', 'grades.repeat.works', 'grades.repeat.worksNote', 'grades.repeat.worksNone', 'grades.repeat.prevSemester', 'grades.repeat.examNone',
+    'grades.repeat.totalPreliminary', 'grades.repeat.total', 'grades.repeat.failedNoTotal', 'grades.repeat.prev', 'grades.repeat.prevNone', 'grades.repeat.attempts',
+    'grades.repeat.main', 'grades.repeat.mainNone', 'grades.repeat.pending', 'grades.repeat.tag', 'grades.repeat.before',
+    'home.repeat.title', 'home.repeat.until', 'home.repeat.late', 'home.repeat.more', 'home.repeat.others'];
+  for (const dict of [ru, ky, en]) {
+    for (const key of keys) {
+      assert.ok(dict[key], key);
+      assert.doesNotMatch(dict[key], /\b(60|40|100)\b/, key);
+    }
+  }
 });
