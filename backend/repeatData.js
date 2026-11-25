@@ -16,7 +16,7 @@ import { readLedgerRows } from './ledgerData.js';
 import { halfResults, halvesOf } from './repeatSnapshot.js';
 
 export const REPEAT_TABLES = ['repeats', 'repeatAttempts', 'subjects', 'groups', 'staff', 'students', 'settings'];
-const CANDIDATE_TABLES = ['subjects', 'groups', 'staff', 'closures', 'syllabi', 'settings', 'repeats'];
+const CANDIDATE_TABLES = ['subjects', 'groups', 'staff', 'closures', 'syllabi', 'syllabusMembers', 'settings', 'repeats'];
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const invalid = (fields) => new AppError('invalid', { fields });

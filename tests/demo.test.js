@@ -1,3 +1,4 @@
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
@@ -192,6 +193,7 @@ function withOldRecords(t) {
   store.insert('settings', { key: 'semester', value: '1' });
   const syllabus = store.insert('syllabi', { disciplineId: discipline.id, teacherId: teacher.id, semester: 1, version: 1 });
   store.insert('topics', { syllabusId: syllabus.id, order: 1, unit: 1, name: 'Старая тема', hours: 2 });
+  applyLinesUpgrade(store, base.platform);
   base.close();
   return config;
 }

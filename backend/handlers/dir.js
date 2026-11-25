@@ -4,7 +4,7 @@ import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core
 import { readSettings } from '../../core/settings.js';
 import { USER_TABLES } from '../users.js';
 import { teacherHandover } from '../../core/schedule.js';
-import { versionsOf } from '../../core/syllabusFlow.js';
+import { versionsOfLine, joinedLineId } from '../../core/syllabusLines.js';
 import { dirSummary, dirCard } from '../dirInfo.js';
 import { loadSettings, relayout, todayOf } from '../scheduleData.js';
 
@@ -183,10 +183,11 @@ function mySubjects(data, ctx, user) {
   const students = store.list('students').filter((s) => s.active === true);
   const mine = store.list('subjects').filter((s) => s.teacherId === user.id);
   const syllabi = store.list('syllabi');
+  const members = store.list('syllabusMembers');
   const half = loadSettings(store).semester;
   const subjects = mine.map((s) => {
     const group = groups.find((g) => g.id === s.groupId);
-    const { approved, open } = s.disciplineId ? versionsOf(syllabi, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester: half }) : { approved: null, open: null };
+    const { approved, open } = s.disciplineId ? versionsOfLine(syllabi, joinedLineId(members, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester: half })) : { approved: null, open: null };
     return {
       id: s.id,
       name: s.name,

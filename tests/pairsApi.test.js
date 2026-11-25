@@ -1,3 +1,4 @@
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
@@ -61,6 +62,7 @@ function setup() {
   const topicIds = [1, 2, 3, 4].map((order) => store.insert('topics', {
     syllabusId, order, unit: 1, lessonKind: 'lecture', name: 'Тема ' + order, hours: 2, description: '',
   }).id);
+  applyLinesUpgrade(store, platform);
   call('settings.save', { settings: S }, t.dean);
   store.insert('weekTemplate', { weekday: 2, slot: 1, subjectId: sb1, roomId: r1.id });
   store.insert('weekTemplate', { weekday: 5, slot: 1, subjectId: sb2, roomId: r2.id });

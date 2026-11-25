@@ -1,7 +1,7 @@
 // Rules of the directory details (group, room and discipline cards). Pure functions, no storage.
 import { minutesOf, addMinutes, isTime, isDate } from './dates.js';
 import { PAIR_MINUTES } from './settings.js';
-import { versionsOf, rightsOn } from './syllabusFlow.js';
+import { rightsOn } from './syllabusFlow.js';
 import { compareNames } from './names.js';
 import { joinedLineId, versionsOfLine } from './syllabusLines.js';
 
@@ -55,9 +55,8 @@ export function topOf(items) {
 
 // viewer: { id, roles }. The open version is shown only to those who may see it.
 export function syllabusState(syllabi, { disciplineId, teacherId, semester }, viewer, members) {
-  const { approved, open } = members === undefined   // TEMP task 4
-    ? versionsOf(syllabi, { disciplineId, teacherId, semester })
-    : versionsOfLine(syllabi, joinedLineId(members, { disciplineId, teacherId, semester }));
+  if (!Array.isArray(members)) throw new TypeError('syllabusState: the members of the lines are required');
+  const { approved, open } = versionsOfLine(syllabi, joinedLineId(members, { disciplineId, teacherId, semester }));
   const visible = open && rightsOn(open, { ...viewer, teaches: false }).see;
   return { approved: approved !== null, open: visible ? open.status : null };
 }

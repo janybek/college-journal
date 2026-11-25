@@ -2,6 +2,7 @@
 // Fictional people only. A group 01-1 with the subject sb1 (Информатика, teacher1, the approved syllabus of two units: 01.09 and 08.09 are
 // unit 1, 15.09 and 22.09 unit 2, 29.09 the control of unit 2) and a group 02-1 with the subject sb2 (Анатомия, teacher2, no syllabus).
 // 01.09 and 08.09 of sb1 and 04.09 and 11.09 of sb2 are closed and carry marks; the pair of sb1 on 15.09 is a substitution of teacher3.
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { createMemoryStore } from '../backend/store/memoryStore.js';
 import { SCHEMA } from '../core/schema.js';
@@ -83,6 +84,7 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   [[1, 'lecture'], [1, 'practice'], [2, 'lecture'], [2, 'practice'], [2, 'control']].forEach(([unit, lessonKind], i) => {
     store.insert('topics', { syllabusId, order: i + 1, unit, lessonKind, name: `Тема ${i + 1}`, hours: 2 });
   });
+  applyLinesUpgrade(store, platform);
 
   // sign-in of everyone at the current moment; the tokens of `t` are replaced in place
   const login = () => {

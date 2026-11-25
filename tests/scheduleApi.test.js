@@ -1,3 +1,4 @@
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
@@ -61,12 +62,13 @@ function setup({ withSettings = true, withTemplate = true } = {}) {
   const r2 = store.insert('rooms', { name: '102' }).id;
   const syllabus1 = store.insert('syllabi', { disciplineId: ds1, teacherId: staff.teacher1, semester: 1, planSemester: 1, status: 'approved', version: 1 }).id;
   const topics = [1, 2, 3].map((order) => topicRow(store, syllabus1, order, 'Тема ' + order));
+  applyLinesUpgrade(store, platform);
   if (withSettings) call('settings.save', { settings: S }, tokens.dean);
   const wt = withTemplate
     ? [[2, 1, sb1, r1], [1, 2, sb1, r1], [5, 1, sb2, '']].map(([weekday, slot, subjectId, roomId]) =>
       store.insert('weekTemplate', { weekday, slot, subjectId, roomId }).id)
     : [];
-  return { store, state, call, calls: spied.calls, reads: spied.reads, writes: spied.writes, reset: spied.reset, ...tokens, staff, g1, g2, ds1, sb1, sb2, r1, r2, topics, wt };
+  return { store, platform, state, call, calls: spied.calls, reads: spied.reads, writes: spied.writes, reset: spied.reset, ...tokens, staff, g1, g2, ds1, sb1, sb2, r1, r2, topics, wt };
 }
 
 test('generate: dry run, real run, repeat, later start, topics laid over pairs', () => {
@@ -161,10 +163,11 @@ test('generate: pairs between today and a later semester start are removed, held
 });
 
 test('semester: only topics of the current semester are laid, switching moves them', () => {
-  const { store, state, call, dean, staff, ds1, sb1, topics: [topic1, topic2] } = setup();
+  const { store, platform, state, call, dean, staff, ds1, sb1, topics: [topic1, topic2] } = setup();
   const spring = store.insert('syllabi', { disciplineId: ds1, teacherId: staff.teacher1, semester: 2, planSemester: 2, status: 'approved', version: 1 }).id;
   const b1 = topicRow(store, spring, 1, 'Второй семестр 1');
   const b2 = topicRow(store, spring, 2, 'Второй семестр 2');
+  applyLinesUpgrade(store, platform);
   call('schedule.generate', {}, dean);
   const mine = () => store.list('pairs').filter(p => p.subjectId === sb1).sort((a, b) => a.date.localeCompare(b.date));
   const withoutTopic = () => mine().filter((p) => p.status === 'planned' && p.topicId === '' && p.date >= settings().semesterStart && p.date <= settings().semesterEnd).length;

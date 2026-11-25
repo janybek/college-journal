@@ -80,7 +80,7 @@ test('draft → review → returned → review → approved: the lessons reach t
   assert.deepEqual(pick(syllabusId, 'status', 'remark', 'decidedBy', 'decidedAt'), ['approved', '', staff.dean, '2026-08-31']);
   assert.deepEqual([lessons(sb1), lessons(sb3)], [[['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]], [['2026-09-02', ...FIRST[0]], ['2026-09-09', ...FIRST[1]]]]);
   assert.deepEqual(writes, { 'updateMany:syllabi': 1, 'updateMany:pairs': 1 });
-  assert.deepEqual(lists, { subjects: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, settings: 1, groups: 1 });
+  assert.deepEqual(lists, { subjects: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, settings: 1, groups: 1, syllabusMembers: 1 });
   assert.deepEqual([calls.get, calls.update || 0, calls.insert || 0], [1, 0, 0]);
 });
 

@@ -73,7 +73,7 @@ export function studentGrades(rows, platform, user) {
     .map((subject) => {
       const all = rows.pairs.filter((p) => p.subjectId === subject.id && inSemester(p.date, settings));
       const first = firstPairId(all);
-      const syllabus = syllabusFor(subject, rows.syllabi, settings.semester);
+      const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusMembers);
       const { planSemester, closed } = closedOfSubject(rows, subject, settings, all);
       const unitOf = (p) => { const t = topics.get(p.topicId); return t && Number.isInteger(t.unit) ? t.unit : null; };
 

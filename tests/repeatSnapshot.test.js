@@ -1,3 +1,4 @@
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup } from './journalSetup.js';
@@ -38,6 +39,7 @@ test('a final sheet opened again is no half; a syllabus of the next half without
   const before = byId(half());
   s.switchSemester();
   s.store.insert('syllabi', { disciplineId: s.ds1, teacherId: s.ids.teacher1, semester: 2, planSemester: 2, status: 'approved', version: 1 });
+  applyLinesUpgrade(s.store, s.platform);
   assert.deepEqual(halvesOf(rows(), subject()), [{ planSemester: 1, current: false }]);
   assert.deepEqual(byId(half()), before);
   const final = s.store.list('closures').find((c) => c.unit === 0);

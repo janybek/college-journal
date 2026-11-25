@@ -2,7 +2,6 @@
 // and the plan of an upload (which rows are added, changed or dropped; held pairs are protected).
 import { FIXED_STATUSES } from './schema.js';
 import { HOURS_PER_PAIR, inSemester, lessonKey, lessonTypeOf, lessonsOf, partsOf } from './topics.js';
-import { versionsOf } from './syllabusFlow.js';
 import { joinedLineId, versionsOfLine } from './syllabusLines.js';
 import { docLessons } from './syllabusPlan.js';
 
@@ -13,7 +12,7 @@ export const semesterHalf = (planSemester) => (planSemester % 2 === 1 ? 1 : 2);
 export function syllabusFor(subject, syllabi, half, members) {
   if (!subject || !subject.disciplineId) return null;
   const key = { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: half };
-  if (members === undefined) return versionsOf(syllabi, key).approved;   // TEMP task 3
+  if (!Array.isArray(members)) throw new TypeError('syllabusFor: the members of the lines are required');
   return versionsOfLine(syllabi, joinedLineId(members, key)).approved;
 }
 

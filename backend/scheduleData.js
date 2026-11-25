@@ -38,10 +38,11 @@ const groupBy = (rows) => {
 export function relayout(store, subjectIds = null, rows = {}, also = []) {
   const subjects = rows.subjects ?? store.list('subjects');
   const syllabi = rows.syllabi ?? store.list('syllabi');
+  const syllabusMembers = rows.syllabusMembers ?? store.list('syllabusMembers');
   const topics = rows.topics ?? store.list('topics');
   const pairs = rows.pairs ?? store.list('pairs');
   const settings = rows.settings ?? loadSettings(store);
-  const index = syllabusIndex(syllabi, topics);
+  const index = syllabusIndex(syllabi, topics, syllabusMembers);
   const pairsBySubject = groupBy(pairs);
   const wanted = subjectIds === null ? null : new Set(subjectIds);
 
@@ -53,9 +54,9 @@ export function relayout(store, subjectIds = null, rows = {}, also = []) {
     for (const id of scope.clear) lesson(id, NO_LESSON);
     for (const { id, patch } of layoutLessons(scope.topics, scope.pairs, scope.skip).assign) lesson(id, patch);
   }
-  if (assigned.size === 0) return { changed: 0, subjects, syllabi, topics, pairs };
+  if (assigned.size === 0) return { changed: 0, subjects, syllabi, syllabusMembers, topics, pairs };
   store.updateMany('pairs', [...assigned].map(([id, patch]) => ({ id, patch })));
-  return { changed: assigned.size, subjects, syllabi, topics, pairs: pairs.map((p) => (assigned.has(p.id) ? { ...p, ...assigned.get(p.id) } : p)) };
+  return { changed: assigned.size, subjects, syllabi, syllabusMembers, topics, pairs: pairs.map((p) => (assigned.has(p.id) ? { ...p, ...assigned.get(p.id) } : p)) };
 }
 
 export function generateSchedule(store, platform, { dryRun = false, restart = false } = {}) {

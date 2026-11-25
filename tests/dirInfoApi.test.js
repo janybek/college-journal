@@ -1,3 +1,4 @@
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { setup, bishkek } from './journalSetup.js';
@@ -115,6 +116,7 @@ test('dir.summary and dir.card of disciplines', () => {
     syllabi: { approved: 1, review: 0, returned: 0, draft: 0, none: 0 } });
   assert.deepEqual(byId(d.rows, ds2).syllabi, { approved: 0, review: 0, returned: 0, draft: 0, none: 1 });
   store.insert('syllabi', { disciplineId: ds2, teacherId: ids.teacher2, semester: 1, planSemester: 1, status: 'draft', version: 1 });
+  applyLinesUpgrade(store, s.platform);
   assert.deepEqual(byId(call('dir.summary', { table: 'disciplines' }, t.dean).data.rows, ds2).syllabi, { approved: 0, review: 0, returned: 0, draft: 1, none: 0 });
   assert.deepEqual(byId(call('dir.summary', { table: 'disciplines' }, t.prorector).data.rows, ds2).syllabi, { approved: 0, review: 0, returned: 0, draft: 0, none: 1 });
   const card2 = call('dir.card', { table: 'disciplines', id: ds2 }, t.prorector).data;

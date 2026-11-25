@@ -1,3 +1,4 @@
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
@@ -17,7 +18,7 @@ function setup() {
   store.insert('groups', { name: '01-1', course: 1 });
   const call = (action, data, token) => handleRequest(JSON.stringify({ action, data, token }), ctx);
   const dean = call('auth.login', { login: 'dean', password: 'secret12' }).data.token;
-  return { store, call, dean };
+  return { store, call, dean, platform };
 }
 
 const cells = [['ФИО', 'Группа', '№ студ. билета'], ['Асанов Азамат', '01-1', 2001], ['Бекова Бегимай', '01-1', 2002], ['Кривой', '99-9', 2003]];
@@ -128,7 +129,7 @@ test('disciplines import: the deanery loads the list, a known name is not added 
 });
 
 test('a subjects import that changes the teacher re-lays the group and hands it its pairs; every sheet is read once', () => {
-  const { store, call, dean } = setup();
+  const { store, call, dean, platform } = setup();
   const g1 = store.list('groups')[0].id;
   const teacher = (login) => store.insert('staff', { fullName: login, login, passwordHash: 'x', roles: 'teacher', lang: 'ky', mustChangePassword: false, active: true }).id;
   const t1 = teacher('tea1');
@@ -137,6 +138,7 @@ test('a subjects import that changes the teacher re-lays the group and hands it 
   const sb = store.insert('subjects', { name: 'Информатика', disciplineId: ds, groupId: g1, teacherId: t1, scheme: 'A' }).id;
   const sy = store.insert('syllabi', { disciplineId: ds, teacherId: t1, semester: 1, planSemester: 1, status: 'approved', version: 1 }).id;
   for (const [order, lessonKind] of [[1, 'lecture'], [2, 'practice']]) store.insert('topics', { syllabusId: sy, order, unit: 1, lessonKind, name: 'Введение', hours: 2, description: '' });
+  applyLinesUpgrade(store, platform);
   assert.equal(call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-09-25', holidays: [], bells: ['08:00', '09:40'], semester: 1 } }, dean).ok, true);
   store.insert('weekTemplate', { weekday: 2, slot: 1, subjectId: sb, roomId: '' });
   assert.equal(call('schedule.generate', {}, dean).ok, true);                     // four Tuesdays: 1, 8, 15, 22 September

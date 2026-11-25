@@ -1,8 +1,9 @@
 // Subjects and their disciplines for the handlers and for setup. No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
 import { normalizeRow, validateRow } from '../core/validate.js';
-import { scheduleFit, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
-import { rightsOn, versionsOf } from '../core/syllabusFlow.js';
+import { scheduleFit, syllabusFor, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
+import { rightsOn } from '../core/syllabusFlow.js';
+import { joinedLineId, versionsOfLine } from '../core/syllabusLines.js';
 import { rolesOf } from './users.js';
 import { loadSettings } from './scheduleData.js';
 
@@ -92,12 +93,13 @@ export function subjectsOverview(store, user) {
   const groups = store.list('groups');
   const staff = store.list('staff');
   const syllabi = store.list('syllabi');
+  const members = store.list('syllabusMembers');
   const topics = store.list('topics');
   const pairs = store.list('pairs');
   const disciplines = store.list('disciplines');
   const settings = loadSettings(store);
 
-  const index = syllabusIndex(syllabi, topics);
+  const index = syllabusIndex(syllabi, topics, members);
   const groupOf = new Map(groups.map((g) => [g.id, g]));
   const disciplineOf = new Map(disciplines.map((d) => [d.id, d]));
   const staffOf = new Map(staff.map((s) => [s.id, s]));
@@ -116,7 +118,7 @@ export function subjectsOverview(store, user) {
   }
   const rows = [...byKey.values()].map((list) => {
     const { disciplineId, teacherId } = list[0];
-    const { approved: current, open } = versionsOf(syllabi, { disciplineId, teacherId, semester: settings.semester });
+    const { approved: current, open } = versionsOfLine(syllabi, joinedLineId(members, { disciplineId, teacherId, semester: settings.semester }));
     // the prorector does not see drafts
     const openStatus = open && rightsOn(open, { id: user.id, roles: user.roles, teaches: false }).see ? open.status : null;
     const totals = syllabusTotals(current ? index.topicsOf.get(current.id) || [] : []);
@@ -129,7 +131,7 @@ export function subjectsOverview(store, user) {
         scheduledPairs: scheduleFit([], pairsOf.get(s.id) || [], settings).pairs,
       })).sort((a, b) => byName(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId)),
       syllabusStatus: current !== null ? 'approved' : 'none', open: openStatus,
-      otherSemester: syllabi.some((y) => y.disciplineId === disciplineId && y.teacherId === teacherId && y.status === 'approved' && y.semester !== settings.semester),
+      otherSemester: syllabusFor(list[0], syllabi, 3 - settings.semester, members) !== null,
       plannedHours: totals.hours, plannedPairs: totals.pairs,
     };
   }).sort((a, b) => byName(a.disciplineName, b.disciplineName) || byName(a.teacherName, b.teacherName) || cmp(a.teacherId, b.teacherId));

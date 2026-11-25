@@ -39,15 +39,16 @@ test('topOf', () => {
 });
 
 test('syllabusState and syllabusCounts', () => {
-  const Y = (status, version, over = {}) => ({ id: 'y' + version, disciplineId: 'd', teacherId: 't', semester: 1, status, version, ...over });
+  const Y = (status, version, over = {}) => ({ id: 'y' + version, disciplineId: 'd', teacherId: 't', semester: 1, lineId: 'l1', status, version, ...over });
+  const members = [{ id: 'm1', lineId: 'l1', disciplineId: 'd', teacherId: 't', semester: 1, state: 'joined', joinedAt: '' }];
   const key = { disciplineId: 'd', teacherId: 't', semester: 1 };
   const dean = { id: 'u', roles: ['dean'] };
   const pro = { id: 'p', roles: ['prorector'] };
-  assert.deepEqual(syllabusState([Y('approved', 1), Y('returned', 2)], key, dean), { approved: true, open: 'returned' });
-  assert.deepEqual(syllabusState([Y('draft', 1)], key, dean), { approved: false, open: 'draft' });
-  assert.deepEqual(syllabusState([Y('draft', 1)], key, pro), { approved: false, open: null });
-  assert.deepEqual(syllabusState([Y('review', 1)], key, pro), { approved: false, open: 'review' });
-  assert.deepEqual(syllabusState([Y('approved', 1, { semester: 2 })], key, dean), { approved: false, open: null });
+  assert.deepEqual(syllabusState([Y('approved', 1), Y('returned', 2)], key, dean, members), { approved: true, open: 'returned' });
+  assert.deepEqual(syllabusState([Y('draft', 1)], key, dean, members), { approved: false, open: 'draft' });
+  assert.deepEqual(syllabusState([Y('draft', 1)], key, pro, members), { approved: false, open: null });
+  assert.deepEqual(syllabusState([Y('review', 1)], key, pro, members), { approved: false, open: 'review' });
+  assert.deepEqual(syllabusState([Y('approved', 1, { semester: 2, lineId: 'l2' })], key, dean, members), { approved: false, open: null });
   assert.deepEqual(syllabusCounts([{ approved: true, open: 'returned' }, { approved: false, open: 'draft' }, { approved: false, open: null }, { approved: false, open: 'review' }]),
     { approved: 1, review: 1, returned: 1, draft: 1, none: 1 });
   assert.deepEqual(syllabusCounts([]), { approved: 0, review: 0, returned: 0, draft: 0, none: 0 });

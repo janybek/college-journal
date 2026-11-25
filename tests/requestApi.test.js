@@ -146,7 +146,9 @@ test('request.decide: nobody approves their own request or both steps; the admin
   s.closeUnit(1);
   // the subject of the dean himself
   s.store.update('subjects', s.sb1, { teacherId: s.ids.dean });
-  s.store.update('syllabi', s.syllabusId, { teacherId: s.ids.dean });
+  const member = s.store.list('syllabusMembers').find((m) => m.teacherId === s.ids.teacher1);
+  s.store.update('syllabusMembers', member.id, { teacherId: s.ids.dean });
+  s.store.update('syllabusLines', member.lineId, { authorId: s.ids.dean });
   s.at('2026-10-01');
   const mk = maker(s, { kind: 'control', subjectId: s.sb1, unit: 1, studentId: s.a2, before: '25', after: '31', reason: 'ошибка при вводе' });
   const id = mk({}, s.t.dean).data.request.id;

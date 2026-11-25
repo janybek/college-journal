@@ -68,6 +68,7 @@ export function syllabusPage(store, platform, data, user) {
   const groups = store.list('groups');
   const staff = store.list('staff');
   const syllabi = store.list('syllabi');
+  const members = store.list('syllabusMembers');
   const pairs = store.list('pairs');
   const settings = loadSettings(store);
   const tables = readTables(store, DOC_TABLES);
@@ -118,7 +119,7 @@ export function syllabusPage(store, platform, data, user) {
     version = null;
   }
 
-  const index = syllabusIndex(syllabi, tables.topics);
+  const index = syllabusIndex(syllabi, tables.topics, members);
   let syllabus = null;
   if (version) {
     const own = shown === 'open' ? [] : pairs.filter((p) => p.subjectId === subject.id);

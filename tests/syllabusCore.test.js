@@ -12,19 +12,21 @@ const two = [lesson('t1', 1, 'lecture'), lesson('t1p', 2, 'practice'), lesson('t
 
 const S1 = { semesterStart: '2026-09-01', semesterEnd: '2026-12-25', semester: 1 };
 const ok = { status: 'approved', version: 1 };
-const syllabi = [{ id: 'sy_1', disciplineId: 'ds_1', teacherId: 'sf_1', semester: 1, planSemester: 1, ...ok }, { id: 'sy_2', disciplineId: 'ds_1', teacherId: 'sf_1', semester: 2, planSemester: 2, ...ok },
-  { id: 'sy_3', disciplineId: 'ds_1', teacherId: 'sf_2', semester: 1, planSemester: 1, ...ok }];
+const syllabi = [{ id: 'sy_1', disciplineId: 'ds_1', teacherId: 'sf_1', semester: 1, planSemester: 1, lineId: 'ln_1', ...ok }, { id: 'sy_2', disciplineId: 'ds_1', teacherId: 'sf_1', semester: 2, planSemester: 2, lineId: 'ln_2', ...ok },
+  { id: 'sy_3', disciplineId: 'ds_1', teacherId: 'sf_2', semester: 1, planSemester: 1, lineId: 'ln_3', ...ok }];
+const joined = (lineId, teacherId, semester) => ({ id: 'm_' + lineId, lineId, disciplineId: 'ds_1', semester, teacherId, state: 'joined', joinedAt: '' });
+const members = [joined('ln_1', 'sf_1', 1), joined('ln_2', 'sf_1', 2), joined('ln_3', 'sf_2', 1)];
 const all = [lesson('a2', 2, 'lecture', 2, 'sy_1'), lesson('a1', 1, 'lecture', 2, 'sy_1'), lesson('b1', 1, 'lecture', 2, 'sy_2'), lesson('c1', 1, 'lecture', 2, 'sy_3'), lesson('c2', 2, 'lecture', 2, 'sy_3')];
-const index = syllabusIndex(syllabi, all);
+const index = syllabusIndex(syllabi, all, members);
 const subject = { id: 'sb_1', disciplineId: 'ds_1', teacherId: 'sf_1', groupId: 'g_1' };
 
 test('semester of the year and the syllabus a subject follows', () => {
   assert.deepEqual([1, 2, 3, 4, 7, 8].map(semesterHalf), [1, 2, 1, 2, 1, 2]);
-  assert.deepEqual([syllabusFor(subject, syllabi, 1).id, syllabusFor(subject, syllabi, 2).id, syllabusFor({ ...subject, teacherId: 'sf_2' }, syllabi, 2),
-    syllabusFor({ ...subject, disciplineId: '' }, [{ id: 'sy_9', disciplineId: '', teacherId: 'sf_1', semester: 1, ...ok }], 1)], ['sy_1', 'sy_2', null, null]);
+  assert.deepEqual([syllabusFor(subject, syllabi, 1, members).id, syllabusFor(subject, syllabi, 2, members).id, syllabusFor({ ...subject, teacherId: 'sf_2' }, syllabi, 2, members),
+    syllabusFor({ ...subject, disciplineId: '' }, [{ id: 'sy_9', disciplineId: '', teacherId: 'sf_1', semester: 1, lineId: 'ln_1', ...ok }], 1, members)], ['sy_1', 'sy_2', null, null]);
   // only the approved version counts
-  const versions = ['archived', 'approved', 'draft'].map((status, i) => ({ id: 'sy_' + i, disciplineId: 'ds_1', teacherId: 'sf_1', semester: 1, status }));
-  assert.deepEqual([syllabusFor(subject, versions, 1).id, syllabusFor(subject, versions.filter((v) => v.status !== 'approved'), 1), syllabusFor(subject, versions, 2)], ['sy_1', null, null]);
+  const versions = ['archived', 'approved', 'draft'].map((status, i) => ({ id: 'sy_' + i, disciplineId: 'ds_1', teacherId: 'sf_1', semester: 1, lineId: 'ln_1', status, version: i + 1 }));
+  assert.deepEqual([syllabusFor(subject, versions, 1, members).id, syllabusFor(subject, versions.filter((v) => v.status !== 'approved'), 1, members), syllabusFor(subject, versions, 2, members)], ['sy_1', null, null]);
   assert.deepEqual([index.topicsOf.get('sy_1').map((t) => t.id), index.syllabusOf.get('b1').id], [['a1', 'a2'], 'sy_2']);
 });
 

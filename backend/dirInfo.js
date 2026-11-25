@@ -4,6 +4,7 @@ import { readSettings, readExtra } from '../core/settings.js';
 import { localDate, localTime, isDate, mondayOf, addDays } from '../core/dates.js';
 import { isSubstitution } from '../core/schedule.js';
 import { compareNames } from '../core/names.js';
+import { teachingOf } from '../core/syllabusLines.js';
 import { CARD_TABLES, pairEnd, nowOf, termOf, topOf, syllabusState, syllabusCounts } from '../core/dirInfo.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -120,6 +121,8 @@ function disciplinesSummary(c) {
   const groups = mapOf(read('groups'));
   const subjects = read('subjects');
   const syllabi = read('syllabi');
+  const members = read('syllabusMembers');
+  const lines = read('syllabusLines');
   const semester = c.settings.semester;
   const rows = read('disciplines').map((d) => {
     const mine = subjects.filter((s) => s.disciplineId === d.id);
@@ -133,7 +136,15 @@ function disciplinesSummary(c) {
       const person = staff.get(teacherId);
       return { teacherId, teacherName: person ? person.fullName : '', groupNames: [...new Set(names)].sort(compareNames) };
     }).sort(byName('teacherName'));
-    const states = teachers.map((t) => syllabusState(syllabi, { disciplineId: d.id, teacherId: t.teacherId, semester }, c.viewer));
+    // one state per live line of this half that somebody leads now; a teacher without a line counts alone
+    const stateOf = (teacherId) => syllabusState(syllabi, { disciplineId: d.id, teacherId, semester }, c.viewer, members);
+    const states = [];
+    for (const line of lines.filter((l) => l.disciplineId === d.id && l.semester === semester)) {
+      const leaders = teachingOf(members, line, mine);
+      if (leaders.length > 0) states.push(stateOf(leaders[0].teacherId));
+    }
+    const led = new Set(members.filter((m) => m.state === 'joined' && m.disciplineId === d.id && m.semester === semester).map((m) => m.teacherId));
+    for (const t of teachers) if (!led.has(t.teacherId)) states.push({ approved: false, open: null });
     return { id: d.id, teachers, syllabi: syllabusCounts(states) };
   });
   return { table: 'disciplines', currentSemester: semester, rows };
@@ -148,7 +159,7 @@ export function dirSummary(store, platform, user, table) {
 }
 
 const syllabusOf = (c, subject) => (subject.disciplineId
-  ? syllabusState(c.read('syllabi'), { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: c.settings.semester }, c.viewer)
+  ? syllabusState(c.read('syllabi'), { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: c.settings.semester }, c.viewer, c.read('syllabusMembers'))
   : { approved: false, open: null });
 
 function groupCard(c, group) {
