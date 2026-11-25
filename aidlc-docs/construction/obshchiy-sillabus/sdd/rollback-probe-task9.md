@@ -1,0 +1,7 @@
+Task 9 probe (rollback to 857345c). Scripts: rollback2.mjs (phases: new builds, old runs, new again), probe4.mjs (new code on final base). Full output: work\report.json; snapshots work\snap0.json, afterOld.json, fin.json.
+Run: node rollback2.mjs "D:/Журнал колледжа" "<dir>/old" "<dir>/work"
+Base: A (teacher1) author with approved v1; B (teacher4) own approved then joined; V (teacher7) no own, added by dean; G (teacher5) invited; D (teacher6) own approved, joined, removed by dean2 (createdBy of his new line); H (teacher9) invited, pair-less subject; dean2 only in createdBy.
+Old code: no internal in any answer; Lines/Members byte-equal; 0 syllabi/topics/pairs/units/files deleted; held pairs lessonType/part unchanged; 3 held pairs follow topic copy of A's new approved version (name differs: "(новая редакция)", edit in the returned draft A approved) - expected old approve behaviour.
+Old view: A own approved v1 (later v2 after approve), B own old v1 (B1.. rows), V no syllabus (group with no topics), G none, D copy of A (v2), H none. Student of B group sees B's own syllabus.
+Old settings.save/generate: future pairs of B -> own syllabus, V -> no topics. Old B approve: v2 at old key, B v1 archived; new line for it after return (member B state left).
+New code again: lines=1 skipped=0; no syllabus without lineId; I1/I2/I3 hold; after schedule.generate future pairs of B, V, D, A equal snapshot; createdBy missing and ghost invited member: no internal, empty name, withdraw works; G invitation visible and join works.
