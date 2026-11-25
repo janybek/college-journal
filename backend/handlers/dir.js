@@ -5,6 +5,7 @@ import { readSettings } from '../../core/settings.js';
 import { USER_TABLES } from '../users.js';
 import { teacherHandover } from '../../core/schedule.js';
 import { versionsOf } from '../../core/syllabusFlow.js';
+import { dirSummary, dirCard } from '../dirInfo.js';
 import { loadSettings, relayout, todayOf } from '../scheduleData.js';
 
 const DIR_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'weekTemplate'];
@@ -203,6 +204,8 @@ function overrides(data, ctx) {
 
 export const dirHandlers = {
   'dir.list': list,
+  'dir.summary': (data, ctx, user) => dirSummary(ctx.store, ctx.platform, user, data.table),
+  'dir.card': (data, ctx, user) => dirCard(ctx.store, ctx.platform, user, data),
   'dir.save': save,
   'dir.remove': remove,
   'dir.resetPassword': resetPassword,
