@@ -1,0 +1,772 @@
+# Доработка «Общий силлабус»: план сборки
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** один силлабус ведут несколько преподавателей одной дисциплины: автор зовёт коллег, деканат добавляет сразу или даёт готовый, правят все участники, отправляет автор, деканат утверждает один раз — и темы встают в группах всех участников; вышедший получает утверждённую копию как свой; нынешние силлабусы переносятся без изменений для людей.
+
+**Architecture:** две новые таблицы — «Линии силлабусов» (дисциплина + половина года + автор) и «Участники силлабусов» (приглашён / ведёт / вышел / отказался / отозвано); у версии появляется колонка «линия». Вопрос «по какому силлабусу идёт группа» везде решает **одна** функция `syllabusFor(subject, syllabi, half, members)`: линия, где преподаватель предмета — участник «ведёт», и её утверждённая версия; «группы силлабуса» везде даёт `lineSubjects`. Переход и выход не пишут новой раскладки: будущие пары перекладывает прежний `relayout` с прежним «пропуском» `subjectScope`, пары вышедшего переезжают на копию по «скопирована из», как при утверждении. Колонка «преподаватель» версии пишется дальше (автор линии), номера версий считаются и по линии, и по старому ключу — так прежний сервер при откате выбирает верную версию.
+
+**Tech Stack:** как в прежних доработках — Node 24, ES-модули, `node --test`, встроенный `node:sqlite`, esbuild только для запасной сборки Apps Script, сайт без сборки. Новых зависимостей нет.
+
+**Spec:** `aidlc-docs/construction/obshchiy-sillabus/design.md` (решения владельца 1–5, «Уточнения после проверки дизайна» 1–12 и «Решения координатора» обязательны). Общие правила — `CLAUDE.md`; форма и приёмы — `aidlc-docs/construction/povtornyi-kurs/plan.md`.
+
+**Исходное состояние:** `HEAD a57de8f`, **1309 тестов** (прогон `npm test` 25.11.2026: 1309 pass, 0 fail). Тестовый сервер и сайт тестового — `857345c`. Боевой не трогаем.
+
+**Порядок.** Сначала сверка плана (opus) с готовым кодом и «ручная» проба отката (раздел «Откат») — находки правит отдельный агент в этом файле. Затем задачи 1 → 14 строго по одной; после каждой `npm test` зелёное и `npm run build:gas` собирается. Задачи 1–9 (правила, сервер, стенд, проба отката) идут без остановок; после задачи 9 — итоги в `aidlc-state.md` и журнал хода, **новый чат координатора**. Дальше три остановки для владельца: макеты (задача 10), блок 1 экранов (задачи 11–12), блок 2 (задача 13). После блока 2 — одна строгая общая проверка (opus), одна волна исправлений, выкладка на тестовый только по просьбе владельца (задача 14).
+
+**Список задач (14).**
+
+| № | Кто | Задача | Проверка |
+| --- | --- | --- | --- |
+| 1 | Л | Две таблицы, две колонки, правила линий, права | строгая (права) |
+| 2 | С | Перенос нынешних силлабусов и рождение линий | строгая (перенос) |
+| 3 | С | «Какой силлабус у группы» — по линии, во всех модулях | строгая (перенос) |
+| 4 | С | Силлабус по линии: версии, права участников, утверждение по всем группам, страница | строгая (права, утверждение) |
+| 5 | С | Участники без перехода: позвать, отозвать, отказаться, автор, готовый от деканата, карточка дисциплины | строгая (права) |
+| 6 | С | Переход: «Перейти на общий» и «Добавить сразу» | строгая (права, раскладка) |
+| 7 | С | Выход и «Убрать»: копия, пары, автор | строгая (права, раскладка) |
+| 8 | С | Стенд с общим силлабусом и приглашением, сборка Apps Script | облегчённая |
+| 9 | П | Проба отката на настоящей прежней версии `857345c` | отчёт проверяющего |
+| 10 | Э | Макеты: три картинки владельцу — **стоп, выбор владельца** | владелец |
+| 11 | Э | Страница силлабуса: «Преподаватели», блок «Участники», окна — блок 1 | ИИ: облегчённая (кнопки по правам, студент) |
+| 12 | Э | Главная преподавателя: приглашение, переход, отказ — блок 1 | владелец принимает блоком |
+| 13 | Э | Деканат: карточка дисциплины, «Новый общий силлабус», «Добавить сразу», очередь, метки — блок 2 | владелец принимает блоком |
+| 14 | — | Общая проверка (opus), одна волна исправлений, выкладка на тестовый по просьбе | — |
+
+Модели: «Логика», «Сервер», «Экраны», проверяющий — sonnet; сверка плана и общая проверка — opus. Модель в поручении указывается явно. Отчёт проверяющего — не длиннее 15 строк.
+
+## Global Constraints
+
+Действуют все правила `.superpowers/sdd/plan-povtornyi-kurs/implementer-contract.md` (раздел «Global constraints») — памятки копируются в `.superpowers/sdd/plan-obshchiy-sillabus/` с этим разделом вместо «Правил доработки „Повторный курс"». Самое важное из них:
+
+- `core/` и `backend/` без зависимостей из npm; обработчики синхронные; `handleRequest` никогда не бросает; ошибки — `AppError(code, { fields })`.
+- Время — только `platform.now()`; даты — строки `'YYYY-MM-DD'`, дата со временем — `'YYYY-MM-DD HH:MM:SS'` (`localDateTime`).
+- Каждая таблица читается не больше одного раза за запрос (`store.list`), запись пачкой; `store.get / update / remove` в цикле запрещены.
+- Что попадает в сборку Apps Script, не содержит `node:`, `require(`, `Buffer`, слова `process` (`tests/gasBundle.test.js`); `npm run build:gas` зелёная после каждой задачи.
+- Любая фраза — через три словаря `ru`, `ky`, `en` с одинаковыми ключами; данные на страницу — только текстом (`textContent`, помощники `site/js/ui.js`), никогда `innerHTML`; цвета hex или rgb, без `oklch()`; две темы, тёмная по умолчанию; студенческие экраны — 360 px, текст от 16 px, кнопки от 44 px.
+- Настоящих людей нет нигде: ни в тестах, ни в отчётах, ни на скриншотах, ни на макетах. Стенд — только порт 5273; рабочий сервер (5373), `D:\Журнал колледжа — сервер`, `D:\Журнал колледжа — данные`, `C:\JournalBackups`, `dev/data/real.json` агенты не открывают и не правят.
+- Стенд и браузер агентов: свой `npm run dev:reset`; headless Chrome с временным профилем и ключами `--disable-sync --disable-extensions`, не Edge; процессы останавливаются **только по своему PID**, никогда по имени программы или заголовку окна.
+- Коммиты на английском, только свои файлы по имени (не `git add -A`), `git status` чистый; `git push` и выкладка — только по прямой просьбе владельца.
+- Права проверяются попыткой обойти защиту; отказ — и ничего не записано (снимок **всех** таблиц до и после). Всё или ничего.
+
+Новые правила доработки:
+
+- **Одна линия «ведёт».** У преподавателя по одной дисциплине на одну половину года — не больше одной строки участника `joined`. Каждый путь, который пишет `joined` (перенос, первый черновик, загрузка файла, переход, добавление, выход), сначала убирает прежнюю (`left`), потом пишет новую. Тесты задач 2, 4–8 после каждого изменения вызывают `oneJoined(store.list('syllabusMembers'))` и ждут `[]`.
+- **Силлабус группы — только через `syllabusFor(subject, syllabi, half, members)`**, «группы силлабуса» — только через `lineSubjects(subjects, line, members)`. Сравнений `teacherId === version.teacherId` и вызовов `versionsOf` для поиска версии в `backend/` после задачи 4 нет (поиск по коду — в общей проверке); `versionsOf` остаётся только внутри `nextVersion`.
+- **Без согласия темы не меняются.** `syllabus.invite`, `syllabus.withdraw`, `syllabus.decline`, `syllabus.setAuthor`, `syllabus.newLine` не пишут в «Пары» и «Силлабусы» (кроме пустого черновика `newLine`). Пары меняют только `syllabus.join`, `syllabus.add`, `syllabus.leave`, `syllabus.remove`, `syllabus.approve` — и только пары групп того, кто переходит (утверждение — групп всех участников «ведёт»).
+- **Проведённая пара держит свою тему.** Ни один путь не меняет `topicId`, `lessonType`, `part` пары со статусом `running` или `closed`, кроме переноса на копию той же темы (выход, утверждение — как сейчас).
+- **Колонка «преподаватель» версии не пропадает и не переписывается:** у новой версии это автор линии (нет автора — тот, кто начал черновик); загрузка файла и сохранение разделов её не меняют. **Номер новой версии** = 1 + наибольший из двух: последний номер в линии и последний номер по старому ключу «дисциплина + этот `teacherId` + половина» (`nextVersion`).
+- **Порядок записи перехода, выхода и утверждения:** сначала новое, на что ещё никто не ссылается (новая линия и черновик-копия — только при выходе), потом «Пары», потом статусы «Силлабусов», потом «Участники», потом автор «Линии» — чтобы оборванная запись (хранилища без транзакций) чинилась повтором того же запроса. На SQLite весь запрос — одна транзакция (`handleRequest`).
+- **Таблицы «Линии силлабусов» и «Участники силлабусов» пишут только** `backend/linesUpgrade.js`, `backend/syllabusDraft.js` (`ensureLine`), `backend/syllabusLines.js`, `backend/lineSwitch.js` и `dev/seed.js` через их функции. `dir.*` и импорт их не знают (кроме запрета удаления).
+- **Ответы только дополняются.** Сервер выкладывается раньше сайта, поэтому прежний сайт (`857345c`) должен работать с новым сервером: ни один прежний ключ ответа не убирается и не меняет смысл; новый ключ в прежнем ответе добавляется, только когда он есть (`...(line ? { line } : {})`), чтобы прежние `deepEqual` остались верными.
+- **Студент** получает о линии только `{ shared, teachers: [{ fullName }] }`: ни дат, ни приглашённых, ни id сотрудников, ни слова о приглашениях (поиск по всему JSON ответа).
+- **Строк «Журнала изменений» доработка не пишет** (решение координатора): следы — даты и «кто» в строках участников.
+
+## Review Focus
+
+1. **Чужая линия и чужая роль.** Каждое новое действие `syllabus.*` — каждой ролью и без входа: преподаватель другой дисциплины, участник вместо автора (`invite`, `withdraw`, `remove`, `submit`), приглашённый правит (`saveSection`, `attachFile`, `dropFile`, `apply`) и отправляет, автор утверждает, автор добавляет «сразу», проректор и студент — всё; `lineId`, `teacherId`, `disciplineId` — массив, число, объект, строка с пробелами, `'__proto__'`. Ответ `forbidden`, `not_found`, `bad_request` или `invalid`, не `internal`; снимок всех таблиц тот же. Тесты — задачи 4–7.
+2. **Вторая линия «ведёт».** Вступить во вторую линию той же дисциплины и половины; двойное «Перейти» и «Добавить»; добавить приглашённого; первый черновик и загрузка файла от админа у того, кто уже в общем; повторный запуск переноса; строки, которые прежний код создал без `lineId`. После каждого — `oneJoined` пуст. Тесты — задачи 2, 4, 6, 7.
+3. **Темы без согласия и потерянные темы.** Приглашение ничего не меняет в парах; переход и выход не трогают проведённые пары и пары чужих групп; закрытый юнит, итоговая и экзамен предмета запрещают переход (открытый заново — разрешает); у вышедшего каждая пара стоит на строке копии с тем же названием; будущие пары продолжают «со следующей по счёту» по каждой группе отдельно; общий короче проведённого — будущие пары без темы, без ошибки. Тесты — задачи 6, 7.
+4. **Утверждение по всем участникам.** Проведённая пара и закрытый юнит группы участника-не-автора останавливают утверждение (`held_missing`, `held_closed`, `semester_closed`) с датой его пары; участник, вступивший между отправкой и утверждением, защищён; раскладка идёт по группам всех «ведёт» и не трогает группу вышедшего. Тесты — задача 4.
+5. **Перенос и откат.** Перенос повторяется без записи; после него каждый видит то же, что до (сравнение ответов `syllabus.get`, `journal.get`, `ledger.list` до и после); прежний код `857345c` на новой базе не отвечает `internal`, ничего не стирает, не портит проведённые пары при сохранении «Настроек семестра»; копия вышедшего — версия с наибольшим номером по его старому ключу. Тесты — задачи 2, 3, 7, проба — задача 9.
+
+## Чего в доработке нет
+
+Общего силлабуса «на всю дисциплину» автоматически; совместной правки в одну секунду (последнее сохранение раздела побеждает, как сейчас); уведомлений по почте и в Telegram; перехода «сразу на обе половины года»; версии «только для части групп»; «теневых» строк ради отката; строк «Журнала изменений» о приглашениях и переходах; запрета перехода по курсу группы; переноса на живом Google (он не обновляется); ИИ.
+
+## Решения плана, которые видят пользователи или которые меняют базу
+
+Строки с пометкой «вопрос N» — вопросы `owner-summary.md`; остальное — решения плана по умолчанию. Координатор переносит их в таблицу решений `aidlc-state.md` (задача 14, шаг 4).
+
+| Вопрос | Решение | Почему |
+| --- | --- | --- |
+| Таблицы и колонки | «Линии силлабусов» (`syllabusLines`), «Участники силлабусов» (`syllabusMembers`); в «Силлабусах» **две** новые колонки: `lineId` «линия» и `sourceId` «копия версии» | дизайн называет одну колонку; вторая нужна, чтобы копию при выходе найти при повторе оборванной записи и показать пометку «копия общего силлабуса» без текста в базе |
+| Дисциплина и половина года в строке участника | Повторяются из линии (`disciplineId`, `semester`) | журнал, ведомость и расписание читают одну лишнюю таблицу, а не две |
+| Кто убрал / отозвал | Хранится в строке участника (`endedBy`); экран показывает даты | строк «Журнала изменений» нет — иначе след пропал бы |
+| **«Ровно одна утверждённая по старому ключу» (дизайн, уточнение 4)** | Выполняется для участника-не-автора. **Для вышедшего автора невыполнимо:** утверждённая версия общего несёт его `teacherId` и по ней идут оставшиеся — в архив её нельзя. Прежний код всё равно выберет копию: её номер — наибольший по старому ключу | код: `versionsOf` прежнего сервера берёт утверждённую с большим номером |
+| Номера версий | Могут идти с пропуском (1, 2, 5): номер считается и по линии, и по старому ключу | откат: прежний код выбирает по номеру |
+| Незаконченная версия своего силлабуса при переходе (вопрос 1) | Уходит в архив в любом открытом состоянии — «черновик», «возвращён» и «на утверждении» (если он был единственным участником) | иначе версия осталась бы в очереди деканата у линии, по которой никто не ведёт |
+| Предупреждение «у общего нет утверждённой версии» | Показывается и приглашённому, и деканату при «Добавить сразу» — только если у преподавателя сейчас есть свой утверждённый; кнопка «Всё равно перейти» / «Всё равно добавить» | дизайн, путь «Перейти / добавить» |
+| Что запрещает переход и выход | Закрытый (не открытый заново) юнит, закрытая итоговая или экзамен предмета в группах **этого** преподавателя по дисциплине — по семестру по плану той линии, откуда он уходит, и той, куда приходит. Чужие группы не мешают | решение владельца 4; ключ закрытия — предмет + семестр по плану |
+| Курс группы (вопрос 2) | Переход не запрещается, если курс группы не совпадает с курсом общего силлабуса: при следующей отправке — прежнее предупреждение «у групп другой курс» | как сейчас у своего силлабуса; на стенде 03-1 — 2 курс |
+| Приглашения | Одному преподавателю можно получить несколько приглашений (из разных общих); принял одно — остальные ждут. После отказа или отзыва позвать можно снова | переход «из одного общего в другой» разрешён |
+| «Убрать» и «Выйти» | Автор себя кнопкой «Убрать» не убирает — только «Выйти»; деканат может убрать и автора. Приглашённого не «убирают», а отзывают приглашение | две разные кнопки — два разных исхода |
+| Автор | Назначить автором можно только участника «ведёт». Сделать линию снова «Деканат» нельзя | дизайн: «назначить другого автора» |
+| Готовый от деканата | Линий без автора у одной дисциплины и половины может быть несколько | две специальности — два готовых силлабуса |
+| Что видит преподаватель в переключателе групп | Только свои группы; деканат — все группы линии с фамилией преподавателя | страница показывает даты пар группы |
+| Где смотреть общий до ответа | Приглашённый открывает форму версии только для чтения (`#/syllabus-form/<версия>`): «Посмотреть» — утверждённую, «Черновик» — открытую, если она есть | дизайн: «видит черновик и утверждённую версию, чтобы решить» |
+| Очередь деканата | Колонка «Автор» («Деканат», если автора нет) и «Участники: N»; «кто отправил» — как сейчас | дизайн |
+| Счётчики справочника «Дисциплины» | Считаются линии текущей половины, где есть участник «ведёт» с предметом; преподаватель с предметом и без линии — «нет силлабуса»; у общего — метка «общий, участников: N» | дизайн, уточнение 6 |
+| Где кнопки (уточняется макетами, задача 10) | По умолчанию — вариант А: блок «Участники» карточкой под шапкой страницы силлабуса; приглашение — карточкой на главной; «Новый общий силлабус» — в карточке дисциплины, раздел «Силлабусы» | дизайн оставил место плану |
+| Стенд | «Информатика», весна: общий — `teacher1` (автор) и `teacher3`; «Информатика», осень (текущая): `teacher1` позвал `teacher3`, приглашение ждёт. Прежние данные стенда не меняются | приёмка без ручной подготовки; текущая половина остаётся как есть, пока владелец сам не нажмёт «Перейти на общий» |
+| Откат | Аварийный, только на тестовом; после возврата на новую версию — «Сформировать расписание» (раздел «Откат») | прежний код перекладывает будущие пары участников по их старым силлабусам |
+
+## Модель данных
+
+`core/schema.js`: константа после `REPEAT_STATUSES`, таблицы — в конец `SCHEMA` (после `repeatAttempts`), колонки версии — в конец списка `syllabi`.
+
+```js
+export const MEMBER_STATES = ['invited', 'joined', 'left', 'declined', 'withdrawn'];   // приглашён, ведёт, вышел, отказался, приглашение отозвано
+// syllabi: + col('lineId', 'линия'), col('sourceId', 'копия версии')
+syllabusLines: { sheet: 'Линии силлабусов', prefix: 'sl', columns: [
+  id, disciplineId 'дисциплина', semester 'половина года' int, authorId 'автор', createdBy 'кто завёл', createdAt 'когда заведена' ] },
+syllabusMembers: { sheet: 'Участники силлабусов', prefix: 'sm', columns: [
+  id, lineId 'линия', disciplineId 'дисциплина', semester 'половина года' int, teacherId 'преподаватель', state 'состояние',
+  byId 'кто позвал или добавил', invitedAt 'когда приглашён', joinedAt 'когда вступил', endedAt 'когда вышел', endedBy 'кто завершил' ] },
+```
+
+- `authorId` пустой — «Деканат». `createdBy` пустой — линию завёл перенос.
+- Строка участника — один «заход»: `invited` → `joined` | `declined` | `withdrawn`; `joined` → `left`. Новое приглашение после отказа — новая строка. `endedAt`, `endedBy` заполняются при `left`, `declined`, `withdrawn`. Все «когда» — `'YYYY-MM-DD HH:MM:SS'`.
+- **И1:** не больше одной `joined` на «преподаватель + дисциплина + половина». **И2:** не больше одной живой (`invited` или `joined`) строки на «линия + преподаватель». **И3:** у линии не больше одной утверждённой версии; у каждой версии с полным ключом после запуска сервера есть `lineId`. **И4:** `disciplineId` и `semester` участника равны полям его линии.
+- `sourceId` версии — id утверждённой версии, с которой она скопирована (у любого нового черновика и у копии при выходе); у первой версии — пусто.
+- «Живая» линия (`isLive`): есть участник `joined` или не было ни одного `joined` / `left` (готовый от деканата, ещё без людей).
+
+## Коды ошибок новых запросов
+
+| Код | Когда | `fields` |
+| --- | --- | --- |
+| `bad_request` | id не простая строка (`plainId`), `semester` не 1 и не 2, `confirm` не булево, «убрать» самого себя | — |
+| `not_found` | нет линии, дисциплины; у «отозвать» нет ждущего приглашения; у «убрать» человек не «ведёт» | — |
+| `forbidden` | не тот человек (таблица «Кто что может» дизайна); «Перейти» без приглашения; «Выйти» не участником | — |
+| `not_teaching` | у того, кого зовут или добавляют (или кто переходит), нет предмета этой дисциплины, либо он отключён или не преподаватель | — |
+| `already_member` | уже «ведёт» эту линию или уже приглашён в неё | — |
+| `last_member` | «Выйти» или «Убрать» единственного участника «ведёт» | — |
+| `line_locked` | закрытый юнит, итоговая или экзамен предмета в группе переходящего | `[{ field: 'group', code: 'unit_closed' \| 'exam_exists', name: '<группа>' }]` — по строке на группу |
+| `needs_confirm` | у общего нет утверждённой версии, у преподавателя своя утверждённая есть, `confirm` не `true` | `[{ field: 'line', code: 'no_approved' }]` |
+
+## Откат
+
+Доработка добавляет две таблицы и две колонки «Силлабусов» и при первом запуске пишет `lineId` во все версии. Прежний выложенный код — `857345c`. Хранилище SQLite прежнего кода читает и пишет только свои колонки: `lineId` и `sourceId` у прежних строк сохраняются, у новых строк прежнего кода они пустые — следующий запуск нового кода заводит им линию (задача 2).
+
+**Проба (задача 9 — целиком; сверка плана — «ручной» вариант: база прежнего `seedDemo`, таблицы, колонки и строки линий вписаны руками по разделу «Модель данных»; общая проверка повторяет; только во временной папке сессии):**
+
+1. Прежний код: `git archive 857345c | tar -x -C <временная папка>/old` (worktree не создавать).
+2. Временная база новым кодом: `initBase` + `seedDemo`, затем запросами: общий «Анатомии» — автор А (со своим утверждённым), участник Б, у которого был свой утверждённый силлабус, участник В без своего; приглашённый Г; вышедший Д с копией; у Б и В — по проведённой паре до и после перехода. Снимок всех таблиц.
+3. Прежний код на этой базе: `openBase` → `upgrade()` → уборка файлов → `handleRequest`: `syllabus.get`, `journal.get`, `ledger.list`, `teacher.mySubjects` — за А, Б, В, Г, Д; `student.subjects` и `syllabus.get` студентом группы Б; `subjects.overview`, `syllabus.queue`, `dir.card` дисциплины — деканатом; `settings.save` (сдвиг даты конца семестра на день и обратно), `schedule.generate`; `syllabus.startDraft` и `syllabus.approve` за А и за Б; `dir.remove` сотрудника, который есть только в `createdBy` линии; `backupNow` и `restoreBase` туда-обратно.
+4. Сверить: ни один ответ не `internal`; число строк и содержимое «Линий» и «Участников» не изменились; ни одна строка «Силлабусов», «Тем», «Пар» не удалена; у каждой проведённой пары (`running`, `closed`) те же `topicId`, `lessonType`, `part`, что в снимке; `lineId` прежних строк на месте. Записать, что видит каждый из пяти.
+5. Новый код снова на той же базе: запуск (перенос даёт линии строкам без `lineId`; `oneJoined` пуст) → `schedule.generate` → будущие пары Б и В снова стоят по общему (сравнить со снимком шага 2); `syllabus.get`, `journal.get`, `syllabus.invitations`, `dir.card` — без `internal`, в том числе когда человек из `createdBy` удалён прежним кодом (имя — пустая строка).
+
+**Что известно заранее (записать в раздел выкладки `aidlc-state.md`; проба уточняет):** на прежнем коде общий силлабус виден как свой только автору; участник, у которого был свой утверждённый, видит его; участник без своего — группы без тем; вышедший видит копию (у неё наибольший номер версии); блока «Участники» и приглашений нет. Любое действие прежнего кода, которое перекладывает пары («Настройки семестра» с новыми датами, «Сформировать расписание», смена преподавателя группы, утверждение), ставит **будущим** парам участников темы их старого силлабуса или снимает темы; проведённые пары держат свои. Данные не стираются. Силлабус, который на прежнем коде завёл или утвердил участник-не-автор, после возврата остаётся в стороне (своя линия-история, по ней никто не ведёт). `serve:demo-wipe` на прежнем коде **не запускать**.
+
+**Что сказать владельцу перед откатом:** «Откат — только аварийный. На прежней версии общий силлабус увидит только его автор, остальные — свой старый или группы без тем; приглашения не видны. Ничего не сотрётся. Пока работает прежняя версия, силлабусы не правим и не утверждаем. После возврата на новую версию деканат один раз нажимает „Сформировать расписание" — темы будущих пар снова встанут по общему».
+
+## Где сейчас ищут силлабус «по дисциплине и преподавателю» — и какая задача это меняет
+
+| Место | Что там сейчас | Задача |
+| --- | --- | --- |
+| `core/syllabus.js` `syllabusFor`, `subjectScope`, `syllabusIndex` | `versionsOf` по ключу | 1 (новая подпись, временный запасной путь), 3 (запасной путь убран) |
+| `core/syllabusFlow.js` `rightsOn` | владелец — `version.teacherId === viewer.id` | 1 (`viewer.part`, временный путь), 4 (убран) |
+| `core/dirInfo.js` `syllabusState` | `versionsOf` по ключу | 1, 3 |
+| `backend/scheduleData.js` `relayout` | `syllabusIndex(syllabi, topics)` | 3 (читает `syllabusMembers`, если не передали) |
+| `backend/journalData.js:87, 144, 455`; `JOURNAL_TABLES` | `syllabusFor(subject, rows.syllabi, …)` | 3 |
+| `backend/ledgerData.js:60`; `LEDGER_LIST_TABLES` | то же | 3 |
+| `backend/workData.js:79, 229`; `WORK_TABLES` | то же | 3 |
+| `backend/studentGrades.js:76` | то же | 3 |
+| `backend/repeatSnapshot.js:19`; `repeatData.js` `CANDIDATE_TABLES` | то же | 3 |
+| `backend/handlers/settings.js:34, 64, 81` | `syllabusFor`; строки для `relayout` | 3 |
+| `backend/handlers/dir.js:188` `mySubjects` | `versionsOf` по ключу | 3 |
+| `backend/handlers/dir.js:103`, `import.js:64`, `schedule.js:55`, `journalData.js:661`, `generateSchedule`, `dev/seed.js:344` | `relayout(…)` | 3 (сами не меняются: `relayout` дочитывает участников; где строки уже прочитаны — передать) |
+| `backend/subjectData.js:100, 119, 132` | `syllabusIndex`, `versionsOf`, поиск «другого семестра» | 3 |
+| `backend/dirInfo.js:136, 151` | `syllabusState` по ключу, счёт «по преподавателям» | 3 (по линиям), 5 (метка «общий», список линий) |
+| `backend/syllabusData.js:51` (`syllabusIndex`) | индекс без участников | 3 |
+| `backend/syllabusData.js:87, 96, 160` | группы и версии по ключу; `studentSubjects` | 4 |
+| `backend/syllabusDraft.js:28, 34, 39, 44, 73, 99, 112–146, 164` | `viewerOf`, `groupsOfTeacher`, `keyOfVersion`, `createDraft`, `startDraft`, `heldErrors`, `draftForm`, `saveSection` | 2 (`createDraft`, `startDraft` пишут линию), 4 (остальное) |
+| `backend/syllabusFlow.js:16–20, 29–33, 70, 102` | `allow`, `examine`, группы утверждения, строка очереди | 4 |
+| `backend/syllabusFiles.js:17, 65–66, 72, 86–92` | права на файл, студент, замена | 4 |
+| `backend/syllabusUpload.js:104–110, 130, writeDrafts, publishSyllabusDoc` | ключ файла, группы, строка версии с `teacherId` | 2 (линия при создании, `teacherId` не переписывается), 4 (версии по линии) |
+| `backend/handlers/dir.js` `BLOCKERS` | запрет удаления | 2 |
+
+## Файлы
+
+```
+core/schema.js               + MEMBER_STATES, 2 таблицы, syllabi.lineId, syllabi.sourceId
+core/syllabusLines.js        правила линий: кто ведёт, версии линии, номер версии, группы линии, перенос       новый
+core/syllabus.js  core/syllabusFlow.js  core/dirInfo.js  core/syllabusDoc.js  core/permissions.js
+backend/linesUpgrade.js      перенос при запуске                                                               новый
+backend/syllabusLines.js     вид линии, права участника, позвать / отозвать / отказаться / автор / готовый      новый
+backend/lineSwitch.js        переход, добавление, выход, «убрать»                                              новый
+backend/syllabusDraft.js  syllabusFlow.js  syllabusData.js  syllabusFiles.js  syllabusUpload.js  handlers/syllabus.js
+backend/scheduleData.js  journalData.js  ledgerData.js  workData.js  studentGrades.js  repeatSnapshot.js  repeatData.js
+backend/subjectData.js  dirInfo.js  handlers/settings.js  handlers/dir.js
+backend/node/base.js  backend/node/server.js  backend/gas/main.js  dev/server.js  dev/seed.js
+site/js/syllabusLine.js      помощники без DOM                                                                 новый
+site/js/views/syllabusMembers.js   блок «Участники» и его окна                                                 новый
+site/js/syllabus.js  dirInfo.js  views/syllabus.js  syllabusForm.js  syllabusFormTabs.js  home.js  dirCard.js  review.js  subjects.js  i18n/*.js  css/screens.css
+tests/linesSetup.js (помощник)  syllabusLines.test.js  linesUpgrade.test.js  lineLookupApi.test.js  lineRightsApi.test.js
+tests/lineMembersApi.test.js  lineJoinApi.test.js  lineLeaveApi.test.js  seedShared.test.js  siteSyllabusLine.test.js      новые
+tests/schema.test.js  gasBundle.test.js  sqliteStore.test.js  permissions.test.js  journalSetup.js  syllabusSetup.js  и прежние тесты из задач 1–4 (назвать в отчёте)
+```
+
+Кто делает: **Л** — `journal-logic`, **С** — `journal-server`, **Э** — `journal-screens`, **П** — `journal-reviewer`. Общие файлы правит только задача, которая сейчас в работе. Задачи 3 и 4 (С) правят по одной названной функции в `core/` — убирают временный путь; других правок `core/` у «Сервера» нет. Рабочий каталог плана — `.superpowers/sdd/plan-obshchiy-sillabus/`, журнал хода — `progress.md` там же, копия — `aidlc-docs/construction/obshchiy-sillabus/sdd/ledger-snapshot.md`.
+
+---
+
+### Task 1 (Л): две таблицы, две колонки, правила линий, права
+
+**Files:** Create `core/syllabusLines.js`, `tests/syllabusLines.test.js`. Modify `core/schema.js`, `core/syllabus.js`, `core/syllabusFlow.js`, `core/dirInfo.js`, `core/syllabusDoc.js`, `core/permissions.js`, `tests/schema.test.js`, `tests/gasBundle.test.js` (число таблиц 35 → 37), `tests/sqliteStore.test.js` (ожидания `ensureTables`), `tests/permissions.test.js`, `tests/syllabusFlow.test.js`. **Проверка — строгая** (права: `rightsOn`, `partOf`).
+
+**Interfaces — Consumes:** `versionsOf`, `OPEN_STATUSES`, `EDITABLE_STATUSES` (`core/syllabusFlow.js`); `compareNames`.
+
+**Produces:**
+
+```js
+// core/schema.js — раздел «Модель данных»
+// core/syllabusLines.js — чистые функции, без хранилища
+export const LIVE_STATES = ['invited', 'joined'];
+export function joinedLineId(members, { disciplineId, teacherId, semester });  // id линии, где он 'joined'; нет — null; из нескольких — с меньшим joinedAt, затем id
+export function joinedOf(members, lineId);          // строки 'joined' линии по joinedAt, затем id
+export function invitedOf(members, lineId);         // строки 'invited' линии по invitedAt, затем id
+export function partOf(line, members, teacherId);   // 'author' (joined и line.authorId === teacherId) | 'member' (joined) | 'invited' | null
+export function versionsOfLine(syllabi, lineId);    // { approved, open, last } — как versionsOf, но по s.lineId; пустой lineId -> { approved: null, open: null, last: 0 }
+export function nextVersion(syllabi, lineId, { disciplineId, teacherId, semester });  // 1 + max(versionsOfLine(...).last, versionsOf(...).last)
+export function lineSubjects(subjects, line, members);       // предметы с disciplineId линии, чей teacherId 'joined' в линии
+export function teacherSubjects(subjects, disciplineId, teacherId);
+export function successor(members, lineId, leavingId);       // teacherId раньше всех вступившего 'joined', кроме leavingId; нет — null
+export function isLive(line, members);                        // есть 'joined' или не было ни 'joined', ни 'left'
+export function oneJoined(members);                           // [] или ['<disciplineId>|<teacherId>|<semester>', …] — ключи, где 'joined' больше одной
+// Блок перехода: closures, subjectExams, examAttempts — строки таблиц; planSemesters — Set (null допустим)
+export function switchLock(subjectId, planSemesters, { closures, subjectExams, examAttempts });  // 'unit_closed' | 'exam_exists' | null
+// Перенос. -> { groups: [{ key: { disciplineId, teacherId, semester }, versionIds: [id…], lineId: string | null, member: 'joined' | 'left' | null }], skipped: [id…] }
+export function linesMigration(syllabi, lines, members);
+// core/syllabus.js
+export function syllabusFor(subject, syllabi, half, members);   // линия joinedLineId -> versionsOfLine(...).approved; нет линии — null
+export function syllabusIndex(syllabi, topics, members);        // + поле members; subjectScope берёт index.members
+// core/syllabusFlow.js — viewer: { id, roles, teaches, part }
+export function rightsOn(version, viewer);   // форма ответа прежняя: { see, edit, submit, approve, giveBack }
+export function checkHeld(draftTopics, approvedTopics, pairs, closures = [], planSemester = null, { withSubject = false } = {});
+//   при withSubject: true каждая ошибка получает ещё subjectId пары, чья дата названа (у held_closed — пары закрытого юнита); без него — ответ прежний
+// core/dirInfo.js
+export function syllabusState(syllabi, key, viewer, members);   // -> { approved, open, ...(участников 'joined' > 1 ? { shared: true, members: N } : {}) }
+// core/syllabusDoc.js — draftVersion получает line и number:
+export function draftVersion({ line, teacherId, approved, planSemester, course, userId, today, number });
+//   строка: disciplineId и semester линии, teacherId, lineId: line.id, sourceId: approved ? approved.id : '', остальное как сейчас
+// core/permissions.js
+'syllabus.invite': { teacher }, 'syllabus.join': { teacher }, 'syllabus.decline': { teacher }, 'syllabus.leave': { teacher }, 'syllabus.invitations': { teacher },
+'syllabus.withdraw': { admin, dean, teacher }, 'syllabus.remove': { admin, dean, teacher },
+'syllabus.add': { admin, dean }, 'syllabus.setAuthor': { admin, dean }, 'syllabus.newLine': { admin, dean }
+```
+
+Правила:
+
+- `rightsOn`: `manager` — admin или dean. `worker` = `manager` или (роль teacher, `teaches === true`, `part` — `'author'` или `'member'`). `see`: утверждённая — всем; открытая — `worker`, или (teacher, `teaches`, `part === 'invited'`), или проректор при `review` / `returned`. `edit` = статус из `EDITABLE_STATUSES` и `worker`. `submit` = `edit` и (`manager` или `part === 'author'`). `approve`, `giveBack` — как сейчас.
+- `switchLock`: `'unit_closed'`, если есть строка `closures` с этим `subjectId`, `reopenedAt === ''` и `(planSemester ?? null)` из набора (юнит 0 — итоговая — тоже); иначе `'exam_exists'`, если такая строка есть в `subjectExams` или `examAttempts`; иначе `null`. Пустой набор — `null`.
+- `linesMigration`: берёт версии с пустым `lineId`, группирует по ключу в порядке первой строки. Версия без дисциплины, без преподавателя или с половиной не 1 и не 2 — в `skipped`. Для группы: (а) есть линия той же дисциплины и половины, где преподаватель ключа `joined` и он её автор или единственный `joined` — `lineId` этой линии, `member: null`; (б) иначе он `joined` в другой линии этой дисциплины и половины — `lineId: null`, `member: 'left'` (линия-история); (в) иначе — `lineId: null`, `member: 'joined'`.
+- **Временные пути (убираются задачами 3 и 4, пометить `// TEMP task 3` / `// TEMP task 4`):** `syllabusFor` и `syllabusState` при `members === undefined` ищут по-старому (`versionsOf` по ключу); `rightsOn` при `viewer.part === undefined` считает владельцем того, у кого `version.teacherId === viewer.id`. Так прежние тесты зелёные без правок до задачи 3.
+- `draftVersion` меняет подпись; его зовут `backend/syllabusDraft.js` и тесты `tests/syllabusDoc.test.js` — до задачи 2 оставить приём прежнего вызова `{ key, … }` (без линии: `lineId: ''`, `teacherId: key.teacherId`), пометка `// TEMP task 2`.
+
+- [ ] **Step 1: тесты** (`tests/syllabusLines.test.js`; строки руками):
+
+```js
+const L = { id: 'sl_1', disciplineId: 'ds_1', semester: 1, authorId: 't1' };
+const m = (id, teacherId, state, joinedAt = '', lineId = 'sl_1') => ({ id, lineId, disciplineId: 'ds_1', semester: 1, teacherId, state, joinedAt, invitedAt: '2026-09-01 09:00:00' });
+const M = [m('sm_1', 't1', 'joined', '2026-09-01 10:00:00'), m('sm_2', 't2', 'joined', '2026-09-02 10:00:00'), m('sm_3', 't3', 'invited'), m('sm_4', 't4', 'left', '2026-09-01 08:00:00')];
+assert.deepEqual(['t1', 't2', 't3', 't4', 't9'].map((t) => partOf(L, M, t)), ['author', 'member', 'invited', null, null]);
+assert.equal(joinedLineId(M, { disciplineId: 'ds_1', teacherId: 't2', semester: 1 }), 'sl_1');
+assert.equal(joinedLineId(M, { disciplineId: 'ds_1', teacherId: 't2', semester: 2 }), null);
+assert.equal(joinedLineId(M, { disciplineId: 'ds_1', teacherId: 't4', semester: 1 }), null);          // вышел
+assert.deepEqual([successor(M, 'sl_1', 't1'), successor(M, 'sl_1', 't2'), successor([M[0]], 'sl_1', 't1')], ['t2', 't1', null]);
+assert.deepEqual(oneJoined([...M, m('sm_5', 't2', 'joined', '2026-09-03 10:00:00', 'sl_2')]), ['ds_1|t2|1']);
+const S = [{ id: 'sy_1', lineId: 'sl_1', disciplineId: 'ds_1', teacherId: 't1', semester: 1, status: 'archived', version: 1 },
+  { id: 'sy_2', lineId: 'sl_1', disciplineId: 'ds_1', teacherId: 't1', semester: 1, status: 'approved', version: 2 },
+  { id: 'sy_3', lineId: 'sl_9', disciplineId: 'ds_1', teacherId: 't2', semester: 1, status: 'approved', version: 7 }];   // прежний свой силлабус t2
+assert.equal(versionsOfLine(S, 'sl_1').approved.id, 'sy_2');
+assert.equal(nextVersion(S, 'sl_1', { disciplineId: 'ds_1', teacherId: 't1', semester: 1 }), 3);
+assert.equal(nextVersion(S, 'sl_new', { disciplineId: 'ds_1', teacherId: 't2', semester: 1 }), 8);    // по старому ключу
+const sb = (id, teacherId) => ({ id, disciplineId: 'ds_1', teacherId });
+assert.equal(syllabusFor(sb('sb_2', 't2'), S, 1, M).id, 'sy_2');                                      // участник идёт по общему, а не по своему старому
+assert.equal(syllabusFor(sb('sb_4', 't4'), S, 1, M), null);
+assert.deepEqual(lineSubjects([sb('sb_1', 't1'), sb('sb_2', 't2'), sb('sb_3', 't3'), sb('sb_4', 't4')], L, M).map((s) => s.id), ['sb_1', 'sb_2']);
+```
+
+Ещё: `rightsOn` для черновика — таблица «Кто что может» дизайна: автор `{ see, edit, submit }` все `true`; участник — `submit: false`; приглашённый — `see: true`, остальное `false`; автор с `teaches: false` — всё `false`; деканат — всё, включая `approve`; проректор — `see` только при `review` и `returned`; `part: null` у преподавателя — `see: false` для открытой и `true` для утверждённой. `checkHeld` с `withSubject: true` — у ошибок `held_missing`, `held_kind`, `held_hours`, `held_closed` есть `subjectId` нужной пары; без параметра прежние проверки `tests/syllabusFlow.test.js` зелёные без правок. `switchLock`: закрытие с `reopenedAt: ''` — `'unit_closed'`; с заполненным — `null`; другой `planSemester` — `null`; `planSemester: null` в наборе и в строке — `'unit_closed'`; строка `subjectExams` — `'exam_exists'`. `linesMigration`: три случая (а), (б), (в) и `skipped`; повтор на уже перенесённых строках — `groups: []`. `isLive`: с `joined`; только `invited`; только `left` (не живая). `syllabusState` — `shared` только при двух `joined`. Схема: `tableNames().slice(-2)` — две новые таблицы, прежние проверки `schema.test.js` со счётом от конца сдвинуть на 2; приставки и названия листов не повторяются; у `syllabi` последние колонки — `lineId`, `sourceId`. Права: каждое новое действие — каждой ролью.
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` (прежние тесты зелёные без правок, кроме названных), `npm run build:gas`.
+- [ ] **Step 5:** коммит `feat: syllabus lines and members - the tables, the rules and the rights`.
+
+---
+
+### Task 2 (С): перенос нынешних силлабусов и рождение линий
+
+**Files:** Create `backend/linesUpgrade.js`, `tests/linesUpgrade.test.js`, `tests/linesSetup.js`. Modify `backend/node/base.js`, `backend/node/server.js`, `backend/gas/main.js`, `dev/server.js`, `backend/syllabusDraft.js`, `backend/syllabusUpload.js`, `backend/handlers/dir.js`, `core/syllabusDoc.js` (только убрать `// TEMP task 2`), `tests/syllabusDoc.test.js` (вызовы `draftVersion` с линией), `tests/syllabusDraftApi.test.js`, `tests/dir.test.js`, `tests/server.test.js` или `tests/serverBase.test.js` (строка журнала), `tests/devServer.test.js`, `tests/demo.test.js`. **Проверка — строгая** (перенос; Review Focus 2 и 5).
+
+**Interfaces — Consumes:** задача 1.
+
+**Produces:**
+
+```js
+// backend/linesUpgrade.js — чистый для Apps Script
+export function applyLinesUpgrade(store, platform);   // -> { lines: N (заведено линий), skipped: K }
+// backend/syllabusDraft.js
+export function ensureLine(store, platform, { disciplineId, teacherId, semester, userId }, rows);
+//   rows: { syllabusLines, syllabusMembers }. -> { line, created }: линия, где teacherId 'joined'; нет — заводит свою:
+//   линия { authorId: teacherId, createdBy: userId, createdAt } и участник { state: 'joined', byId: userId, joinedAt }
+export function createDraft(store, platform, { line, approved, group, userId }, tables);
+//   teacherId версии = line.authorId || userId; version = nextVersion(tables.syllabi, line.id, { disciplineId, teacherId, semester }); пишет lineId и sourceId
+// tests/linesSetup.js — setup() -> s (вымышленные люди)
+//   сотрудники: admin, dean ('dean,teacher'), prorector, t1, t2, t3 (ведут «Анатомию»), t4 (ведёт «Химию»), t5 (преподаватель без предметов);
+//   студенты s1 (01-1), s2 (02-1), s3 (03-1); группы 1 курса
+//   предметы: sb1 = Анатомия·01-1·t1 (вторник), sb2 = Анатомия·02-1·t2 (среда), sb3 = Анатомия·03-1·t3 (четверг), sb4 = Химия·01-1·t4 (пятница)
+//   s.ids (ключ -> id), s.names (ключ -> ФИО), s.t (ключ -> токен), s.ds1 («Анатомия»), s.ds2 («Химия»), s.sb1…s.sb4, s.call(action, data, token)
+//   семестр 1: 2026-09-01 … 2026-12-20, расписание создано; s.at(date, time) двигает часы и входит заново
+//   s.FILE_A, s.FILE_B — два плана на 5 занятий с разными названиями тем («А1»…«А5», «Б1»…«Б5»), два юнита
+//   s.publish(subjectId, sheets, token = dean) — файл -> черновик -> утверждён; s.lineOf(key, half = 1) — линия, где он 'joined'
+//   s.share(lineId, key, state = 'joined', over = {}) — строка участника прямо в хранилище
+//   s.hold(subjectId, date) — пара становится 'closed'; s.closeUnit(subjectId, unit, planSemester = 1, over = {})
+//   s.topicsOf(subjectId) — названия тем пар предмета по датам ('' — пара без темы)
+//   s.store — хранилище; s.spied — оно же со счётчиком s.spy (lists, writes, reset), через него идут s.call; s.snapshot() — все таблицы схемы;
+//   s.failingOn(method, table) — хранилище, которое бросает на этой записи; s.oneJoined() — oneJoined по «Участникам»
+```
+
+Правила:
+
+- `applyLinesUpgrade`: читает «Силлабусы»; нет версий с пустым `lineId` — возвращает `{ lines: 0, skipped: 0 }`, ничего больше не читает и не пишет. Иначе читает «Линии» и «Участников», берёт `linesMigration` и пишет в таком порядке: новые линии (`createdBy: ''`, `createdAt` — сейчас) → участники (`joined`: `joinedAt` — сейчас; `left`: `joinedAt` и `endedAt` — сейчас; `byId: ''`) → `lineId` версий одной пачкой. Всё — внутри `store.transaction`, когда она есть (как `applySchemeUpgrade`). Пропущенные версии не трогаются.
+- `backend/node/base.js`: `upgrade` дополняется `...applyLinesUpgrade(store, platform)`; `backend/node/server.js`: при `lines > 0` — строка журнала `syllabus lines made: N`, при `skipped > 0` — ещё `, rows without a line: K`. Копия базы делается до `upgrade` — как сейчас.
+- `dev/server.js`: после `applySchemeUpgrade` — перенос; **до него**, если в файле есть версии без `lineId`, файл копируется рядом как `<имя>.before-shared-syllabus.bak` (существующая копия не перезаписывается) — это защищает и файл с настоящими данными владельца; в консоль — та же строка.
+- `backend/gas/main.js`, `setup()`: `applyLinesUpgrade(store, platform)` после `applySchemeUpgrade` (листы создаёт `ensureSheets`; живой Google не обновляем).
+- `startDraft` (поиск версий пока прежний, по ключу): перед созданием черновика — `ensureLine` для преподавателя предмета; `createDraft` получает линию. Загрузка файла (`writeDrafts`, `publishSyllabusDoc`) — то же для каждой половины файла; **в строку версии `teacherId` из плана файла не пишется** (`p.syllabus.row` без `teacherId`).
+- `BLOCKERS` (`dir.remove`): сотрудник — ещё `syllabusLines` (`authorId`, `createdBy`) и `syllabusMembers` (`teacherId`, `byId`, `endedBy`); дисциплина — ещё `syllabusLines` (`disciplineId`).
+- `serve:demo-wipe` (`backend/node/demo.js`) стирает и две новые таблицы (проверить тестом `tests/demo.test.js`; если список таблиц берётся из схемы — правки не нужны).
+
+- [ ] **Step 1: тесты** (`tests/linesUpgrade.test.js`; хранилище в памяти, версии вставлены руками без `lineId`):
+
+```js
+// ds1: t1 — версии 1 (archived), 2 (approved), 3 (draft) осени и 1 (approved) весны; t2 — версия 1 (approved) осени; строка без teacherId
+const before = s.snapshot();
+assert.deepEqual(applyLinesUpgrade(s.store, s.platform), { lines: 3, skipped: 1 });
+const lines = s.store.list('syllabusLines');
+assert.deepEqual(lines.map((l) => [l.semester, l.authorId, l.createdBy]), [[1, s.ids.t1, ''], [2, s.ids.t1, ''], [1, s.ids.t2, '']]);
+assert.deepEqual(s.store.list('syllabusMembers').map((x) => x.state), ['joined', 'joined', 'joined']);
+const strip = (rows) => rows.map(({ lineId, ...rest }) => rest);
+assert.deepEqual(strip(s.store.list('syllabi')), strip(before.syllabi));                 // кроме lineId версии не изменились
+assert.equal(s.store.list('syllabi').filter((v) => v.lineId === '').length, 1);          // пропущенная
+for (const t of Object.keys(before)) if (!['syllabi', 'syllabusLines', 'syllabusMembers'].includes(t)) assert.deepEqual(s.snapshot()[t], before[t], t);
+s.spy.reset();
+assert.deepEqual([applyLinesUpgrade(s.spied, s.platform), s.spy.writes], [{ lines: 0, skipped: 1 }, {}]);   // повтор ничего не пишет
+```
+
+Ещё: **строки прежнего кода после отката** — после переноса вставить версию без `lineId` по ключу t1 (автор своей линии) → `{ lines: 0 }`, версия получила `lineId` его линии; сделать t2 участником `joined` линии t1 (его строку в своей линии — `left`), вставить версию без `lineId` по ключу t2 → `{ lines: 1 }`, новая линия с автором t2 и участником `left`, `oneJoined` пуст. SQLite (временная база): хранилище, которое бросает на `updateMany('syllabi')`, — после ошибки «Линий» и «Участников» нет (транзакция откатилась). Запуск сервера: в журнале `base upgraded: 2 tables made, 2 columns added` и `syllabus lines made: N`; второй запуск — ни той, ни другой строки. `dev/server.js`: файл стенда со старыми версиями — появилась копия `.before-shared-syllabus.bak`, линии заведены; свежий стенд — копии нет. `syllabus.startDraft` преподавателя без линии: одна линия (автор — он, `createdBy` — он), один участник `joined`, версия с `lineId`, `sourceId: ''`, `version: 1`; повтор — `{ created: false }`, новых строк нет; деканат начинает «за преподавателя» — автор линии — преподаватель предмета, `createdBy` — деканат. `syllabus.apply` от админа для преподавателя без линии — своя линия (уточнение 10); `teacherId` версии — преподаватель предмета. Новая версия при утверждённой: `sourceId` — id утверждённой. `dir.remove` сотрудника, который есть только в `byId` участника, и дисциплины с линией — `in_use`. После каждого шага — `s.oneJoined()` пуст.
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test`, `npm run build:gas`.
+- [ ] **Step 5:** коммит `feat: syllabus lines are made for the stored syllabi at the start and for every new draft`.
+
+---
+
+### Task 3 (С): «какой силлабус у группы» — по линии, во всех модулях
+
+**Files:** Create `tests/lineLookupApi.test.js`. Modify `backend/scheduleData.js`, `backend/journalData.js`, `backend/ledgerData.js`, `backend/workData.js`, `backend/studentGrades.js`, `backend/repeatSnapshot.js`, `backend/repeatData.js`, `backend/subjectData.js`, `backend/dirInfo.js`, `backend/handlers/settings.js`, `backend/handlers/dir.js` (`mySubjects`), `backend/syllabusData.js` (только вызов `syllabusIndex`), `core/syllabus.js` и `core/dirInfo.js` (**только** убрать `// TEMP task 3`), прежние тесты из списка ниже. **Проверка — строгая** (Review Focus 5: после переноса каждый видит то же).
+
+**Interfaces — Consumes:** задачи 1–2. **Produces:** `relayout(store, subjectIds, rows, also)` принимает `rows.syllabusMembers` (нет — читает сам один раз) и возвращает его в ответе; `JOURNAL_TABLES`, `LEDGER_LIST_TABLES`, `WORK_TABLES`, `CANDIDATE_TABLES` получают `'syllabusMembers'`.
+
+Правила:
+
+- Каждое место раздела «Где сейчас ищут силлабус…» с пометкой «3» переходит на `syllabusFor(subject, rows.syllabi, half, rows.syllabusMembers)`, `syllabusIndex(syllabi, topics, members)`, `syllabusState(syllabi, key, viewer, members)`. Перед работой — `grep` по `syllabusFor(`, `syllabusIndex(`, `syllabusState(`, `versionsOf(` в `backend/` и `dev/`: всё найденное вне `backend/syllabus*.js` меняется здесь; найденное сверх таблицы — назвать в отчёте.
+- После этого временный путь в `syllabusFor` и `syllabusState` убирается: вызов без `members` бросает `TypeError` (тихого «нет силлабуса» быть не должно).
+- `subjectsOverview`: «есть утверждённый в другой половине» — `syllabusFor(…, другая половина, members) !== null`. `disciplinesSummary`: состояния считаются по **живым линиям** текущей половины, у которых есть участник `joined` с предметом дисциплины (по одной на линию), плюс `{ approved: false, open: null }` на каждого преподавателя с предметом и без линии; список `teachers` — как сейчас. Формы ответов не меняются.
+- `handlers/settings.js`: при сдвиге дат читает `syllabusMembers` один раз и отдаёт в `cutsClosedUnit` и `relayout`.
+- Прежние тесты, которые кладут версии прямо в хранилище, после вставки вызывают `applyLinesUpgrade(store, platform)`: `tests/journalSetup.js:82`, `tests/pairsApi.test.js:60`, `tests/scheduleApi.test.js:62` и `:165`, `tests/importApi.test.js:138`, `tests/repeatSnapshot.test.js:40`, `tests/dirInfoApi.test.js:117`, `tests/demo.test.js:193`; списки таблиц руками — `tests/repeatApi.test.js:265` и `:273` (+ `syllabusMembers`); прямые вызовы без участников — `tests/syllabus.test.js`, `tests/dirInfo.test.js`. Другие упавшие — поправить тем же приёмом и назвать в отчёте. Ожидаемые числа и формы ответов в прежних тестах не меняются.
+
+- [ ] **Step 1: тесты** (`tests/lineLookupApi.test.js`; `s.publish(s.sb1, s.FILE_A)`; `s.publish(s.sb2, s.FILE_B)`; затем руками: t2 в своей линии — `left`, в линии t1 — `s.share(line1.id, 't2')`; `schedule.generate`):
+
+```js
+const names = (subjectId, token) => s.call('journal.get', { subjectId }, token).data.pairs.map((p) => p.topicName).filter(Boolean);
+assert.equal(names(s.sb2, s.t.t2)[0], 'А1');                                             // группа участника идёт по общему
+assert.equal(s.topicsOf(s.sb2)[0], 'А1');
+assert.equal(s.call('ledger.list', {}, s.t.t2).data.subjects.find((x) => x.subjectId === s.sb2).hasSyllabus, true);
+assert.equal(s.call('student.grades', {}, s.t.s2).data.subjects.find((x) => x.subjectId === s.sb2).hasSyllabus, true);
+assert.deepEqual(s.call('teacher.mySubjects', {}, s.t.t2).data.subjects[0].syllabus, { approved: true, open: null });
+assert.equal(s.call('subjects.overview', {}, s.t.dean).data.rows.find((r) => r.teacherId === s.ids.t2).syllabusStatus, 'approved');
+assert.deepEqual(s.call('dir.summary', { table: 'disciplines' }, s.t.dean).data.rows.find((r) => r.id === s.ds1).syllabi, { approved: 1, review: 0, returned: 0, draft: 0, none: 1 });   // одна линия + t3 без линии
+assert.throws(() => syllabusFor({ disciplineId: s.ds1, teacherId: s.ids.t1 }, s.store.list('syllabi'), 1), TypeError);
+```
+
+(имена полей ответа `journal.get` сверить с прежними тестами журнала; смысл — название темы первой пары). Ещё: участник стал `left` и «Сформировать расписание» — у sb2 тем нет, `hasSyllabus: false`; «Настройки семестра» со сдвигом конца семестра — пары sb2 по-прежнему по общему; `dir.save` предмета sb3 с преподавателем t2 — sb3 идёт по общему (уточнение о смене преподавателя); на преподавателя t5 без линии — sb3 без тем (уточнение 7); `work.list` и `journal.saveResults` для sb2 работают (нет `no_syllabus`). **До и после переноса одно и то же:** на базе `journalSetup` ответы `journal.get`, `ledger.list`, `syllabus.get`, `student.grades` до `applyLinesUpgrade` (старый код этой задачи не нужен — сравнить с ожиданиями прежних тестов: они зелёные без правки чисел). Скорость: `journal.get`, `ledger.list`, `work.list`, `student.grades`, `subjects.overview`, `dir.summary`, `settings.save` со сдвигом дат, `schedule.generate` — `spy.lists.syllabusMembers === 1` и ни одна таблица не читается дважды.
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test`, `npm run build:gas`.
+- [ ] **Step 5:** коммит `feat: the journal, the ledger, the schedule and the directories find the syllabus of a group by its line`.
+
+---
+
+### Task 4 (С): силлабус по линии — версии, права участников, утверждение по всем группам, страница
+
+**Files:** Create `backend/syllabusLines.js`, `tests/lineRightsApi.test.js`. Modify `backend/syllabusDraft.js`, `backend/syllabusFlow.js`, `backend/syllabusData.js`, `backend/syllabusFiles.js`, `backend/syllabusUpload.js`, `core/syllabusFlow.js` (**только** убрать `// TEMP task 4`), `tests/syllabusSetup.js` (`READS` + две таблицы), `tests/syllabusFlow.test.js`. **Проверка — строгая** (права, утверждение; Review Focus 1 и 4).
+
+**Interfaces — Consumes:** задачи 1–3.
+
+**Produces:**
+
+```js
+// backend/syllabusLines.js
+export const LINE_TABLES = ['syllabusLines', 'syllabusMembers'];
+export function lineOfVersion(lines, version);                 // строка линии версии; нет — AppError('not_found')
+export function viewerOf(user, line, members, subjects);       // -> { id, roles, teaches (есть предмет дисциплины линии), part: partOf(line, members, user.id) }
+export function lineView(rows, line, user);                    // rows: { syllabusLines, syllabusMembers, subjects, staff, groups } -> line (ниже)
+// Сотруднику:
+// line: { id, disciplineId, semester, authorId, authorName,           // '' и '' — «Деканат»
+//   shared (участников 'joined' больше одного), teachers: [{ id, fullName }] ('joined', по joinedAt),
+//   members: [{ teacherId, fullName, author, joinedAt, byName, groups: [название…] }],
+//   invited: [{ teacherId, fullName, invitedAt, byName }],
+//   mine: 'author' | 'member' | 'invited' | null,
+//   can: { invite, add, remove, withdraw, leave, join, decline, setAuthor },
+//   ...(can.invite || can.add ? { candidates: [{ id, fullName, groups: [название…] }] } : {}) }
+// Студенту: line: { shared, teachers: [{ fullName }] }
+```
+
+`can`: `invite` — `mine === 'author'` и `teaches`; `add`, `setAuthor` — admin или dean (`setAuthor` — когда есть хоть один `joined`); `remove`, `withdraw` — admin, dean или автор с `teaches`; `leave` — `mine` — `'author'` или `'member'` и участников `joined` больше одного; `join`, `decline` — `mine === 'invited'`. `candidates` — действующие сотрудники с ролью teacher и предметом этой дисциплины, не `joined` и не `invited` в этой линии, по ФИО. Проректор получает вид сотрудника с `can` из одних `false`, без `candidates`.
+
+Что меняется (каждый запрос читает `LINE_TABLES` по одному разу):
+
+- **Все запросы по версии** (`syllabus.form`, `saveSection`, `submit`, `approve`, `return`, `attachFile`, `dropFile`, `file`): линия — `lineOfVersion`; права — `rightsOn(version, viewerOf(user, line, members, subjects))`. `viewerOf` и `groupsOfTeacher` в `syllabusDraft.js` удаляются; группы версии — `lineSubjects`.
+- **Кто получает какой отказ.** Править (`saveSection`, `attachFile`, `dropFile`): не видит версию или он не деканат, не админ, не автор и не участник — `forbidden`; видит и вправе, но статус не тот — `syllabus_locked`. Отправить: участник-не-автор и приглашённый — `forbidden`. `syllabus.form`: деканат, админ, проректор (как сейчас), автор, участник, приглашённый; прочие — `forbidden`, даже для утверждённой версии.
+- **`startDraft { subjectId, semester }`**: линия — `joinedLineId` преподавателя предмета (нет — `ensureLine`); версии — `versionsOfLine`; права — деканат, админ или преподаватель предмета. Новый вариант **`startDraft { lineId }`** (ровно один из двух параметров, иначе `bad_request`): деканат, админ или участник `joined` с предметом — для линии без предметов (готовый от деканата).
+- **Загрузка файла**: `planFile` берёт версии половины через линию преподавателя предмета; названия групп — `lineSubjects`.
+- **`examine`, `heldErrors`, `approveSyllabus`**: утверждённая — `versionsOfLine(...).approved`; «свои предметы» для `semester_closed` и список предметов для `relayout` — `lineSubjects(subjects, line, members)` **на момент запроса**; `relayout` получает `syllabusMembers`. `checkHeld` идёт по парам на строках утверждённой версии — чьи бы они ни были. **У общей линии** (участников `joined` больше одного) ошибки проведённых пар называют группу (уточнение 8): `checkHeld` зовётся с `withSubject: true`, `subjectId` заменяется на `group: '<название>'`; ошибка `semester_closed` получает `groups: [названия групп с закрытием или экзаменом]`. У своего силлабуса ответ прежний.
+- **`syllabus.queue`**: строка получает `authorName` (автор линии, `''` — «Деканат») и `members` (число `joined`); прежний ключ `teacherName` остаётся и равен `authorName`; `subjectId` — первый по названию группы предмет линии или `''`.
+- **`syllabus.get`**: версии половины — по линии преподавателя предмета; `groups` — предметы линии: деканату, админу, проректору — все (у общей линии у каждой строки ещё `teacherName`), преподавателю — только его собственные; ответ получает `...(line ? { line: lineView(...) } : {})` для показанной половины. `can.submit` — из `rightsOn`.
+- **`syllabus.form`**: `subject.groups` — по тому же правилу; `subject.teacherId` / `teacherName` — как сейчас (колонка версии); ответ получает `line`.
+- **`student.subjects`**, **`studentMayRead`**, **`covers`** — через линию: студент читает файл утверждённой версии линии, по которой идёт предмет его группы.
+
+- [ ] **Step 1: тесты** (`tests/lineRightsApi.test.js`; `s.publish(s.sb1, s.FILE_A)`; `s.share(line.id, 't2')`; `s.share(line.id, 't3', 'invited')`; `draft` — `syllabus.startDraft` за t1):
+
+```js
+const code = (r) => (r.ok ? 'ok' : r.error.code);
+const save = (token) => code(s.call('syllabus.saveSection', { syllabusId: draft, section: 'goals', data: GOALS }, token));
+assert.deepEqual(['t1', 't2', 't3', 't4', 'dean', 'prorector'].map((k) => save(s.t[k])), ['ok', 'ok', 'forbidden', 'forbidden', 'ok', 'forbidden']);
+const submit = (token) => code(s.call('syllabus.submit', { syllabusId: draft, dryRun: true }, token));
+assert.deepEqual(['t2', 't3', 't4', 't1'].map((k) => submit(s.t[k])), ['forbidden', 'forbidden', 'forbidden', 'ok']);
+const form = (token) => s.call('syllabus.form', { syllabusId: draft }, token);
+assert.deepEqual([form(s.t.t3).data.can.edit, form(s.t.t3).data.line.mine, code(form(s.t.t4))], [false, 'invited', 'forbidden']);
+const page = s.call('syllabus.get', { subjectId: s.sb2 }, s.t.s2).data;
+assert.deepEqual(page.line, { shared: true, teachers: [{ fullName: s.names.t1 }, { fullName: s.names.t2 }] });
+assert.equal(/invited|joinedAt|byName|candidates/.test(JSON.stringify(page)), false);                 // студент не видит приглашённых и дат
+assert.deepEqual(s.call('syllabus.queue', {}, s.t.dean).data.rows.map((r) => [r.authorName, r.teacherName, r.members]), [[s.names.t1, s.names.t1, 2]]);   // после отправки
+```
+
+Ещё — **утверждение по всем участникам**: у sb2 проведена пара на теме «А1»; новая версия без занятия «А1» → `syllabus.approve` даёт `approved: false` и ошибку `held_missing` с датой пары sb2 и `group: '02-1'`; у sb2 закрыт юнит 1, а в новой версии занятие перенесено в юнит 2 → `held_closed`; сменён семестр по плану при закрытом юните sb2 → `semester_closed`; t3 стал `joined` после отправки и до утверждения — его проведённая пара тоже защищена; после удачного утверждения пары sb1 и sb2 стоят на строках новой версии, пары sb3 (участник `left`) и sb4 — снимок тот же; `changedPairs` считает пары обеих групп. Участник t2 начинает новую версию (`startDraft` с sb2): версия в общей линии, `teacherId` — автор t1, номер — `nextVersion`. Файл от участника (`syllabus.apply` с sb2) ложится в общий черновик, `teacherId` версии не изменился. Автор без предмета (`teaches: false`) — править и отправить `forbidden`. Студент группы участника читает файл утверждённой версии (`syllabus.file`); студент группы вышедшего — `not_found`. Линия без автора: `authorName: ''`, отправляет деканат. `startDraft` с обоими параметрами или без них — `bad_request`; `{ lineId }` преподавателем другой дисциплины — `forbidden`. Версия без линии (пустой `lineId`) — `not_found`, не `internal`. Скорость: `syllabus.get`, `syllabus.form`, `syllabus.submit`, `syllabus.approve`, `syllabus.queue`, `syllabus.apply` — каждая таблица, включая две новые, не больше одного раза. Поиск по коду: в `backend/` нет `teacherId === version.teacherId` и `versionsOf(` вне `nextVersion`.
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test`, `npm run build:gas`.
+- [ ] **Step 5:** коммит `feat: syllabus versions, rights and approval go by the line and its members`.
+
+---
+
+### Task 5 (С): участники без перехода — позвать, отозвать, отказаться, автор, готовый от деканата, карточка дисциплины
+
+**Files:** Create `tests/lineMembersApi.test.js`. Modify `backend/syllabusLines.js`, `backend/handlers/syllabus.js`, `backend/dirInfo.js`, `backend/subjectData.js`, `backend/handlers/dir.js` (`mySubjects`), `tests/dirInfoApi.test.js`. **Проверка — строгая** (права, обход; Review Focus 1 и 3).
+
+**Interfaces — Consumes:** задачи 1–4.
+
+**Produces:**
+
+```js
+export const MEMBER_TABLES = ['syllabusLines', 'syllabusMembers', 'subjects', 'staff', 'groups'];   // читает каждый запрос ниже, по одному разу
+export function inviteMember(store, platform, data, user);    // 'syllabus.invite' { lineId, teacherId } -> { line }
+export function withdrawInvite(store, platform, data, user);  // 'syllabus.withdraw' { lineId, teacherId } -> { line }
+export function declineInvite(store, platform, data, user);   // 'syllabus.decline' { lineId } -> { declined: true }
+export function setAuthor(store, platform, data, user);       // 'syllabus.setAuthor' { lineId, teacherId } -> { line }
+export function newLine(store, platform, data, user);         // 'syllabus.newLine' { disciplineId, semester } -> { lineId, syllabusId }   (+ disciplines, syllabi)
+export function myInvitations(store, platform, user);         // 'syllabus.invitations' {} -> { invitations: [row] }                       (+ disciplines, syllabi)
+// row: { lineId, disciplineId, disciplineName, semester, authorName, byName, invitedAt, hasApproved,
+//        approvedId, openId (версии общего, которые можно посмотреть; нет — ''), subjectId (его первый по названию группы предмет дисциплины),
+//        losesTopics (у общего нет утверждённой, а у него сейчас есть) }
+// dir.card дисциплины: + lines: [{ lineId, semester, authorName, shared, members (число 'joined'), teachers: [ФИО…], approved, open (статус или null — по rightsOn),
+//        syllabusId (открытая, если её видно, иначе утверждённая, иначе ''), subjectId (первый предмет линии или '') }] — живые линии обеих половин,
+//        по половине, автору, id; + can: { newLine } (admin, dean)
+// dir.summary дисциплин: syllabi получает ...(общих линий > 0 ? { shared: N } : {}); строки dir.card, subjects.overview и teacher.mySubjects —
+//        syllabus / строка получает ...(shared ? { shared: true, members: N } : {})
+```
+
+Правила:
+
+- `invite`: вызывающий — автор линии (`part === 'author'`) с предметом дисциплины, иначе `forbidden` (деканат без авторства — тоже: он добавляет сразу). Цель — действующий сотрудник с ролью teacher и предметом дисциплины, иначе `not_teaching`; уже `joined` или `invited` в этой линии (в том числе сам автор) — `already_member`. Пишется одна строка участника `invited` (`byId`, `invitedAt`). «Пары» и «Силлабусы» не читаются и не пишутся.
+- `withdraw`: admin, dean или автор с предметом; нет строки `invited` у цели — `not_found`; строка → `withdrawn`, `endedAt`, `endedBy`.
+- `decline`: своя строка `invited` → `declined`; нет её — `forbidden`.
+- `setAuthor`: admin или dean; цель — `joined` в линии, иначе `not_found`; пишется `authorId` линии. Колонка `teacherId` существующих версий не меняется.
+- `newLine`: admin или dean; дисциплины нет — `not_found`; `semester` не 1 и не 2 — `bad_request`. Пишет линию (`authorId: ''`, `createdBy`) и пустой черновик через `createDraft` (`approved: null`, `group: null`; `teacherId` версии — тот, кто нажал). Участников не заводит.
+- `invitations`: строки `invited` вызывающего, у которого ещё есть предмет этой дисциплины; по `invitedAt`.
+- `dirInfo`: `lines` и метки; проректор не видит черновики (`open: null`, `syllabusId` — утверждённая) и получает `can.newLine: false`.
+
+- [ ] **Step 1: тесты** (`tests/lineMembersApi.test.js`; `s.publish(s.sb1, s.FILE_A)`; `L` — линия t1):
+
+```js
+const code = (r) => (r.ok ? 'ok' : r.error.code);
+const invite = (teacherId, token = s.t.t1, lineId = L.id) => s.call('syllabus.invite', { lineId, teacherId }, token);
+const pairs = JSON.stringify(s.store.list('pairs'));
+const r = invite(s.ids.t2);
+assert.deepEqual([r.ok, r.data.line.invited.map((x) => x.teacherId), r.data.line.members.length, r.data.line.shared], [true, [s.ids.t2], 1, false]);
+assert.equal(JSON.stringify(s.store.list('pairs')), pairs);                                  // без согласия темы не меняются
+assert.deepEqual([s.ids.t2, s.ids.t1, s.ids.t4, s.ids.t5, s.ids.prorector].map((id) => code(invite(id))), ['already_member', 'already_member', 'not_teaching', 'not_teaching', 'not_teaching']);
+const was = s.snapshot();
+assert.deepEqual([s.t.t2, s.t.t3, s.t.dean, s.t.admin].map((token) => code(invite(s.ids.t3, token))), ['forbidden', 'forbidden', 'forbidden', 'forbidden']);
+for (const bad of [[s.ids.t3], 5, { id: 1 }, '  ', '__proto__', null]) assert.ok(['bad_request', 'not_teaching'].includes(code(invite(bad))), JSON.stringify(bad));
+assert.deepEqual(s.snapshot(), was);
+assert.deepEqual(s.call('syllabus.invitations', {}, s.t.t2).data.invitations.map((x) => [x.lineId, x.disciplineName, x.semester, x.authorName, x.hasApproved, x.losesTopics]),
+  [[L.id, 'Анатомия', 1, s.names.t1, true, false]]);
+```
+
+Ещё: `withdraw` автором и деканатом — строка `withdrawn` с `endedBy`; участником — `forbidden`; у того, кого не звали, — `not_found`; после отзыва `syllabus.invitations` пуст и позвать можно снова (новая строка, прежняя осталась). `decline` приглашённым — `declined`; чужим — `forbidden`. Приглашённый без предмета (предмет передан другому) — в `invitations` не показан. `setAuthor`: деканат назначает участника — `authorId` сменился, прежний автор больше не отправляет (`syllabus.submit` — `forbidden`), новый — отправляет; назначить приглашённого или постороннего — `not_found`; преподавателем — `forbidden`. `newLine`: деканат — линия без автора и черновик `version: 1`, участников нет; вторая такая же линия той же дисциплины и половины — можно; преподавателем и проректором — `forbidden`; `semester: 3` — `bad_request`; чужой `disciplineId` — `not_found`. Каждое действие каждой ролью и без токена; после каждого отказа снимок всех таблиц тот же. `dir.card` дисциплины: `lines` — линия t1 (`shared: false`, `members: 1`), после `s.share` второго — `shared: true`, `members: 2`; линия без автора видна (`authorName: ''`); линия, где все вышли, не видна; проректору черновик не виден. `dir.summary`: `shared: 1` только при общей линии. Скорость: каждый запрос — `MEMBER_TABLES` (и названные добавки) не больше одного раза; `syllabus.invite` не читает `pairs`, `topics`, `syllabi`.
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test`, `npm run build:gas`.
+- [ ] **Step 5:** коммит `feat: invite a colleague to a syllabus, withdraw, decline, set the author, a ready syllabus from the deanery`.
+
+---
+
+### Task 6 (С): переход — «Перейти на общий» и «Добавить сразу»
+
+**Files:** Create `backend/lineSwitch.js`, `tests/lineJoinApi.test.js`. Modify `backend/handlers/syllabus.js`. **Проверка — строгая** (права, раскладка; Review Focus 1–3).
+
+**Interfaces — Consumes:** задачи 1–5; `relayout`, `loadSettings`; `closedOfSubject` (`backend/journalData.js`); `inSemester`.
+
+**Produces:**
+
+```js
+export const SWITCH_TABLES = ['syllabusLines', 'syllabusMembers', 'syllabi', 'subjects', 'staff', 'groups', 'topics', 'pairs', 'settings', 'closures', 'subjectExams', 'examAttempts'];
+export function switchLocks(rows, settings, teacherId, lines);   // lines: [линия | null, …] (откуда и куда) -> fields ошибки line_locked ([] — можно)
+export function joinLine(store, platform, data, user);           // 'syllabus.join' { lineId, confirm? } -> { line, changedPairs }
+export function addMember(store, platform, data, user);          // 'syllabus.add' { lineId, teacherId, confirm? } -> { line, changedPairs }
+```
+
+Правила (общая часть — одна внутренняя функция для обоих запросов; все чтения — до первой записи):
+
+1. **Проверки по порядку.** id не простая строка, `confirm` не булево — `bad_request`. Линии нет — `not_found`. `join`: вызывающий уже `joined` в этой линии — `already_member`; нет его строки `invited` — `forbidden`. `add`: вызывающий — admin или dean (иначе `forbidden`); цель уже `joined` — `already_member`. Переходящий — действующий преподаватель с предметом дисциплины, иначе `not_teaching`.
+2. **Откуда.** `from` — линия, где он сейчас `joined` по этой дисциплине и половине (`joinedLineId`), может не быть.
+3. **Запрет (`switchLocks`).** Для каждого его предмета дисциплины набор семестров по плану: утверждённой версии `from`, утверждённой версии новой линии и — если половина линии текущая (`line.semester === settings.semester`) — `closedOfSubject(rows, subject, settings, пары предмета в датах семестра).planSemester`. `switchLock` по этому набору; по строке `{ field: 'group', code, name }` на каждую закрытую группу → `line_locked`.
+4. **Предупреждение.** У новой линии нет утверждённой версии, у `from` есть, `confirm !== true` → `needs_confirm`.
+5. **Запись, в таком порядке:**
+   - «Пары»: `relayout(store, id его предметов дисциплины, строки «как будет» (участники: в `from` — `left`, в новой — `joined`), [])`. Для не текущей половины `relayout` ничего не меняет — это верно. Проведённые пары он не трогает; будущие встают со следующей по счёту темы (прежний «пропуск» `subjectScope`).
+   - «Силлабусы»: если в `from` он был единственным `joined` и у неё есть открытая версия (`draft`, `returned`, `review`) — она становится `archived`. Утверждённая версия `from` статус не меняет.
+   - «Участники»: сначала его строка в `from` → `left` (`endedAt`, `endedBy` — кто нажал), потом в новой линии — `joined` (`joinedAt`): `join` правит свою строку `invited`; `add` правит его строку `invited`, если она есть, иначе вставляет новую (`byId` — деканат).
+   - «Линии»: если он был автором `from` и там остались `joined` — `authorId` = `successor`; если никого — не меняется (история).
+6. Ответ — `lineView` новой линии и число изменённых пар.
+
+- [ ] **Step 1: тесты** (`tests/lineJoinApi.test.js`; `s.publish(s.sb1, s.FILE_A)`; `s.publish(s.sb2, s.FILE_B)`; `s.at('2026-09-03')`; `s.hold(s.sb2, '2026-09-02')` — проведена на «Б1»; `L = s.lineOf('t1')`; t1 зовёт t2 и t3):
+
+```js
+const code = (r) => (r.ok ? 'ok' : r.error.code);
+const mine1 = JSON.stringify(s.store.list('pairs').filter((p) => p.subjectId === s.sb1));
+const own = s.lineOf('t2');
+const r = s.call('syllabus.join', { lineId: L.id }, s.t.t2);
+assert.equal(r.ok, true);
+assert.deepEqual(s.topicsOf(s.sb2).slice(0, 3), ['Б1', 'А2', 'А3']);                           // проведённая держит свою тему, дальше — со следующей по счёту
+assert.equal(JSON.stringify(s.store.list('pairs').filter((p) => p.subjectId === s.sb1)), mine1);   // группа автора не тронута
+assert.equal(s.store.list('syllabusMembers').find((x) => x.lineId === own.id).state, 'left');
+assert.equal(s.store.list('syllabi').find((v) => v.lineId === own.id && v.version === 1).status, 'approved');   // прежняя утверждённая — как была
+assert.deepEqual([s.oneJoined(), r.data.line.members.length, code(s.call('syllabus.join', { lineId: L.id }, s.t.t2))], [[], 2, 'already_member']);
+assert.deepEqual(s.topicsOf(s.sb3).slice(0, 2), ['', '']);                                      // приглашённый, который не ответил: тем нет
+```
+
+Ещё: t3 (без своего силлабуса) переходит — пары с «А1». У t2 был открытый черновик своей линии (и случай «на утверждении») — после перехода `archived`, очередь деканата пуста. **Запрет:** закрытый юнит sb2 (`planSemester: 1`) — `line_locked` с `[{ field: 'group', code: 'unit_closed', name: '02-1' }]`, снимок тот же; юнит открыт заново (`reopenedAt` заполнен) — переход проходит; закрытая итоговая (юнит 0) — `unit_closed`; строка `subjectExams` — `exam_exists`; закрытие с другим семестром по плану (3) — не мешает; закрытый юнит в группе **автора** — не мешает переходу t2. **Предупреждение:** у общей линии только черновик, у t2 свой утверждённый — `needs_confirm` с `[{ field: 'line', code: 'no_approved' }]`, ничего не записано; с `confirm: true` — переход, будущие пары sb2 без тем, проведённая держит «Б1»; t3 без своего утверждённого переходит без `confirm`. **Общий короче проведённого:** у sb2 проведено 5 пар, в общем 5 занятий — будущие пары без темы, ответ `ok`. `join` без приглашения, после отзыва и после отказа — `forbidden`; чужой линии другой дисциплины — `forbidden`; `lineId` — массив, число, `'  '`, `'__proto__'` — `bad_request` или `not_found`. `add`: деканат добавляет t3 без приглашения — `joined`, `byId` — деканат; добавляет приглашённого t2 — его строка `invited` стала `joined`, второй строки нет; преподавателем — `forbidden`; t4 (другая дисциплина) и отключённого — `not_teaching`; уже участника — `already_member`; в линию без автора и без людей (`newLine`) — проходит, автора нет. Из общего в общий: t2 `joined` в L1, приглашён в L2 → `join` L2: в L1 `left`, в L2 `joined`, новых версий нет. Автор L1 уходит в L2 — автором L1 стал вступивший раньше всех. Не текущая половина (линия весны): «Пары» — снимок тот же, `changedPairs: 0`. Обрыв: хранилище в памяти бросает на `updateMany('syllabusMembers')` → повтор запроса доводит до того же состояния, что и чистый переход. Скорость: `SWITCH_TABLES` — каждая не больше одного раза. После каждого шага `s.oneJoined()` пуст.
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test`, `npm run build:gas`.
+- [ ] **Step 5:** коммит `feat: a teacher joins a shared syllabus and the deanery adds one at once - future pairs follow it`.
+
+---
+
+### Task 7 (С): выход и «Убрать» — копия, пары, автор
+
+**Files:** Create `tests/lineLeaveApi.test.js`. Modify `backend/lineSwitch.js`, `backend/handlers/syllabus.js`, `backend/syllabusData.js` (только ключ `copy`). **Проверка — строгая** (права, раскладка; Review Focus 1–3, 5).
+
+**Interfaces — Consumes:** задачи 1–6; `createDraft` (задача 2), `copiesOf` (`core/syllabusFlow.js`), `rowsOfVersion`, `DOC_TABLES`.
+
+**Produces:**
+
+```js
+export const LEAVE_TABLES = [...SWITCH_TABLES, 'units', 'outcomes', 'selfWork', 'literature', 'software', 'grading', 'rules'];
+export function leaveLine(store, platform, data, user);      // 'syllabus.leave' { lineId } -> { lineId (новая), syllabusId (копия или черновик), copied, changedPairs }
+export function removeMember(store, platform, data, user);   // 'syllabus.remove' { lineId, teacherId } -> { line (общая, как стала), left: { lineId, syllabusId, copied }, changedPairs }
+// backend/syllabusData.js, syllabus.get: state.approved получает ...(копия ? { copy: true } : {}) — у утверждённой версии есть sourceId, и версия-источник лежит в другой линии
+```
+
+Правила (общая внутренняя функция; `who` — кто выходит, `actor` — кто нажал):
+
+1. **Проверки.** `leave`: вызывающий не `joined` в линии — `forbidden`. `remove`: вызывающий — admin, dean или автор линии с предметом, иначе `forbidden`; `teacherId === user.id` — `bad_request` (для себя — «Выйти»); цель не `joined` — `not_found`. Участников `joined` один — `last_member`. Запрет — `switchLocks(rows, settings, who, [линия, null])` → `line_locked`.
+2. **У общего есть утверждённая версия `A`.** Запись в таком порядке:
+   - «Линии»: новая линия `N` (`authorId: who`, `createdBy: actor`).
+   - «Силлабусы» и листы разделов: `createDraft(store, platform, { line: N, approved: A, group: null, userId: actor }, tables)` — версия-копия `C` со всеми разделами (`sourceId: A.id`, темы — со «скопирована из»), `teacherId: who`, номер — `nextVersion` (последний по старому ключу `who` + 1), пока `draft`.
+   - «Пары»: каждая пара предметов `who` по этой дисциплине, стоящая на строке `A`, переезжает на копию этой строки (`copiesOf`) — и проведённые, и будущие; затем `relayout` его предметов по строкам «как будет» — одной пачкой с переездом (`also`). Пары остальных участников не трогаются.
+   - «Силлабусы»: `C` → `approved` (`decidedBy: actor`, `decidedAt` — сегодня, `remark: ''`); **все** утверждённые версии со старым ключом «дисциплина + `who` + половина», у линии которых после выхода нет ни одного `joined`, кроме `C`, → `archived`.
+   - «Участники»: его строка в общей → `left` (`endedAt`, `endedBy: actor`), затем строка `joined` в `N` (`byId: actor`).
+   - «Линии»: если он был автором общей — `authorId` = `successor`.
+3. **Утверждённой версии нет.** `N` и пустой черновик (`createDraft` с `approved: null`, группа — его первая по названию группа предмета, как у `startDraft`); `relayout` его предметов; участники и автор — как выше. Черновик общего не копируется. `copied: false`.
+4. **Повтор после обрыва:** если уже есть линия с автором `who` той же дисциплины и половины без строк участников, а в ней — версия `draft` с `sourceId === A.id` (или пустой черновик для случая 3), берутся они, новые не создаются.
+
+- [ ] **Step 1: тесты** (`tests/lineLeaveApi.test.js`; общий t1 + t2 + t3 через запросы задач 5–6, `FILE_A` утверждён, `L` — его линия, `A` — её утверждённая версия; у t2 раньше был свой силлабус `FILE_B` версий 1–2; у sb2 проведены пары 02.09 («Б1», до перехода) и 09.09 («А2», после)):
+
+```js
+const before = s.topicsOf(s.sb2);                                                // названия тем по датам
+const others = JSON.stringify(s.store.list('pairs').filter((p) => p.subjectId !== s.sb2));
+const r = s.call('syllabus.leave', { lineId: L.id }, s.t.t2);
+const copy = s.store.list('syllabi').find((v) => v.id === r.data.syllabusId);
+const oldKey = s.store.list('syllabi').filter((v) => v.disciplineId === s.ds1 && v.teacherId === s.ids.t2 && v.semester === 1);
+assert.deepEqual([r.ok, r.data.copied, copy.status, copy.sourceId, copy.teacherId, copy.decidedBy, copy.version], [true, true, 'approved', A.id, s.ids.t2, s.ids.t2, 3]);
+assert.deepEqual(oldKey.filter((v) => v.status === 'approved').map((v) => v.id), [copy.id]);      // по старому ключу — ровно одна утверждённая
+assert.deepEqual(s.topicsOf(s.sb2), before);                                                      // темы пар не изменились
+const copyRows = new Set(s.store.list('topics').filter((t) => t.syllabusId === copy.id).map((t) => t.id));
+assert.ok(s.store.list('pairs').filter((p) => p.subjectId === s.sb2 && p.date >= '2026-09-09' && p.topicId).every((p) => copyRows.has(p.topicId)));
+assert.equal(JSON.stringify(s.store.list('pairs').filter((p) => p.subjectId !== s.sb2)), others); // чужие пары не тронуты
+assert.deepEqual([s.oneJoined(), s.lineOf('t2').id, s.lineOf('t2').authorId], [[], r.data.lineId, s.ids.t2]);
+for (const name of DOC_TABLES) assert.equal(s.store.list(name).filter((x) => x.syllabusId === copy.id).length, s.store.list(name).filter((x) => x.syllabusId === A.id).length, name);
+```
+
+Ещё: пара 02.09 осталась на строке старого своего силлабуса («Б1»); `syllabus.get` sb2 — `state.approved.copy === true`, у обычной новой версии своего силлабуса ключа `copy` нет. **Выходит автор** t1 (остаются t2, t3): автором общей стал вступивший раньше всех; `A` (с `teacherId` t1) осталась `approved`, и sb2 по-прежнему идёт по ней; по старому ключу t1 утверждённых две, у копии номер больше. **Автор вышел, пока версия на утверждении** (уточнение 9): версия осталась в очереди, `authorName` строки очереди — новый автор, деканат утверждает как обычно. Трое участников с разным `joinedAt` — `successor` по времени, при равном — по id. Единственный участник — `last_member`, снимок тот же. Закрытый юнит в группе выходящего — `line_locked`; в группе другого участника — не мешает. Утверждённой версии у общего нет: новая линия с пустым черновиком (`status: 'draft'`, тем нет), `copied: false`. `remove`: автор убирает t2 — то же, что выход, `endedBy` и `decidedBy` — автор; участник убирает автора — `forbidden`; себя — `bad_request`; деканат убирает автора — проходит, автор сменился; приглашённого — `not_found`; преподаватель другой дисциплины — `forbidden`; id-мусор — не `internal`. После выхода t2 правит копию: `startDraft` → версия в его линии с номером 4; её утверждение перекладывает только sb2. После выхода `journal.get` sb2 показывает те же темы по тем же датам. Не текущая половина — «Пары» не изменились. Обрыв: хранилище бросает на `updateMany('syllabi')` → повтор: линий стало на одну больше, версий — на одну (а не на две), состояние как у чистого выхода. Скорость: `LEAVE_TABLES` — каждая не больше одного раза.
+
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test`, `npm run build:gas`.
+- [ ] **Step 5:** коммит `feat: leaving a shared syllabus gives the teacher an approved copy and moves the pairs to it`.
+
+---
+
+### Task 8 (С): стенд с общим силлабусом и приглашением, сборка Apps Script
+
+**Files:** Create `tests/seedShared.test.js`. Modify `dev/seed.js`. **Проверка — облегчённая.**
+
+**Produces:** `export function seedShared(store, platform)` — зовётся последним в `fill` (значит, и в `serve:demo`). Через функции задач 5–6, не прямой записью:
+
+- «Информатика», **весна**: деканат (`dean`) добавляет `teacher3` в линию `teacher1` → общий на двоих (автор `teacher1`); пары не меняются (весна — не текущая половина).
+- «Информатика», **осень** (текущая): `teacher1` зовёт `teacher3` → приглашение ждёт; ничего в парах не меняется.
+
+Чем входить на стенде: `teacher3` — приглашение на главной, «Перейти на общий» (у 03-1 появляются темы), «Выйти» (копия); `teacher1` — блок «Участники», «Позвать», «Убрать»; `dean` — очередь, карточка дисциплины, «Новый общий силлабус», «Добавить сразу»; после того как `teacher3` перешёл, «Убрать» `teacher1` из осенней линии упирается в закрытые юниты его групп (пример запрета; до перехода ответ — «единственный участник»); `S3001` — студент 03-1. «Анатомия» (`teacher2`) остаётся как есть.
+
+- [ ] **Step 1: тесты** (`tests/seedShared.test.js`): после `seed` — у весенней линии «Информатики» два `joined` (`teacher1` автор, `teacher3`), у осенней один `joined` и один `invited`; `syllabus.invitations` за `teacher3` — одна строка (осень, автор — имя `teacher1`, `hasApproved: true`, `losesTopics: false`); `oneJoined` пуст; `dean` убирает `teacher1` из осенней линии — `last_member`; `teacher3` принимает приглашение — у пар «Информатики» 03-1 появились темы; `dean` снова убирает `teacher1` — `line_locked`, среди групп — 02-1. **Прежние проверки стенда (`tests/devServer.test.js`, `seedMarks`, `seedWork`, `seedLedger`, `seedRepeat`, `demo`) зелёные без правок чисел** — стенд текущей половины не изменился.
+- [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test`; `npm run build:gas` — в `build/gas/` есть листы «Линии силлабусов» и «Участники силлабусов» (проверка `tests/gasBundle.test.js`).
+- [ ] **Step 5:** коммит `feat: the stand has a shared syllabus of two teachers and a pending invitation`.
+
+---
+
+### Task 9 (П): проба отката на настоящей прежней версии
+
+Исполнитель — `journal-reviewer` (sonnet, строго), код репозитория не правит. Раздел «Откат», шаги 1–5 целиком, прежний код — `857345c`; пробные скрипты — во временной папке сессии, их путь — в отчёте (не длиннее 15 строк: вердикт и находки). Стенд и рабочий сервер не запускать.
+
+- [ ] **Step 1:** прежний код распакован (`git archive 857345c`), временная база собрана новым кодом (шаг 2 раздела «Откат»): общий с А, Б, В, приглашённый Г, вышедший Д.
+- [ ] **Step 2:** шаги 3 и 4: ни одного `internal`; «Линии» и «Участники» не изменились; ни одна строка «Силлабусов», «Тем», «Пар» не удалена; у проведённых пар те же `topicId`, `lessonType`, `part` — в том числе после `settings.save` и `schedule.generate` прежним кодом. В отчёте — что видит каждый из пяти (автор, участник со своим силлабусом, участник без своего, приглашённый, вышедший).
+- [ ] **Step 3:** шаг 5: новый код на базе после прежнего стартует, перенос даёт линии строкам без `lineId`, `oneJoined` пуст; после `schedule.generate` будущие пары Б и В стоят по общему, как в снимке.
+- [ ] **Step 4:** находки — координатору; важные исправляет `journal-server` одной правкой, тот же проверяющий повторяет только упавший шаг. Абзацы «Что известно заранее» и «Что сказать владельцу» дополняются тем, что нашлось. После задачи — итоги в `aidlc-state.md`, журнал хода, **новый чат координатора**.
+
+---
+
+## Экраны: макеты и два блока с остановкой после каждого
+
+Перед блоком стенд координатора остановлен; агенты поднимают свой `npm run dev:reset` и останавливают его по своему PID. После последней задачи блока — **стоп**: координатор поднимает `journal-dev-reset`, входит за владельца и даёт нумерованный список «что посмотреть» (владелец часто с телефона — список и скриншоты в конце ответа, вторая вкладка — `127.0.0.1:5273`); заметки — в `aidlc-docs/construction/obshchiy-sillabus/замечания.md`; правки блока — одному агенту.
+
+Общее для экранов: ключи словаря — приставки `sline.*` (блок «Участники» и окна), `home.invite.*`, `dir.lines.*`, `review.col.author`, `review.col.members`; новые коды — `error.line_locked`, `error.already_member`, `error.not_teaching`, `error.last_member`, `error.needs_confirm` — во всех трёх словарях (`tests/i18n.test.js`); новые кыргызские ключи — в список на вычитку. Слова: «общий силлабус», «участники», «автор», «Позвать коллегу», «Перейти на общий», «Отказаться», «Выйти из общего», «Убрать», «Добавить сразу», «Назначить автором», «Новый общий силлабус»; слова «линия» на экране нет. Кнопка, которая шлёт запрос, занята до ответа; ответ, пришедший после ухода со страницы, ничего не рисует (приём «владелец состояния + билет», как в `views/grades.js`); ошибка сервера показывается текстом из словаря, у `line_locked` — с названиями групп из `fields`. Имена — «Фамилия И.» через `shortName` (`site/js/lesson.js`) в строке «Преподаватели», полностью — в блоке «Участники». Кнопки рисуются только по `line.can` из ответа; своих правил «кто что может» на сайте нет.
+
+---
+
+### Task 10 (Э): макеты — три картинки владельцу
+
+Проверка — владелец. Код сайта не меняется; файлы — в `.superpowers/sdd/plan-obshchiy-sillabus/mockups/` (в git не попадают): HTML с вымышленными людьми в стиле сайта (переменные `site/css/app.css`, тёмная тема) → PNG через headless Chrome, 1366 px и 360 px.
+
+- [ ] **Step 1:** М1 — страница силлабуса, **вариант А**: под шапкой карточка «Участники» (кто ведёт, с датами и группами; кто приглашён; кнопки «Позвать коллегу», «Убрать», «Выйти из общего»), в «Сведениях» — «Преподаватели: Фамилия И., Фамилия И.».
+- [ ] **Step 2:** М2 — та же страница, **вариант Б**: в шапке строка «Общий силлабус · участников: 2 · Участники…», список и кнопки — в окне.
+- [ ] **Step 3:** М3 — главная преподавателя с карточкой приглашения («Вас зовут вести „Анатомию" (осень) по общему силлабусу автора Фамилия И.» — «Посмотреть», «Перейти на общий», «Отказаться») и окно предупреждения «у общего ещё нет утверждённой версии»; рядом — карточка дисциплины, раздел «Силлабусы» с кнопкой «Новый общий силлабус» и строкой «общий, участников: 2».
+- [ ] **Step 4:** **стоп**: координатор шлёт владельцу три картинки и вопрос «А или Б» (по умолчанию — А). Выбор — строкой `Ruling:` в журнал хода и в задание задач 11–13.
+
+---
+
+### Task 11 (Э): страница силлабуса — «Преподаватели», блок «Участники», окна — блок 1
+
+Проверка ИИ — **облегчённая** (кнопки по `line.can`; студент блока не видит).
+
+**Files:** Create `site/js/syllabusLine.js`, `site/js/views/syllabusMembers.js`, `tests/siteSyllabusLine.test.js`. Modify `site/js/syllabus.js` (`fileData`, `draftFileData` — строка преподавателей), `site/js/views/syllabus.js`, `site/js/views/syllabusForm.js`, `site/js/views/syllabusFormTabs.js`, `site/js/i18n/*.js`, `site/css/screens.css`, `tests/i18n.test.js`, `tests/syllabusForm.test.js` (если затронут).
+
+**Interfaces — Consumes:** `line` в ответах `syllabus.get` и `syllabus.form` (задача 4); `syllabus.invite`, `syllabus.withdraw`, `syllabus.remove`, `syllabus.leave` (задачи 5, 7).
+
+**Produces:**
+
+```js
+// site/js/syllabusLine.js (без DOM)
+export function teachersText(line, fallback);     // 'Фамилия И., Фамилия И.' из line.teachers; нет line — fallback (прежнее subject.teacherName)
+export function memberRows(line);                 // -> [{ teacherId, fullName, role: 'author' | 'member', date, by, groups, canRemove }] — canRemove: line.can.remove и это не сам смотрящий-автор
+export function invitedRows(line);                // -> [{ teacherId, fullName, date, by, canWithdraw }]
+export function lineBadge(line);                  // -> { key: 'sline.shared', params: { n } } | null (не общий)
+export function lockText(error, t);               // текст ошибки line_locked: названия групп из fields через запятую, отдельно закрытый юнит и экзамен
+export function leaveNote(line, hasApproved);     // -> ключ пояснения в окне выхода: 'sline.leave.copy' | 'sline.leave.empty'
+// site/js/views/syllabusMembers.js
+export function membersBlock({ line, hasApproved, onChange });   // карточка (или строка с окном — по выбору владельца в задаче 10); null, когда line нет или смотрит студент
+```
+
+Экраны:
+
+- **Страница силлабуса.** В шапке и в «Сведениях» вместо одного преподавателя — «Преподаватели: …» (`teachersText`); у общего — метка «общий, участников: N». Студент видит то же без блока. Печать и «Скачать Excel» — та же строка преподавателей.
+- **Блок «Участники»** (сотрудники; на странице и в форме версии): «Ведут» — ФИО, пометка «автор», дата вступления, кто добавил, группы; «Приглашены» — ФИО, дата, кто позвал. Кнопки по `line.can`: «Позвать коллегу» (окно: выбор из `line.candidates` с группами; пусто — «Больше некого звать: дисциплину никто больше не ведёт»), «Отозвать» у приглашённого, «Убрать» у участника (окно с пояснением «получит утверждённую копию как свой силлабус, темы его пар не изменятся»), «Выйти из общего» (то же пояснение; без утверждённой версии — «у вас будет пустой черновик»). После ответа блок и страница перечитываются; после «Выйти» — переход на свою страницу силлабуса.
+- **Проверки перед отправкой и утверждением** (страница и форма): у ошибки с `group` или `groups` в конце текста — «(группа 02-1)»; у утверждённой версии с `sourceId` из чужой линии сервер отдаёт `state.approved.copy: true` (задача 7 добавляет этот ключ, только когда он есть) — рядом с номером версии пометка «копия общего силлабуса».
+- **Форма версии.** Участник правит как автор; кнопка «Отправить» — только при `can.submit`; участнику-не-автору вместо неё строка «На утверждение отправляет автор: Фамилия И.». Приглашённый видит форму только для чтения с полосой «Вас зовут вести по этому силлабусу» и кнопками задачи 12. У общего под полем «Контакты преподавателя» — подсказка «Одно поле на всех: каждый участник вписывает свои контакты».
+
+- [ ] **Step 1: тесты** (`tests/siteSyllabusLine.test.js`): `teachersText` — двое, один, нет `line`; `memberRows` — автор первым, `canRemove` ложно у самого автора и при `can.remove: false`; `invitedRows`; `lineBadge` — `null` у своего, `{ n: 2 }` у общего; `lockText` — две группы с закрытым юнитом и одна с экзаменом; `leaveNote` — оба ключа; ключи словаря одинаковые в трёх языках.
+- [ ] **Step 2:** падает. **Step 3:** написать.
+- [ ] **Step 4: проверка на стенде** (`npm run dev:reset`, headless Chrome, обе темы, 1366 px; студент — 360 px): `teacher1`, «Информатика», весна — блок с двумя участниками, «Убрать» `teacher3` → остался один; осень — один участник и приглашённый `teacher3`, кнопки «Выйти из общего» нет, «Отозвать» и снова «Позвать»; стенд заново (`npm run dev:reset`): `teacher3`, весна — «Выйти из общего» → своя страница с утверждённой копией и пометкой «копия общего силлабуса»; `prorector` — блок без кнопок; `S1001` — «Преподаватели» есть, блока нет; в разметке нет вставок через `innerHTML`. Сообщение о закрытом юните проверяется в задаче 12 (после перехода).
+- [ ] **Step 5:** скриншоты в `.superpowers/sdd/plan-obshchiy-sillabus/task-11-shots/`: блок (тёмная и светлая), окна «Позвать», «Убрать», «Выйти», форма участника-не-автора, страница студента с телефона.
+- [ ] **Step 6:** коммит `feat: the syllabus page shows its teachers and the members block - invite, withdraw, remove, leave`.
+
+---
+
+### Task 12 (Э): главная преподавателя — приглашение, переход, отказ — блок 1
+
+Проверка — владелец блоком.
+
+**Files:** Modify `site/js/views/home.js`, `site/js/views/syllabus.js`, `site/js/views/syllabusForm.js`, `site/js/syllabusLine.js`, `site/js/i18n/*.js`, `site/css/screens.css`, `tests/siteSyllabusLine.test.js`.
+
+**Interfaces — Consumes:** `syllabus.invitations`, `syllabus.join`, `syllabus.decline` (задачи 5–6).
+
+**Produces:** `export function inviteText(row)` в `site/js/syllabusLine.js` → `{ key: 'home.invite.text', params: { discipline, half, author } }` (нет автора — ключ `home.invite.textDean`); `export function joinWarning(row)` → `'home.invite.warn.noApproved'` при `losesTopics`, иначе `null`.
+
+Экраны:
+
+- **Главная преподавателя:** блок «Приглашения» (только когда они есть): «Вас зовут вести „Анатомию" (осень) по общему силлабусу автора Фамилия И.» — «Посмотреть» (форма утверждённой версии `#/syllabus-form/<approvedId>`, только чтение) и «Черновик» (`openId`); нет версии — кнопки нет; «Перейти на общий», «Отказаться». Больше на главной ничего не меняется.
+- **«Перейти на общий»:** окно-подтверждение «Будущие пары ваших групп пойдут по общему силлабусу, проведённые сохранят свои темы»; при `losesTopics` или ответе `needs_confirm` — предупреждение дизайна и кнопка «Всё равно перейти» (запрос с `confirm: true`). Отказ `line_locked` — текст с группами. После перехода — страница силлабуса своего предмета.
+- **«Отказаться»:** вопрос «Отказаться от приглашения?»; после — блок без этой строки.
+- Те же две кнопки — в полосе приглашения на форме версии и на странице силлабуса своего предмета, когда `line` своей линии есть, а приглашение ждёт (строка над блоком «Участники»).
+
+- [ ] **Step 1: тесты:** `inviteText` — с автором и без; `joinWarning`; ключи словаря.
+- [ ] **Step 2:** падает. **Step 3:** написать.
+- [ ] **Step 4: проверка на стенде** (`npm run dev:reset`, обе темы): `teacher3` — на главной одно приглашение; «Посмотреть» — форма только для чтения; «Перейти на общий» → в «Журнале» 03-1 у пар появились темы «Информатики», на странице силлабуса — двое преподавателей; вторая вкладка `127.0.0.1:5273`: `teacher1` видит нового участника, `dean` жмёт «Убрать» у `teacher1` → сообщение о закрытых юнитах с названиями групп; `npm run dev:reset` заново → «Отказаться» → блока нет, у `teacher1` приглашённых нет. Окно с предупреждением «нет утверждённой версии» на стенде у преподавателя не встречается — его текст проверяется тестом `joinWarning`, а само окно — в задаче 13 (то же окно у деканата).
+- [ ] **Step 5:** скриншоты в `task-12-shots/`: главная с приглашением (обе темы), окно перехода, журнал 03-1 до и после, сообщение о закрытых юнитах.
+- [ ] **Step 6:** коммит `feat: a teacher sees invitations to a shared syllabus on the home page and joins or declines`.
+
+**Стоп, блок 1.** Координатор: `journal-dev-reset`, список «что посмотреть» из шагов 4 задач 11 и 12 (входы `teacher3`, `teacher1`, `S3001`), скриншоты владельцу.
+
+---
+
+### Task 13 (Э): деканат — карточка дисциплины, «Новый общий силлабус», «Добавить сразу», очередь, метки — блок 2
+
+Проверка — владелец блоком.
+
+**Files:** Modify `site/js/views/dirCard.js`, `site/js/dirInfo.js`, `site/js/views/syllabusMembers.js`, `site/js/views/review.js`, `site/js/views/subjects.js`, `site/js/views/home.js` (метка у «Моих предметов»), `site/js/syllabusLine.js`, `site/js/i18n/*.js`, `site/css/screens.css`, `tests/siteSyllabusLine.test.js`, `tests/siteDirInfo.test.js`.
+
+**Interfaces — Consumes:** `dir.card` дисциплины с `lines` и `can.newLine`, `dir.summary` с `shared`, метки `shared` в `subjects.overview` и `teacher.mySubjects`, `syllabus.newLine`, `syllabus.add`, `syllabus.setAuthor`, `syllabus.queue` (задачи 4–6).
+
+**Produces:** `export function lineRows(lines, currentSemester)` в `site/js/syllabusLine.js` → строки раздела «Силлабусы» (текущая половина первой; `href` — `#/syllabus/<subjectId>/<половина>`, без предмета — `#/syllabus-form/<syllabusId>`); `syllabusCountBadges` и `syllabusBadges` в `site/js/dirInfo.js` — ещё метка `dir.syllabi.shared`.
+
+Экраны:
+
+- **Карточка дисциплины**, новый раздел «Силлабусы»: по строке на силлабус — половина года, автор («Деканат», если нет), преподаватели, метка «общий, участников: N», статус (утверждён / на утверждении / возвращён / черновик), ссылка «Открыть». Кнопка **«Новый общий силлабус»** (при `can.newLine`): окно с выбором половины года → открывается форма пустого черновика. Проректор — без кнопки и без черновиков.
+- **Блок «Участники» у деканата** (в форме и на странице): «Добавить сразу» (окно: выбор из `candidates`; пояснение «будущие пары его групп сразу пойдут по этому силлабусу»; при `needs_confirm` — предупреждение и «Всё равно добавить»; `line_locked` — текст с группами), «Назначить автором» у участника, «Убрать», «Отозвать».
+- **Очередь «На утверждении»:** колонка «Автор» вместо «Преподаватель» («Деканат», если пусто) и «Участники: N».
+- **Метки:** список «Дисциплины» — к счётчикам «общих: N»; «Предметы» и «Мои предметы» — «общий» у строки с `shared`.
+
+- [ ] **Step 1: тесты:** `lineRows` — порядок половин, ссылка с предметом и без, автор пустой; `syllabusCountBadges` с `shared: 1` и без ключа; ключи словаря.
+- [ ] **Step 2:** падает. **Step 3:** написать.
+- [ ] **Step 4: проверка на стенде** (`npm run dev:reset`, обе темы): `dean` — карточка «Информатики»: строки осени (свой `teacher1`, черновик `teacher3`) и весны («общий, участников: 2»); «Новый общий силлабус» → весна → пустой черновик, в блоке «Автор: Деканат»; «Добавить сразу» `teacher3` (он ведёт по общему весны с утверждённой версией) → предупреждение «у общего ещё нет утверждённой версии» → «Всё равно добавить» → он участник, в прежнем общем весны остался один `teacher1`; «Назначить автором» `teacher3`; «Новый общий силлабус» → осень → «Добавить сразу» `teacher1` → отказ с названиями групп с закрытыми юнитами; очередь — «Автор», «Участники»; список «Дисциплины» — метка «общих»; `prorector` — карточка без кнопок и без черновиков.
+- [ ] **Step 5:** скриншоты в `task-13-shots/`: раздел «Силлабусы», окно «Новый общий силлабус», блок деканата с «Добавить сразу», очередь, список дисциплин с меткой.
+- [ ] **Step 6:** коммит `feat: the deanery makes a ready shared syllabus, adds teachers at once and sees shared syllabi in the directories`.
+
+**Стоп, блок 2.** Координатор: `journal-dev-reset`, список из шага 4 (вход `dean`, вторая вкладка — `teacher3`), скриншоты владельцу.
+
+---
+
+### Task 14 (координатор и владелец): общая проверка, выкладка на тестовый
+
+- [ ] **Step 1: общая проверка** — opus, строго, диапазон от коммита плана до `HEAD`, по Review Focus 1–5, с пробными скриптами во временной папке сессии. Обязательные пробы: каждое новое действие `syllabus.*` каждой ролью и без входа, со снимком всех таблиц; все обходы Review Focus 1; `oneJoined` после цепочек «позвать → перейти → выйти → добавить → убрать → перейти в другой общий» в разном порядке и после повторного переноса; темы пар до и после перехода и выхода по каждой группе; закрытый юнит, итоговая и экзамен; утверждение при трёх участниках; поиск в JSON студента слов `invited`, `joinedAt`, `byName`, `candidates` и id сотрудников; поиск по коду `teacherId === version.teacherId`, `versionsOf(` вне `nextVersion`, `innerHTML` в новых файлах сайта; `spy.lists` каждого нового и изменённого запроса; **прежний сайт на новом сервере**: ответы `syllabus.get`, `syllabus.form`, `syllabus.queue`, `dir.card`, `dir.summary`, `subjects.overview` содержат все прежние ключи; **проба отката** — повтор задачи 9 на итоговом коде.
+- [ ] **Step 2:** одна волна исправлений **одним** агентом; повторная проверка тем же проверяющим — только этих правок (исправления после общей проверки тоже проверяются).
+- [ ] **Step 3:** короткий показ владельцу того, что изменила волна (если экраны). Стенд остановить.
+- [ ] **Step 4:** решения раздела «Решения плана» (с ответами владельца на вопросы) — в таблицу решений `aidlc-state.md`; `design.md` — статус «собрано»; `CLAUDE.md`, «Главные правила предметной области» — абзац «Общий силлабус» (правило «силлабус свой у каждого преподавателя» дополняется, не отменяется); копия журнала хода — в `aidlc-docs/construction/obshchiy-sillabus/sdd/ledger-snapshot.md`.
+- **Apps Script (запасной Google):** новые листы и перенос делает только `setup()`; если запасной вариант когда-нибудь выкладывается, после выкладки обязательно запустить `setup()` — без него на Google ни одна группа не найдёт свой силлабус. Живой Google сейчас не обновляем.
+- [ ] **Step 5 (только по прямой просьбе владельца): выкладка на тестовый.** До выкладки — скриншот «Предметов» тестового под `admin` (статусы силлабусов «до»). В папке сервера: `npm run serve:backup` → `npm run serve:stop` → `git -C "D:\Журнал колледжа — сервер" checkout --detach <принятый коммит>` → `npm run serve:start` (сервер сам сделает копию базы; в журнале — `base upgraded: 2 tables made, 2 columns added` и `syllabus lines made: N`) → `npm run serve:status` («работает») → `git push`. Сверить «Предметы» со скриншотом «до»: статусы те же. Записать выложенный и прежний (`857345c`) коммит в `aidlc-state.md`, раздел «Выкладка», вместе с абзацами «Что известно заранее» и «Что сказать владельцу» из раздела «Откат». **Назад** — тот же порядок на `857345c`, сайт — новым коммитом-откатом; после возврата вперёд — «Сформировать расписание». При порче данных — `serve:restore` копии, сделанной перед выкладкой.
+- [ ] **Step 6: проверка на тестовом** (пробные люди): владелец под пробным преподавателем зовёт коллегу; под вторым — «Перейти на общий», смотрит темы в журнале своей группы; правит черновик вторым, отправляет первым; под деканатом утверждает и видит темы в обеих группах; «Выйти» — копия; с телефона пробным студентом — «Преподаватели» на странице силлабуса. Страница силлабуса или карточка дисциплины дольше 2 секунд — находка.
+- [ ] **Step 7:** обновить `aidlc-state.md`: доработка принята и выложена на тестовый; в «Что перенести» — **известные ограничения**: номера версий могут идти с пропуском; у вышедшего автора по старому ключу две утверждённые версии (на новом коде это не видно); откат — аварийный, после возврата «Сформировать расписание»; курс группы при переходе не проверяется; строк «Журнала изменений» о переходах нет. **Для боевого** (когда владелец попросит): в сообщении айтишнику сказать прямо — версия добавляет две таблицы и две колонки и при первом запуске переносит силлабусы; откат на прежний тег данные не стирает, но общий силлабус на прежней версии виден только автору — перед обновлением нужна копия `/data`.
+
+---
+
+## Вопросы плана владельцу
+
+Тексты простыми словами — в `owner-summary.md`. Оба вопроса с вариантом «по умолчанию»; если владелец ответит иначе, координатор правит строку раздела «Решения плана» и задачу 6 до её начала.
+
+1. **Свой силлабус был «на утверждении», а преподаватель перешёл на общий.** По умолчанию: незаконченная версия своего (черновик, возвращённая, на утверждении) уходит в архив, из очереди деканата пропадает. Вариант Б: пока своя версия на утверждении, перейти нельзя — сначала деканат утверждает или возвращает.
+2. **Группа другого курса.** По умолчанию: перейти на общий можно, даже если курс группы не совпадает с курсом силлабуса; при отправке на утверждение журнал, как и сейчас, предупредит «у групп другой курс». Вариант Б: переход запрещён, если курс не совпадает.
