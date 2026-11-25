@@ -18,6 +18,17 @@ function shared() {
   assert.deepEqual(s.call('schedule.generate', {}, s.t.dean).ok, true);
   return { s, line1, own, row };
 }
+// The answers the old code (the key «discipline + teacher + half») gave on this base; the transfer must not change them.
+const EXPECTED = {
+  get1: ['approved', 1, 'draft', ['А1', 'А2', 'А3']], get1open: ['open', 1, 'draft', []], get2: ['approved', null, 'review', null],
+  journal: [[true, ['А1', 'А2', 'А3']], [false, []], [false, []]],
+  ledger: [true, false, false, false],
+  grades: [[['Анатомия', true], ['Химия', false]], [['Анатомия', false]], [['Анатомия', false]]],
+  mySubjects: [[{ approved: true, open: 'draft' }], [{ approved: false, open: 'review' }], [{ approved: false, open: null }]],
+  overview: [['Анатомия', 'Сотрудник t1', 'approved', 'draft', false, 3], ['Анатомия', 'Сотрудник t2', 'none', 'review', true, 0],
+    ['Анатомия', 'Сотрудник t3', 'none', null, false, 0], ['Химия', 'Сотрудник t4', 'none', null, false, 0]],
+  summary: [['ds1', { approved: 1, review: 1, returned: 0, draft: 1, none: 1 }], ['ds2', { approved: 0, review: 0, returned: 0, draft: 0, none: 1 }]],
+};
 const names = (s, subjectId, token) => s.call('journal.get', { subjectId }, token).data.journal.pairs.map((p) => p.topicName).filter(Boolean);
 
 test('every module finds the syllabus of a group by the line of its teacher', () => {
@@ -71,17 +82,48 @@ test('the journal results and the works of a group on a shared syllabus work', (
   assert.notEqual(s.call('journal.saveResults', { subjectId: s.sb2, unit: 1, field: 'self', items: [] }, s.t.t2).error?.code, 'no_syllabus');
 });
 
-test('the old keys give the same answers before and after the transfer', () => {
+// A base as the old code left it: versions and topics inserted straight into the store, with no line and no member.
+function oldBase() {
   const s = setup();
-  s.publish(s.sb1, s.FILE_A);
-  s.publish(s.sb2, s.FILE_B);
-  const ask = () => ({
-    journal: s.call('journal.get', { subjectId: s.sb1 }, s.t.t1), ledger: s.call('ledger.list', {}, s.t.t1),
-    grades: s.call('student.grades', {}, s.t.s1), mine: s.call('teacher.mySubjects', {}, s.t.t2),
-  });
-  const before = ask();
+  const version = (key, semester, status, number) => s.store.insert('syllabi', {
+    disciplineId: s.ds1, teacherId: s.ids[key], semester, planSemester: semester, status, version: number, course: 1,
+  }).id;
+  const topics = (syllabusId, prefix) => [1, 2, 3].forEach((order) => s.store.insert('topics', {
+    syllabusId, order, unit: 1, lessonKind: 'lecture', name: prefix + order, hours: 2, description: '',
+  }));
+  topics(version('t1', 1, 'approved', 1), 'А');   // t1: an approved one and a draft after it
+  version('t1', 1, 'draft', 2);
+  version('t2', 1, 'review', 1);                    // t2: only a version under review in the autumn, an approved one in the spring
+  topics(version('t2', 2, 'approved', 1), 'Б');     // t3 and t4 have no syllabus
+  return s;
+}
+
+// What each person sees, reduced to what a screen shows (no ids).
+function answers(s) {
+  const get = (subjectId, data = {}) => s.call('syllabus.get', { subjectId, ...data }, s.t.dean).data;
+  const page = (d) => [d.shown, d.state.approved && d.state.approved.version, d.state.open && d.state.open.status, d.syllabus ? d.syllabus.rows.map((r) => r.name) : null];
+  const mine = (key) => s.call('teacher.mySubjects', {}, s.t[key]).data.subjects.map((x) => x.syllabus);
+  const has = (list) => list.map((x) => [x.name, x.hasSyllabus]);
+  return {
+    get1: page(get(s.sb1)), get1open: page(get(s.sb1, { version: 'open' })), get2: page(get(s.sb2)),
+    journal: ['sb1', 'sb2', 'sb3'].map((k) => { const j = s.call('journal.get', { subjectId: s[k] }, s.t.dean).data.journal; return [j.subject.hasSyllabus, j.pairs.map((p) => p.topicName).filter(Boolean)]; }),
+    ledger: [s.sb1, s.sb2, s.sb3, s.sb4].map((id) => s.call('ledger.list', {}, s.t.dean).data.subjects.find((x) => x.subjectId === id).hasSyllabus),
+    grades: ['s1', 's2', 's3'].map((k) => has(s.call('student.grades', {}, s.t[k]).data.subjects)),
+    mySubjects: [mine('t1'), mine('t2'), mine('t3')],
+    overview: s.call('subjects.overview', {}, s.t.dean).data.rows.map((r) => [r.disciplineName, r.teacherName, r.syllabusStatus, r.open, r.otherSemester, r.plannedPairs]),
+    summary: s.call('dir.summary', { table: 'disciplines' }, s.t.dean).data.rows.map((r) => [r.id === s.ds1 ? 'ds1' : 'ds2', r.syllabi]).sort(),
+  };
+}
+
+test('the transfer of a base made by the old code keeps what every screen shows', () => {
+  const s = oldBase();
+  assert.equal(s.store.list('syllabi').filter((v) => v.lineId === '').length, 4);
+  assert.deepEqual([s.store.list('syllabusLines').length, s.store.list('syllabusMembers').length], [0, 0]);
   applyLinesUpgrade(s.store, s.platform);
-  assert.deepEqual(ask(), before);
+  assert.equal(s.store.list('syllabi').filter((v) => v.lineId === '').length, 0);
+  assert.deepEqual(s.oneJoined(), []);
+  assert.equal(s.call('schedule.generate', {}, s.t.dean).ok, true);
+  assert.deepEqual(answers(s), EXPECTED);
 });
 
 test('every list is read once per request, the members once', () => {
@@ -96,7 +138,7 @@ test('every list is read once per request, the members once', () => {
     s.spy.reset();
     assert.equal(s.call(action, data, token).ok, true, action);
     assert.ok(Object.values(s.spy.lists).every((n) => n === 1), `${action}: ${JSON.stringify(s.spy.lists)}`);
-    assert.ok((s.spy.lists.syllabusMembers ?? 1) === 1, action);
+    assert.equal(s.spy.lists.syllabusMembers, 1, action);
   }
   s.spy.reset();
   s.call('journal.get', { subjectId: s.sb2 }, s.t.t2);
