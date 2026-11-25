@@ -4,6 +4,8 @@ import { AppError } from '../core/errors.js';
 import { SECTIONS, SECTION_TABLES, checkSection, plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES, buildDoc, copyRows, draftVersion, rowsOfVersion, sectionWrites } from '../core/syllabusDoc.js';
 import { checkHeld, checkSubmit, rightsOn, versionsOf } from '../core/syllabusFlow.js';
+import { joinedLineId, nextVersion } from '../core/syllabusLines.js';
+import { localDateTime } from '../core/dates.js';
 import { todayOf } from './scheduleData.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -38,13 +40,33 @@ export function groupsOfTeacher(version, subjects, groups) {
 
 const keyOfVersion = (v) => ({ disciplineId: v.disciplineId, teacherId: v.teacherId, semester: v.semester });
 
-// Writes the row of a new version of a key and, when the key has an approved version, a copy of its sections (one insertMany per non-empty sheet).
-// tables: at least `syllabi`; with an approved version also the sheets of DOC_TABLES. -> { version, rows }
-export function createDraft(store, platform, { key, approved, group, userId }, tables) {
-  const { last } = versionsOf(tables.syllabi, key);
+// The line where the teacher leads the discipline in this half of the year, and a line of his own when there is none:
+// the line (author: the teacher, made by userId) and the member 'joined' are written, the line first. rows: { syllabusLines, syllabusMembers } as read by the request.
+// -> { line, created }
+export function ensureLine(store, platform, { disciplineId, teacherId, semester, userId }, rows) {
+  const lineId = joinedLineId(rows.syllabusMembers, { disciplineId, teacherId, semester });
+  if (lineId !== null) {
+    const line = rows.syllabusLines.find((l) => l.id === lineId);
+    if (!line) throw new AppError('not_found');
+    return { line, created: false };
+  }
+  const at = localDateTime(platform.now());
+  const [line] = store.insertMany('syllabusLines', [{ disciplineId, semester, authorId: teacherId, createdBy: userId, createdAt: at }]);
+  store.insertMany('syllabusMembers', [{
+    lineId: line.id, disciplineId, semester, teacherId, state: 'joined', byId: userId, invitedAt: '', joinedAt: at, endedAt: '', endedBy: '',
+  }]);
+  return { line, created: true };
+}
+
+// Writes the row of a new version of a line and, when the line has an approved version, a copy of its sections (one insertMany per non-empty sheet).
+// The teacher of the version is the author of the line (nobody: the one who starts the draft). tables: at least `syllabi`; with an approved version also the sheets of DOC_TABLES.
+// -> { version, rows }
+export function createDraft(store, platform, { line, approved, group, userId }, tables) {
+  const teacherId = line.authorId || userId;
+  const number = nextVersion(tables.syllabi, line.id, { disciplineId: line.disciplineId, teacherId, semester: line.semester });
   const course = group && Number.isInteger(group.course) ? group.course : null;
-  const planSemester = course !== null && course >= 1 && course <= 4 ? (course - 1) * 2 + key.semester : null;
-  const row = draftVersion({ key, approved, planSemester, course, userId, today: todayOf(platform), number: last + 1 });
+  const planSemester = course !== null && course >= 1 && course <= 4 ? (course - 1) * 2 + line.semester : null;
+  const row = draftVersion({ line, teacherId, approved, planSemester, course, userId, today: todayOf(platform), number });
   const [version] = store.insertMany('syllabi', [row]);
   const rows = {};
   if (approved) {
@@ -73,9 +95,11 @@ export function startDraft(store, platform, data, user) {
   const { approved, open } = versionsOf(syllabi, key);
   if (open) return { syllabusId: open.id, created: false };
 
+  const lines = readTables(store, ['syllabusLines', 'syllabusMembers']);
+  const { line } = ensureLine(store, platform, { ...key, userId: user.id }, lines);
   const group = approved ? null : store.list('groups').find((g) => g.id === subject.groupId) || null;
   const tables = { syllabi, ...(approved ? readTables(store, DOC_TABLES) : {}) };
-  const { version } = createDraft(store, platform, { key, approved, group, userId: user.id }, tables);
+  const { version } = createDraft(store, platform, { line, approved, group, userId: user.id }, tables);
   return { syllabusId: version.id, created: true };
 }
 

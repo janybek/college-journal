@@ -8,7 +8,7 @@ import { plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES } from '../core/syllabusDoc.js';
 import { copiesOf, versionsOf } from '../core/syllabusFlow.js';
 import { todayOf } from './scheduleData.js';
-import { createDraft, draftForm, saveSection } from './syllabusDraft.js';
+import { createDraft, draftForm, ensureLine, saveSection } from './syllabusDraft.js';
 import { approveSyllabus } from './syllabusFlow.js';
 
 const MAX_SHEETS = 10;
@@ -167,6 +167,7 @@ function writeDrafts(store, platform, { subject, user, doc, found, keyOf, ctx, p
   const today = todayOf(platform);
   const made = {};                                                       // half -> { version, units (rows), books (rows) }
   let others = null;                                                     // the sheets only a copy of an approved version needs
+  let lines = null;                                                      // the lines and the members, read when the first version is made
   for (const part of planned.parts) {
     const half = part.semester;
     const { open, approved } = found[half];
@@ -174,17 +175,19 @@ function writeDrafts(store, platform, { subject, user, doc, found, keyOf, ctx, p
       made[half] = { version: open, units: tables.units.filter((u) => u.syllabusId === open.id), books: tables.literature.filter((b) => b.syllabusId === open.id) };
       continue;
     }
+    if (lines === null) lines = { syllabusLines: store.list('syllabusLines'), syllabusMembers: store.list('syllabusMembers') };
+    const { line } = ensureLine(store, platform, { ...keyOf(half), userId: user.id }, lines);
     let copy;
     if (approved) {
       if (others === null) {
         others = {};
         for (const name of DOC_TABLES) if (!tables[name]) others[name] = store.list(name);
       }
-      copy = createDraft(store, platform, { key: keyOf(half), approved, group: null, userId: user.id }, { ...tables, ...others });
+      copy = createDraft(store, platform, { line, approved, group: null, userId: user.id }, { ...tables, ...others });
       made[half] = { version: copy.version, units: copy.rows.units, books: copy.rows.literature };
     } else {
       const group = ctx.groups.find((g) => g.id === subject.groupId) || null;
-      copy = createDraft(store, platform, { key: keyOf(half), approved: null, group, userId: user.id }, { syllabi: tables.syllabi });
+      copy = createDraft(store, platform, { line, approved: null, group, userId: user.id }, { syllabi: tables.syllabi });
       made[half] = { version: copy.version, units: [], books: [] };
     }
     tables.syllabi = [...tables.syllabi, copy.version];
@@ -195,7 +198,11 @@ function writeDrafts(store, platform, { subject, user, doc, found, keyOf, ctx, p
   const again = planFile(doc, subject, { ...ctx, tables }).plan;
   if (again.errors.length > 0) return { errors: again.errors, summaries: again.parts.map((p) => p.summary) };
 
-  const syllabi = again.parts.map((p) => ({ id: made[p.semester].version.id, patch: { ...p.syllabus.row, editedBy: user.id, updated: today } }));
+  // the teacher of a version stays what the draft made it: the file does not name the author
+  const syllabi = again.parts.map((p) => {
+    const { teacherId, ...row } = p.syllabus.row;
+    return { id: made[p.semester].version.id, patch: { ...row, editedBy: user.id, updated: today } };
+  });
   store.updateMany('syllabi', syllabi);
 
   const removeTopics = new Set();

@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup, INFO, HEAD, T, M, file, A, FIRST, READS } from './syllabusSetup.js';
+import { setup, INFO, HEAD, T, M, file, A, FIRST, READS, READS_WITH_LINES } from './syllabusSetup.js';
 
 const book = { authors: 'Автор', title: 'Книга', year: '2020', publisher: 'Издат', availability: 'библиотека' };
 // a copy of an approved version reads every sheet of the document, once
-const COPY_READS = { ...READS, outcomes: 1, selfWork: 1, software: 1, grading: 1, rules: 1 };
+const COPY_READS = { ...READS_WITH_LINES, outcomes: 1, selfWork: 1, software: 1, grading: 1, rules: 1 };
 const topicsOf = (store, syllabusId) => store.list('topics').filter((t) => t.syllabusId === syllabusId).sort((a, b) => a.order - b.order);
 
 test('syllabus upload: one syllabus of a teacher; the file fills the draft, the approval lays it over every group of that teacher', () => {
@@ -18,8 +18,8 @@ test('syllabus upload: one syllabus of a teacher; the file fills the draft, the 
   reset();
   const done = send('syllabus.apply', sb1, A, dean).data;
   assert.deepEqual([done.ok, done.applied, done.drafts.length], [true, true, 1]);
-  assert.deepEqual(lists, READS);
-  assert.deepEqual(writes, { 'insertMany:syllabi': 1, 'updateMany:syllabi': 1, 'insertMany:topics': 1, 'insertMany:units': 1 });
+  assert.deepEqual(lists, READS_WITH_LINES);
+  assert.deepEqual(writes, { 'insertMany:syllabusLines': 1, 'insertMany:syllabusMembers': 1, 'insertMany:syllabi': 1, 'updateMany:syllabi': 1, 'insertMany:topics': 1, 'insertMany:units': 1 });
   assert.deepEqual([calls.get, calls.insert || 0, calls.update || 0, calls.remove || 0], [1, 0, 0, 0]);  // get — only the check of the token
   assert.deepEqual(lessons(sb1).map((x) => x[1]), ['', '']);
   const { id: syllabusId, ...sheetRow } = store.list('syllabi')[0];

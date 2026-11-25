@@ -89,7 +89,7 @@ test('a token lives through a restart; upgrade adds a new sheet and keeps the ro
   base.db.exec('DROP TABLE "rooms"');
   base.close();
   base = open(t, config);
-  assert.deepEqual(base.upgrade(), { created: ['rooms'], added: [], moved: [] });
+  assert.deepEqual(base.upgrade(), { created: ['rooms'], added: [], moved: [], lines: 0, skipped: 0 });
   assert.equal(handleRequest({ action: 'auth.me', token }, base).data.user.fullName, PERSON.fullName);
 });
 test('resetAdminPassword: the old password dies, the new one works and must be changed; other people are untouched; a lost admin row comes back', (t) => {

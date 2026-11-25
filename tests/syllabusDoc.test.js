@@ -161,12 +161,12 @@ test('copyRows: no ids; the topics say where they were copied from', () => {
 });
 
 test('draftVersion: a copy of the approved title and goal, or an empty version with the plan semester and the course', () => {
-  const key = { disciplineId: 'ds_1', teacherId: 'sf_t', semester: 1 };
-  const args = { key, userId: 'sf_t', today: '2026-09-10', number: 2 };
+  const line = { id: 'sl_1', disciplineId: 'ds_1', semester: 1 };
+  const args = { line, teacherId: 'sf_t', userId: 'sf_t', today: '2026-09-10', number: 2 };
   const fromApproved = draftVersion({ ...args, approved: { ...version, status: 'approved', manualOrder: true, remark: 'старое', decidedBy: 'sf_d' }, planSemester: 5, course: 3 });
   assert.deepEqual([fromApproved.status, fromApproved.version, fromApproved.editedBy, fromApproved.updated, fromApproved.department, fromApproved.goal, fromApproved.manualOrder,
     fromApproved.planSemester, fromApproved.course, fromApproved.remark, fromApproved.decidedBy, fromApproved.id], ['draft', 2, 'sf_t', '2026-09-10', 'Кафедра', 'Цель', true, 1, 1, '', '', undefined]);
-  assert.deepEqual([fromApproved.disciplineId, fromApproved.teacherId, fromApproved.semester], ['ds_1', 'sf_t', 1]);
+  assert.deepEqual([fromApproved.disciplineId, fromApproved.teacherId, fromApproved.semester, fromApproved.lineId, fromApproved.sourceId], ['ds_1', 'sf_t', 1, 'sl_1', version.id]);
   assert.equal(draftVersion({ ...args, approved: { ...version, status: 'approved', fileId: 'fl_9' }, planSemester: 5, course: 3 }).fileId, 'fl_9');
   assert.equal(draftVersion({ ...args, approved: { ...version, status: 'approved' }, planSemester: 5, course: 3 }).fileId, '');
   assert.equal(draftVersion({ ...args, approved: null, number: 1, planSemester: 3, course: 2 }).fileId, '');

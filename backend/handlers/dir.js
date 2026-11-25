@@ -114,7 +114,7 @@ function save(data, ctx) {
 
 // What blocks deleting a row: [sheet, test(row)] pairs, each sheet read once. A stored syllabus keeps its discipline and its teacher.
 const BLOCKERS = {
-  disciplines: (id) => [['subjects', (r) => r.disciplineId === id], ['syllabi', (r) => r.disciplineId === id]],
+  disciplines: (id) => [['subjects', (r) => r.disciplineId === id], ['syllabi', (r) => r.disciplineId === id], ['syllabusLines', (r) => r.disciplineId === id]],
   groups: (id) => [['students', (r) => r.groupId === id], ['subjects', (r) => r.groupId === id], ['pairs', (r) => r.groupId === id],
     ['stateExams', (r) => r.groupId === id], ['announcements', (r) => r.groupId === id],
   ],
@@ -126,6 +126,7 @@ const BLOCKERS = {
   ],
   staff: (id) => [
     ['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id], ['syllabi', (r) => r.teacherId === id],
+    ['syllabusLines', (r) => r.authorId === id || r.createdBy === id], ['syllabusMembers', (r) => r.teacherId === id || r.byId === id || r.endedBy === id],
     ['attendance', (r) => r.markedBy === id], ['unitResults', (r) => r.updatedBy === id], ['changeLog', (r) => r.actorId === id],
     ['assignments', (r) => r.createdBy === id], ['assignments', (r) => r.updatedBy === id], ['submissions', (r) => r.checkedBy === id],
     ['closures', (r) => r.closedBy === id || r.reopenedBy === id], ['requests', (r) => r.authorId === id || r.deanBy === id || r.finalBy === id],

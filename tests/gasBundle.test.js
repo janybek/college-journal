@@ -206,7 +206,9 @@ test('setup creates all 37 sheets, adds nineteen columns to an old syllabus shee
   assert.deepEqual(rows[0], SCHEMA.syllabi.columns.map((c) => c.title));
   assert.equal(rows[0].length, 30);
   assert.deepEqual(rows[1].slice(0, 11), ['sy_old', 'ds_1', 'sf_1', 1, 1, 'ИС', 3, 90, 60, 30, 'вчера']);
-  assert.equal(rows[1].slice(11).every((v) => v === ''), true);
+  const lineCol = SCHEMA.syllabi.columns.findIndex((c) => c.key === 'lineId');                                   // the move puts the old version on a line; the other new columns stay empty
+  assert.equal(rows[1][lineCol] !== '', true);
+  assert.equal(rows[1].slice(11).every((v, i) => i + 11 === lineCol || v === ''), true);
   const names = old.getSheets().map((s) => s.getName());
   const snapshot = JSON.stringify(names.map((n) => [n, old.dump(n)]));
   sandbox.setup();

@@ -49,7 +49,7 @@ test('startDraft: an empty draft; a second click gives the same one and writes n
   const [row] = store.list('syllabi');
   assert.deepEqual([first.created, row.id, row.status, row.version, row.disciplineId, row.teacherId, row.semester, row.planSemester, row.course, row.editedBy, row.manualOrder],
     [true, first.syllabusId, 'draft', 1, ds1, staff.teacher1, 1, 1, 1, staff.teacher1, false]);
-  assert.deepEqual([lists, writes], [{ subjects: 1, groups: 1, syllabi: 1 }, { 'insertMany:syllabi': 1 }]);
+  assert.deepEqual([lists, writes], [{ subjects: 1, groups: 1, syllabi: 1, syllabusLines: 1, syllabusMembers: 1 }, { 'insertMany:syllabusLines': 1, 'insertMany:syllabusMembers': 1, 'insertMany:syllabi': 1 }]);
   reset();
   assert.deepEqual([call('syllabus.startDraft', { subjectId: sb1, semester: 1 }, teacher1).data, writes, store.list('syllabi').length], [{ syllabusId: row.id, created: false }, {}, 1]);
   // у другой группы того же преподавателя — та же версия; у второй половины года — своя

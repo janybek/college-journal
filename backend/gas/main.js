@@ -5,6 +5,7 @@ import { handleRequest } from '../api.js';
 import { createSheetsStore, ensureSheets } from '../store/sheetsStore.js';
 import { createGasPlatform } from '../platform/gasPlatform.js';
 import { applySchemeUpgrade } from '../schemeUpgrade.js';
+import { applyLinesUpgrade } from '../linesUpgrade.js';
 import { linkSubjects } from '../subjectData.js';
 
 // Apps Script entry points. Apps Script globals (SpreadsheetApp, ContentService, ...) are used directly.
@@ -89,6 +90,7 @@ export function setup() {
 
   const store = createSheetsStore(SCHEMA, platform, spreadsheet, withLock);
   applySchemeUpgrade(store);
+  applyLinesUpgrade(store, platform);
   let adminTempPassword = null;
   if (store.list('staff').length === 0) {
     adminTempPassword = generateTempPassword(platform);

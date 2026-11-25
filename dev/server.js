@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import { SCHEMA } from '../core/schema.js';
 import { createFileStore } from '../backend/store/fileStore.js';
 import { applySchemeUpgrade } from '../backend/schemeUpgrade.js';
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
 import { handleRequest } from '../backend/api.js';
 import { createLoginGuard } from '../core/loginGuard.js';
@@ -73,6 +74,21 @@ export function standArgs(argv, root = ROOT) {
   return lessonNow ? { mode: 'demo', dataFile: DATA_FILES.demo, lessonNow: true } : { mode: 'demo', dataFile: DATA_FILES.demo };
 }
 
+// A stand file that still has syllabus versions without a line is copied beside itself before the move (an existing copy is kept).
+function copyBeforeLines(dataPath) {
+  if (!fs.existsSync(dataPath)) return;
+  let data = null;
+  try {
+    data = JSON.parse(fs.readFileSync(dataPath, 'utf8'));
+  } catch (error) {
+    return;
+  }
+  const versions = data !== null && typeof data === 'object' ? data.syllabi : null;
+  if (!Array.isArray(versions) || !versions.some((v) => !v || !v.lineId)) return;
+  const copy = dataPath + '.before-shared-syllabus.bak';
+  if (!fs.existsSync(copy)) fs.copyFileSync(dataPath, copy);
+}
+
 // What fills a missing data file. The real data file never gets the fictional people, whatever the mode.
 export function seederFor(dataPath, mode) {
   return mode === 'real' || path.resolve(dataPath) === path.resolve(ROOT, DATA_FILES.real) ? seedAdmin : seed;
@@ -90,8 +106,11 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   if (upgraded.changed) {
     console.log(`stand file carried over: versions ${upgraded.versions}, split rows ${upgraded.split}, units ${upgraded.units}, untouched rows ${upgraded.skipped.length}, zero-hour rows ${upgraded.zeroHours.length}; copy: ${path.basename(dataPath)}.before-addendum-3.bak`);
   }
+  copyBeforeLines(dataPath);
   const store = createFileStore(SCHEMA, platform, dataPath);
   applySchemeUpgrade(store);
+  const lines = applyLinesUpgrade(store, platform);
+  if (lines.lines > 0) console.log(`syllabus lines made: ${lines.lines}${lines.skipped > 0 ? `, rows without a line: ${lines.skipped}` : ''}; copy: ${path.basename(dataPath)}.before-shared-syllabus.bak`);
   // the box of the files lies beside the data file: files for the fictional stand, real-files for the real one
   const filesDir = path.join(path.dirname(dataPath), seederFor(dataPath, mode) === seedAdmin ? 'real-files' : FILES_DIR);
   const files = createDiskFiles(filesDir);

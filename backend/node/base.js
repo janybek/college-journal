@@ -8,6 +8,7 @@ import { hashPassword, generateTempPassword, TEMP_HASH_ROUNDS } from '../../core
 import { normalizeRow } from '../../core/validate.js';
 import { createNodePlatform } from '../platform/nodePlatform.js';
 import { applySchemeUpgrade } from '../schemeUpgrade.js';
+import { applyLinesUpgrade } from '../linesUpgrade.js';
 import { createSqliteStore, ensureTables, openDatabase } from '../store/sqliteStore.js';
 
 // Opening and first run of the working base. Node only: this file is not bundled for Apps Script.
@@ -81,7 +82,7 @@ export function openBase(config, { now } = {}) {
     let closed = false;
     return {
       db, store, platform,
-      upgrade: () => ({ ...ensureTables(SCHEMA, db), ...applySchemeUpgrade(store) }),
+      upgrade: () => ({ ...ensureTables(SCHEMA, db), ...applySchemeUpgrade(store), ...applyLinesUpgrade(store, platform) }),
       close() {
         if (closed) return;
         closed = true;
