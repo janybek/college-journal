@@ -56,6 +56,9 @@ function shownVersion(store, version, rows, own, settings, subject, index, curre
   };
 }
 
+// An approved version made by leaving a shared line: its source lies on another line.
+const isCopy = (syllabi, version) => !!version.sourceId && syllabi.some((v) => v.id === version.sourceId && v.lineId !== version.lineId);
+
 // 'syllabus.get' { subjectId, semester?, version? }: the syllabus of the line where the teacher of the subject leads the discipline, with the dates of THIS subject's group.
 // version: 'approved' (default) or 'open'.
 export function syllabusPage(store, platform, data, user) {
@@ -148,7 +151,7 @@ export function syllabusPage(store, platform, data, user) {
     groups: shownGroups, semesters: loaded, semester, shown, hidden,
     ...(line ? { line: lineView({ syllabusLines: lines, syllabusMembers: members, subjects, staff, groups }, line, user) } : {}),
     state: {
-      approved: approved ? { version: approved.version, decidedAt: approved.decidedAt ?? '' } : null,
+      approved: approved ? { version: approved.version, decidedAt: approved.decidedAt ?? '', ...(isCopy(syllabi, approved) ? { copy: true } : {}) } : null,
       open: seenOpen(semester)
         ? { syllabusId: open.id, status: open.status, version: open.version, remark: open.remark ?? '', submittedAt: open.submittedAt ?? '', updated: open.updated ?? '' }
         : null,

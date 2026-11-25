@@ -3,7 +3,7 @@ import { uploadSyllabus } from '../syllabusUpload.js';
 import { draftForm, saveSection, startDraft } from '../syllabusDraft.js';
 import { attachSyllabusFile, dropSyllabusFile, readSyllabusFile } from '../syllabusFiles.js';
 import { declineInvite, inviteMember, myInvitations, newLine, setAuthor, withdrawInvite } from '../syllabusLines.js';
-import { addMember, joinLine } from '../lineSwitch.js';
+import { addMember, joinLine, leaveLine, removeMember } from '../lineSwitch.js';
 import { approveSyllabus, returnSyllabus, reviewQueue, submitSyllabus } from '../syllabusFlow.js';
 
 export const syllabusHandlers = {
@@ -27,6 +27,8 @@ export const syllabusHandlers = {
   'syllabus.newLine': (data, ctx, user) => newLine(ctx.store, ctx.platform, data, user),
   'syllabus.join': (data, ctx, user) => joinLine(ctx.store, ctx.platform, data, user),
   'syllabus.add': (data, ctx, user) => addMember(ctx.store, ctx.platform, data, user),
+  'syllabus.leave': (data, ctx, user) => leaveLine(ctx.store, ctx.platform, data, user),
+  'syllabus.remove': (data, ctx, user) => removeMember(ctx.store, ctx.platform, data, user),
   'syllabus.invitations': (data, ctx, user) => myInvitations(ctx.store, ctx.platform, user),
   'student.subjects': (data, ctx, user) => studentSubjects(ctx.store, user),
 };
