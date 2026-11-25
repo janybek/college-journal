@@ -222,3 +222,13 @@ test('navFor: «Объявления» come right after home for the office and 
   assert.equal(navFor(['journal.list'], 'dean').flatMap((g) => g.items).some((i) => i.name === 'announcements'), false);
   assert.equal(navFor(['announce.list'], 'student').flatMap((g) => g.items).some((i) => i.name === 'announcements'), false);
 });
+
+test('navFor: «Повторный курс» follows «Ведомости» for the office and the teacher, and a student has none', () => {
+  const office = navFor(['journal.list', 'ledger.list', 'work.overview', 'repeat.list'], 'dean').find((g) => g.titleKey === 'nav.journal');
+  assert.deepEqual(office.items.map((i) => i.name), ['journalList', 'ledgerList', 'repeats', 'tasks']);
+  assert.deepEqual(office.items[2], { name: 'repeats', href: '#/repeats', textKey: 'repeat.title', icon: 'sheet', hintKey: 'repeat.hint' });
+  const teacher = navFor([...DEAN, 'schedule.mine', 'journal.list', 'work.overview', 'ledger.list', 'repeat.list', 'request.mine'], 'teacher')[0].items;
+  assert.deepEqual(teacher.map((i) => i.name), ['home', 'mySchedule', 'journalList', 'tasks', 'ledgerList', 'repeats', 'requests']);
+  assert.deepEqual(teacher[5], { name: 'repeats', href: '#/repeats', textKey: 'repeat.mine.title', icon: 'sheet' });
+  assert.equal(navFor(['schedule.mine'], 'student').flatMap((g) => g.items).some((i) => i.name === 'repeats'), false);
+});

@@ -231,3 +231,16 @@ test('resolveRoute: the announcements need announce.list, every role has it', ()
   assert.equal(resolveRoute('#/announcements', { mustChangePassword: false, permissions: [] }).view, 'home');
   assert.equal(resolveRoute('#/announcements', null).view, 'login');
 });
+
+test('resolveRoute: the repeats need repeat.list, one repeat card needs repeat.get', () => {
+  const staff = { mustChangePassword: false, roles: ['dean'], permissions: ['repeat.list', 'repeat.get'] };
+  const student = { mustChangePassword: false, roles: ['student'], permissions: ['schedule.mine'] };
+  assert.deepEqual(resolveRoute('#/repeats', staff), { view: 'repeats', params: {} });
+  assert.deepEqual(resolveRoute('#/repeat/rp1', staff), { view: 'repeat', params: { repeatId: 'rp1' } });
+  assert.equal(resolveRoute('#/repeat/%E0%A4%A', staff).view, 'home');
+  assert.equal(resolveRoute('#/repeats', student).view, 'home');
+  assert.equal(resolveRoute('#/repeat/rp1', student).view, 'home');
+  assert.equal(resolveRoute('#/repeats', { mustChangePassword: false, permissions: ['repeat.get'] }).view, 'home');
+  assert.equal(resolveRoute('#/repeat/rp1', { mustChangePassword: false, permissions: ['repeat.list'] }).view, 'home');
+  assert.equal(resolveRoute('#/repeat/rp1/x', staff).view, 'home');
+});

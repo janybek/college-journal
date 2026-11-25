@@ -47,6 +47,7 @@ export function navFor(permissionList, role) {
     if (list.includes('journal.list')) items.push({ name: 'journalList', href: '#/journal', textKey: 'journal.title', icon: 'table' });
     if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard' });
     if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet' });
+    if (list.includes('repeat.list')) items.push({ name: 'repeats', href: '#/repeats', textKey: 'repeat.mine.title', icon: 'sheet' });
     if (list.includes('request.mine')) items.push({ name: 'requests', href: '#/requests', textKey: 'request.mine.title', icon: 'clipboard' });
     if (list.includes('stateExam.list')) items.push({ name: 'stateExams', href: '#/state-exams', textKey: 'stateExam.title', icon: 'sheet' });
     if (list.includes('announce.list')) items.push(ANNOUNCEMENTS);
@@ -58,6 +59,7 @@ export function navFor(permissionList, role) {
   if (list.includes('journal.list')) {
     const items = [{ name: 'journalList', href: '#/journal', textKey: 'journal.list.title', icon: 'table', hintKey: 'journal.hint' }];
     if (list.includes('ledger.list')) items.push({ name: 'ledgerList', href: '#/ledger', textKey: 'ledger.title', icon: 'sheet', hintKey: 'ledger.hint' });
+    if (list.includes('repeat.list')) items.push({ name: 'repeats', href: '#/repeats', textKey: 'repeat.title', icon: 'sheet', hintKey: 'repeat.hint' });
     if (list.includes('work.overview')) items.push({ name: 'tasks', href: '#/tasks', textKey: 'tasks.title', icon: 'clipboard', hintKey: 'tasks.hint' });
     if (list.includes('request.queue')) items.push({ name: 'requests', href: '#/requests', textKey: 'request.queue.title', icon: 'clipboard', hintKey: 'request.queue.hint' });
     if (list.includes('stateExam.list')) items.push({ name: 'stateExams', href: '#/state-exams', textKey: 'stateExam.title', icon: 'sheet', hintKey: 'stateExam.hint' });
@@ -232,6 +234,7 @@ function currentName(view, params, role) {
   if (view === 'journal') return 'journalList';
   if (view === 'task') return 'tasks';
   if (view === 'ledger') return 'ledgerList';
+  if (view === 'repeat') return 'repeats';
   if (view === 'stateExam') return 'stateExams';
   if (view === 'journalLog') return menuParts(role).includes('office') ? 'journalLog' : 'journalList';
   if (view === 'syllabus' || view === 'syllabusForm') return menuParts(role).includes('office') ? 'subjects' : 'home';

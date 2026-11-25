@@ -71,6 +71,10 @@ export function resolveRoute(hash, user) {
   if (grades && permissions.includes('student.grades') && idOf(grades[1]) !== null) return { view: 'grades', params: { subjectId: idOf(grades[1]) } };
   // «Заявки»: the requests of a teacher to correct closed data (request.mine); the deanery's queue (request.queue) comes to the same address.
   if (path === '/requests' && (permissions.includes('request.mine') || permissions.includes('request.queue'))) return { view: 'requests', params: {} };
+  // «Повторный курс»: the list; #/repeat/<id>: one card. The server checks every right itself (the teacher of the repeat sees only own cards).
+  if (path === '/repeats' && permissions.includes('repeat.list')) return { view: 'repeats', params: {} };
+  const repeat = /^\/repeat\/([^/]+)$/.exec(path);
+  if (repeat && permissions.includes('repeat.get') && idOf(repeat[1]) !== null) return { view: 'repeat', params: { repeatId: idOf(repeat[1]) } };
   // «Гос. экзамены»: the list; #/state-exam/<examId>: the sheet of one exam (the deanery enters the scores, the others read). The server checks every right itself.
   if (path === '/state-exams' && permissions.includes('stateExam.list')) return { view: 'stateExams', params: {} };
   const stateExam = /^\/state-exam\/([^/]+)$/.exec(path);
