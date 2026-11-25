@@ -4,6 +4,7 @@ import { normalizeRow, validateRow } from '../core/validate.js';
 import { scheduleFit, syllabusFor, syllabusIndex, syllabusTotals } from '../core/syllabus.js';
 import { rightsOn } from '../core/syllabusFlow.js';
 import { joinedLineId, versionsOfLine } from '../core/syllabusLines.js';
+import { sharedMark } from './syllabusLines.js';
 import { rolesOf } from './users.js';
 import { loadSettings } from './scheduleData.js';
 
@@ -131,6 +132,7 @@ export function subjectsOverview(store, user) {
         scheduledPairs: scheduleFit([], pairsOf.get(s.id) || [], settings).pairs,
       })).sort((a, b) => byName(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId)),
       syllabusStatus: current !== null ? 'approved' : 'none', open: openStatus,
+      ...sharedMark(members, subjects, { disciplineId, teacherId, semester: settings.semester }),
       otherSemester: syllabusFor(list[0], syllabi, 3 - settings.semester, members) !== null,
       plannedHours: totals.hours, plannedPairs: totals.pairs,
     };

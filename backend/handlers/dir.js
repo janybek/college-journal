@@ -5,6 +5,7 @@ import { readSettings } from '../../core/settings.js';
 import { USER_TABLES } from '../users.js';
 import { teacherHandover } from '../../core/schedule.js';
 import { versionsOfLine, joinedLineId } from '../../core/syllabusLines.js';
+import { sharedMark } from '../syllabusLines.js';
 import { dirSummary, dirCard } from '../dirInfo.js';
 import { loadSettings, relayout, todayOf } from '../scheduleData.js';
 
@@ -181,7 +182,8 @@ function mySubjects(data, ctx, user) {
   const { store } = ctx;
   const groups = store.list('groups');
   const students = store.list('students').filter((s) => s.active === true);
-  const mine = store.list('subjects').filter((s) => s.teacherId === user.id);
+  const all = store.list('subjects');
+  const mine = all.filter((s) => s.teacherId === user.id);
   const syllabi = store.list('syllabi');
   const members = store.list('syllabusMembers');
   const half = loadSettings(store).semester;
@@ -194,7 +196,7 @@ function mySubjects(data, ctx, user) {
       groupId: s.groupId,
       groupName: group ? group.name : '',
       studentCount: students.filter((st) => st.groupId === s.groupId).length,
-      syllabus: { approved: approved !== null, open: open ? open.status : null },
+      syllabus: { approved: approved !== null, open: open ? open.status : null, ...(s.disciplineId ? sharedMark(members, all, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester: half }) : {}) },
     };
   });
   return { subjects };

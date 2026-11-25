@@ -37,9 +37,9 @@ test('every module finds the syllabus of a group by the line of its teacher', ()
   assert.equal(s.topicsOf(s.sb2)[0], 'А1');
   assert.equal(s.call('ledger.list', {}, s.t.t2).data.subjects.find((x) => x.subjectId === s.sb2).hasSyllabus, true);
   assert.equal(s.call('student.grades', {}, s.t.s2).data.subjects.find((x) => x.subjectId === s.sb2).hasSyllabus, true);
-  assert.deepEqual(s.call('teacher.mySubjects', {}, s.t.t2).data.subjects[0].syllabus, { approved: true, open: null });
+  assert.deepEqual(s.call('teacher.mySubjects', {}, s.t.t2).data.subjects[0].syllabus, { approved: true, open: null, shared: true, members: 2 });
   assert.equal(s.call('subjects.overview', {}, s.t.dean).data.rows.find((r) => r.teacherId === s.ids.t2).syllabusStatus, 'approved');
-  assert.deepEqual(s.call('dir.summary', { table: 'disciplines' }, s.t.dean).data.rows.find((r) => r.id === s.ds1).syllabi, { approved: 1, review: 0, returned: 0, draft: 0, none: 1 });
+  assert.deepEqual(s.call('dir.summary', { table: 'disciplines' }, s.t.dean).data.rows.find((r) => r.id === s.ds1).syllabi, { approved: 1, review: 0, returned: 0, draft: 0, none: 1, shared: 1 });
   assert.equal(s.call('work.list', { subjectId: s.sb2 }, s.t.t2).ok, true);
   assert.notEqual(s.call('work.list', { subjectId: s.sb2 }, s.t.t2).error?.code, 'no_syllabus');
   assert.deepEqual(s.oneJoined(), []);
