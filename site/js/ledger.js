@@ -7,6 +7,16 @@ const DASH = '—';
 
 export const wordTone = (word) => WORD_TONES[word] ?? 'neutral';
 
+// The mark of a repeat course beside the total of a student of the ledger (the row's `repeat`): null without a card.
+// draft: the mark is not the main one of the half (the card is not the one that counts for the ledger).
+const REPEAT_BADGES = { open: ['ledger.repeat.open', 'primary'], passed: ['ledger.repeat.passed', 'success'], failed: ['ledger.repeat.failed', 'danger'] };
+export function repeatBadge(student) {
+  const mark = student && student.repeat;
+  if (!mark || !REPEAT_BADGES[mark.status]) return null;
+  const [key, tone] = REPEAT_BADGES[mark.status];
+  return { key, params: { total: mark.total === null || mark.total === undefined ? DASH : mark.total }, tone, draft: !mark.main };
+}
+
 // The columns of the ledger, left to right: four per unit, then the semester, the admission, the exam, the total and the grade.
 export function ledgerColumns(view) {
   const units = Array.isArray(view.units) ? view.units : [];

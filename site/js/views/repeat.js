@@ -2,7 +2,8 @@ import { call } from '../api.js';
 import { t } from '../i18n.js';
 import { el, errorKey, hasText, badge, emptyState, focusById, focusFirstInvalid, holdOnLeave, markBusy, note, pageHeader, refresh } from '../ui.js';
 import { icon } from '../icons.js';
-import { stateBadge, totalLine, prevLine, orderLine, dayOf, worksState, admissionLine, attemptForm, fixTarget, closeNote, canClose } from '../repeat.js';
+import { printSheet } from '../print.js';
+import { repeatSheet, stateBadge, totalLine, prevLine, orderLine, dayOf, worksState, admissionLine, attemptForm, fixTarget, closeNote, canClose } from '../repeat.js';
 import { attemptLines, nextLabel, wordTone } from '../ledger.js';
 import { dialogShell, fieldBox, resetBusy, showProblems, termsFields } from './repeatEnrol.js';
 
@@ -22,6 +23,7 @@ const blank = () => ({
   flash: null,         // 'works': the works were just saved
 });
 let state = blank();
+let host = null; // the element of the screen: the printed sheet stands in it while the browser prints
 
 export function leave() {
   for (const id of ['repeat-edit-dialog', 'repeat-cancel-dialog', 'repeat-attempt-dialog', 'repeat-close-dialog', 'repeat-reopen-dialog', 'repeat-leave-dialog']) {
@@ -33,6 +35,7 @@ export function leave() {
 }
 
 export function render(root, params) {
+  host = root;
   if (state.id !== params.repeatId) state = Object.assign(blank(), { id: params.repeatId });
   if (state.data === null && !state.loading && state.loadErrorKey === null) load();
   const card = state.data === null ? null : state.data.repeat;
@@ -76,9 +79,13 @@ function loadingBody() {
   return failure;
 }
 
+function printCard(card) {
+  printSheet(host, repeatSheet(card, { t, title: t('repeat.print.title'), draft: t('repeat.print.draft') }), 'portrait');
+}
+
 function actions(card) {
-  if (!card.can.edit && !card.can.cancel) return null;
   return el('div', { class: 'rp-actions' },
+    el('button', { type: 'button', class: 'button button--secondary', id: 'repeat-print', onclick: () => printCard(card) }, icon('printer'), t('repeat.print.button')),
     card.can.edit ? el('button', { type: 'button', class: 'button button--secondary', id: 'repeat-edit', onclick: () => openEdit(card) }, icon('pencil'), t('repeat.edit')) : null,
     card.can.cancel ? el('button', { type: 'button', class: 'button button--secondary', id: 'repeat-cancel', onclick: () => openCancel(card) }, t('repeat.cancel')) : null);
 }

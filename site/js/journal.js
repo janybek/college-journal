@@ -158,6 +158,8 @@ const PAIR_STATUS_VALUES = ['planned', 'running', 'closed', 'missed', 'cancelled
 const RESULT_VALUES = ['control', 'self', 'current'];
 const WORK_FIELDS = ['points', 'status', 'maxPoints', 'dueAt'];
 const WORK_STATES = ['submitted', 'checked', 'returned'];
+const REPEAT_KINDS = ['full', 'exam'];
+const REPEAT_STATES = ['open', 'passed', 'failed', 'cancelled'];
 // 'YYYY-MM-DD HH:MM:SS' -> 'DD.MM.YYYY HH:MM'; anything else stays as it is.
 const dueText = (text) => { const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}:\d{2})/.exec(text); return m ? `${m[3]}.${m[2]}.${m[1]} ${m[4]}` : text; };
 
@@ -217,6 +219,23 @@ export function logLine(row) {
     const word = (text) => (text === 'absent' || text === 'incomplete' ? 'ledger.exam.' + text : text === '' ? '—' : text);
     const p = { no: Number(String(r.field).slice(3)), before: word(before), after: word(after) };
     return line('journal.log.subjectExam.result', p, ['before', 'after'].filter((name) => p[name].startsWith('ledger.exam.')));
+  }
+  if (r.entity === 'repeat') {
+    const dash = (text) => (text === '' ? '—' : text);
+    const day = (text) => (/^\d{4}-\d{2}-\d{2}$/.test(text) ? `${text.slice(8, 10)}.${text.slice(5, 7)}.${text.slice(0, 4)}` : text);
+    const field = String(r.field);
+    if (field === 'enrol') return line('journal.log.repeat.enrol', { kind: value(after, REPEAT_KINDS, 'journal.log.repeat.kind.') }, REPEAT_KINDS.includes(after) ? ['kind'] : []);
+    if (field === 'orderNo' || field === 'teacher' || field === 'works' || field === 'worksNote') return line('journal.log.repeat.' + field, { before: dash(before), after: dash(after) });
+    if (field === 'orderDate' || field === 'deadline') return line('journal.log.repeat.' + field, { before: dash(day(before)), after: dash(day(after)) });
+    if (/^try[1-9]\d*$/.test(field)) {
+      const word = (text) => (text === 'absent' || text === 'incomplete' ? 'ledger.exam.' + text : dash(text));
+      const p = { no: Number(field.slice(3)), before: word(before), after: word(after) };
+      return line('journal.log.repeat.try', p, ['before', 'after'].filter((name) => p[name].startsWith('ledger.exam.')));
+    }
+    if (field === 'status') {
+      const p = { before: value(before, REPEAT_STATES, 'journal.log.repeat.state.'), after: value(after, REPEAT_STATES, 'journal.log.repeat.state.') };
+      return line('journal.log.repeat.status', p, ['before', 'after'].filter((name) => p[name].startsWith('journal.log.repeat.state.')));
+    }
   }
   return line('journal.log.other', { field: r.field || '', before, after });
 }

@@ -446,3 +446,26 @@ test('task 26 keys are in three dictionaries; value and max are placeholders, no
     assert.equal('home.newsSoon' in dict, false);
   }
 });
+
+test('logLine: the lines of a repeat course, one expectation for each field; an unknown field is «other»', () => {
+  const row = (field, before, after) => ({ entity: 'repeat', field, before, after });
+  assert.deepEqual(logLine(row('enrol', '', 'full')), { key: 'journal.log.repeat.enrol', params: { kind: 'journal.log.repeat.kind.full' }, keyParams: ['kind'] });
+  assert.deepEqual(logLine(row('enrol', '', 'exam')).params, { kind: 'journal.log.repeat.kind.exam' });
+  assert.deepEqual(logLine(row('orderNo', '12', '14')), { key: 'journal.log.repeat.orderNo', params: { before: '12', after: '14' }, keyParams: [] });
+  assert.deepEqual(logLine(row('orderDate', '2026-11-10', '2026-11-12')).params, { before: '10.11.2026', after: '12.11.2026' });
+  assert.deepEqual(logLine(row('deadline', '2027-02-01', '2027-03-01')), { key: 'journal.log.repeat.deadline', params: { before: '01.02.2027', after: '01.03.2027' }, keyParams: [] });
+  assert.deepEqual(logLine(row('teacher', 'Первый', 'Третий')).params, { before: 'Первый', after: 'Третий' });
+  assert.deepEqual(logLine(row('works', '', '50')), { key: 'journal.log.repeat.works', params: { before: '—', after: '50' }, keyParams: [] });
+  assert.deepEqual(logLine(row('worksNote', '', 'Реферат')), { key: 'journal.log.repeat.worksNote', params: { before: '—', after: 'Реферат' }, keyParams: [] });
+  assert.deepEqual(logLine(row('works', '45', '50')).params, { before: '45', after: '50' });
+  assert.deepEqual(logLine(row('try1', '', '30')), { key: 'journal.log.repeat.try', params: { no: 1, before: '—', after: '30' }, keyParams: [] });
+  assert.deepEqual(logLine(row('try2', 'absent', 'incomplete')), { key: 'journal.log.repeat.try', params: { no: 2, before: 'ledger.exam.absent', after: 'ledger.exam.incomplete' }, keyParams: ['before', 'after'] });
+  assert.deepEqual(logLine(row('status', 'open', 'passed')), { key: 'journal.log.repeat.status', params: { before: 'journal.log.repeat.state.open', after: 'journal.log.repeat.state.passed' }, keyParams: ['before', 'after'] });
+  assert.equal(logLine(row('status', 'passed', 'open')).params.after, 'journal.log.repeat.state.open');
+  assert.equal(logLine(row('status', 'open', 'cancelled')).params.after, 'journal.log.repeat.state.cancelled');
+  assert.equal(logLine(row('whatever', 'a', 'b')).key, 'journal.log.other');
+  assert.equal(logLine(row('try0', '', '1')).key, 'journal.log.other');
+  for (const dict of [ruDict, kyDict, enDict]) {
+    for (const key of ['enrol', 'orderNo', 'orderDate', 'deadline', 'teacher', 'works', 'worksNote', 'try', 'status']) assert.ok(dict['journal.log.repeat.' + key], key);
+  }
+});

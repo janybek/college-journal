@@ -5,7 +5,7 @@ import { icon } from '../icons.js';
 import { semesterCell } from '../journal.js';
 import { permissions } from '../shell.js';
 import {
-  ledgerColumns, unitCellText, isLow, admissionCell, examCell, finalCell, closeNote, canCloseUnit, examNote, unitBlockNote,
+  ledgerColumns, unitCellText, isLow, admissionCell, examCell, finalCell, closeNote, canCloseUnit, examNote, unitBlockNote, repeatBadge,
 } from '../ledger.js';
 import { examSection, examTd as examEditTd, studentExtra, countsList, reset as resetExam, sheetTools, textLabels } from './ledgerExam.js';
 import { ledgerOrientation } from '../print.js';
@@ -271,10 +271,19 @@ function finalTd(student, ready, closed) {
 // «Оценка»: the word as a label; while the final sheet is open, «предварительно» under it.
 function wordTd(student, ready, closed) {
   const cell = finalCell(student, { ready, closed });
-  if (cell.key === null) return el('td', { class: 'lg-word lg-empty' }, '—');
+  const repeat = repeatTag(student);
+  if (cell.key === null) return el('td', { class: `lg-word${repeat ? '' : ' lg-empty'}` }, repeat ?? '—');
   return el('td', { class: 'lg-word' },
     badge(t(cell.key), cell.tone),
-    cell.draft ? el('span', { class: 'lg-draft' }, t('ledger.draft')) : null);
+    cell.draft ? el('span', { class: 'lg-draft' }, t('ledger.draft')) : null,
+    repeat);
+}
+
+// The mark of a repeat course under the grade: «повтор: 75 (предварительно)». The previous total stays where it is.
+function repeatTag(student) {
+  const mark = repeatBadge(student);
+  if (mark === null) return null;
+  return el('span', { class: 'lg-repeat', title: t('ledger.repeat.tip') }, badge(t(mark.key, mark.params), mark.tone));
 }
 
 // ---- A request to correct a closed number: the cell becomes a button (only the teacher of the subject, see can.request) ----

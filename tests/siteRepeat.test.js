@@ -183,3 +183,115 @@ test('the texts of the card of the teacher: three dictionaries, the maxima are p
     for (const dict of [ru, ky, en]) assert.ok(/\{(max|need)\}/.test(dict[key]), key);
   }
 });
+
+// ---- Task 11: the sheet of a repeat course ----
+
+import { repeatSheet } from '../site/js/repeat.js';
+import { translate } from '../site/js/i18n.js';
+import { ledgerSheet, examSheet } from '../site/js/ledgerFile.js';
+
+const sheetT = (key, params) => translate({ ru }, 'ru', key, params);
+const sheetLabels = { t: sheetT, title: sheetT('repeat.print.title'), draft: sheetT('repeat.print.draft') };
+const cardView = (over = {}) => ({
+  id: 'r1', status: 'passed', kind: 'full', overdue: false, collegeName: 'Колледж Вымышленный',
+  student: { id: 's', fullName: 'Студент Вымышленный', groupName: '02-1', course: 2 },
+  subject: { id: 'sb', name: 'Информатика', planSemester: 3 }, teacher: { id: 't', fullName: 'Преподаватель Третий' },
+  order: { no: '45-к', date: '2026-11-10' }, deadline: '2027-02-01',
+  prev: { semester: 38, admitted: true, status: 'done', exam: 20, total: 58, word: 'fail', tries: 3, attempts: [], fromRepeat: false },
+  works: { value: 45, note: 'Сдал проект' },
+  attempts: [{ id: 'a', no: 1, date: '2026-12-01', outcome: 'score', score: 30, commission: '' }],
+  result: { semester: 45, admitted: true, status: 'done', tries: 1, exam: 30, total: 75, word: 'fair', next: null },
+  split: { semester: 60, exam: 40, admission: 30 },
+  ...over,
+});
+
+test('repeatSheet: a closed repeat of the whole subject: 13 facts in order, the points are numbers, the sign of the teacher of the repeat', () => {
+  const sheet = repeatSheet(cardView(), sheetLabels);
+  assert.equal(sheet.draft, '');
+  assert.equal(sheet.college, 'Колледж Вымышленный');
+  assert.equal(sheet.title, 'ЛИСТ ПОВТОРНОГО КУРСА');
+  assert.equal(sheet.facts.length, 13);
+  assert.deepEqual(sheet.facts.map(([label]) => label), [
+    ru['repeat.fact.student'], ru['repeat.fact.group'], ru['repeat.print.course'], ru['repeat.fact.subject'], ru['repeat.fact.semester'], ru['repeat.fact.kind'],
+    ru['repeat.fact.order'], ru['repeat.fact.deadline'], ru['repeat.fact.teacher'], ru['repeat.prev.title'], ru['repeat.works.title'], ru['repeat.print.total'], ru['repeat.print.result']]);
+  assert.deepEqual(sheet.facts.slice(0, 5).map(([, value]) => value), ['Студент Вымышленный', '02-1', '2', 'Информатика', '3']);
+  assert.equal(sheet.facts[5][1], 'Весь предмет');
+  assert.equal(sheet.facts[6][1], '№ 45-к от 10.11.2026');
+  assert.equal(sheet.facts[7][1], '01.02.2027');
+  assert.equal(sheet.facts[8][1], 'Преподаватель Третий');
+  assert.match(sheet.facts[9][1], /58 из 100/);
+  assert.equal(sheet.facts[10][1], '45 из 60. Сдал проект');
+  assert.equal(sheet.facts[11][1], '75 из 100 · ' + ru['journal.grade.fair']);
+  assert.equal(sheet.facts[12][1], 'сдал');
+  assert.deepEqual(sheet.body, [[1, '01.12.2026', 30, '']]);
+  assert.equal(typeof sheet.body[0][2], 'number');
+  assert.equal(sheet.head[0].length, 4);
+  assert.equal(sheet.counts, null);
+  assert.equal(sheet.retakes, null);
+  assert.deepEqual(sheet.merges, []);
+  assert.equal(sheet.signs[0], 'Преподаватель ____________ / Преподаватель Третий');
+  assert.equal(sheet.signs[1], 'Деканат ____________');
+});
+
+test('repeatSheet: an open repeat is preliminary, without sittings one empty row; the result is empty', () => {
+  const sheet = repeatSheet(cardView({ status: 'open', attempts: [], result: { semester: 45, admitted: true, status: 'incomplete', tries: 0, exam: null, total: null, word: null, next: { no: 1 } } }), sheetLabels);
+  assert.equal(sheet.draft, 'Предварительный');
+  assert.deepEqual(sheet.body, [['', '', '', '']]);
+  assert.equal(sheet.facts[11][1], '');
+  assert.equal(sheet.facts[12][1], '');
+});
+
+test('repeatSheet: «только экзамен» has the previous semester instead of the works; a failed one says so; words stay words', () => {
+  const sheet = repeatSheet(cardView({
+    kind: 'exam', status: 'failed', works: { value: null, note: '' },
+    attempts: [{ no: 1, date: '2026-12-01', outcome: 'absent', score: null, commission: '' }, { no: 2, date: '2026-12-10', outcome: 'incomplete', score: null, commission: '' },
+      { no: 3, date: '2026-12-20', outcome: 'score', score: 12, commission: 'Комиссия из трёх' }],
+    result: { semester: 38, admitted: true, status: 'done', tries: 3, exam: 12, total: 50, word: 'fail', next: null },
+  }), sheetLabels);
+  assert.deepEqual(sheet.facts[10], ['Баллы за семестр (прежние)', '38 из 60']);
+  assert.equal(sheet.facts[12][1], 'не сдал');
+  assert.deepEqual(sheet.body.map((row) => row[2]), ['не явился(ась)', 'I', 12]);
+  assert.equal(sheet.body[2][3], 'Комиссия из трёх');
+});
+
+test('repeatSheet: no college name is an empty line; a name like a formula or a tag stays a text; not admitted', () => {
+  const view = cardView({
+    collegeName: '', student: { fullName: '=СУММ(A1)', groupName: '<script>', course: null }, teacher: { fullName: '<script>alert(1)</script>' },
+    result: { semester: 20, admitted: false, status: 'not_admitted', tries: 0, exam: null, total: null, word: null, next: null },
+  });
+  const sheet = repeatSheet(view, sheetLabels);
+  assert.equal(sheet.college, '');
+  assert.equal(sheet.facts[0][1], '=СУММ(A1)');
+  assert.equal(sheet.facts[1][1], '<script>');
+  assert.equal(sheet.facts[2][1], '');
+  assert.equal(sheet.facts[11][1], 'не допущен');
+  assert.match(sheet.signs[0], /<script>alert\(1\)<\/script>/);
+  for (const [, value] of sheet.facts) assert.equal(typeof value, 'string');
+});
+
+test('the dictionaries have the keys of the sheet, the badge and the change log in three languages', () => {
+  for (const dict of [ru, ky, en]) {
+    for (const key of ['title', 'draft', 'button', 'course', 'prevSemester', 'worksOf', 'total', 'totalOf', 'result', 'passed', 'failed']) assert.ok(dict['repeat.print.' + key], key);
+    for (const key of ['open', 'passed', 'failed']) assert.ok(dict['ledger.repeat.' + key], key);
+    for (const field of ['enrol', 'orderNo', 'orderDate', 'deadline', 'teacher', 'works', 'try', 'status']) assert.ok(dict['journal.log.repeat.' + field], field);
+    for (const kind of ['full', 'exam']) assert.ok(dict['journal.log.repeat.kind.' + kind], kind);
+    for (const st of ['open', 'passed', 'failed', 'cancelled']) assert.ok(dict['journal.log.repeat.state.' + st], st);
+  }
+});
+
+test('the print and the Excel sheet of the ledger do not change when a student has a repeat', () => {
+  const base = {
+    today: '2026-12-15', collegeName: 'Колледж', subject: { id: 's1', name: 'Информатика', groupName: '02-1', course: 1, teacherName: 'П', semester: 1, planSemester: 1 },
+    split: { semester: 60, exam: 40, admission: 30 }, units: [{ unit: 1, title: '', closed: true, blocking: [], missing: 0 }],
+    exam: { ready: true, date: '2026-12-15', examiner: '', assistants: '' }, final: { closed: true, blocking: [] },
+  };
+  const student = {
+    id: 'a', fullName: 'Студент', left: false, semester: 47, complete: true, admitted: true, status: 'done', exam: 20, total: 67, word: 'fair',
+    units: [{ unit: 1, current: 38, self: 16, control: 30, total: 84, word: 'good', currentLow: false, controlLow: false, selfPending: 0 }], attempts: [],
+  };
+  const plain = { ...base, students: [student] };
+  const marked = { ...base, students: [{ ...student, repeat: { kind: 'full', status: 'passed', total: 80, word: 'good', main: true } }] };
+  const labels = { t: sheetT, sheet: 'Ведомость' };
+  assert.deepEqual(ledgerSheet(marked, labels), ledgerSheet(plain, labels));
+  assert.deepEqual(examSheet(marked, labels), examSheet(plain, labels));
+});

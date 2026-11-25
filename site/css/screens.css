@@ -8566,3 +8566,11 @@ a.gr-card:hover { border-color: var(--primary-line); }
 }
 
 .rp-form .field[hidden] { display: none; }
+
+/* The mark of a repeat course under the grade of the ledger. */
+.lg-repeat { display: block; margin-top: var(--space-1); }
+
+/* A sheet with one empty row (a repeat without sittings): the row is tall enough to be written in by hand. */
+@media print {
+  .print-table tbody tr:only-child > * { height: 8mm; }
+}

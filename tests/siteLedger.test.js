@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   ledgerColumns, unitCellText, isLow, admissionCell, examCell, finalCell, closeNote, canCloseUnit, wordCounts, examNote,
-  examDraft, examItems, examNeedsReason, finalNote, attemptLabel, attemptLines, nextLabel, unitBlockNote,
+  examDraft, examItems, examNeedsReason, finalNote, attemptLabel, attemptLines, nextLabel, unitBlockNote, repeatBadge,
 } from '../site/js/ledger.js';
 
 const U = (over) => ({ unit: 1, current: 38, manual: false, self: 16, selfPending: 0, control: 30, total: 84, word: 'good', currentLow: false, controlLow: false, ...over });
@@ -312,4 +312,13 @@ test('«035» against 35 is not a change: no item and no reason is asked (final 
   assert.deepEqual(examItems(new Map([['a1', '036']]), list, SP).items, [{ studentId: 'a1', outcome: 'score', score: 36 }]);
   assert.deepEqual(scoreItems(new Map([['a', '090'], ['c', '055']]), EXAM_STUDENTS), { items: [], bad: [] });
   assert.deepEqual(scoreItems(new Map([['b', '080']]), EXAM_STUDENTS), { items: [{ studentId: 'b', score: 80 }], bad: [] });
+});
+
+test('repeatBadge: no card is null; an open, a passed and a failed repeat; the draft flag follows `main`', () => {
+  assert.equal(repeatBadge({}), null);
+  assert.equal(repeatBadge({ repeat: null }), null);
+  assert.deepEqual(repeatBadge({ repeat: { status: 'open', total: 75, main: true } }), { key: 'ledger.repeat.open', params: { total: 75 }, tone: 'primary', draft: false });
+  assert.deepEqual(repeatBadge({ repeat: { status: 'passed', total: 80, main: true } }), { key: 'ledger.repeat.passed', params: { total: 80 }, tone: 'success', draft: false });
+  assert.deepEqual(repeatBadge({ repeat: { status: 'failed', total: 50, main: false } }), { key: 'ledger.repeat.failed', params: { total: 50 }, tone: 'danger', draft: true });
+  assert.deepEqual(repeatBadge({ repeat: { status: 'open', total: null, main: true } }).params, { total: '—' });
 });

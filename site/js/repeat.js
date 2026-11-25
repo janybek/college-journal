@@ -117,3 +117,64 @@ export function homeRepeats(repeats) {
 
 export const dayOf = (date) => (typeof date === 'string' && date.length >= 10 ? `${date.slice(8, 10)}.${date.slice(5, 7)}.${date.slice(0, 4)}` : '');
 export const orderLine = (no, date) => (no ? { key: 'repeat.order', params: { no, date: dayOf(date) } } : null);
+
+// ---- The sheet of a repeat course (A4, portrait) ----
+
+const SIGN_LINE = '____________';
+const signLine = (label, name) => (name ? `${label} ${SIGN_LINE} / ${name}` : `${label} ${SIGN_LINE}`);
+const JOIN = ' · ';
+
+// The same shape as examSheet (ledgerFile.js), so printSheet prints it. labels: { t, title, draft }.
+// A number of a sitting is a number in the table; «не явился(ась)» and «I» stand as words.
+export function repeatSheet(view, labels) {
+  const { t } = labels;
+  const { split, prev, result } = view;
+  const max = split.semester + split.exam;
+  const open = view.status === 'open';
+  const prevText = prevLine(prev, split);
+  const prevWord = prev.word ? t('journal.grade.' + prev.word) : '';
+  const order = orderLine(view.order.no, view.order.date);
+  const full = view.kind === 'full';
+
+  let works;
+  if (full) {
+    const value = Number.isInteger(view.works.value) ? t('repeat.print.worksOf', { works: view.works.value, max: split.semester }) : '';
+    works = [t('repeat.works.title'), [value, view.works.note].filter((part) => part !== '').join('. ')];
+  } else {
+    const semester = prev.semester === null || prev.semester === undefined ? '' : t('repeat.print.worksOf', { works: prev.semester, max: split.semester });
+    works = [t('repeat.print.prevSemester'), semester];
+  }
+
+  const totalText = result.status === 'done'
+    ? [t('repeat.print.totalOf', { total: result.total, max }), result.word ? t('journal.grade.' + result.word) : ''].filter((part) => part !== '').join(JOIN)
+    : result.status === 'not_admitted' ? t('repeat.total.notAdmitted') : '';
+
+  const facts = [
+    [t('repeat.fact.student'), view.student.fullName],
+    [t('repeat.fact.group'), view.student.groupName],
+    [t('repeat.print.course'), view.student.course === null || view.student.course === undefined ? '' : String(view.student.course)],
+    [t('repeat.fact.subject'), view.subject.name],
+    [t('repeat.fact.semester'), view.subject.planSemester === null || view.subject.planSemester === undefined ? '' : String(view.subject.planSemester)],
+    [t('repeat.fact.kind'), t('repeat.kind.' + view.kind)],
+    [t('repeat.fact.order'), order ? t(order.key, order.params) : ''],
+    [t('repeat.fact.deadline'), dayOf(view.deadline)],
+    [t('repeat.fact.teacher'), view.teacher.fullName],
+    [t('repeat.prev.title'), [t(prevText.key, prevText.params), prevWord].filter((part) => part !== '').join(JOIN)],
+    works,
+    [t('repeat.print.total'), totalText],
+    [t('repeat.print.result'), view.status === 'passed' || view.status === 'failed' ? t('repeat.print.' + view.status) : ''],
+  ];
+
+  const sitting = (a) => [a.no, dayOf(a.date), a.outcome === 'score' ? a.score : a.outcome === 'absent' ? t('ledger.exam.absent') : t('ledger.exam.incomplete'), a.commission || ''];
+  const body = view.attempts.length > 0 ? view.attempts.map(sitting) : [['', '', '', '']];
+
+  return {
+    college: view.collegeName || '',
+    title: labels.title,
+    draft: open ? labels.draft : '',
+    facts,
+    head: [[t('ledger.print.no'), t('ledger.exam.date'), t('repeat.print.result'), t('ledger.attempt.commissionField')]],
+    merges: [], body, low: [], counts: null, retakes: null,
+    signs: [signLine(t('ledger.print.signTeacher'), view.teacher.fullName), signLine(t('ledger.print.signDean'), '')],
+  };
+}
