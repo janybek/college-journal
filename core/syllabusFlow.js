@@ -39,8 +39,7 @@ export function rightsOn(version, viewer) {
   const status = version.status;
   const manager = hasRole(viewer, 'admin') || hasRole(viewer, 'dean');
   const teacher = hasRole(viewer, 'teacher') && viewer.teaches === true && typeof viewer.id === 'string' && viewer.id !== '';
-  // TEMP task 3: without a part the owner of the old key counts as the author
-  const part = viewer.part === undefined ? (teacher && version.teacherId === viewer.id ? 'author' : null) : viewer.part;
+  const part = viewer.part ?? null;
   const worker = manager || (teacher && (part === 'author' || part === 'member'));
   let see = false;
   if (status === 'approved') see = true;

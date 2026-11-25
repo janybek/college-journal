@@ -3,9 +3,11 @@
 import { AppError } from '../core/errors.js';
 import { localDate, localDateTime } from '../core/dates.js';
 import { FILE_LIMITS, SYLLABUS_FILE_KINDS, base64Bytes, cleanFileName, isStoredName, kindByName, sniffKind } from '../core/files.js';
-import { rightsOn, versionsOf } from '../core/syllabusFlow.js';
+import { rightsOn } from '../core/syllabusFlow.js';
+import { lineSubjects, versionsOfLine } from '../core/syllabusLines.js';
 import { todayOf } from './scheduleData.js';
-import { versionOf, viewerOf } from './syllabusDraft.js';
+import { readTables, versionOf } from './syllabusDraft.js';
+import { LINE_TABLES, lineOfVersion, viewerOf, worksOn } from './syllabusLines.js';
 
 const MANAGER_ROLES = ['admin', 'dean', 'prorector'];
 
@@ -14,8 +16,10 @@ function editableVersion(store, data, user) {
   const syllabi = store.list('syllabi');
   const version = versionOf(syllabi, data.syllabusId);
   const subjects = store.list('subjects');
-  const rights = rightsOn(version, viewerOf(user, version, subjects));
-  if (!rights.see) throw new AppError('forbidden');
+  const lines = readTables(store, LINE_TABLES);
+  const viewer = viewerOf(user, lineOfVersion(lines.syllabusLines, version), lines.syllabusMembers, subjects);
+  const rights = rightsOn(version, viewer);
+  if (!rights.see || !worksOn(viewer)) throw new AppError('forbidden');
   if (!rights.edit) throw new AppError('syllabus_locked');
   return version;
 }
@@ -57,19 +61,19 @@ export function dropSyllabusFile(store, platform, files, data, user) {
   return { file: null };
 }
 
-// A student reads the file of the approved version his group is shown (not while a new version of it is under review).
-function studentMayRead(version, syllabi, subjects, user) {
+// A student reads the file of the approved version of the line that leads his group's subject (not while a new version of it is under review).
+function studentMayRead(version, line, members, syllabi, subjects, user) {
   if (version.status !== 'approved') return false;
   const groupId = user.row.groupId;
   if (typeof groupId !== 'string' || groupId === '') return false;
-  if (!subjects.some((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId && s.groupId === groupId)) return false;
-  const { open } = versionsOf(syllabi, { disciplineId: version.disciplineId, teacherId: version.teacherId, semester: version.semester });
+  if (!lineSubjects(subjects, line, members).some((s) => s.groupId === groupId)) return false;
+  const { open } = versionsOfLine(syllabi, line.id);
   return open === null || open.status !== 'review';
 }
 
-// A teacher who leads a pair of a subject of this discipline and this teacher (a replacement); the pairs are read only here.
-function covers(store, version, subjects, user) {
-  const ids = new Set(subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId).map((s) => s.id));
+// A teacher who leads a pair of a subject of the line (a replacement); the pairs are read only here.
+function covers(store, line, members, subjects, user) {
+  const ids = new Set(lineSubjects(subjects, line, members).map((s) => s.id));
   return store.list('pairs').some((p) => p.teacherId === user.id && ids.has(p.subjectId));
 }
 
@@ -79,15 +83,18 @@ export function readSyllabusFile(store, platform, files, data, user) {
   const syllabi = store.list('syllabi');
   const version = versionOf(syllabi, data.syllabusId);
   const subjects = store.list('subjects');
+  const lines = readTables(store, LINE_TABLES);
+  const line = lineOfVersion(lines.syllabusLines, version);
+  const members = lines.syllabusMembers;
   const roles = Array.isArray(user.roles) ? user.roles : [];
   if (user.kind === 'student') {
-    if (!studentMayRead(version, syllabi, subjects, user)) throw new AppError('not_found');
+    if (!studentMayRead(version, line, members, syllabi, subjects, user)) throw new AppError('not_found');
   } else {
-    const viewer = viewerOf(user, version, subjects);
+    const viewer = viewerOf(user, line, members, subjects);
     let may = false;
     if (version.status === 'approved') {
       may = roles.some((r) => MANAGER_ROLES.includes(r))
-        || (roles.includes('teacher') && ((viewer.teaches && version.teacherId === user.id) || covers(store, version, subjects, user)));
+        || (roles.includes('teacher') && ((viewer.teaches && viewer.part !== null) || covers(store, line, members, subjects, user)));
     } else {
       may = rightsOn(version, viewer).see;
     }

@@ -5,9 +5,11 @@ import { scheduleFit, subjectScope, syllabusIndex, syllabusTotals } from '../cor
 import { controlMarks, lessonKey, lessonsOf } from '../core/topics.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
 import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
-import { rightsOn, versionsOf } from '../core/syllabusFlow.js';
+import { rightsOn } from '../core/syllabusFlow.js';
+import { joinedLineId, versionsOfLine } from '../core/syllabusLines.js';
 import { loadSettings, todayOf } from './scheduleData.js';
-import { fileMetaOf, readTables, viewerOf } from './syllabusDraft.js';
+import { fileMetaOf, readTables } from './syllabusDraft.js';
+import { lineGroups, lineView, viewerOf } from './syllabusLines.js';
 
 const MANAGER_ROLES = ['admin', 'dean', 'prorector'];
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -54,7 +56,7 @@ function shownVersion(store, version, rows, own, settings, subject, index, curre
   };
 }
 
-// 'syllabus.get' { subjectId, semester?, version? }: the syllabus of the subject's discipline and teacher, with the dates of THIS subject's group.
+// 'syllabus.get' { subjectId, semester?, version? }: the syllabus of the line where the teacher of the subject leads the discipline, with the dates of THIS subject's group.
 // version: 'approved' (default) or 'open'.
 export function syllabusPage(store, platform, data, user) {
   const { subjectId, semester: asked, version: want = 'approved' } = data;
@@ -68,6 +70,7 @@ export function syllabusPage(store, platform, data, user) {
   const groups = store.list('groups');
   const staff = store.list('staff');
   const syllabi = store.list('syllabi');
+  const lines = store.list('syllabusLines');
   const members = store.list('syllabusMembers');
   const pairs = store.list('pairs');
   const settings = loadSettings(store);
@@ -85,24 +88,30 @@ export function syllabusPage(store, platform, data, user) {
   const group = groups.find((g) => g.id === subject.groupId);
   const teacher = staff.find((s) => s.id === subject.teacherId);
   const hasDiscipline = typeof subject.disciplineId === 'string' && subject.disciplineId !== '';
-  const sameCourse = hasDiscipline ? subjects.filter((s) => s.disciplineId === subject.disciplineId && s.teacherId === subject.teacherId) : [subject];
   const seeAllGroups = isManager || isOwnTeacher;
-  const shownGroups = (seeAllGroups ? sameCourse : [subject])
-    .map((s) => ({ subjectId: s.id, groupName: groupName(s.groupId) }))
-    .sort((a, b) => cmp(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId));
 
-  // both halves of the year: the approved version, the open one and what this person may do with the open one
+  // both halves of the year: the line where the teacher leads the discipline, its approved version, the open one and what this person may do with the open one
   const halves = {};
   for (const half of [1, 2]) {
-    const { approved, open } = hasDiscipline ? versionsOf(syllabi, { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: half }) : { approved: null, open: null };
-    halves[half] = { approved, open, rights: open ? rightsOn(open, viewerOf(user, open, subjects)) : null };
+    const lineId = hasDiscipline ? joinedLineId(members, { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: half }) : null;
+    const line = lineId === null ? null : lines.find((l) => l.id === lineId) || null;
+    const { approved, open } = line ? versionsOfLine(syllabi, line.id) : { approved: null, open: null };
+    halves[half] = { line, approved, open, rights: open ? rightsOn(open, viewerOf(user, line, members, subjects)) : null };
   }
   const seenOpen = (half) => halves[half].rights !== null && halves[half].rights.see;
   // the half hidden from a student stays in the list: else he would be shown the other half instead of «updating»
   const loaded = [1, 2].filter((h) => halves[h].approved || seenOpen(h))
     .map((h) => ({ semester: h, planSemester: (halves[h].approved || halves[h].open).planSemester }));
   const semester = shownSemester(asked, settings.semester, loaded);
-  const { approved, open } = halves[semester];
+  const { line, approved, open } = halves[semester];
+
+  // the groups: the staff who see everything get every group of the line (a shared line names the teachers), a teacher his own, the others only this one
+  const sameCourse = hasDiscipline ? subjects.filter((s) => s.disciplineId === subject.disciplineId && s.teacherId === subject.teacherId) : [subject];
+  const shownGroups = line && seeAllGroups
+    ? lineGroups({ subjects, groups, staff }, line, members, user, subject)
+    : (seeAllGroups ? sameCourse : [subject])
+      .map((s) => ({ subjectId: s.id, groupName: groupName(s.groupId) }))
+      .sort((a, b) => cmp(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId));
 
   const mayCreate = hasDiscipline && (user.roles.includes('admin') || user.roles.includes('dean') || isOwnTeacher);
   let shown = 'approved';
@@ -137,6 +146,7 @@ export function syllabusPage(store, platform, data, user) {
       course: group ? group.course : null, teacherId: subject.teacherId, teacherName: teacher ? teacher.fullName : '',
     },
     groups: shownGroups, semesters: loaded, semester, shown, hidden,
+    ...(line ? { line: lineView({ syllabusLines: lines, syllabusMembers: members, subjects, staff, groups }, line, user) } : {}),
     state: {
       approved: approved ? { version: approved.version, decidedAt: approved.decidedAt ?? '' } : null,
       open: seenOpen(semester)
@@ -153,12 +163,13 @@ export function studentSubjects(store, user) {
   const subjects = store.list('subjects');
   const staff = store.list('staff');
   const syllabi = store.list('syllabi');
+  const members = store.list('syllabusMembers');
   const groupId = user.row.groupId;
   const mine = typeof groupId === 'string' && groupId !== '' ? subjects.filter((s) => s.groupId === groupId) : [];
   const teacherName = (id) => (staff.find((s) => s.id === id) || { fullName: '' }).fullName;
-  // the approved versions of both halves of the year: 'shown', 'hidden' (the open version of that half is under review) or null
+  // the approved versions of both halves of the year on the line of the subject's teacher: 'shown', 'hidden' (the open version of that half is under review) or null
   const states = (s) => (typeof s.disciplineId === 'string' && s.disciplineId !== '' ? [1, 2] : []).map((semester) => {
-    const { approved, open } = versionsOf(syllabi, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester });
+    const { approved, open } = versionsOfLine(syllabi, joinedLineId(members, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester }));
     if (approved === null) return null;
     return open !== null && open.status === 'review' ? 'hidden' : 'shown';
   });

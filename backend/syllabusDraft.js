@@ -3,10 +3,12 @@
 import { AppError } from '../core/errors.js';
 import { SECTIONS, SECTION_TABLES, checkSection, plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES, buildDoc, copyRows, draftVersion, rowsOfVersion, sectionWrites } from '../core/syllabusDoc.js';
-import { checkHeld, checkSubmit, rightsOn, versionsOf } from '../core/syllabusFlow.js';
-import { joinedLineId, nextVersion } from '../core/syllabusLines.js';
+import { checkHeld, checkSubmit, rightsOn } from '../core/syllabusFlow.js';
+import { isLive, joinedLineId, joinedOf, lineSubjects, nextVersion, versionsOfLine } from '../core/syllabusLines.js';
+import { compareNames } from '../core/names.js';
 import { localDateTime } from '../core/dates.js';
 import { todayOf } from './scheduleData.js';
+import { LINE_TABLES, groupsOfLine, lineGroups, lineOfVersion, lineView, viewerOf, worksOn } from './syllabusLines.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const isManager = (user) => user.roles.includes('admin') || user.roles.includes('dean');
@@ -26,35 +28,34 @@ export function fileMetaOf(store, version) {
   return row ? { name: row.name, kind: row.kind, size: row.size, at: row.at } : null;
 }
 
-// What rightsOn needs to know about the person: the id, the roles and whether they teach the discipline of the version now.
-export function viewerOf(user, version, subjects) {
-  const teaches = subjects.some((s) => s.disciplineId === version.disciplineId && s.teacherId === user.id);
-  return { id: user.id, roles: user.roles, teaches };
-}
-
-// [{ name, course }]: the groups where the teacher of the version leads its discipline, from sheets the request has already read.
-export function groupsOfTeacher(version, subjects, groups) {
-  const ids = new Set(subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId).map((s) => s.groupId));
-  return groups.filter((g) => ids.has(g.id)).map((g) => ({ name: g.name, course: g.course }));
-}
-
-const keyOfVersion = (v) => ({ disciplineId: v.disciplineId, teacherId: v.teacherId, semester: v.semester });
-
 // The line where the teacher leads the discipline in this half of the year, and a line of his own when there is none:
-// the line (author: the teacher, made by userId) and the member 'joined' are written, the line first. rows: { syllabusLines, syllabusMembers } as read by the request.
+// the line (author: the teacher, made by userId) and the member 'joined' are written, the line first. rows: { syllabusLines, syllabusMembers } as read by the request;
+// the function puts what it wrote into them, so the caller may go on with the same object.
+// A 'joined' row whose line is not there is no line of anybody: it is closed ('left') before the new one is written. A line made by userId for the teacher
+// that has no member at all (a break between the two writes on a store without transactions) is taken again instead of making a second one.
 // -> { line, created }
 export function ensureLine(store, platform, { disciplineId, teacherId, semester, userId }, rows) {
-  const lineId = joinedLineId(rows.syllabusMembers, { disciplineId, teacherId, semester });
-  if (lineId !== null) {
-    const line = rows.syllabusLines.find((l) => l.id === lineId);
-    if (!line) throw new AppError('not_found');
-    return { line, created: false };
-  }
+  const there = (id) => rows.syllabusLines.some((l) => l.id === id);
+  const joined = rows.syllabusMembers.filter((m) => m.state === 'joined' && m.disciplineId === disciplineId && m.teacherId === teacherId && m.semester === semester);
+  const lineId = joinedLineId(joined.filter((m) => there(m.lineId)), { disciplineId, teacherId, semester });
+  if (lineId !== null) return { line: rows.syllabusLines.find((l) => l.id === lineId), created: false };
+
   const at = localDateTime(platform.now());
-  const [line] = store.insertMany('syllabusLines', [{ disciplineId, semester, authorId: teacherId, createdBy: userId, createdAt: at }]);
-  store.insertMany('syllabusMembers', [{
+  const dead = joined.filter((m) => !there(m.lineId));
+  if (dead.length > 0) {
+    const closed = new Map(store.updateMany('syllabusMembers', dead.map((m) => ({ id: m.id, patch: { state: 'left', endedAt: at, endedBy: userId } }))).map((m) => [m.id, m]));
+    rows.syllabusMembers = rows.syllabusMembers.map((m) => closed.get(m.id) ?? m);
+  }
+  const taken = new Set(rows.syllabusMembers.map((m) => m.lineId));
+  const unfinished = rows.syllabusLines
+    .filter((l) => l.disciplineId === disciplineId && l.semester === semester && l.authorId === teacherId && l.createdBy === userId && !taken.has(l.id))
+    .sort((a, b) => cmp(a.createdAt, b.createdAt) || cmp(a.id, b.id))[0];
+  const line = unfinished ?? store.insertMany('syllabusLines', [{ disciplineId, semester, authorId: teacherId, createdBy: userId, createdAt: at }])[0];
+  const [member] = store.insertMany('syllabusMembers', [{
     lineId: line.id, disciplineId, semester, teacherId, state: 'joined', byId: userId, invitedAt: '', joinedAt: at, endedAt: '', endedBy: '',
   }]);
+  if (!unfinished) rows.syllabusLines = [...rows.syllabusLines, line];
+  rows.syllabusMembers = [...rows.syllabusMembers, member];
   return { line, created: true };
 }
 
@@ -78,29 +79,50 @@ export function createDraft(store, platform, { line, approved, group, userId }, 
   return { version, rows };
 }
 
-// 'syllabus.startDraft' { subjectId, semester } -> { syllabusId, created }
+// The first group of a line: the course of a draft that has no approved version gives its plan semester. A line without a subject has none.
+const firstGroup = (line, members, subjects, groups) => {
+  const first = lineSubjects(subjects, line, members).sort((a, b) => cmp(a.id, b.id))[0];
+  return first ? groups.find((g) => g.id === first.groupId) || null : null;
+};
+
+// The draft of a line: the open version if there is one, else a new one (a copy of the approved version when there is one). `group` is asked only when it is needed.
+function draftOfLine(store, platform, line, group, user) {
+  const syllabi = store.list('syllabi');
+  const { approved, open } = versionsOfLine(syllabi, line.id);
+  if (open) return { syllabusId: open.id, created: false };
+  const tables = { syllabi, ...(approved ? readTables(store, DOC_TABLES) : {}) };
+  const { version } = createDraft(store, platform, { line, approved, group: approved ? null : group(), userId: user.id }, tables);
+  return { syllabusId: version.id, created: true };
+}
+
+// 'syllabus.startDraft' { subjectId, semester } or { lineId } (exactly one of the two) -> { syllabusId, created }
+// By a subject: the line where the teacher of the subject leads the discipline (a line of his own is made when there is none).
+// By a line: the deanery, the administrator, and a teacher who leads the line; a line nobody leads any more is not found.
 export function startDraft(store, platform, data, user) {
+  if ((data.subjectId === undefined) === (data.lineId === undefined)) throw new AppError('bad_request');
+  const subjects = store.list('subjects');
+  const lines = readTables(store, LINE_TABLES);
+
+  if (data.lineId !== undefined) {
+    const lineId = plainId(data.lineId);
+    if (lineId === null) throw new AppError('bad_request');
+    const line = lines.syllabusLines.find((l) => l.id === lineId);
+    if (!line || !isLive(line, lines.syllabusMembers)) throw new AppError('not_found');
+    if (!worksOn(viewerOf(user, line, lines.syllabusMembers, subjects))) throw new AppError('forbidden');
+    return draftOfLine(store, platform, line, () => firstGroup(line, lines.syllabusMembers, subjects, store.list('groups')), user);
+  }
+
   const subjectId = plainId(data.subjectId);
   if (subjectId === null || !isHalf(data.semester)) throw new AppError('bad_request');
-  const subjects = store.list('subjects');
   const subject = subjects.find((s) => s.id === subjectId);
   if (!subject) throw new AppError('not_found');
   if (!(isManager(user) || (user.roles.includes('teacher') && subject.teacherId === user.id))) throw new AppError('forbidden');
   if (typeof subject.disciplineId !== 'string' || subject.disciplineId === '') {
     throw new AppError('invalid', { fields: [{ field: 'disciplineId', code: 'bad_ref' }] });
   }
-
   const key = { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: data.semester };
-  const syllabi = store.list('syllabi');
-  const { approved, open } = versionsOf(syllabi, key);
-  if (open) return { syllabusId: open.id, created: false };
-
-  const lines = readTables(store, ['syllabusLines', 'syllabusMembers']);
   const { line } = ensureLine(store, platform, { ...key, userId: user.id }, lines);
-  const group = approved ? null : store.list('groups').find((g) => g.id === subject.groupId) || null;
-  const tables = { syllabi, ...(approved ? readTables(store, DOC_TABLES) : {}) };
-  const { version } = createDraft(store, platform, { line, approved, group, userId: user.id }, tables);
-  return { syllabusId: version.id, created: true };
+  return draftOfLine(store, platform, line, () => store.list('groups').find((g) => g.id === subject.groupId) || null, user);
 }
 
 // The version of a request: the id is a plain string (else bad_request), the row exists (else not_found).
@@ -113,46 +135,63 @@ export function versionOf(syllabi, id) {
 }
 
 // The errors of the held pairs of the approved version against the new one: lessons, hours, kind (checkHeld), the closed units and the half of the plan.
-// A closed unit or the exam of the old half is never moved by a new version (final review, I1).
-export function heldErrors(store, version, approved, rows, previous, pairs, subjects) {
+// A closed unit or the exam of the old half is never moved by a new version (final review, I1). The pairs on the rows of the approved version count whoever's they are;
+// a shared line (more than one member) names the group in each error. ctx: { subjects, groups, line, members } as read by the request.
+export function heldErrors(store, ctx, version, approved, rows, previous, pairs) {
   if (!approved || approved.id === version.id) return [];
+  const { subjects, groups, line, members } = ctx;
+  const shared = joinedOf(members, line.id).length > 1;
+  const groupOf = (subjectId) => {
+    const subject = subjects.find((s) => s.id === subjectId);
+    return (groups.find((g) => subject && g.id === subject.groupId) || { name: '' }).name;
+  };
   const closures = store.list('closures');
   const old = approved.planSemester ?? null;
-  const errors = checkHeld(rows.topics, previous.topics, pairs, closures, old);
+  const errors = checkHeld(rows.topics, previous.topics, pairs, closures, old, { withSubject: shared })
+    .map(({ subjectId, ...rest }) => (shared ? { ...rest, group: groupOf(subjectId) } : rest));
   if ((version.planSemester ?? null) !== old) {
-    const mine = new Set(subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId).map((s) => s.id));
-    const inOld = (r) => mine.has(r.subjectId) && (r.planSemester ?? null) === old;
-    const stands = closures.some((c) => inOld(c) && c.reopenedAt === '') || store.list('subjectExams').some(inOld) || store.list('examAttempts').some(inOld);
-    if (stands) errors.push({ section: 'title', code: 'semester_closed' });
+    const exams = store.list('subjectExams');
+    const attempts = store.list('examAttempts');
+    const standing = lineSubjects(subjects, line, members).filter((s) => {
+      const inOld = (r) => r.subjectId === s.id && (r.planSemester ?? null) === old;
+      return closures.some((c) => inOld(c) && c.reopenedAt === '') || exams.some(inOld) || attempts.some(inOld);
+    });
+    if (standing.length > 0) {
+      const names = [...new Set(standing.map((s) => groupOf(s.id)))].sort(compareNames);
+      errors.push({ section: 'title', code: 'semester_closed', ...(shared ? { groups: names } : {}) });
+    }
   }
   return errors;
 }
 
-// 'syllabus.form' { syllabusId } -> the version, its subject, what the viewer may do, the document and the checks before submitting.
+// 'syllabus.form' { syllabusId } -> the version, its subject, what the viewer may do, the line, the document and the checks before submitting.
+// Who reads it: the deanery, the administrator, the prorector, and a teacher of the discipline who is the author, a member or invited on the line.
 export function draftForm(store, platform, data, user) {
   const syllabi = store.list('syllabi');
   const version = versionOf(syllabi, data.syllabusId);
   const subjects = store.list('subjects');
-  const viewer = viewerOf(user, version, subjects);
+  const lines = readTables(store, LINE_TABLES);
+  const line = lineOfVersion(lines.syllabusLines, version);
+  const members = lines.syllabusMembers;
+  const viewer = viewerOf(user, line, members, subjects);
   const rights = rightsOn(version, viewer);
-  const owner = viewer.roles.includes('teacher') && viewer.teaches && version.teacherId === user.id;
-  if (!(rights.see && (isManager(user) || owner || user.roles.includes('prorector')))) throw new AppError('forbidden');
+  const teacher = user.roles.includes('teacher') && viewer.teaches && viewer.part !== null;
+  if (!(rights.see && (isManager(user) || teacher || user.roles.includes('prorector')))) throw new AppError('forbidden');
 
   const staff = store.list('staff');
   const groups = store.list('groups');
   const tables = readTables(store, DOC_TABLES);
   const pairs = store.list('pairs');
 
-  const { approved } = versionsOf(syllabi, keyOfVersion(version));
+  const { approved } = versionsOfLine(syllabi, line.id);
   const rows = rowsOfVersion(tables, version.id);
   const doc = buildDoc(version, rows);
-  const held = approved && approved.id !== version.id ? heldErrors(store, version, approved, rows, rowsOfVersion(tables, approved.id), pairs, subjects) : [];
+  const held = approved && approved.id !== version.id
+    ? heldErrors(store, { subjects, groups, line, members }, version, approved, rows, rowsOfVersion(tables, approved.id), pairs) : [];
 
-  const groupName = (id) => (groups.find((g) => g.id === id) || { name: '' }).name;
-  const mine = subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId)
-    .map((s) => ({ subjectId: s.id, groupName: groupName(s.groupId) })).sort((a, b) => cmp(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId));
+  const mine = lineGroups({ subjects, groups, staff }, line, members, user);
   const named = mine.length > 0 ? subjects.find((s) => s.id === mine[0].subjectId) : subjects.find((s) => s.disciplineId === version.disciplineId);
-  const teacher = staff.find((s) => s.id === version.teacherId);
+  const author = staff.find((s) => s.id === version.teacherId);
 
   return {
     today: todayOf(platform),
@@ -163,11 +202,12 @@ export function draftForm(store, platform, data, user) {
     },
     subject: {
       id: mine.length > 0 ? mine[0].subjectId : '', name: named ? named.name : '', disciplineId: version.disciplineId, teacherId: version.teacherId,
-      teacherName: teacher ? teacher.fullName : '', groups: mine,
+      teacherName: author ? author.fullName : '', groups: mine,
     },
     can: { edit: rights.edit, submit: rights.submit, approve: rights.approve, giveBack: rights.giveBack },
+    line: lineView({ ...lines, subjects, staff, groups }, line, user),
     doc,
-    checks: checkSubmit(doc, held, groupsOfTeacher(version, subjects, groups)),
+    checks: checkSubmit(doc, held, groupsOfLine(line, members, subjects, groups)),
   };
 }
 
@@ -185,8 +225,10 @@ export function saveSection(store, platform, data, user) {
   const syllabi = store.list('syllabi');
   const version = versionOf(syllabi, data.syllabusId);
   const subjects = store.list('subjects');
-  const rights = rightsOn(version, viewerOf(user, version, subjects));
-  if (!rights.see) throw new AppError('forbidden');
+  const lines = readTables(store, LINE_TABLES);
+  const viewer = viewerOf(user, lineOfVersion(lines.syllabusLines, version), lines.syllabusMembers, subjects);
+  const rights = rightsOn(version, viewer);
+  if (!rights.see || !worksOn(viewer)) throw new AppError('forbidden');
   if (!rights.edit) throw new AppError('syllabus_locked');
 
   const checked = checkSection(section, data.data, { half: version.semester });

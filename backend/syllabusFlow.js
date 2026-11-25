@@ -3,45 +3,58 @@
 import { AppError } from '../core/errors.js';
 import { LIMITS, plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
-import { approvalPlan, checkSubmit, rightsOn, versionsOf } from '../core/syllabusFlow.js';
+import { approvalPlan, checkSubmit, rightsOn } from '../core/syllabusFlow.js';
+import { lineSubjects, teachingOf, versionsOfLine } from '../core/syllabusLines.js';
 import { loadSettings, relayout, todayOf } from './scheduleData.js';
-import { groupsOfTeacher, heldErrors, readTables, versionOf, viewerOf } from './syllabusDraft.js';
+import { heldErrors, readTables, versionOf } from './syllabusDraft.js';
+import { LINE_TABLES, groupsOfLine, lineOfVersion, viewerOf } from './syllabusLines.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const isManager = (user) => user.roles.includes('admin') || user.roles.includes('dean');
 
+// The version of the request with its line and the sheets that decide who may do what: { syllabi, version, subjects, line, members }.
+function load(store, data) {
+  const syllabi = store.list('syllabi');
+  const version = versionOf(syllabi, data.syllabusId);
+  const subjects = store.list('subjects');
+  const lines = readTables(store, LINE_TABLES);
+  const line = lineOfVersion(lines.syllabusLines, version);
+  return { syllabi, version, subjects, line, members: lines.syllabusMembers };
+}
+
 // The rights of the user on the version for one action. Someone who may not even see the version, or who never does this action, gets `forbidden`;
-// someone who does it in general but not with a version in this status gets `syllabus_locked`.
-function allow(version, user, subjects, action) {
-  const viewer = viewerOf(user, version, subjects);
-  const rights = rightsOn(version, viewer);
+// someone who does it in general but not with a version in this status gets `syllabus_locked`. Only the author of the line (who teaches the discipline) submits.
+function allow(ctx, user, action) {
+  const viewer = viewerOf(user, ctx.line, ctx.members, ctx.subjects);
+  const rights = rightsOn(ctx.version, viewer);
   if (!rights.see) throw new AppError('forbidden');
-  const owner = viewer.roles.includes('teacher') && viewer.teaches && version.teacherId === user.id;
+  const owner = viewer.roles.includes('teacher') && viewer.teaches && viewer.part === 'author';
   const may = action === 'submit' ? isManager(user) || owner : isManager(user);
   if (!may) throw new AppError('forbidden');
   if (!rights[action === 'return' ? 'giveBack' : action]) throw new AppError('syllabus_locked');
 }
 
-// The checks before submitting and approving: the version against the approved one of its key and the held pairs.
-function examine(store, version, syllabi, subjects) {
+// The checks before submitting and approving: the version against the approved one of its line and the held pairs of every group of the line.
+function examine(store, ctx) {
+  const { version, line, members, subjects, syllabi } = ctx;
   const tables = readTables(store, DOC_TABLES);
   const pairs = store.list('pairs');
-  const { approved } = versionsOf(syllabi, { disciplineId: version.disciplineId, teacherId: version.teacherId, semester: version.semester });
+  const groups = store.list('groups');
+  const { approved } = versionsOfLine(syllabi, line.id);
   const rows = rowsOfVersion(tables, version.id);
   const previous = approved && approved.id !== version.id ? rowsOfVersion(tables, approved.id) : null;
-  const held = previous ? heldErrors(store, version, approved, rows, previous, pairs, subjects) : [];
-  return { tables, pairs, approved: previous ? approved : null, rows, previous, checks: checkSubmit(buildDoc(version, rows), held, groupsOfTeacher(version, subjects, store.list('groups'))) };
+  const held = previous ? heldErrors(store, { subjects, groups, line, members }, version, approved, rows, previous, pairs) : [];
+  return { tables, pairs, approved: previous ? approved : null, rows, previous, checks: checkSubmit(buildDoc(version, rows), held, groupsOfLine(line, members, subjects, groups)) };
 }
 
 // 'syllabus.submit' { syllabusId, dryRun? } -> { submitted, checks }
 export function submitSyllabus(store, platform, data, user) {
   const syllabusId = plainId(data.syllabusId);
   if (syllabusId === null || (data.dryRun !== undefined && typeof data.dryRun !== 'boolean')) throw new AppError('bad_request');
-  const syllabi = store.list('syllabi');
-  const version = versionOf(syllabi, syllabusId);
-  const subjects = store.list('subjects');
-  allow(version, user, subjects, 'submit');
-  const { checks } = examine(store, version, syllabi, subjects);
+  const ctx = load(store, data);
+  const { version } = ctx;
+  allow(ctx, user, 'submit');
+  const { checks } = examine(store, ctx);
   if (checks.errors.length > 0 || data.dryRun === true) return { submitted: false, checks };
   store.updateMany('syllabi', [{ id: version.id, patch: { status: 'review', submittedBy: user.id, submittedAt: todayOf(platform) } }]);
   return { submitted: true, checks };
@@ -51,11 +64,10 @@ export function submitSyllabus(store, platform, data, user) {
 export function approveSyllabus(store, platform, data, user) {
   const syllabusId = plainId(data.syllabusId);
   if (syllabusId === null) throw new AppError('bad_request');
-  const syllabi = store.list('syllabi');
-  const version = versionOf(syllabi, syllabusId);
-  const subjects = store.list('subjects');
-  allow(version, user, subjects, 'approve');
-  const { tables, pairs, approved, rows, previous, checks } = examine(store, version, syllabi, subjects);
+  const ctx = load(store, data);
+  const { version, syllabi, subjects, line, members } = ctx;
+  allow(ctx, user, 'approve');
+  const { tables, pairs, approved, rows, previous, checks } = examine(store, ctx);
   if (checks.errors.length > 0) return { approved: false, checks, changedPairs: 0 };
   const settings = loadSettings(store);                     // every read goes before the first write
 
@@ -67,8 +79,8 @@ export function approveSyllabus(store, platform, data, user) {
 
   // «Пары» go first, «Силлабусы» second: if the second write fails, the version stays open with the pairs already on its rows,
   // and «Утвердить» again finishes the job (approvalPlan moves nothing, the layout is the same).
-  const ids = subjects.filter((s) => s.disciplineId === version.disciplineId && s.teacherId === version.teacherId).map((s) => s.id);
-  const result = relayout(store, ids, { subjects, syllabi: after, topics: tables.topics, pairs: afterPairs, settings }, plan.pairs);
+  const ids = lineSubjects(subjects, line, members).map((s) => s.id);       // the groups of everybody who leads the line at this moment
+  const result = relayout(store, ids, { subjects, syllabi: after, syllabusMembers: members, topics: tables.topics, pairs: afterPairs, settings }, plan.pairs);
   store.updateMany('syllabi', plan.syllabi);
   return { approved: true, checks, changedPairs: result.changed };
 }
@@ -77,10 +89,9 @@ export function approveSyllabus(store, platform, data, user) {
 export function returnSyllabus(store, platform, data, user) {
   const syllabusId = plainId(data.syllabusId);
   if (syllabusId === null || typeof data.remark !== 'string') throw new AppError('bad_request');
-  const syllabi = store.list('syllabi');
-  const version = versionOf(syllabi, syllabusId);
-  const subjects = store.list('subjects');
-  allow(version, user, subjects, 'return');
+  const ctx = load(store, data);
+  const { version } = ctx;
+  allow(ctx, user, 'return');
   const remark = data.remark.trim();
   if (remark === '') throw new AppError('invalid', { fields: [{ field: 'remark', code: 'required' }] });
   if (remark.length > LIMITS.text) throw new AppError('invalid', { fields: [{ field: 'remark', code: 'too_long' }] });
@@ -89,6 +100,7 @@ export function returnSyllabus(store, platform, data, user) {
 }
 
 // 'syllabus.queue' { countOnly? } -> { today, count, rows } or { count }
+// A row names the author of the line ('' - the deanery) and the number of the teachers who lead the discipline on it now; teacherName is the old key of the same meaning.
 export function reviewQueue(store, platform, data) {
   if (data.countOnly !== undefined && typeof data.countOnly !== 'boolean') throw new AppError('bad_request');
   const queue = store.list('syllabi').filter((s) => s.status === 'review');
@@ -97,12 +109,16 @@ export function reviewQueue(store, platform, data) {
   const disciplines = store.list('disciplines');
   const staff = store.list('staff');
   const groups = store.list('groups');
+  const lines = readTables(store, LINE_TABLES);
   const nameOf = (rows, id, field) => (rows.find((r) => r.id === id) || {})[field] ?? '';
   const rows = queue.map((s) => {
-    const first = subjects.filter((x) => x.disciplineId === s.disciplineId && x.teacherId === s.teacherId)
-      .map((x) => ({ id: x.id, group: nameOf(groups, x.groupId, 'name') })).sort((a, b) => cmp(a.group, b.group) || cmp(a.id, b.id))[0];
+    const line = lines.syllabusLines.find((l) => l.id === s.lineId);
+    const authorName = line ? nameOf(staff, line.authorId, 'fullName') : nameOf(staff, s.teacherId, 'fullName');
+    const first = line ? lineSubjects(subjects, line, lines.syllabusMembers)
+      .map((x) => ({ id: x.id, group: nameOf(groups, x.groupId, 'name') })).sort((a, b) => cmp(a.group, b.group) || cmp(a.id, b.id))[0] : undefined;
     return {
-      syllabusId: s.id, subjectId: first ? first.id : '', disciplineName: nameOf(disciplines, s.disciplineId, 'name'), teacherName: nameOf(staff, s.teacherId, 'fullName'),
+      syllabusId: s.id, subjectId: first ? first.id : '', disciplineName: nameOf(disciplines, s.disciplineId, 'name'), teacherName: authorName, authorName,
+      members: line ? teachingOf(lines.syllabusMembers, line, subjects).length : 0,
       semester: s.semester, planSemester: s.planSemester ?? null, version: s.version, submittedAt: s.submittedAt ?? '', submittedByName: nameOf(staff, s.submittedBy, 'fullName'),
     };
   }).sort((a, b) => cmp(a.submittedAt, b.submittedAt) || cmp(a.disciplineName, b.disciplineName) || cmp(a.syllabusId, b.syllabusId));

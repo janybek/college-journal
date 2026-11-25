@@ -107,10 +107,10 @@ test('a syllabus of another semester only counts as otherSemester in the overvie
 test('reading: every sheet once, nothing written', () => {
   const { call, lists, calls, writes, reset, sb1, dean, teacher1, s1 } = ready();
   const overview = { subjects: 1, groups: 1, staff: 1, syllabi: 1, syllabusMembers: 1, topics: 1, pairs: 1, settings: 1, disciplines: 1 };
-  const page = { subjects: 1, groups: 1, staff: 1, syllabi: 1, syllabusMembers: 1, pairs: 1, settings: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1 };
+  const page = { subjects: 1, groups: 1, staff: 1, syllabi: 1, syllabusLines: 1, syllabusMembers: 1, pairs: 1, settings: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1 };
   for (const [action, data, token, expected] of [['syllabus.get', { subjectId: sb1 }, s1, page], ['syllabus.get', { subjectId: sb1 }, teacher1, page],
     ['syllabus.get', { subjectId: sb1, version: 'open' }, dean, page], ['subjects.overview', {}, dean, overview],
-    ['student.subjects', {}, s1, { subjects: 1, staff: 1, syllabi: 1 }]]) {
+    ['student.subjects', {}, s1, { subjects: 1, staff: 1, syllabi: 1, syllabusMembers: 1 }]]) {
     reset();
     assert.equal(call(action, data, token).ok, true);
     assert.deepEqual(lists, expected, action);

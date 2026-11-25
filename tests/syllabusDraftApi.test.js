@@ -258,13 +258,13 @@ test('speed: a section reads only its own sheets, each once; the form reads ever
     const answer = save(syllabusId, section, changed[section], teacher1);
     assert.equal(answer.ok, true, section + ' ' + JSON.stringify(answer));
     assert.equal(answer.data.lessons === null, !['plan', 'order'].includes(section), section);
-    assert.deepEqual(lists, { syllabi: 1, subjects: 1, ...own }, section);
+    assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, ...own }, section);
     assert.deepEqual([calls.get, calls.insert || 0, calls.update || 0, calls.remove || 0], [1, 0, 0, 0], section);
     assert.equal(Object.values(writes).every((n) => n === 1) && writes['updateMany:syllabi'] === 1, true, section);
   }
   reset();
   call('syllabus.form', { syllabusId }, teacher1);
-  assert.deepEqual([lists, writes], [{ subjects: 1, staff: 1, groups: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1 }, {}]);
+  assert.deepEqual([lists, writes], [{ subjects: 1, staff: 1, groups: 1, syllabi: 1, syllabusLines: 1, syllabusMembers: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1 }, {}]);
 });
 
 test('saveSection: the answer carries the section, the order of lessons, the flag and the date', () => {

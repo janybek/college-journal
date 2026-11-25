@@ -248,23 +248,23 @@ test('reads and writes', () => {
   const { call, store, id, attach, read, fill, reset, lists, writes, sb1, pairOf, dean, teacher1, teacher2, s1 } = env();
   reset();
   assert.equal(attach({}).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, files: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, files: 1 });
   assert.deepEqual(writes, { 'insertMany:files': 1, 'updateMany:syllabi': 1 });
   fill(id);
   call('syllabus.submit', { syllabusId: id }, teacher1);
   call('syllabus.approve', { syllabusId: id }, dean);
   reset();
   assert.equal(read(s1).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, files: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, files: 1 });
   assert.deepEqual(writes, {});
   reset();
   assert.equal(read(teacher1).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, files: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, files: 1 });
   const teacherId = store.list('staff').find((x) => x.login === 'teacher2').id;
   assert.equal(call('schedule.changePair', { id: pairOf(sb1, '2026-09-08').id, teacherId }, dean).ok, true);
   reset();
   assert.equal(read(teacher2).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, pairs: 1, files: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, pairs: 1, files: 1 });
   assert.deepEqual(writes, {});
 });
 
@@ -347,10 +347,10 @@ test('a student cannot hand in the id of a syllabus file as a work file; dropFil
 
   reset();
   assert.equal(call('syllabus.dropFile', { syllabusId: id }, teacher1).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1 });
   assert.deepEqual(writes, { 'updateMany:syllabi': 1 });
   reset();
   assert.equal(call('syllabus.dropFile', { syllabusId: id }, teacher1).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1 });
   assert.deepEqual(writes, {});
 });

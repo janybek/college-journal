@@ -45,12 +45,12 @@ export function failingOn(store, method, table) {
   return wrapper;
 }
 
-export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform) } = {}) {
+export function setup({ makeStore = (schema, platform) => createMemoryStore(schema, platform), files } = {}) {
   let clock = Date.UTC(2026, 7, 31, 6);
   const platform = createNodePlatform({ now: () => clock, secret: 'test-secret' });
   const store = makeStore(SCHEMA, platform);
   const spy = spyOn(store);
-  const ctx = { store: spy, platform, log: () => {} };
+  const ctx = { store: spy, platform, log: () => {}, files };
   const call = (action, data, token) => handleRequest(JSON.stringify({ action, data, token }), ctx);
   const ids = {};
   const names = {};
@@ -122,7 +122,7 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   };
   const snapshot = () => Object.fromEntries(Object.keys(SCHEMA).map((name) => [name, store.list(name)]));
   return {
-    store, spied: spy, spy, platform, call, ids, names, t, ds1, ds2, groups, sb1, sb2, sb3, sb4, FILE_A, FILE_B, at, publish, lineOf, share, hold, closeUnit,
+    store, files, spied: spy, spy, platform, call, ids, names, t, ds1, ds2, groups, sb1, sb2, sb3, sb4, FILE_A, FILE_B, at, publish, lineOf, share, hold, closeUnit,
     topicsOf, snapshot, failingOn: (method, table) => failingOn(store, method, table), oneJoined: () => oneJoined(store.list('syllabusMembers')),
   };
 }

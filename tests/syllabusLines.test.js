@@ -112,8 +112,8 @@ test('rightsOn by the place on the line', () => {
   assert.deepEqual(rightsOn({ ...draft, status: 'review' }, { id: 'x', roles: ['teacher'], teaches: true, part: 'author' }), R(true, false, false));
   // a dean who also teaches: the manager rights win
   assert.equal(rightsOn(draft, { id: 'x', roles: ['dean', 'teacher'], teaches: true, part: 'member' }).submit, true);
-  // TEMP task 3: without a part the owner of the old key is the author
-  assert.deepEqual(rightsOn(draft, { id: 't1', roles: ['teacher'], teaches: true }), R(true, true, true));
+  // a viewer without a part (undefined) is on no line: the owner of the old key column gets nothing
+  assert.deepEqual(rightsOn(draft, { id: 't1', roles: ['teacher'], teaches: true }), R(false, false, false));
   assert.deepEqual(rightsOn(draft, { id: 't2', roles: ['teacher'], teaches: true }), R(false, false, false));
 });
 
