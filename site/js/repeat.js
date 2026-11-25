@@ -59,8 +59,9 @@ export const enrolDraft = (candidate, subject, today) => ({
   kind: candidate.suggest || 'full', orderNo: '', orderDate: today, deadline: '', teacherId: subject.teacherId,
 });
 
-// How many sittings of the exam a student still has (for «остались пересдачи: N»); 0 when none.
-export const retakesLeft = (prev) => (prev.retakesLeft === true ? Math.max(0, EXAM_TRIES_MAX - (prev.tries || 0)) : 0);
+// How many retakes of the exam a student still has (for «остались пересдачи: N»); 0 when none.
+// The first sitting is not a retake, so at most EXAM_TRIES_MAX - 1 remain: tries 0 -> 2, 1 -> 2, 2 -> 1, 3 -> 0.
+export const retakesLeft = (prev) => (prev.retakesLeft === true ? Math.max(0, Math.min(EXAM_TRIES_MAX - 1, EXAM_TRIES_MAX - (prev.tries || 0))) : 0);
 
 export const dayOf = (date) => (typeof date === 'string' && date.length >= 10 ? `${date.slice(8, 10)}.${date.slice(5, 7)}.${date.slice(0, 4)}` : '');
 export const orderLine = (no, date) => (no ? { key: 'repeat.order', params: { no, date: dayOf(date) } } : null);

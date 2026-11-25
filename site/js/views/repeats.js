@@ -82,7 +82,7 @@ const options = (list) => list.map((value) => ({ value, label: value }));
 
 function body(teacher) {
   const { data } = state;
-  const mine = teacher ? data.repeats.filter((row) => row.own === true) : data.repeats;
+  const mine = filterRepeats(data.repeats, { own: teacher });
   if (mine.length === 0) {
     return emptyState('table',
       el('p', { class: 'empty__title', id: 'repeats-empty' }, t('repeat.empty')),

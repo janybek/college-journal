@@ -64,7 +64,9 @@ test('enrolDraft: the suggested kind, the date of today, the teacher of the subj
 
 test('retakesLeft and orderLine; the number of sittings is the one of the server', () => {
   assert.equal(EXAM_TRIES_MAX, EXAM.triesMax);
+  assert.equal(retakesLeft({ retakesLeft: true, tries: 0 }), 2);
   assert.equal(retakesLeft({ retakesLeft: true, tries: 1 }), 2);
+  assert.equal(retakesLeft({ retakesLeft: true, tries: 2 }), 1);
   assert.equal(retakesLeft({ retakesLeft: true, tries: 3 }), 0);
   assert.equal(retakesLeft({ retakesLeft: false, tries: 1 }), 0);
   assert.deepEqual(orderLine('45-А', '2026-11-20'), { key: 'repeat.order', params: { no: '45-А', date: '20.11.2026' } });
