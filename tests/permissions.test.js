@@ -203,3 +203,15 @@ test('repeat course rights', () => {
   assert.equal(can(['dean'], 'repeat.reopen'), false);
   assert.equal(can(['student'], 'repeat.list'), false);
 });
+
+test('directory details: dir.summary and dir.card', () => {
+  for (const action of ['dir.summary', 'dir.card']) {
+    for (const role of ['admin', 'dean', 'prorector']) {
+      for (const table of ['groups', 'rooms', 'disciplines']) assert.equal(can([role], action, table), true);
+    }
+    for (const table of ['students', 'staff', 'weekTemplate', undefined, ['groups']]) assert.equal(can(['dean'], action, table), false);
+    assert.equal(can(['teacher'], action, 'groups'), false);
+    assert.equal(can(['student'], action, 'groups'), false);
+  }
+  assert.ok(listPermissions(['prorector']).includes('dir.card:rooms'));
+});
