@@ -62,3 +62,29 @@ test('termNote', () => {
   assert.deepEqual(termNote({ term: 'exam' }), { key: 'dir.term.exam' });
   assert.deepEqual(termNote({ term: 'none' }), { key: 'dir.term.none' });
 });
+
+import { readFileSync } from 'node:fs';
+import { syllabusBadges, gridRows, FIRST_STUDENTS } from '../site/js/dirInfo.js';
+
+test('syllabusBadges', () => {
+  assert.deepEqual(syllabusBadges({ approved: true, open: 'returned' }), [
+    { key: 'home.syllabusState.approved', tone: 'success' },
+    { key: 'home.syllabusState.returned', tone: 'warning' },
+  ]);
+  assert.deepEqual(syllabusBadges({ approved: false, open: 'review' }), [{ key: 'home.syllabusState.review', tone: 'info' }]);
+  assert.deepEqual(syllabusBadges({ approved: true, open: 'draft' }).map((b) => b.tone), ['success', 'neutral']);
+  assert.deepEqual(syllabusBadges({ approved: false, open: null }), [{ key: 'home.syllabusState.none', tone: 'danger' }]);
+  assert.deepEqual(syllabusBadges(null), [{ key: 'home.syllabusState.none', tone: 'danger' }]);
+});
+
+test('gridRows: the bells, and pair numbers past them', () => {
+  assert.deepEqual(gridRows(['08:00', '09:40'], [{ slot: 3, startTime: '11:20' }, { slot: 1, startTime: '08:00' }]),
+    [{ slot: 1, time: '08:00' }, { slot: 2, time: '09:40' }, { slot: 3, time: '11:20' }]);
+  assert.deepEqual(gridRows(['08:00'], [{ slot: 1, startTime: '08:00' }]), [{ slot: 1, time: '08:00' }]);
+  assert.equal(FIRST_STUDENTS, 5);
+});
+
+test('dir.card.inactive has the four plural forms in Russian', () => {
+  const ru = readFileSync(new URL('../site/js/i18n/ru.js', import.meta.url), 'utf8');
+  for (const form of ['one', 'few', 'many', 'other']) assert.ok(ru.includes(`'dir.card.inactive.${form}'`), form);
+});

@@ -8642,3 +8642,47 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .dir-teachers__line { line-height: 1.35; }
 .dir-syllabi { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
 .dir-syllabi .badge { white-space: nowrap; }
+
+/* Cards of a group, a room and a discipline. */
+.card-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); color: var(--text-muted); font-size: 0.875rem; }
+.card-crumbs a { color: var(--text-muted); }
+.card-crumbs a:hover { color: var(--text); }
+.card-crumbs__here { color: var(--text); font-weight: 500; }
+.dir-now { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
+.dir-now .note { margin: 0; }
+.dir-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
+.dir-stat { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4); }
+.dir-stat__value { font-size: 1.75rem; line-height: 1.1; }
+.dir-stat__label, .dir-stat__small { font-size: 0.875rem; }
+.dir-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-4); align-items: start; margin-bottom: var(--space-5); }
+.dir-block { padding: 0; overflow: hidden; margin-bottom: var(--space-4); }
+.dir-columns .dir-block { margin-bottom: 0; }
+.dir-block__title { margin: 0; padding: var(--space-4); border-bottom: 1px solid var(--border); font-size: 1rem; }
+.dir-block__empty { margin: 0; padding: var(--space-4); }
+.dir-block .week-nav { padding: var(--space-3) var(--space-4); }
+.dir-students { list-style: none; margin: 0; padding: 0 var(--space-4); }
+.dir-students li { display: flex; justify-content: space-between; gap: var(--space-3); padding: var(--space-3) 0; border-bottom: 1px solid var(--border); }
+.dir-students__no { font-size: 0.875rem; }
+.dir-students__all { display: inline-block; margin: var(--space-3) var(--space-4); }
+.dir-syllabus-link { margin-left: var(--space-2); }
+.room-week { padding: 0 var(--space-4) var(--space-4); }
+.room-grid { width: 100%; min-width: 46rem; border-collapse: separate; border-spacing: var(--space-1); table-layout: fixed; }
+.room-grid th, .room-grid td { vertical-align: top; text-align: left; }
+.room-grid__corner, .room-grid__slot { width: 5.5rem; }
+.room-grid__day { padding: var(--space-2); background: var(--muted); border-radius: var(--radius-sm, 6px); font-size: 0.875rem; }
+.room-grid__day > * { margin-right: var(--space-2); }
+.room-grid__day.is-today { box-shadow: inset 0 2px 0 var(--primary); }
+.room-grid__slot { padding: var(--space-2) 0; font-weight: 500; font-size: 0.875rem; }
+.room-grid__pair, .room-grid__time { display: block; }
+.room-grid__cell { padding: 0; }
+.room-pair, .room-free { display: flex; flex-direction: column; gap: 2px; min-height: 3.5rem; padding: var(--space-2); border-radius: var(--radius-sm, 6px); }
+.room-pair { border: 1px solid var(--primary-line); background: var(--primary-wash); }
+.room-pair + .room-pair { margin-top: var(--space-1); }
+.room-free { border: 1px dashed var(--border); }
+.room-free__cancelled { font-size: 0.8125rem; }
+.room-pair__what { font-size: 0.875rem; }
+.room-pair__marks { display: flex; flex-wrap: wrap; gap: var(--space-1); }
+@media (max-width: 64rem) {
+  .dir-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dir-columns { grid-template-columns: minmax(0, 1fr); }
+}

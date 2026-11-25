@@ -67,3 +67,26 @@ export function termNote(summary) {
   if (term === 'none') return { key: 'dir.term.none' };
   return null;
 }
+
+// The labels of a syllabus of a subject in the cards: the approved one, then the open version when there is one.
+const OPEN_TONES = { review: 'info', returned: 'warning', draft: 'neutral' };
+export function syllabusBadges(syllabus) {
+  const badges = [];
+  if (syllabus?.approved) badges.push({ key: 'home.syllabusState.approved', tone: 'success' });
+  if (OPEN_TONES[syllabus?.open]) badges.push({ key: 'home.syllabusState.' + syllabus.open, tone: OPEN_TONES[syllabus.open] });
+  return badges.length > 0 ? badges : [{ key: 'home.syllabusState.none', tone: 'danger' }];
+}
+
+// The rows of the week of a room: every bell, and the numbers past the bells that some pair has (with its own time).
+export function gridRows(bells, pairs) {
+  const rows = bells.map((time, i) => ({ slot: i + 1, time }));
+  const extra = new Map();
+  for (const pair of pairs) {
+    if (pair.slot > bells.length && (!extra.has(pair.slot) || pair.startTime < extra.get(pair.slot))) extra.set(pair.slot, pair.startTime);
+  }
+  for (const slot of [...extra.keys()].sort((a, b) => a - b)) rows.push({ slot, time: extra.get(slot) });
+  return rows;
+}
+
+// The students a group card shows before «Все N студентов».
+export const FIRST_STUDENTS = 5;

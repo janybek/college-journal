@@ -271,3 +271,13 @@ test('resolveRoute: edit window of a record, and a screen opened on a group', ()
   assert.deepEqual(resolveRoute('#/schedule', office), { view: 'schedule', params: {} });
   assert.deepEqual(resolveRoute('#/journal', office), { view: 'journalList', params: {} });
 });
+
+test('resolveRoute: the card of a record needs dir.card of its table', () => {
+  const dean = { mustChangePassword: false, permissions: ['dir.card:groups', 'dir.list:students'] };
+  assert.deepEqual(resolveRoute('#/dir/groups/g1', dean), { view: 'dirCard', params: { table: 'groups', id: 'g1' } });
+  assert.deepEqual(resolveRoute('#/dir/groups/g%201', dean), { view: 'dirCard', params: { table: 'groups', id: 'g 1' } });
+  assert.equal(resolveRoute('#/dir/rooms/r1', dean).view, 'home');
+  assert.equal(resolveRoute('#/dir/students/x', dean).view, 'home');
+  assert.equal(resolveRoute('#/dir/groups/%E0%A4%A', dean).view, 'home');
+  assert.equal(resolveRoute('#/dir/groups/g1', { mustChangePassword: false, permissions: [] }).view, 'home');
+});

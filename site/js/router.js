@@ -1,5 +1,6 @@
 import { DIR_TABLES } from './views/directoryConfig.js';
 import { tabOf } from './syllabusForm.js';
+import { CARD_TABLES } from './dirInfo.js';
 
 // Maps the address (#/...) and the signed-in user to a screen. Pure: no DOM, no storage.
 // Tables such as weekTemplate are listed through dir.* too, but have screens of their own:
@@ -19,6 +20,9 @@ export function resolveRoute(hash, user) {
   // #/dir/<groups|rooms|disciplines>/<id>/edit: the edit window of a record; #/dir/students/group/<groupId>: the students of a group.
   const edit = /^\/dir\/(groups|rooms|disciplines)\/([^/]+)\/edit$/.exec(path);
   if (edit && permissions.includes('dir.save:' + edit[1]) && idOf(edit[2]) !== null) return { view: 'directory', params: { table: edit[1], editId: idOf(edit[2]) } };
+  // #/dir/<groups|rooms|disciplines>/<id>: the card of a record (the server checks dir.card itself).
+  const card = /^\/dir\/([^/]+)\/([^/]+)$/.exec(path);
+  if (card && CARD_TABLES.includes(card[1]) && permissions.includes('dir.card:' + card[1]) && idOf(card[2]) !== null) return { view: 'dirCard', params: { table: card[1], id: idOf(card[2]) } };
   const studentsOf = /^\/dir\/students\/group\/([^/]+)$/.exec(path);
   if (studentsOf && permissions.includes('dir.list:students') && idOf(studentsOf[1]) !== null) return { view: 'directory', params: { table: 'students', groupId: idOf(studentsOf[1]) } };
   if (path === '/import' && permissions.some((p) => p.startsWith('import.apply:'))) return { view: 'import', params: {} };
