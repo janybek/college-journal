@@ -175,6 +175,6 @@ export function repeatSheet(view, labels) {
     facts,
     head: [[t('ledger.print.no'), t('ledger.exam.date'), t('repeat.print.result'), t('ledger.attempt.commissionField')]],
     merges: [], body, low: [], counts: null, retakes: null,
-    signs: [signLine(t('ledger.print.signTeacher'), view.teacher.fullName), signLine(t('ledger.print.signDean'), '')],
+    signs: [signLine(t('ledger.print.signTeacher'), view.teacher.fullName), signLine(t('repeat.print.signDean'), '')],
   };
 }

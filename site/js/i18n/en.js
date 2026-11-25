@@ -2409,4 +2409,5 @@ export default {
   'journal.log.repeat.state.failed': 'failed',
   'journal.log.repeat.state.cancelled': 'cancelled',
   'journal.log.repeat.worksNote': 'Note on the works of the repeat: {before} → {after}',
+  'repeat.print.signDean': 'Dean',
 };

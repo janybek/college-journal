@@ -2409,4 +2409,5 @@ export default {
   'journal.log.repeat.state.failed': 'не сдал',
   'journal.log.repeat.state.cancelled': 'отменён',
   'journal.log.repeat.worksNote': 'Пояснение к работам повтора: {before} → {after}',
+  'repeat.print.signDean': 'Декан',
 };

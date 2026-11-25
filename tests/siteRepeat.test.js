@@ -230,7 +230,7 @@ test('repeatSheet: a closed repeat of the whole subject: 13 facts in order, the 
   assert.equal(sheet.retakes, null);
   assert.deepEqual(sheet.merges, []);
   assert.equal(sheet.signs[0], 'Преподаватель ____________ / Преподаватель Третий');
-  assert.equal(sheet.signs[1], 'Деканат ____________');
+  assert.equal(sheet.signs[1], 'Декан ____________');
 });
 
 test('repeatSheet: an open repeat is preliminary, without sittings one empty row; the result is empty', () => {
@@ -271,7 +271,7 @@ test('repeatSheet: no college name is an empty line; a name like a formula or a 
 
 test('the dictionaries have the keys of the sheet, the badge and the change log in three languages', () => {
   for (const dict of [ru, ky, en]) {
-    for (const key of ['title', 'draft', 'button', 'course', 'prevSemester', 'worksOf', 'total', 'totalOf', 'result', 'passed', 'failed']) assert.ok(dict['repeat.print.' + key], key);
+    for (const key of ['title', 'draft', 'button', 'course', 'prevSemester', 'worksOf', 'total', 'totalOf', 'result', 'passed', 'failed', 'signDean']) assert.ok(dict['repeat.print.' + key], key);
     for (const key of ['open', 'passed', 'failed']) assert.ok(dict['ledger.repeat.' + key], key);
     for (const field of ['enrol', 'orderNo', 'orderDate', 'deadline', 'teacher', 'works', 'try', 'status']) assert.ok(dict['journal.log.repeat.' + field], field);
     for (const kind of ['full', 'exam']) assert.ok(dict['journal.log.repeat.kind.' + kind], kind);

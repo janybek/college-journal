@@ -2409,4 +2409,5 @@ export default {
   'journal.log.repeat.state.failed': 'тапшырган жок',
   'journal.log.repeat.state.cancelled': 'жокко чыгарылды',
   'journal.log.repeat.worksNote': 'Кайталоонун иштерине түшүндүрмө: {before} → {after}',
+  'repeat.print.signDean': 'Декан',
 };
