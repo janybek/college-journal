@@ -195,9 +195,9 @@ test('ensureTables adds syllabi.fileId to a base without it; an old row reads it
   const { db } = tmpBase(t, { empty: true });
   ensureTables(SCHEMA, db);
   db.exec('DROP TABLE "syllabi"');
-  const oldColumns = SCHEMA.syllabi.columns.slice(0, -1);
+  const oldColumns = SCHEMA.syllabi.columns.slice(0, -3);
   db.exec(`CREATE TABLE "syllabi" (${oldColumns.map((c) => `"${c.key}" TEXT`).join(', ')}); INSERT INTO "syllabi" ("id", "goal") VALUES ('sy_1', 'Цель')`);
-  assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [['syllabi', 'fileId']] });
+  assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [['syllabi', 'fileId'], ['syllabi', 'lineId'], ['syllabi', 'sourceId']] });
   const store = createSqliteStore(SCHEMA, platform, db);
   assert.equal(store.get('syllabi', 'sy_1').fileId, '');
   assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
@@ -230,5 +230,24 @@ test('ensureTables on a unit 5 base adds the seven unit 6 tables and changeLog.r
   assert.deepEqual([row.requestId, row.examId], ['', '']);
   const id = store.insert('closures', { subjectId: 'sb_1', planSemester: 1, unit: 0, closedBy: 'st_1', closedAt: '2026-12-16 12:00:00' }).id;
   assert.equal(store.get('closures', id).reopenedAt, '');
+  assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
+});
+
+test('ensureTables on a base before the shared syllabus adds the line and member tables; syllabi get lineId and sourceId read as empty', (t) => {
+  const { db } = tmpBase(t, { empty: true });
+  ensureTables(SCHEMA, db);
+  db.exec('DROP TABLE "syllabi"; DROP TABLE "syllabusLines"; DROP TABLE "syllabusMembers"');
+  const oldColumns = SCHEMA.syllabi.columns.slice(0, -2);
+  db.exec(`CREATE TABLE "syllabi" (${oldColumns.map((c) => `"${c.key}" TEXT`).join(', ')}); INSERT INTO "syllabi" ("id", "goal") VALUES ('sy_1', 'Цель')`);
+  const result = ensureTables(SCHEMA, db);
+  assert.deepEqual(result.created, ['syllabusLines', 'syllabusMembers']);
+  assert.deepEqual(result.added, [['syllabi', 'lineId'], ['syllabi', 'sourceId']]);
+  const store = createSqliteStore(SCHEMA, platform, db);
+  const old = store.get('syllabi', 'sy_1');
+  assert.deepEqual([old.lineId, old.sourceId], ['', '']);
+  assert.deepEqual([store.list('syllabusLines'), store.list('syllabusMembers')], [[], []]);
+  const line = store.insert('syllabusLines', { disciplineId: 'ds_1', semester: 1, authorId: 'sf_1', createdBy: 'sf_1', createdAt: '2026-11-25 10:00:00' });
+  assert.match(line.id, /^sl_/);
+  assert.equal(store.insert('syllabusMembers', { lineId: line.id, disciplineId: 'ds_1', semester: 1, teacherId: 'sf_1', state: 'joined' }).id.startsWith('sm_'), true);
   assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
 });

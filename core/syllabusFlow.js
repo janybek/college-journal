@@ -11,11 +11,15 @@ const later = (a, b) => (!a || b.version > a.version || (b.version === a.version
 // The versions of one key «discipline + teacher + half of the year» -> { approved, open, last }.
 // approved: the row with status 'approved'; open: the row with a status of OPEN_STATUSES (rows or null); last: the greatest version number (0: none).
 export function versionsOf(syllabi, { disciplineId, teacherId, semester }) {
+  return versionsIn((syllabi || []).filter((s) => s.disciplineId === disciplineId && s.teacherId === teacherId && s.semester === semester));
+}
+
+// The same for rows already picked (by a key or by a line).
+export function versionsIn(rows) {
   let approved = null;
   let open = null;
   let last = 0;
-  for (const s of syllabi || []) {
-    if (s.disciplineId !== disciplineId || s.teacherId !== teacherId || s.semester !== semester) continue;
+  for (const s of rows || []) {
     last = Math.max(last, Number(s.version) || 0);
     if (s.status === 'approved') approved = later(approved, s);
     else if (OPEN_STATUSES.includes(s.status)) open = later(open, s);
@@ -28,18 +32,22 @@ export const EDITABLE_STATUSES = ['draft', 'returned'];
 const NO_RIGHTS = { see: false, edit: false, submit: false, approve: false, giveBack: false };
 const hasRole = (viewer, role) => Array.isArray(viewer.roles) && viewer.roles.includes(role);
 
-// What the viewer may do with a version. viewer: { id, roles (array), teaches (true: teaches the discipline now) }.
+// What the viewer may do with a version. viewer: { id, roles (array), teaches (true: teaches the discipline now),
+// part ('author' | 'member' | 'invited' | null: the place on the line of the version, from partOf) }.
 export function rightsOn(version, viewer) {
   if (!version || !viewer || typeof viewer !== 'object') return { ...NO_RIGHTS };
   const status = version.status;
   const manager = hasRole(viewer, 'admin') || hasRole(viewer, 'dean');
-  const owner = hasRole(viewer, 'teacher') && viewer.teaches === true && typeof viewer.id === 'string' && viewer.id !== '' && version.teacherId === viewer.id;
+  const teacher = hasRole(viewer, 'teacher') && viewer.teaches === true && typeof viewer.id === 'string' && viewer.id !== '';
+  // TEMP task 3: without a part the owner of the old key counts as the author
+  const part = viewer.part === undefined ? (teacher && version.teacherId === viewer.id ? 'author' : null) : viewer.part;
+  const worker = manager || (teacher && (part === 'author' || part === 'member'));
   let see = false;
   if (status === 'approved') see = true;
-  else if (OPEN_STATUSES.includes(status)) see = manager || owner || (hasRole(viewer, 'prorector') && (status === 'review' || status === 'returned'));
-  const worker = manager || owner;
+  else if (OPEN_STATUSES.includes(status)) see = worker || (teacher && part === 'invited') || (hasRole(viewer, 'prorector') && (status === 'review' || status === 'returned'));
   const edit = EDITABLE_STATUSES.includes(status) && worker;
-  return { see, edit, submit: edit, approve: manager && OPEN_STATUSES.includes(status), giveBack: manager && status === 'review' };
+  const submit = edit && (manager || part === 'author');
+  return { see, edit, submit, approve: manager && OPEN_STATUSES.includes(status), giveBack: manager && status === 'review' };
 }
 
 const byOrder = (a, b) => (a.order || 0) - (b.order || 0);
@@ -75,7 +83,8 @@ const pairOrder = (a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0) || 
 
 // Held pairs of the rows of the approved version against the copies of those rows in the new version.
 // closures + planSemester (of the approved version): a held pair of a unit that is closed now must stay in that unit.
-export function checkHeld(draftTopics, approvedTopics, pairs, closures = [], planSemester = null) {
+// withSubject: every error also names the subject of the pair whose date it names.
+export function checkHeld(draftTopics, approvedTopics, pairs, closures = [], planSemester = null, { withSubject = false } = {}) {
   const copies = copiesOf(draftTopics, approvedTopics);
   const held = new Map();
   for (const p of pairs || []) {
@@ -89,7 +98,7 @@ export function checkHeld(draftTopics, approvedTopics, pairs, closures = [], pla
     if (!mine) continue;
     held.delete(a.id);
     mine.sort(pairOrder);
-    const where = { name: a.name, date: mine[0].date };
+    const where = { name: a.name, date: mine[0].date, ...(withSubject ? { subjectId: mine[0].subjectId } : {}) };
     const copy = copies.get(a.id);
     if (!copy) errors.push({ section: 'plan', code: 'held_missing', ...where });
     else if (mine.some((p) => p.lessonType !== lessonTypeOf(copy))) errors.push({ section: 'plan', code: 'held_kind', ...where });
@@ -97,7 +106,7 @@ export function checkHeld(draftTopics, approvedTopics, pairs, closures = [], pla
       errors.push({ section: 'plan', code: 'held_hours', ...where, held: Math.max(...mine.map((p) => p.part)) * HOURS_PER_PAIR });
     } else if (copy.unit !== a.unit) {
       const shut = mine.find((p) => closedUnitsOf(closures, p.subjectId, planSemester).units.includes(a.unit));
-      if (shut) errors.push({ section: 'plan', code: 'held_closed', name: a.name, date: shut.date });
+      if (shut) errors.push({ section: 'plan', code: 'held_closed', name: a.name, date: shut.date, ...(withSubject ? { subjectId: shut.subjectId } : {}) });
     }
   }
   return errors;

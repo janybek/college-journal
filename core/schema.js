@@ -29,6 +29,7 @@ export const OPEN_REQUESTS = ['dean', 'prorector'];                             
 export const AUDIENCES = ['all', 'teachers', 'group'];
 export const REPEAT_KINDS = ['full', 'exam'];                          // весь предмет, только экзамен
 export const REPEAT_STATUSES = ['open', 'passed', 'failed', 'cancelled']; // идёт, сдал, не сдал, отменён
+export const MEMBER_STATES = ['invited', 'joined', 'left', 'declined', 'withdrawn'];   // приглашён, ведёт, вышел, отказался, приглашение отозвано
 
 const col =(key, title, type = 'string') => ({ key, title, type });
 
@@ -98,6 +99,7 @@ export const SCHEMA = {
       col('version', 'версия', 'int'), col('remark', 'замечание деканата'), col('submittedBy', 'отправил'), col('submittedAt', 'отправлен'),
       col('decidedBy', 'решение принял'), col('decidedAt', 'дата решения'), col('editedBy', 'правил'),
       col('manualOrder', 'порядок задан вручную', 'bool'), col('fileId', 'файл силлабуса'),
+      col('lineId', 'линия'), col('sourceId', 'копия версии'),
     ],
   },
   topics: {
@@ -260,6 +262,17 @@ export const SCHEMA = {
     sheet: 'Попытки экзамена повтора', prefix: 'rx',
     columns: [col('id', 'id'), col('repeatId', 'повтор'), col('no', 'номер попытки', 'int'), col('date', 'дата'), col('outcome', 'результат'),
       col('score', 'баллы', 'int'), col('commission', 'комиссия'), col('updatedBy', 'кто изменил'), col('updatedAt', 'когда изменено')],
+  },
+  syllabusLines: {
+    sheet: 'Линии силлабусов', prefix: 'sl',
+    columns: [col('id', 'id'), col('disciplineId', 'дисциплина'), col('semester', 'половина года', 'int'), col('authorId', 'автор'),
+      col('createdBy', 'кто завёл'), col('createdAt', 'когда заведена')],
+  },
+  syllabusMembers: {
+    sheet: 'Участники силлабусов', prefix: 'sm',
+    columns: [col('id', 'id'), col('lineId', 'линия'), col('disciplineId', 'дисциплина'), col('semester', 'половина года', 'int'),
+      col('teacherId', 'преподаватель'), col('state', 'состояние'), col('byId', 'кто позвал или добавил'), col('invitedAt', 'когда приглашён'),
+      col('joinedAt', 'когда вступил'), col('endedAt', 'когда вышел'), col('endedBy', 'кто завершил')],
   },
 };
 

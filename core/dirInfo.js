@@ -3,6 +3,7 @@ import { minutesOf, addMinutes, isTime, isDate } from './dates.js';
 import { PAIR_MINUTES } from './settings.js';
 import { versionsOf, rightsOn } from './syllabusFlow.js';
 import { compareNames } from './names.js';
+import { joinedLineId, versionsOfLine } from './syllabusLines.js';
 
 export const CARD_TABLES = ['groups', 'rooms', 'disciplines'];
 
@@ -53,8 +54,10 @@ export function topOf(items) {
 }
 
 // viewer: { id, roles }. The open version is shown only to those who may see it.
-export function syllabusState(syllabi, { disciplineId, teacherId, semester }, viewer) {
-  const { approved, open } = versionsOf(syllabi, { disciplineId, teacherId, semester });
+export function syllabusState(syllabi, { disciplineId, teacherId, semester }, viewer, members) {
+  const { approved, open } = members === undefined   // TEMP task 4
+    ? versionsOf(syllabi, { disciplineId, teacherId, semester })
+    : versionsOfLine(syllabi, joinedLineId(members, { disciplineId, teacherId, semester }));
   const visible = open && rightsOn(open, { ...viewer, teaches: false }).see;
   return { approved: approved !== null, open: visible ? open.status : null };
 }

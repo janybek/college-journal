@@ -7,17 +7,18 @@ test('tableNames lists tables in schema order', () => {
   assert.deepEqual(tableNames(), ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'translations', 'settings', 'weekTemplate',
     'syllabi', 'topics', 'units', 'outcomes', 'selfWork', 'literature', 'software', 'grading', 'rules', 'pairs',
     'attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files',
-    'closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts', 'repeats', 'repeatAttempts']);
+    'closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts', 'repeats', 'repeatAttempts',
+    'syllabusLines', 'syllabusMembers']);
 });
 
 test('journal tables, substitute column and statuses', () => {
-  assert.deepEqual(tableNames().slice(-16, -9), ['attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files']);
+  assert.deepEqual(tableNames().slice(-18, -11), ['attendance', 'unitResults', 'changeLog', 'checkins', 'assignments', 'submissions', 'files']);
   assert.deepEqual(SCHEMA.attendance.columns.map((c) => c.key), ['id', 'pairId', 'studentId', 'status', 'noCoat', 'activity', 'source', 'markedBy', 'markedAt']);
   assert.deepEqual(SCHEMA.unitResults.columns.map((c) => c.key), ['id', 'subjectId', 'studentId', 'planSemester', 'unit', 'control', 'self', 'currentManual', 'updatedBy', 'updatedAt']);
   assert.deepEqual(SCHEMA.changeLog.columns.map((c) => c.key), ['id', 'at', 'actorId', 'entity', 'subjectId', 'pairId', 'studentId', 'unit', 'field', 'before', 'after', 'reason', 'late', 'assignmentId', 'requestId', 'examId']);
   assert.deepEqual(SCHEMA.pairs.columns.slice(-7).map((c) => [c.key, c.type]), [['substitute', 'bool'], ['startedAt', 'string'], ['startedBy', 'string'],
     ['checkinUntil', 'string'], ['checkinClosed', 'bool'], ['finishedAt', 'string'], ['finishedBy', 'string']]);
-  assert.equal(tableNames().at(-3), 'examAttempts');
+  assert.equal(tableNames().at(-5), 'examAttempts');
   assert.deepEqual(SCHEMA.checkins.columns.map((c) => c.key), ['id', 'pairId', 'studentId', 'device', 'way', 'result', 'at']);
   assert.deepEqual([SCHEMA.checkins.sheet, SCHEMA.checkins.prefix], ['Отметки с телефона', 'ci']);
   assert.deepEqual([MARK_SOURCES, CHECKIN_WAYS, CHECKIN_RESULTS], [['teacher', 'code', 'qr', 'auto'], ['code', 'qr'], ['ok', 'wrong']]);
@@ -71,7 +72,7 @@ test('syllabi sheet, pair lesson columns and kinds', () => {
 
 test('syllabus version fields and section sheets', () => {
   assert.deepEqual(SCHEMA.syllabi.columns.map((c) => c.key).slice(11), ['department', 'faculty', 'academicYear', 'course', 'contacts', 'place', 'goal',
-    'status', 'version', 'remark', 'submittedBy', 'submittedAt', 'decidedBy', 'decidedAt', 'editedBy', 'manualOrder', 'fileId']);
+    'status', 'version', 'remark', 'submittedBy', 'submittedAt', 'decidedBy', 'decidedAt', 'editedBy', 'manualOrder', 'fileId', 'lineId', 'sourceId']);
   assert.deepEqual(SCHEMA.syllabi.columns.filter((c) => c.type !== 'string').map((c) => c.key),
     ['semester', 'planSemester', 'credits', 'totalHours', 'classHours', 'selfHours', 'course', 'version', 'manualOrder']);
   const sheet = (t) => [SCHEMA[t].sheet, SCHEMA[t].prefix, SCHEMA[t].columns.map((c) => c.key)];
@@ -90,7 +91,7 @@ test('syllabus version fields and section sheets', () => {
 });
 
 test('unit 5 tables: assignments, submissions, files, the work log column and the constants', () => {
-  assert.deepEqual(tableNames().slice(-13, -9), ['checkins', 'assignments', 'submissions', 'files']);
+  assert.deepEqual(tableNames().slice(-15, -11), ['checkins', 'assignments', 'submissions', 'files']);
   assert.deepEqual(SCHEMA.assignments.columns.map((c) => c.key), ['id', 'subjectId', 'kind', 'planSemester', 'unit', 'topicId', 'pairId', 'title', 'description', 'dueAt', 'maxPoints', 'createdBy', 'createdAt', 'updatedBy', 'updatedAt']);
   assert.deepEqual(SCHEMA.submissions.columns.map((c) => [c.key, c.type]).filter(([, t]) => t !== 'string'), [['n', 'int'], ['paper', 'bool'], ['points', 'int']]);
   assert.deepEqual(SCHEMA.files.columns.map((c) => c.key), ['id', 'assignmentId', 'submissionId', 'ownerId', 'state', 'name', 'kind', 'size', 'stored', 'at']);
@@ -101,7 +102,7 @@ test('unit 5 tables: assignments, submissions, files, the work log column and th
 });
 
 test('unit 6 tables: closures, requests, announcements, state exams, subject exams, attempts and the constants', () => {
-  assert.deepEqual(tableNames().slice(-10, -2), ['files', 'closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts']);
+  assert.deepEqual(tableNames().slice(-12, -4), ['files', 'closures', 'requests', 'announcements', 'stateExams', 'stateExamResults', 'subjectExams', 'examAttempts']);
   assert.deepEqual(SCHEMA.subjectExams.columns.map((c) => [c.key, c.type]), [['id', 'string'], ['subjectId', 'string'], ['planSemester', 'int'], ['date', 'string'], ['examiner', 'string'], ['assistants', 'string'], ['updatedBy', 'string'], ['updatedAt', 'string']]);
   assert.deepEqual(SCHEMA.examAttempts.columns.map((c) => c.key), ['id', 'subjectId', 'planSemester', 'studentId', 'no', 'date', 'outcome', 'score', 'commission', 'updatedBy', 'updatedAt']);
   assert.deepEqual(SCHEMA.examAttempts.columns.filter((c) => c.type !== 'string').map((c) => [c.key, c.type]), [['planSemester', 'int'], ['no', 'int'], ['score', 'int']]);
@@ -122,7 +123,7 @@ test('unit 6 tables: closures, requests, announcements, state exams, subject exa
 });
 
 test('repeat course tables: repeats, repeatAttempts and the constants', () => {
-  assert.deepEqual(tableNames().slice(-2), ['repeats', 'repeatAttempts']);
+  assert.deepEqual(tableNames().slice(-4, -2), ['repeats', 'repeatAttempts']);
   assert.deepEqual(SCHEMA.repeats.columns.map((c) => [c.key, c.type]), [['id', 'string'], ['studentId', 'string'], ['subjectId', 'string'], ['planSemester', 'int'],
     ['kind', 'string'], ['orderNo', 'string'], ['orderDate', 'string'], ['deadline', 'string'], ['teacherId', 'string'], ['prevSemester', 'int'], ['prevAdmitted', 'bool'],
     ['prevStatus', 'string'], ['prevExam', 'int'], ['prevTotal', 'int'], ['prevWord', 'string'], ['prevAttempts', 'string'], ['prevRepeatId', 'string'], ['works', 'int'],

@@ -186,11 +186,11 @@ test('hashes made inside the Apps Script bundle verify with the Node platform', 
 
 const SECTION_SHEETS = ['Юниты', 'Результаты обучения', 'СРС', 'Литература', 'Программное обеспечение', 'Оценивание', 'Правила'];
 
-test('setup creates all 35 sheets, adds seventeen columns to an old syllabus sheet and a second setup changes nothing', () => {
+test('setup creates all 37 sheets, adds nineteen columns to an old syllabus sheet and a second setup changes nothing', () => {
   const { gas, sandbox } = load();
   sandbox.setup();
   const [fresh] = gas.spreadsheets.values();
-  assert.equal(Object.keys(SCHEMA).length, 35);
+  assert.equal(Object.keys(SCHEMA).length, 37);
   for (const def of Object.values(SCHEMA)) assert.ok(fresh.getSheetByName(def.sheet), def.sheet);
   for (const name of SECTION_SHEETS) assert.ok(fresh.getSheetByName(name), name);
 
@@ -204,7 +204,7 @@ test('setup creates all 35 sheets, adds seventeen columns to an old syllabus she
   for (const name of SECTION_SHEETS) assert.ok(old.getSheetByName(name), name);
   const rows = old.dump('Силлабусы');
   assert.deepEqual(rows[0], SCHEMA.syllabi.columns.map((c) => c.title));
-  assert.equal(rows[0].length, 28);
+  assert.equal(rows[0].length, 30);
   assert.deepEqual(rows[1].slice(0, 11), ['sy_old', 'ds_1', 'sf_1', 1, 1, 'ИС', 3, 90, 60, 30, 'вчера']);
   assert.equal(rows[1].slice(11).every((v) => v === ''), true);
   const names = old.getSheets().map((s) => s.getName());
