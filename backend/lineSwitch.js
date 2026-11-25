@@ -8,7 +8,7 @@ import { NO_LESSON, inSemester } from '../core/topics.js';
 import { plainId } from '../core/syllabusSections.js';
 import { OPEN_STATUSES } from '../core/schema.js';
 import { compareNames } from '../core/names.js';
-import { DOC_TABLES } from '../core/syllabusDoc.js';
+import { DOC_TABLES, copyRows, rowsOfVersion } from '../core/syllabusDoc.js';
 import { copiesOf } from '../core/syllabusFlow.js';
 import { invitedOf, isLive, joinedLineId, joinedOf, partOf, successor, switchLock, teacherSubjects, teachingOf, versionsOfLine } from '../core/syllabusLines.js';
 import { relayout, todayOf } from './scheduleData.js';
@@ -187,6 +187,16 @@ function leaveCore(store, platform, lineId, who, actor, byActor) {
     const made = createDraft(store, platform, { line: target, approved, group: first ? first.g : null, userId: actor.id }, rows);
     version = made.version;
     written = made.rows.topics || [];
+  }
+  if (approved && broken && broken.version) {
+    // a copy found after a break may lack sheets (each sheet is one batch): write the missing ones whole before anything moves onto it
+    const source = copyRows(rowsOfVersion(rows, approved.id));
+    for (const name of DOC_TABLES) {
+      const have = rows[name].filter((r) => r.syllabusId === version.id).length;
+      if (have >= source[name].length) continue;
+      const added = store.insertMany(name, source[name].map((r) => ({ ...r, syllabusId: version.id })));
+      if (name === 'topics') written = added;
+    }
   }
   const copyTopics = written.length > 0 ? written : rows.topics.filter((t) => t.syllabusId === version.id);
 

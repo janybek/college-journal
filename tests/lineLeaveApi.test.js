@@ -330,3 +330,21 @@ test('leave and remove read each sheet once', () => {
   assert.equal(s.call('syllabus.remove', { lineId: L.id, teacherId: s.ids.t3 }, s.t.t1).ok, true);
   for (const table of LEAVE_TABLES) assert.ok((s.spy.lists[table] || 0) <= 1, `${table}: ${s.spy.lists[table]}`);
 });
+
+test('leave: a break while the copy is being written (any sheet) - the repeat completes the copy before the pairs move', () => {
+  const clean = base();
+  assert.equal(clean.s.call('syllabus.leave', { lineId: clean.L.id }, clean.s.t.t2).ok, true);
+  const expected = clean.s.topicsOf(clean.s.sb2);
+  for (const name of DOC_TABLES.filter((n) => clean.s.store.list(n).some((x) => x.syllabusId === clean.A.id))) {
+    const { s, L, A, lines, versions } = (() => { const b = leaveWith((x) => x.failingOn('insertMany', name)); return { ...b, A: approvedOf(b.s, b.L.id) }; })();
+    const r = s.call('syllabus.leave', { lineId: L.id }, s.t.t2);
+    assert.equal(r.ok, true, name + JSON.stringify(r));
+    assert.deepEqual([s.store.list('syllabusLines').length, s.store.list('syllabi').length], [lines + 1, versions + 1], name);
+    for (const t of DOC_TABLES) {
+      assert.equal(s.store.list(t).filter((x) => x.syllabusId === r.data.syllabusId).length, s.store.list(t).filter((x) => x.syllabusId === A.id).length, name + '/' + t);
+    }
+    assert.deepEqual(s.topicsOf(s.sb2), expected, name);
+    assert.equal(versionOf(s, r.data.syllabusId).status, 'approved', name);
+    assert.deepEqual(s.oneJoined(), [], name);
+  }
+});
