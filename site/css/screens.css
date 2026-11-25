@@ -8632,3 +8632,13 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .gr-before .badge { background: transparent; border-color: var(--border); color: var(--text-muted); font-size: 0.875rem; }
 .gr-before .gr-low__icon { display: none; }
 .gr-before .gr-unit { border-inline-start-color: var(--border); }
+
+/* Directory lists with figures (dir.summary): the name opens the card, long cells wrap instead of widening the page. */
+.dir-link { color: var(--primary-ink); text-decoration: none; }
+.dir-link:hover { text-decoration: underline; }
+.table td.dir-wrap { min-width: 9rem; max-width: 28rem; }
+.dir-inactive { font-size: 0.875rem; white-space: nowrap; }
+.dir-teachers { display: flex; flex-direction: column; gap: var(--space-1); }
+.dir-teachers__line { line-height: 1.35; }
+.dir-syllabi { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-2); }
+.dir-syllabi .badge { white-space: nowrap; }

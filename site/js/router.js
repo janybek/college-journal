@@ -16,6 +16,11 @@ export function resolveRoute(hash, user) {
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   const dir = /^\/dir\/([^/]+)$/.exec(path);
   if (dir && DIR_TABLES.includes(dir[1]) && permissions.includes('dir.list:' + dir[1])) return { view: 'directory', params: { table: dir[1] } };
+  // #/dir/<groups|rooms|disciplines>/<id>/edit: the edit window of a record; #/dir/students/group/<groupId>: the students of a group.
+  const edit = /^\/dir\/(groups|rooms|disciplines)\/([^/]+)\/edit$/.exec(path);
+  if (edit && permissions.includes('dir.save:' + edit[1]) && idOf(edit[2]) !== null) return { view: 'directory', params: { table: edit[1], editId: idOf(edit[2]) } };
+  const studentsOf = /^\/dir\/students\/group\/([^/]+)$/.exec(path);
+  if (studentsOf && permissions.includes('dir.list:students') && idOf(studentsOf[1]) !== null) return { view: 'directory', params: { table: 'students', groupId: idOf(studentsOf[1]) } };
   if (path === '/import' && permissions.some((p) => p.startsWith('import.apply:'))) return { view: 'import', params: {} };
   // #/syllabus/<subjectId>, #/syllabus/<subjectId>/<1|2>: the syllabus of a subject, in that semester of the year;
   // #/syllabus/<subjectId>/<1|2>/draft: its new version (the open one), not yet approved.
@@ -30,6 +35,11 @@ export function resolveRoute(hash, user) {
   const form = /^\/syllabus-form\/([^/]+)(?:\/([^/]+))?$/.exec(path);
   if (form && permissions.includes('syllabus.form')) return { view: 'syllabusForm', params: { syllabusId: form[1], tab: tabOf(form[2]) } };
   if (path === '/schedule' && permissions.includes('schedule.list')) return { view: 'schedule', params: {} };
+  // #/schedule/group/<groupId>: the week of that group; #/journal/group/<groupId>: the journals, that group chosen.
+  const scheduleOf = /^\/schedule\/group\/([^/]+)$/.exec(path);
+  if (scheduleOf && permissions.includes('schedule.list') && idOf(scheduleOf[1]) !== null) return { view: 'schedule', params: { groupId: idOf(scheduleOf[1]) } };
+  const journalsOf = /^\/journal\/group\/([^/]+)$/.exec(path);
+  if (journalsOf && permissions.includes('journal.list') && idOf(journalsOf[1]) !== null) return { view: 'journalList', params: { groupId: idOf(journalsOf[1]) } };
   // «Предметы» of the deanery: who teaches what and whose syllabus. Subjects are no longer an ordinary directory.
   if (path === '/subjects' && permissions.includes('subjects.overview')) return { view: 'subjects', params: {} };
   // «Силлабусы на утверждении»: the versions sent to the deanery.

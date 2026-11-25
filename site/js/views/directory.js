@@ -9,6 +9,7 @@ import {
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { DIRECTORIES, FIELDS, STAFF_ROLES } from './directoryConfig.js';
+import { cardHref, infoById, groupNowLabel, roomNowLabel, syllabusCountBadges, termNote } from '../dirInfo.js';
 
 // One directory (#/dir/<table>): a table with search, and dialogs to add, edit, delete and issue a new
 // password. Drawn from `state`, so a redraw (language switch, texts from the sheet) keeps typed values and an
@@ -19,15 +20,21 @@ const blank = (table) => ({
   rows: null,          // this directory's rows; null until loaded
   refs: {},            // rows of the directories this one shows by name: { groups, staff }
   loadErrorKey: null,
+  summary: null,       // the answer of dir.summary (figures of the extra columns); null: none, see summaryFailed
+  info: null,          // the same by record id
+  summaryFailed: false,
+  askedEdit: null,     // the id of the record whose edit window the address already opened
+  askedGroup: null,    // the group of the address the filter was already set from
   query: '',
   groupFilter: '',
   status: null,        // { key, params }: what the last action did
   freshId: null,       // the record saved last, marked in the table
-  dialog: null,        // { kind: 'edit' | 'remove' | 'reset' | 'password', ... }
+  dialog: null,        // { kind: 'edit' | 'remove' | 'reset' | 'password', ... }; an edit opened by address has `back`
 });
 let state = blank(null);
 
 const can = (action, table) => permissions().includes(`${action}:${table}`);
+const wantsInfo = (table) => DIRECTORIES[table].extra !== undefined && can('dir.summary', table);
 
 export function leave() {
   state = blank(null);
@@ -38,6 +45,7 @@ export function render(root, params) {
     state = blank(params.table);
     load(state);
   }
+  applyAddress(params);
   const { table } = state;
   const add = state.rows !== null && can('dir.save', table)
     ? el('button', { type: 'button', id: 'dir-add', class: 'button button--primary', onclick: () => openEdit(null) }, icon('plus'), t(`dir.${table}.add`))
@@ -52,16 +60,54 @@ async function load(owner) {
   const { table } = owner;
   const refs = DIRECTORIES[table].refs.filter((ref) => can('dir.list', ref));
   try {
+    // The figures are an extra: if they fail, the plain list is still shown.
+    const summary = wantsInfo(table) ? call('dir.summary', { table }).catch(() => null) : Promise.resolve(undefined);
     const [main, ...others] = await Promise.all([table, ...refs].map((name) => call('dir.list', { table: name })));
+    const figures = await summary;
     if (state !== owner) return;
     owner.rows = main.rows;
     refs.forEach((ref, i) => { owner.refs[ref] = others[i].rows; });
+    setSummary(owner, figures);
     owner.loadErrorKey = null;
   } catch (error) {
     if (state !== owner) return;
     owner.loadErrorKey = errorKey(error.code);
   }
   refresh();
+}
+
+function setSummary(owner, figures) {
+  owner.summary = figures ?? null;
+  owner.info = infoById(owner.summary);
+  owner.summaryFailed = figures === null;
+}
+
+// After a record was added or removed the figures are read again; a failure leaves the old ones.
+async function reloadSummary(owner) {
+  if (!wantsInfo(owner.table)) return;
+  try {
+    const figures = await call('dir.summary', { table: owner.table });
+    if (state !== owner) return;
+    setSummary(owner, figures);
+    refresh();
+  } catch (error) { /* the figures stay as they were */ }
+}
+
+// What the address asks for, once per value: the edit window of a record, a group to filter the students by.
+function applyAddress(params) {
+  if (state.rows === null) return;
+  const { table } = state;
+  if (params.editId === undefined) state.askedEdit = null;
+  else if (state.askedEdit !== params.editId) {
+    state.askedEdit = params.editId;
+    const row = state.rows.find((item) => item.id === params.editId);
+    if (row && can('dir.save', table)) state.dialog = editState(row, cardHref(table, row.id));
+    else location.replace('#/dir/' + table);
+  }
+  if (params.groupId !== undefined && state.askedGroup !== params.groupId) {
+    state.askedGroup = params.groupId;
+    if (DIRECTORIES[table].groupFilter) state.groupFilter = (state.refs.groups ?? []).some((group) => group.id === params.groupId) ? params.groupId : '';
+  }
 }
 
 function retry() {
@@ -164,9 +210,10 @@ function listing() {
   const withActions = rights.save || rights.remove || rights.reset;
   const isSelf = (row) => table === 'staff' && user.kind === 'staff' && row.id === user.id;
   const columns = shownColumns();
+  const extra = extraKeys();
 
   const lines = sortedRows().map((row) => line(row, { ...rights, remove: rights.remove && !isSelf(row) }, withActions));
-  const columnCount = columns.length + (isPerson(table) ? 1 : 0) + (withActions ? 2 : 1);
+  const columnCount = columns.length + extra.length + (isPerson(table) ? 1 : 0) + (withActions ? 2 : 1);
   const nothing = el('tr', { hidden: true }, el('td', { class: 'table__nothing', colspan: columnCount }, t('dir.nothingFound')));
   const count = el('p', { class: 'toolbar__count', 'aria-live': 'polite' });
 
@@ -185,8 +232,11 @@ function listing() {
       : t('dir.shown', { shown, count: lines.length });
   };
 
+  const term = termNote(state.summary);
   const notes = el('div', { class: 'notes', role: 'status' },
-    state.status ? note('success', t(state.status.key, state.status.params)) : null);
+    state.status ? note('success', t(state.status.key, state.status.params)) : null,
+    state.summaryFailed ? note('info', t('dir.info.unavailable')) : null,
+    term && extra.length > 0 ? note('info', t(term.key, term.params)) : null);
 
   if (lines.length === 0) {
     return el('div', { class: 'stack' },
@@ -208,6 +258,7 @@ function listing() {
   const head = el('tr', {},
     el('th', { scope: 'col', class: 'table__num' }, t('dir.number')),
     columns.map((key) => el('th', { scope: 'col', class: cellClass(key) }, t('field.' + key))),
+    extra.map((key) => el('th', { scope: 'col', class: extraClass(key) }, key === 'now' ? t('dir.col.now', { time: state.summary.time }) : t('dir.col.' + key))),
     isPerson(table) ? el('th', { scope: 'col' }, t('dir.status')) : null,
     withActions ? el('th', { scope: 'col', class: 'table__actions' }, el('span', { class: 'visually-hidden' }, t('dir.actions'))) : null);
   const tableEl = el('div', { class: 'table-scroll' },
@@ -225,15 +276,46 @@ function shownColumns() {
   return config.columns.filter((key) => key !== config.login);
 }
 
+// The extra columns (figures of dir.summary); none when the answer is missing.
+const extraKeys = () => (state.info === null ? [] : DIRECTORIES[state.table].extra ?? []);
+const extraClass = (key) => (key === 'students' || key === 'weekPairs' ? 'num' : 'dir-wrap');
+
+const muted = (text) => el('span', { class: 'muted' }, text);
+
+function extraCell(key, info) {
+  if (!info) return muted('—');
+  if (key === 'students') {
+    return el('span', {}, String(info.students), info.inactive > 0 ? el('span', { class: 'muted dir-inactive' }, ' ' + t('dir.inactiveShort', { count: info.inactive })) : null);
+  }
+  if (key === 'weekPairs') return String(info.weekPairs);
+  if (key === 'disciplines') return info.disciplines.length > 0 ? info.disciplines.join(', ') : muted(t('dir.none'));
+  if (key === 'now') {
+    const label = state.table === 'rooms' ? roomNowLabel(info.now) : groupNowLabel(info.now);
+    return badge(t(label.key, label.params), label.tone, true);
+  }
+  if (key === 'top') return info.top ? `${info.top.groupNames.join(', ')} · ${info.top.disciplineName}` : muted(t('dir.noPairs'));
+  if (key === 'teachers') {
+    if (info.teachers.length === 0) return muted(t('dir.nowhere'));
+    return el('span', { class: 'dir-teachers' }, info.teachers.map((item, i) => el('span', { class: i === 0 ? 'dir-teachers__line' : 'dir-teachers__line muted' },
+      `${item.groupNames.join(', ')} — ${item.teacherName}`)));
+  }
+  return el('span', { class: 'dir-syllabi' }, syllabusCountBadges(info.syllabi).map((item) => badge(t(item.key, { count: item.count }), item.tone)));
+}
+
 function line(row, rights, withActions) {
   const config = DIRECTORIES[state.table];
   const person = isPerson(state.table);
   const nameId = 'dir-name-' + row.id;
   const keys = shownColumns();
+  const linked = config.card === true && can('dir.card', state.table);
+  const nameCell = () => (linked
+    ? el('a', { class: 'table__label dir-link', id: nameId, href: cardHref(state.table, row.id) }, display(config.label, row))
+    : el('span', { class: 'table__label', id: nameId }, display(config.label, row)));
   const cells = keys.map((key) => el('td', { class: cellClass(key) },
     key !== config.label ? display(key, row)
       : person ? personCell(row, nameId, config.login)
-        : el('span', { class: 'table__label', id: nameId }, display(key, row))));
+        : nameCell()));
+  const figures = extraKeys().map((key) => el('td', { class: extraClass(key) }, extraCell(key, state.info.get(row.id))));
   const status = person ? el('td', {}, statusCell(row)) : null;
   const action = (kind, iconName, textKey, onClick, extra = '') => iconButton({
     id: `dir-${kind}-${row.id}`, iconName, label: t(textKey), onClick, className: 'row-action' + extra, attrs: { 'aria-describedby': nameId },
@@ -244,7 +326,7 @@ function line(row, rights, withActions) {
     rights.remove ? action('remove', 'trash', 'common.remove', () => openConfirm('remove', row), ' row-action--danger') : null) : null;
   const number = el('td', { class: 'table__num' });
   const classes = [person && row.active !== true ? 'is-inactive' : '', row.id === state.freshId ? 'is-fresh' : ''];
-  const tr = el('tr', { class: classes.filter(Boolean).join(' ') || null }, number, cells, status, actions);
+  const tr = el('tr', { class: classes.filter(Boolean).join(' ') || null }, number, cells, figures, status, actions);
   // Searchable text: what the cells say, without the initials of the avatar.
   const words = keys.map((key, i) => (key === config.label ? nameOf(row) : cells[i].textContent));
   if (person) words.push(String(row[config.login] ?? ''), status.textContent);
@@ -263,19 +345,27 @@ function closeDialog() {
   const d = state.dialog;
   if (!d) return;
   state.dialog = null;
+  if (d.back) {
+    location.replace(d.back);
+    return;
+  }
   refresh();
   focusById(d.returnId, 'dir-add', 'dir-search');
 }
 
-function openEdit(row) {
+function editState(row, back = null) {
   const values = {};
   for (const key of DIRECTORIES[state.table].form) values[key] = initialValue(key, row);
-  state.status = null;
-  state.freshId = null;
-  state.dialog = {
-    kind: 'edit', row, values, fieldErrors: {}, messageKey: null, busy: false,
+  return {
+    kind: 'edit', row, values, fieldErrors: {}, messageKey: null, busy: false, back,
     returnId: row ? 'dir-edit-' + row.id : 'dir-add',
   };
+}
+
+function openEdit(row) {
+  state.status = null;
+  state.freshId = null;
+  state.dialog = editState(row);
   refresh();
 }
 
@@ -383,7 +473,12 @@ async function save(d) {
       return;
     }
     owner.dialog = null;
+    if (d.back) {
+      location.replace(d.back);
+      return;
+    }
     owner.status = { key: 'dir.saved', params: { name } };
+    if (!d.row) reloadSummary(owner);
     refresh();
     focusById('dir-edit-' + saved.id, 'dir-add');
   } catch (error) {
@@ -461,6 +556,7 @@ async function removeRow(d) {
     owner.rows = owner.rows.filter((row) => row.id !== d.row.id);
     owner.dialog = null;
     owner.status = { key: 'dir.removed', params: { name } };
+    reloadSummary(owner);
     refresh();
     focusById('dir-add', 'dir-search');
   } catch (error) {

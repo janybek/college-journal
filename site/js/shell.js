@@ -229,7 +229,7 @@ function studentFrame(main, { onLang, onLogout }) {
 // The menu item of a screen. The syllabus page of a subject and its form belong to the deanery's «Предметы», and to the
 // teacher's «Мои предметы» (their home).
 function currentName(view, params, role) {
-  if (view === 'directory') return params.table;
+  if (view === 'directory' || view === 'dirCard') return params.table;
   // A journal of a subject belongs to the list of journals.
   if (view === 'journal') return 'journalList';
   if (view === 'task') return 'tasks';

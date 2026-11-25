@@ -244,3 +244,30 @@ test('resolveRoute: the repeats need repeat.list, one repeat card needs repeat.g
   assert.equal(resolveRoute('#/repeat/rp1', { mustChangePassword: false, permissions: ['repeat.list'] }).view, 'home');
   assert.equal(resolveRoute('#/repeat/rp1/x', staff).view, 'home');
 });
+
+test('resolveRoute: edit window of a record, and a screen opened on a group', () => {
+  const office = {
+    mustChangePassword: false,
+    permissions: ['dir.list:students', 'dir.save:groups', 'dir.save:rooms', 'dir.save:disciplines', 'schedule.list', 'journal.list'],
+  };
+  const none = { mustChangePassword: false, permissions: [] };
+  assert.deepEqual(resolveRoute('#/dir/groups/g1/edit', office), { view: 'directory', params: { table: 'groups', editId: 'g1' } });
+  assert.deepEqual(resolveRoute('#/dir/rooms/r%201/edit', office), { view: 'directory', params: { table: 'rooms', editId: 'r 1' } });
+  assert.deepEqual(resolveRoute('#/dir/disciplines/d1/edit', office), { view: 'directory', params: { table: 'disciplines', editId: 'd1' } });
+  assert.equal(resolveRoute('#/dir/groups/g1/edit', none).view, 'home');
+  assert.equal(resolveRoute('#/dir/staff/s1/edit', office).view, 'home');
+  assert.equal(resolveRoute('#/dir/groups/%E0%A4%A/edit', office).view, 'home');
+  assert.deepEqual(resolveRoute('#/dir/students/group/g1', office), { view: 'directory', params: { table: 'students', groupId: 'g1' } });
+  assert.equal(resolveRoute('#/dir/students/group/g1', none).view, 'home');
+  assert.equal(resolveRoute('#/dir/students/group/%E0%A4%A', office).view, 'home');
+  assert.equal(resolveRoute('#/dir/staff/group/x', office).view, 'home');
+  assert.deepEqual(resolveRoute('#/schedule/group/g%201', office), { view: 'schedule', params: { groupId: 'g 1' } });
+  assert.equal(resolveRoute('#/schedule/group/g1', none).view, 'home');
+  assert.equal(resolveRoute('#/schedule/group/%E0%A4%A', office).view, 'home');
+  assert.deepEqual(resolveRoute('#/journal/group/g1', office), { view: 'journalList', params: { groupId: 'g1' } });
+  assert.equal(resolveRoute('#/journal/group/g1', none).view, 'home');
+  assert.equal(resolveRoute('#/journal/group/%E0%A4%A', office).view, 'home');
+  assert.deepEqual(resolveRoute('#/dir/students', office), { view: 'directory', params: { table: 'students' } });
+  assert.deepEqual(resolveRoute('#/schedule', office), { view: 'schedule', params: {} });
+  assert.deepEqual(resolveRoute('#/journal', office), { view: 'journalList', params: {} });
+});

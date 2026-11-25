@@ -34,6 +34,8 @@ const blank = () => ({
   refs: null,          // { groups, teachers, rooms, bells, pairMinutes }; null until loaded
   refsErrorKey: null,
   refsPending: false,
+  askedGroup: null,    // the group of the address the view was already set from
+  wantedGroup: undefined,   // the group of the address, applied when the groups come
   mode: 'group',
   groupId: '',
   teacherId: '',
@@ -80,7 +82,9 @@ function restoreKept(owner) {
 const scopeOf = (s) => (s.mode === 'day' ? 'day' : s.mode + ':' + (s.mode === 'group' ? s.groupId : s.teacherId));
 const keyOf = (s) => scopeOf(s) + '@' + (s.mode === 'day' ? s.day : s.from);
 
-export function render(root) {
+export function render(root, params = {}) {
+  state.wantedGroup = params.groupId;
+  if (state.refs !== null) applyGroup(state, params.groupId);
   if (state.refs === null && state.refsErrorKey === null && !state.refsPending) loadRefs(state);
   root.append(pageHeader({ id: 'schedule-title', title: t('schedule.title'), lead: t(canChange() ? 'schedule.leadEdit' : 'schedule.lead') }));
   if (state.refs === null) {
@@ -96,6 +100,14 @@ export function render(root) {
       el('div', { class: 'toolbar schedule-toolbar' }, modeSwitch(), state.mode === 'day' ? dayTools() : weekTools()),
       body()));
   if (state.dialog) showModal(root, dialogFor(state.dialog));
+}
+
+// #/schedule/group/<groupId>: the week of that group, whatever view was kept; a group that is gone changes nothing.
+function applyGroup(owner, groupId) {
+  if (groupId === undefined || owner.askedGroup === groupId) return;
+  owner.askedGroup = groupId;
+  if (!owner.refs.groups.some((group) => group.id === groupId)) return;
+  Object.assign(owner, { mode: 'group', groupId, from: null, day: null });
 }
 
 async function loadRefs(owner) {
@@ -118,6 +130,7 @@ async function loadRefs(owner) {
     owner.groupId = owner.refs.groups[0]?.id ?? '';
     owner.teacherId = owner.refs.teachers[0]?.id ?? '';
     restoreKept(owner);
+    applyGroup(owner, owner.wantedGroup);
     owner.refsErrorKey = null;
   } catch (error) {
     if (state !== owner) return;

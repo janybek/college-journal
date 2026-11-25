@@ -19,6 +19,7 @@ const blank = () => ({
   loadErrorKey: null,
   ticket: 0,
   groupId: '',         // the group chosen above the table; '' — every group
+  askedGroup: null,    // the group of the address the choice was already set from
 });
 let state = blank();
 
@@ -26,7 +27,11 @@ export function leave() {
   state = blank();
 }
 
-export function render(root) {
+export function render(root, params = {}) {
+  if (params.groupId !== undefined && state.askedGroup !== params.groupId) {
+    state.askedGroup = params.groupId;
+    state.groupId = params.groupId;   // a group that is not in the list is dropped when the table is drawn
+  }
   if (state.data === null && !state.loading && state.loadErrorKey === null) load();
   const teacher = activeRole(getUser()) === 'teacher';
   root.append(

@@ -44,8 +44,12 @@ export const FIELDS = {
 
 // label: the field that names a record (dialog titles, confirmations, sorting).
 // login: the field a person signs in with. refs: other directories whose names the table shows.
+// card: the name opens the card of the record. extra: columns with figures from dir.summary, after the ordinary ones.
 export const DIRECTORIES = {
-  groups: { label: 'name', columns: ['name', 'course'], form: ['name', 'course'], refs: [] },
+  groups: {
+    label: 'name', columns: ['name', 'course'], form: ['name', 'course'], refs: [],
+    card: true, extra: ['students', 'disciplines', 'weekPairs', 'now'],
+  },
   students: {
     label: 'fullName', login: 'cardNo', refs: ['groups'], groupFilter: true,
     columns: ['fullName', 'groupId', 'cardNo', 'lang'],
@@ -56,6 +60,6 @@ export const DIRECTORIES = {
     columns: ['fullName', 'login', 'roles', 'lang'],
     form: ['fullName', 'login', 'roles', 'lang', 'active'],
   },
-  disciplines: { label: 'name', columns: ['name'], form: ['name'], refs: [] },
-  rooms: { label: 'name', columns: ['name'], form: ['name'], refs: [] },
+  disciplines: { label: 'name', columns: ['name'], form: ['name'], refs: [], card: true, extra: ['teachers', 'syllabi'] },
+  rooms: { label: 'name', columns: ['name'], form: ['name'], refs: [], card: true, extra: ['weekPairs', 'top', 'now'] },
 };

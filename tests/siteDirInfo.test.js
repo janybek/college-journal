@@ -1,0 +1,64 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import {
+  CARD_TABLES, cardHref, infoById, groupNowLabel, roomNowLabel, syllabusCountBadges, fullDate, termNote,
+} from '../site/js/dirInfo.js';
+
+test('cardHref and the tables with a card', () => {
+  assert.deepEqual(CARD_TABLES, ['groups', 'rooms', 'disciplines']);
+  assert.equal(cardHref('groups', 'g 1'), '#/dir/groups/g%201');
+  assert.equal(cardHref('rooms', 'r1'), '#/dir/rooms/r1');
+});
+
+test('infoById: a map by id, null stays null', () => {
+  assert.equal(infoById(null), null);
+  const map = infoById({ rows: [{ id: 'a', weekPairs: 1 }, { id: 'b', weekPairs: 2 }] });
+  assert.equal(map.get('b').weekPairs, 2);
+  assert.equal(map.get('x'), undefined);
+});
+
+test('groupNowLabel', () => {
+  assert.deepEqual(groupNowLabel({ state: 'busy', until: '10:30', roomName: '101' }), { key: 'dir.now.busy', params: { until: '10:30', room: '101' }, tone: 'success' });
+  assert.deepEqual(groupNowLabel({ state: 'busy', until: '10:30', roomName: '' }), { key: 'dir.now.busyNoRoom', params: { until: '10:30' }, tone: 'success' });
+  assert.deepEqual(groupNowLabel({ state: 'next', at: '11:20', roomName: '7' }), { key: 'dir.now.next', params: { at: '11:20', room: '7' }, tone: 'info' });
+  assert.deepEqual(groupNowLabel({ state: 'next', at: '11:20' }), { key: 'dir.now.nextNoRoom', params: { at: '11:20' }, tone: 'info' });
+  assert.deepEqual(groupNowLabel({ state: 'done' }), { key: 'dir.now.done', params: {}, tone: 'neutral' });
+  assert.deepEqual(groupNowLabel({ state: 'none' }), { key: 'dir.now.none', params: {}, tone: 'neutral' });
+  assert.deepEqual(groupNowLabel(null), { key: 'dir.now.none', params: {}, tone: 'neutral' });
+});
+
+test('roomNowLabel', () => {
+  assert.deepEqual(roomNowLabel({ state: 'busy', until: '10:30', groupName: '01-1' }), { key: 'dir.room.busy', params: { until: '10:30', group: '01-1' }, tone: 'warning' });
+  assert.deepEqual(roomNowLabel({ state: 'free', until: '13:30' }), { key: 'dir.room.free', params: { until: '13:30' }, tone: 'success' });
+  assert.deepEqual(roomNowLabel({ state: 'freeRest' }), { key: 'dir.room.freeRest', params: {}, tone: 'success' });
+  assert.deepEqual(roomNowLabel({ state: 'freeDay' }), { key: 'dir.room.freeDay', params: {}, tone: 'success' });
+});
+
+test('syllabusCountBadges', () => {
+  assert.deepEqual(syllabusCountBadges({ approved: 1, review: 0, returned: 1, draft: 0, none: 2 }), [
+    { key: 'dir.syllabi.approved', count: 1, tone: 'success' },
+    { key: 'dir.syllabi.returned', count: 1, tone: 'warning' },
+    { key: 'dir.syllabi.none', count: 2, tone: 'danger' },
+  ]);
+  assert.deepEqual(syllabusCountBadges({ approved: 0, review: 3, returned: 0, draft: 4, none: 0 }), [
+    { key: 'dir.syllabi.review', count: 3, tone: 'info' },
+    { key: 'dir.syllabi.draft', count: 4, tone: 'neutral' },
+  ]);
+  assert.deepEqual(syllabusCountBadges({ approved: 0, review: 0, returned: 0, draft: 0, none: 0 }), [{ key: 'dir.syllabi.nothing', count: 0, tone: 'neutral' }]);
+});
+
+test('fullDate', () => {
+  assert.equal(fullDate('2026-09-01'), '01.09.2026');
+  assert.equal(fullDate('сентябрь'), 'сентябрь');
+  assert.equal(fullDate(undefined), '');
+});
+
+test('termNote', () => {
+  assert.equal(termNote({ rows: [] }), null);
+  assert.equal(termNote({ term: 'on' }), null);
+  assert.equal(termNote(null), null);
+  assert.deepEqual(termNote({ term: 'before', semesterStart: '2026-09-01' }), { key: 'dir.term.before', params: { date: '01.09.2026' } });
+  assert.deepEqual(termNote({ term: 'after', semesterEnd: '2027-01-20' }), { key: 'dir.term.after', params: { date: '20.01.2027' } });
+  assert.deepEqual(termNote({ term: 'exam' }), { key: 'dir.term.exam' });
+  assert.deepEqual(termNote({ term: 'none' }), { key: 'dir.term.none' });
+});
