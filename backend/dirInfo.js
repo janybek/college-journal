@@ -4,7 +4,7 @@ import { readSettings, readExtra } from '../core/settings.js';
 import { localDate, localTime, isDate, mondayOf, addDays } from '../core/dates.js';
 import { isSubstitution } from '../core/schedule.js';
 import { compareNames } from '../core/names.js';
-import { ownLines } from '../core/disciplineSyllabus.js';
+import { mainLine, ownLines, waitingHalves } from '../core/disciplineSyllabus.js';
 import { CARD_TABLES, pairEnd, nowOf, termOf, topOf, syllabusState, syllabusCounts } from '../core/dirInfo.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -269,7 +269,16 @@ function disciplineCard(c, discipline) {
       weekPairs: template.get(s.id) || 0,
     };
   }).sort(byName('groupName'));
-  return { table: 'disciplines', currentSemester: c.settings.semester, discipline: { id: discipline.id, name: discipline.name }, rows };
+  // the short part about the syllabus of the discipline (the full one is in «Documents»); what the viewer may see of the open versions
+  const lines = read('syllabusLines');
+  const main = mainLine(lines, discipline.id);
+  const syllabus = {
+    waiting: waitingHalves(lines, discipline.id).length > 0,
+    responsibleName: main && staff.get(main.responsibleId) ? staff.get(main.responsibleId).fullName : '',
+    dueDate: main ? main.dueDate || '' : '',
+    halves: [1, 2].map((semester) => ({ semester, ...syllabusState(read('syllabi'), { disciplineId: discipline.id, teacherId: '', semester }, c.viewer, lines) })),
+  };
+  return { table: 'disciplines', currentSemester: c.settings.semester, discipline: { id: discipline.id, name: discipline.name }, syllabus, rows };
 }
 
 export function dirCard(store, platform, user, data) {

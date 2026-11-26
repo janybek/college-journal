@@ -295,6 +295,7 @@ export function publishSyllabusDoc(store, platform, subjectId, doc, user, title 
   }
   // one approval for the first half approves every started half of the line; the others are only checked
   const [firstHalf, ...rest] = written.list;
+  if (!firstHalf) throw new Error('publishSyllabusDoc: the file made no draft');
   const done = approveSyllabus(store, platform, { syllabusId: firstHalf.syllabusId }, user);
   if (!done.approved) throw new Error('publishSyllabusDoc: ' + JSON.stringify(done.checks.errors));
   const status = new Map(store.list('syllabi').map((s) => [s.id, s.status]));

@@ -1,9 +1,11 @@
 // The syllabus of a discipline on the server: which line a version is on, what a person is on it, where a new draft goes and the view of the line
-// for the screens. Pure functions over rows the request has already read (the only writes are the ones of openLine). No Node or Apps Script objects here.
+// for the screens. Functions over rows the request has already read; the writes are those of openLine, assignResponsible and setReviewDue. No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
 import { compareNames } from '../core/names.js';
-import { localDateTime } from '../core/dates.js';
-import { draftTarget, lineSubjects, partOf, teacherSubjects } from '../core/disciplineSyllabus.js';
+import { isDate, localDateTime } from '../core/dates.js';
+import { plainId } from '../core/syllabusSections.js';
+import { draftTarget, lineSubjects, mainLine, partOf, reviewRows, teacherSubjects, waitingHalves } from '../core/disciplineSyllabus.js';
+import { rolesOf } from './users.js';
 
 export const LINE_TABLES = ['syllabusLines'];
 
@@ -97,8 +99,58 @@ export function lineView(rows, line, user, subject = null) {
   }
   const teachers = [...byTeacher].map(([id, names]) => ({ id, fullName: nameOf(id), groups: names.sort(compareNames) }))
     .sort((a, b) => compareNames(a.fullName, b.fullName) || cmp(a.id, b.id));
+  const waiting = waitingHalves(rows.syllabusLines, line.disciplineId);
+  const manager = isManagerUser(user);
   return {
     id: line.id, disciplineId: line.disciplineId, kind: line.kind, responsibleId: line.responsibleId || '', responsibleName: nameOf(line.responsibleId),
+    dueDate: line.dueDate || '', reviewDue: line.reviewDue || '', waiting,
     teachers, mine: partOf(line, user.id, rows.subjects, rows.syllabusLines),
+    can: { assign: manager, setReviewDue: manager, choose: manager && waiting.length > 0 },
   };
+}
+
+const isDay = (value) => value === '' || isDate(value);
+const isManagerRoles = (user) => Array.isArray(user.roles) && (user.roles.includes('admin') || user.roles.includes('dean'));
+
+// 'syllabus.assign' { disciplineId, teacherId, dueDate } -> { line }: the responsible for the syllabus of the discipline and the date of its development
+// (teacherId '' - nobody; dueDate '' - no date). Writes the 'main' row of the discipline (made when it is not there). «Силлабусы» and «Пары» are not read.
+export function assignResponsible(store, platform, data, user) {
+  const disciplineId = plainId(data.disciplineId);
+  const teacherId = data.teacherId === '' ? '' : plainId(data.teacherId);
+  if (disciplineId === null || teacherId === null || typeof data.dueDate !== 'string' || !isDay(data.dueDate)) throw new AppError('bad_request');
+  if (!isManagerRoles(user)) throw new AppError('forbidden');
+  if (!store.list('disciplines').some((d) => d.id === disciplineId)) throw new AppError('not_found');
+  const lines = store.list('syllabusLines');
+  if (lines.some((l) => l.kind === 'own' && l.disciplineId === disciplineId)) throw new AppError('choose_first');
+  const staff = store.list('staff');
+  if (teacherId !== '') {
+    const person = staff.find((r) => r.id === teacherId);
+    if (!person || person.active === false || !rolesOf(person, 'staff').includes('teacher')) throw new AppError('not_teacher');
+  }
+  const main = mainLine(lines, disciplineId);
+  let line;
+  if (main) {
+    [line] = store.updateMany('syllabusLines', [{ id: main.id, patch: { responsibleId: teacherId, dueDate: data.dueDate } }]);
+  } else {
+    [line] = store.insertMany('syllabusLines', [{
+      disciplineId, kind: 'main', semester: null, teacherId: '', responsibleId: teacherId, dueDate: data.dueDate, reviewDue: '',
+      createdBy: user.id, createdAt: localDateTime(platform.now()),
+    }]);
+  }
+  const after = lines.some((l) => l.id === line.id) ? lines.map((l) => (l.id === line.id ? line : l)) : [...lines, line];
+  return { line: lineView({ syllabusLines: after, subjects: store.list('subjects'), staff, groups: store.list('groups') }, line, user) };
+}
+
+// 'syllabus.setReviewDue' { lineId, date } -> { line }: the date by which the deanery looks at the versions of the line on approval ('' clears it).
+export function setReviewDue(store, platform, data, user) {
+  const lineId = plainId(data.lineId);
+  if (lineId === null || typeof data.date !== 'string' || !isDay(data.date)) throw new AppError('bad_request');
+  if (!isManagerRoles(user)) throw new AppError('forbidden');
+  const lines = store.list('syllabusLines');
+  const found = lines.find((l) => l.id === lineId);
+  if (!found || found.kind === 'archived') throw new AppError('not_found');
+  if (reviewRows(store.list('syllabi'), found.id).length === 0) throw new AppError('syllabus_locked');
+  const [line] = store.updateMany('syllabusLines', [{ id: found.id, patch: { reviewDue: data.date } }]);
+  const after = lines.map((l) => (l.id === line.id ? line : l));
+  return { line: lineView({ syllabusLines: after, subjects: store.list('subjects'), staff: store.list('staff'), groups: store.list('groups') }, line, user) };
 }

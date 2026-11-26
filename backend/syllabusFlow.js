@@ -45,6 +45,12 @@ function commonNumber(targets, syllabi, lineId) {
   return 1 + Math.max(0, ...syllabi.filter((s) => s.lineId === lineId).map((s) => Number(s.version) || 0));
 }
 
+// The dates of the line after the decision of the deanery: written only when there is something to clear (a repeated «approve» leaves them as they are).
+function clearDates(store, line, patch) {
+  const filled = Object.keys(patch).filter((key) => line[key]);
+  if (filled.length > 0) store.updateMany('syllabusLines', [{ id: line.id, patch: Object.fromEntries(filled.map((key) => [key, ''])) }]);
+}
+
 // The checks before submitting and approving, per target: the version against the approved one of its half of the line and the held pairs of every group of the line.
 // Several targets: every error and warning names its half. -> { pairs, parts: [{ version, approved, rows, previous }], checks }
 function examine(store, ctx, tables, targets) {
@@ -122,6 +128,7 @@ export function approveSyllabus(store, platform, data, user) {
   const ids = [...new Set(targets.flatMap((s) => lineSubjects(subjects, line, lines, s.semester)).map((s) => s.id))];   // the groups that follow the line in these halves at this moment
   const result = relayout(store, ids, { subjects, syllabi: after, syllabusLines: lines, topics: tables.topics, pairs: afterPairs, settings }, movedPairs);
   store.updateMany('syllabi', patches);
+  clearDates(store, line, { dueDate: '', reviewDue: '' });
   return { approved: true, checks, changedPairs: result.changed, halves };
 }
 
@@ -137,17 +144,19 @@ export function returnSyllabus(store, platform, data, user) {
   if (remark.length > LIMITS.text) throw new AppError('invalid', { fields: [{ field: 'remark', code: 'too_long' }] });
   const targets = withRequest(reviewRows(syllabi, line.id), version);
   store.updateMany('syllabi', targets.map((s) => ({ id: s.id, patch: { status: 'returned', remark, decidedBy: user.id, decidedAt: todayOf(platform) } })));
+  clearDates(store, line, { reviewDue: '' });
   return { returned: true, halves: targets.map((s) => s.semester) };
 }
 
 // 'syllabus.queue' { countOnly? } -> { today, count, rows } or { count }
-// The versions on approval of the lines that are not a history. teacherName: the responsible (the syllabus of the discipline) or the teacher (an old own one), '' - nobody.
+// The versions on approval of the lines that are not a history; count is the number of lines (two halves of one line are one decision). teacherName: the responsible (the syllabus of the discipline) or the teacher (an old own one), '' - nobody.
 export function reviewQueue(store, platform, data) {
   if (data.countOnly !== undefined && typeof data.countOnly !== 'boolean') throw new AppError('bad_request');
   const lines = store.list('syllabusLines');
   const lineOf = new Map(lines.map((l) => [l.id, l]));
   const queue = store.list('syllabi').filter((s) => s.status === 'review' && !(lineOf.has(s.lineId) && lineOf.get(s.lineId).kind === 'archived'));
-  if (data.countOnly === true) return { count: queue.length };
+  const lineCount = new Set(queue.map((s) => s.lineId || s.id)).size;
+  if (data.countOnly === true) return { count: lineCount };
   const subjects = store.list('subjects');
   const disciplines = store.list('disciplines');
   const staff = store.list('staff');
@@ -159,9 +168,10 @@ export function reviewQueue(store, platform, data) {
       .map((x) => ({ id: x.id, group: nameOf(groups, x.groupId, 'name') })).sort((a, b) => cmp(a.group, b.group) || cmp(a.id, b.id))[0] : undefined;
     const who = !line ? s.teacherId : line.kind === 'main' ? line.responsibleId : line.teacherId;
     return {
-      syllabusId: s.id, subjectId: first ? first.id : '', disciplineName: nameOf(disciplines, s.disciplineId, 'name'), teacherName: nameOf(staff, who, 'fullName'),
+      syllabusId: s.id, lineId: s.lineId || '', disciplineId: s.disciplineId, reviewDue: line ? line.reviewDue || '' : '',
+      subjectId: first ? first.id : '', disciplineName: nameOf(disciplines, s.disciplineId, 'name'), teacherName: nameOf(staff, who, 'fullName'),
       semester: s.semester, planSemester: s.planSemester ?? null, version: s.version, submittedAt: s.submittedAt ?? '', submittedByName: nameOf(staff, s.submittedBy, 'fullName'),
     };
   }).sort((a, b) => cmp(a.submittedAt, b.submittedAt) || cmp(a.disciplineName, b.disciplineName) || cmp(a.syllabusId, b.syllabusId));
-  return { today: todayOf(platform), count: rows.length, rows };
+  return { today: todayOf(platform), count: lineCount, rows };
 }

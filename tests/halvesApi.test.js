@@ -154,9 +154,11 @@ test('approving moves only the pairs of the current half; held pairs keep their 
   const held = s.hold(s.sb1, '2026-09-01');
   const name = (id) => (s.store.list('topics').find((t) => t.id === id) || {}).name;
   const before = [name(held.topicId), held.lessonType, held.part];
+  const chemistry = JSON.stringify(s.store.list('pairs').filter((p) => p.subjectId === s.sb4));      // another discipline
   const id1 = start();
   const done = s.call('syllabus.approve', { syllabusId: id1 }, s.t.dean).data;
   assert.equal(done.approved, true);
+  assert.equal(JSON.stringify(s.store.list('pairs').filter((p) => p.subjectId === s.sb4)), chemistry);
   const after = s.store.list('pairs').find((p) => p.id === held.id);
   assert.deepEqual([name(after.topicId), after.lessonType, after.part, after.status], [...before, 'closed']);
   assert.equal(after.topicId !== held.topicId, true);          // on the copy of the same topic

@@ -4,7 +4,7 @@ import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core
 import { readSettings } from '../../core/settings.js';
 import { USER_TABLES } from '../users.js';
 import { teacherHandover } from '../../core/schedule.js';
-import { lineFor, versionsOfLine } from '../../core/disciplineSyllabus.js';
+import { lineFor, partOf, versionsOfLine } from '../../core/disciplineSyllabus.js';
 import { rightsOn } from '../../core/syllabusFlow.js';
 import { viewerOf } from '../syllabusLines.js';
 import { dirSummary, dirCard } from '../dirInfo.js';
@@ -194,13 +194,14 @@ function mySubjects(data, ctx, user) {
     const line = lineId === null ? null : lines.find((l) => l.id === lineId);
     const { approved, open } = line ? versionsOfLine(syllabi, line.id, half) : { approved: null, open: null };
     const seen = open && rightsOn(open, viewerOf(user, line, all, lines)).see ? open : null;
+    const part = line ? partOf(line, user.id, all, lines) : null;
     return {
       id: s.id,
       name: s.name,
       groupId: s.groupId,
       groupName: group ? group.name : '',
       studentCount: students.filter((st) => st.groupId === s.groupId).length,
-      syllabus: { approved: approved !== null, open: seen ? seen.status : null },
+      syllabus: { approved: approved !== null, open: seen ? seen.status : null, ...(part !== null ? { mine: part } : {}) },
     };
   });
   return { subjects };

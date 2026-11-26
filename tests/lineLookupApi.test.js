@@ -21,7 +21,7 @@ test('every module finds the syllabus of a group by the syllabus of its discipli
     assert.notEqual(s.call('work.list', { subjectId: sb }, s.t[who]).error?.code, 'no_syllabus');
   }
   assert.equal(s.call('student.grades', {}, s.t.s2).data.subjects.find((x) => x.subjectId === s.sb2).hasSyllabus, true);
-  assert.deepEqual(s.call('teacher.mySubjects', {}, s.t.t2).data.subjects[0].syllabus, { approved: true, open: null });
+  assert.deepEqual(s.call('teacher.mySubjects', {}, s.t.t2).data.subjects[0].syllabus, { approved: true, open: null, mine: 'teaches' });
   const overview = s.call('subjects.overview', {}, s.t.dean).data.rows;
   assert.deepEqual(overview.filter((r) => r.disciplineId === s.ds1).map((r) => r.syllabusStatus), ['approved', 'approved', 'approved']);
   assert.deepEqual(s.call('dir.summary', { table: 'disciplines' }, s.t.dean).data.rows.find((r) => r.id === s.ds1).syllabi, { approved: 1, review: 0, returned: 0, draft: 0, none: 0 });
@@ -113,7 +113,7 @@ test('the transfer of a base made by the earlier code: what changes is what the 
     journal: [[true, AUTUMN], [true, AUTUMN], [true, AUTUMN]],
     ledger: [true, true, true, false],
     grades: [[['Анатомия', true], ['Химия', false]], [['Анатомия', true]], [['Анатомия', true]]],
-    mySubjects: [[{ approved: true, open: 'draft' }], [{ approved: true, open: 'draft' }], [{ approved: true, open: 'draft' }]],
+    mySubjects: [[{ approved: true, open: 'draft', mine: 'responsible' }], [{ approved: true, open: 'draft', mine: 'teaches' }], [{ approved: true, open: 'draft', mine: 'teaches' }]],
     // changes: the spring syllabus of t2 became the spring syllabus of the discipline, so every row of the discipline has «other semester»
     overview: [['Анатомия', 'Сотрудник t1', 'approved', 'draft', true, 5], ['Анатомия', 'Сотрудник t2', 'approved', 'draft', true, 5],
       ['Анатомия', 'Сотрудник t3', 'approved', 'draft', true, 5], ['Химия', 'Сотрудник t4', 'none', null, false, 0]],

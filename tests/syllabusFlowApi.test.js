@@ -195,11 +195,11 @@ test('the other half of the year: approving it lays no spring pair; the semester
 });
 
 test('the queue: versions under review for the deanery, the administrator and the prorector', () => {
-  const { call, reset, lists, writes, syllabusId, sb1, teacher1, dean, prorector, s1 } = ready();
+  const { call, store, reset, lists, writes, syllabusId, sb1, teacher1, dean, prorector, s1 } = ready();
   call('syllabus.submit', { syllabusId }, teacher1);
   reset();
   const queue = call('syllabus.queue', {}, prorector).data;
-  assert.deepEqual([queue.count, queue.rows], [1, [{ syllabusId, subjectId: sb1, disciplineName: 'Информатика', teacherName: 'teacher1', semester: 1, planSemester: 1,
+  assert.deepEqual([queue.count, queue.rows], [1, [{ syllabusId, lineId: store.get('syllabi', syllabusId).lineId, disciplineId: store.get('syllabi', syllabusId).disciplineId, reviewDue: '', subjectId: sb1, disciplineName: 'Информатика', teacherName: 'teacher1', semester: 1, planSemester: 1,
     version: 1, submittedAt: '2026-08-31', submittedByName: 'teacher1' }]]);
   assert.deepEqual([lists, writes], [{ syllabi: 1, subjects: 1, disciplines: 1, staff: 1, groups: 1, syllabusLines: 1 }, {}]);
   reset();

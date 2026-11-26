@@ -240,8 +240,8 @@ test('statuses in the lists: the overview of the deanery and the subjects of a t
   assert.deepEqual([row().open, row(prorector).open], ['draft', null]);                         // the prorector does not see drafts
   call('syllabus.submit', { syllabusId: open }, teacher1);
   assert.deepEqual([row().syllabusStatus, row().open, row(prorector).open, call('subjects.overview', {}, dean).data.reviewCount], ['approved', 'review', 'review', 1]);
-  assert.deepEqual(call('teacher.mySubjects', {}, teacher1).data.subjects.map((x) => x.syllabus), [{ approved: true, open: 'review' }, { approved: true, open: 'review' }]);
-  assert.deepEqual(call('teacher.mySubjects', {}, teacher2).data.subjects.map((x) => x.syllabus), [{ approved: false, open: null }]);
+  assert.deepEqual(call('teacher.mySubjects', {}, teacher1).data.subjects.map((x) => x.syllabus), [{ approved: true, open: 'review', mine: 'responsible' }, { approved: true, open: 'review', mine: 'responsible' }]);
+  assert.deepEqual(call('teacher.mySubjects', {}, teacher2).data.subjects.map((x) => x.syllabus), [{ approved: false, open: null, mine: 'responsible' }]);
   // speed: «My subjects» reads every sheet once and writes nothing
   reset();
   call('teacher.mySubjects', {}, teacher1);

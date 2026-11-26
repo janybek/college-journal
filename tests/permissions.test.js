@@ -84,6 +84,7 @@ test('a file fills the draft: the deanery, the administrator and a teacher (of h
       'lesson.mine', 'lesson.get', 'lesson.start', 'lesson.endCheckin', 'lesson.finish',
       'schedule.mine', 'syllabus.apply', 'syllabus.attachFile', 'syllabus.dropFile', 'syllabus.file', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects',
       'work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save',
+      'docs.discipline', 'docs.syllabi',
       'announce.list', 'announce.remove', 'announce.save', 'ledger.addAttempt', 'ledger.closeFinal', 'ledger.closeUnit', 'ledger.get', 'ledger.list', 'ledger.saveExam',
       'repeat.close', 'repeat.get', 'repeat.list', 'repeat.saveAttempt', 'repeat.saveWorks',
       'request.create', 'request.mine', 'request.withdraw', 'stateExam.get', 'stateExam.list'].sort());
@@ -116,6 +117,8 @@ test('syllabus form actions by role', () => {
   for (const action of ['syllabus.startDraft', 'syllabus.saveSection', 'syllabus.submit']) assert.deepEqual(who(action), [true, true, false, true, false], action);
   assert.deepEqual([who('syllabus.form'), who('syllabus.approve'), who('syllabus.return'), who('syllabus.queue')],
     [[true, true, true, true, false], [true, true, false, false, false], [true, true, false, false, false], [true, true, true, false, false]]);
+  for (const action of ['syllabus.assign', 'syllabus.setReviewDue']) assert.deepEqual(who(action), [true, true, false, false, false], action);
+  for (const action of ['docs.syllabi', 'docs.discipline']) assert.deepEqual(who(action), [true, true, true, true, false], action);
 });
 
 test('phone check-in: the pass is public, lessons are for the teacher, marks for the student, the table is closed to directories and import', () => {
