@@ -62,3 +62,5 @@
 - Task 7 review (sonnet, strict, probe scratchpad/probe.mjs): принять, no Critical/Important.
 - Task 7: minor (deferred): idOf lets a whitespace-only id through (#/dir/students/%20 → personCard, server answers not_found) — same for all cards, harmless; room 101 no before/after shot (code moved verbatim per diff).
 - Task 7: complete (commits 5d1fa19..fe10a81, review clean); waiting for owner acceptance of block 2.
+- **Block 2 (task 7) accepted by the owner 26.11.2026** («Принимаю»), no remarks; the «— —» of a repeat card without marks left as is. Coordinator stand stopped.
+- Next: new coordinator chat (rule 6б) → task 8 step 1, final review (opus, strict), deferred minors of tasks 1–7 and the flaky test included.
