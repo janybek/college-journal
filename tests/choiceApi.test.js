@@ -343,3 +343,13 @@ test('syllabus.startDraft + choose: the deanery starts the other half with nobod
   assert.equal(s.main(s.ds1).responsibleId, s.ids.t1);
   assert.deepEqual(s.oneMain(), []);
 });
+
+test('syllabus.choose: a break of the write that archives the lines and fills the responsible is mended by the same request', () => {
+  const { s, A } = world();
+  s.call('syllabus.startDraft', { subjectId: s.sb3, semester: 2 }, s.t.dean);
+  assert.equal(s.main(s.ds1).responsibleId, '');
+  const request = JSON.stringify({ action: 'syllabus.choose', data: { disciplineId: s.ds1, semester: 1, lineId: A.id }, token: s.t.dean });
+  assert.equal(handleRequest(request, { store: s.failingOn('updateMany', 'syllabusLines'), platform: s.platform, log: () => {} }).ok, false);
+  assert.equal(code(chooseOf(s, A)({})), 'ok');
+  assert.deepEqual([s.main(s.ds1).responsibleId, s.oneMain()], [s.ids.t1, []]);
+});

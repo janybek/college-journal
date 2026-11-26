@@ -127,8 +127,7 @@ export function chooseSyllabus(store, platform, data, user) {
   const laid = relayout(store, ofDiscipline.map((s) => s.id), { subjects, syllabi: afterSyllabi, syllabusLines: afterLines, topics, pairs, settings }, []);
   // 3. «Силлабусы», 4. «Силлабусы дисциплин»
   if (patches.length > 0) store.updateMany('syllabi', patches);
-  const retired = [...lost, ...merged].map((l) => ({ id: l.id, patch: { kind: 'archived' } }));
+  const retired = [...(filled ? [filled] : []), ...[...lost, ...merged].map((l) => ({ id: l.id, patch: { kind: 'archived' } }))];
   if (retired.length > 0) store.updateMany('syllabusLines', retired);
-  if (filled) store.updateMany('syllabusLines', [filled]);
   return { chosen: true, resolved, changedPairs: laid.changed };
 }
