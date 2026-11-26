@@ -296,7 +296,7 @@ function readOnlyKey() {
 // submitting, a tab carries the number of its errors (or of its warnings).
 function tabs() {
   const counts = checkTabs(state.checks);
-  return el('nav', { class: 'sform-tabs', 'aria-label': t('sform.tabs') },
+  return el('nav', { class: 'sform-tabs', 'data-to-top': 'saved', 'aria-label': t('sform.tabs') },
     el('ol', { class: 'sform-tabs__list' }, TABS.map((tab, i) => {
       const dirty = isDirty(tab, state.doc, state.saved);
       const count = counts.get(tab);

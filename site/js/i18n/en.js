@@ -16,6 +16,7 @@ export default {
   'common.logout': 'Sign out',
   'common.toHome': 'Back to home',
   'common.retry': 'Try again',
+  'common.toTop': 'Back to top',
   'common.show': 'Show',
   'common.hide': 'Hide',
   'common.loading': 'Loading…',

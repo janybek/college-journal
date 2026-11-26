@@ -16,6 +16,7 @@ export default {
   'common.logout': 'Выйти',
   'common.toHome': 'На главную',
   'common.retry': 'Попробовать снова',
+  'common.toTop': 'Наверх',
   'common.show': 'Показать',
   'common.hide': 'Скрыть',
   'common.loading': 'Загрузка…',

@@ -48,8 +48,8 @@ export function boundField(ctx, { id, key, kind = 'input', label, hint = null, h
   }
   return el('div', { class: ('field ' + className).trim() },
     el('label', { class: hideLabel ? 'visually-hidden' : 'field__label', for: id }, label),
-    hint ? el('p', { class: 'field__hint', id: hintId }, hint) : null,
     control,
+    hint ? el('p', { class: 'field__hint', id: hintId }, hint) : null,
     code ? el('p', { class: 'field__error', id: errorId }, icon('alert'), ctx.errorText(key, code)) : null);
 }
 

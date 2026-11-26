@@ -16,6 +16,7 @@ export default {
   'common.logout': 'Чыгуу',
   'common.toHome': 'Башкы бетке',
   'common.retry': 'Кайра аракет кылуу',
+  'common.toTop': 'Жогору',
   'common.show': 'Көрсөтүү',
   'common.hide': 'Жашыруу',
   'common.loading': 'Жүктөлүүдө…',

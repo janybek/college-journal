@@ -8705,3 +8705,40 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .dir-syllabus .doc-halves { gap: 0; }
 .dir-syllabus__who { margin: 0; font-size: 0.875rem; }
 .dir-syllabus .dir-syllabus-link { margin-left: 0; justify-self: start; }
+
+/* The switches and the buttons of the sections of a syllabus (page and form): a visible outline round the track,
+   and the shown one filled, so they read on a white page too. The colours are the --chip-* variables of app.css. */
+.syllabus-switch__links,
+.version-switch,
+.sform-halves,
+.sform-tabs {
+  border: 1px solid var(--chip-line);
+}
+
+.syllabus-switch__links .segmented__button,
+.version-switch .segmented__button,
+.sform-halves .segmented__button,
+.sform-tab {
+  color: var(--chip-text);
+}
+
+.syllabus-switch__links .segmented__button:hover,
+.version-switch .segmented__button:hover,
+.sform-halves .segmented__button:hover,
+.sform-tab:hover { color: var(--text); }
+
+.syllabus-switch__links .segmented__button[aria-current="page"],
+.version-switch .segmented__button[aria-current="page"],
+.sform-halves .segmented__button[aria-current="page"],
+.sform-tab[aria-current="page"] {
+  border: 1px solid var(--chip-on-line);
+  background: var(--chip-on-bg);
+  color: var(--chip-on-text);
+}
+
+.syllabus-toc__link { border-color: var(--chip-line); }
+
+/* The semester that is on, inside the filled (shown) button: the lamp and the words take the button's own text colour. */
+.semester-tab[aria-current="page"] .semester-tab__now { color: var(--chip-on-text); }
+
+.semester-tab[aria-current="page"] .semester-tab__now::before { box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.28); }

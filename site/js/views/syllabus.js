@@ -670,7 +670,7 @@ function sections(view) {
 // «Разделы»: a button for each section shown; it scrolls to the section and puts focus on its title. (The address
 // is the screen, so the sections are not links.)
 function contents(sections) {
-  return el('nav', { class: 'syllabus-toc', 'aria-label': t('syllabus.toc') },
+  return el('nav', { class: 'syllabus-toc', 'data-to-top': '', 'aria-label': t('syllabus.toc') },
     el('p', { class: 'syllabus-toc__title' }, t('syllabus.toc')),
     el('ol', { class: 'syllabus-toc__list' }, sections.map(({ name, titleKey }) => el('li', {},
       el('button', {
