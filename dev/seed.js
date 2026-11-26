@@ -5,6 +5,8 @@ import { readSplit } from '../core/scoring.js';
 import { markText, pointsText } from '../core/requests.js';
 import { parseSyllabus } from '../core/syllabusFile.js';
 import { generateSchedule, relayout, todayOf } from '../backend/scheduleData.js';
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
+import { assignResponsible, setReviewDue } from '../backend/syllabusLines.js';
 import { publishSyllabusDoc, uploadSyllabus } from '../backend/syllabusUpload.js';
 import { draftForm, saveSection, startDraft } from '../backend/syllabusDraft.js';
 import { journalView, lastOf, readJournalRows, savePairMarks, saveUnitResults, writeMarks, writeUnitResult } from '../backend/journalData.js';
@@ -189,6 +191,78 @@ function seedSyllabi(store, platform, subjects, teacherName, adminRow) {
   if (!submitSyllabus(store, platform, { syllabusId: anatomy }, admin).submitted) throw new Error('seed: the anatomy syllabus is not submitted');
 }
 
+// The chemistry syllabus (fictional): four lessons in two units.
+const CHEMISTRY_PLAN = { units: [
+  { title: 'Общая химия', lecture: [{ name: 'Строение вещества', hours: 2 }], practice: [{ name: 'Растворы и их концентрация', hours: 2 }] },
+  { title: 'Органическая химия', lecture: [{ name: 'Углеводороды', hours: 2 }], practice: [{ name: 'Спирты и кислоты', hours: 2 }] },
+] };
+
+// Topics of the old version of «Физиология» of one teacher (fictional): the rows «Темы» as the earlier build kept them (no line).
+const PHYSIOLOGY_TOPICS = {
+  teacher2: ['Физиология крови', 'Сердечный цикл', 'Дыхание и газообмен', 'Пищеварение'],
+  teacher3: ['Кровь и её функции', 'Работа сердца и давление', 'Лёгочная вентиляция', 'Обмен веществ'],
+};
+
+// The states of the syllabus of a discipline, besides those of seedSyllabi (all fictional, the dates count from today of the stand):
+//   «Анатомия» (on review): the deanery wrote the date of the review two days before today - it is late;
+//   «Химия» (teacher2, 01-1): the responsible is teacher2, the version is on review, the date of the review is today + 5;
+//   «Биология» (teacher3, 02-1): no syllabus, the responsible is teacher3, the date of the development is today + 10;
+//   «Латинский язык» (teacher1, 03-1): no syllabus, nobody is named;
+//   «Физиология» (teacher2 in 01-1, teacher3 in 03-1, Friday, room 305, pairs 1 and 3): every teacher has an approved syllabus of the autumn
+//   as the earlier build kept it (no line), so the discipline waits for the choice of the deanery.
+// Only the new disciplines get subjects and weeks; the disciplines of the stand before are not touched. Everything but «Физиология» goes through the requests.
+function seedDocuments(store, platform, adminRow) {
+  const admin = { id: adminRow.id, roles: ['admin'], kind: 'staff' };
+  const today = todayOf(platform);
+  const staff = new Map(store.list('staff').map((person) => [person.login, person]));
+  const groups = new Map(store.list('groups').map((group) => [group.name, group]));
+  const room = store.list('rooms').find((r) => r.name === '305');
+  const teacherUser = (login) => ({ id: staff.get(login).id, roles: ['teacher'], kind: 'staff' });
+  const discipline = (name) => store.insert('disciplines', { name });
+  const subject = (made, login, group) => store.insert('subjects', {
+    name: made.name, disciplineId: made.id, teacherId: staff.get(login).id, groupId: groups.get(group).id, scheme: 'A',
+  });
+
+  // «Анатомия»: the date of the review is two days ago
+  const anatomy = store.list('disciplines').find((d) => d.name === 'Анатомия');
+  const anatomyLine = store.list('syllabusLines').find((l) => l.disciplineId === anatomy.id && l.kind === 'main');
+  setReviewDue(store, platform, { lineId: anatomyLine.id, date: addDays(today, -2) }, admin);
+
+  // «Химия»: the responsible writes it and sends it
+  const chemistry = discipline('Химия');
+  subject(chemistry, 'teacher2', '01-1');
+  assignResponsible(store, platform, { disciplineId: chemistry.id, teacherId: staff.get('teacher2').id, dueDate: '' }, admin);
+  const writer = teacherUser('teacher2');
+  const draft = startDraft(store, platform, { disciplineId: chemistry.id, semester: 1 }, writer).syllabusId;
+  writeSection(store, platform, writer, draft, 'title', { department: 'Кафедра химии', faculty: 'Факультет сестринского дела', academicYear: '2026–2027', course: 1, credits: 2 });
+  writeSection(store, platform, writer, draft, 'goals', { goal: 'Дать будущему медику основы химии для работы с лекарствами.' });
+  saveSection(store, platform, { syllabusId: draft, section: 'plan', data: CHEMISTRY_PLAN }, writer);
+  if (!submitSyllabus(store, platform, { syllabusId: draft }, writer).submitted) throw new Error('seed: the chemistry syllabus is not submitted');
+  const chemistryLine = store.list('syllabusLines').find((l) => l.disciplineId === chemistry.id && l.kind === 'main');
+  setReviewDue(store, platform, { lineId: chemistryLine.id, date: addDays(today, 5) }, admin);
+
+  // «Биология» and «Латинский язык»: no syllabus yet
+  const biology = discipline('Биология');
+  subject(biology, 'teacher3', '02-1');
+  assignResponsible(store, platform, { disciplineId: biology.id, teacherId: staff.get('teacher3').id, dueDate: addDays(today, 10) }, admin);
+  subject(discipline('Латинский язык'), 'teacher1', '03-1');
+
+  // «Физиология»: two old approved versions of the autumn (no line), then the start of a server makes the lines and the discipline waits for the choice
+  const physiology = discipline('Физиология');
+  const weekdayFriday = 5;
+  [['teacher2', '01-1', 1], ['teacher3', '03-1', 3]].forEach(([login, group, slot]) => {
+    const made = subject(physiology, login, group);
+    store.insert('weekTemplate', { weekday: weekdayFriday, slot, subjectId: made.id, roomId: room.id });
+    const version = store.insert('syllabi', {
+      disciplineId: physiology.id, teacherId: staff.get(login).id, semester: 1, planSemester: 1, status: 'approved', version: 1, decidedAt: today,
+    });
+    store.insertMany('topics', PHYSIOLOGY_TOPICS[login].map((name, i) => ({
+      syllabusId: version.id, order: i + 1, unit: 1, unitTitle: '', lessonKind: 'lecture', name, hours: 2, selfHours: 0, description: '', controlForms: '', sourceId: '',
+    })));
+  });
+  applyLinesUpgrade(store, platform);
+}
+
 // The common filling: groups, students, disciplines, subjects, the week, syllabi, pairs. The staff of the stand
 // (everyone except the administrator) is made here; the administrator is made by the caller or already is in the store.
 function fill(store, platform, { passwordHash, names, studentsMustChange, admin, files, repeats = true }) {
@@ -226,7 +300,6 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin,
     const informatics = subject(disciplines['Информатика'], g < 2 ? teacher1 : teacher3);
     const anatomy = subject(disciplines['Анатомия'], teacher2);
     if (g === 0) Object.assign(subjects, { informatics: informatics.id, anatomy: anatomy.id });
-    if (g === 2) subjects.thirdInformatics = informatics.id;
     // Monday: informatics in room 204; Wednesday and Thursday: anatomy in room 101. The pair number is the group number.
     store.insertMany('weekTemplate', [
       { weekday: 1, slot: g + 1, subjectId: informatics.id, roomId: rooms['204'].id },
@@ -236,6 +309,7 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin,
   });
 
   seedSyllabi(store, platform, subjects, teacher1.fullName, admin);
+  seedDocuments(store, platform, admin);
   seedPairs(store, platform);
   seedMarks(store, platform);
   seedWork(store, platform, files);

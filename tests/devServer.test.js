@@ -149,28 +149,30 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   assert.equal(store.list('staff').some((s) => s.mustChangePassword), false);
   assert.deepEqual(readSettings(store.list('settings')),
     { semesterStart: '2026-09-14', semesterEnd: '2027-01-15', holidays: ['2026-11-25'], bells: DEFAULT_BELLS, semester: 1 });
-  assert.deepEqual(store.list('disciplines').map((x) => x.name).sort(), ['Анатомия', 'Информатика']);
+  assert.deepEqual(store.list('disciplines').map((x) => x.name).sort(), ['Анатомия', 'Биология', 'Информатика', 'Латинский язык', 'Физиология', 'Химия']);
   assert.equal(store.list('subjects').every((s) => s.disciplineId !== '' && s.name !== ''), true);
   const staffLogin = new Map(store.list('staff').map((s) => [s.id, s.login]));
   const groupName = new Map(store.list('groups').map((g) => [g.id, g.name]));
   assert.deepEqual(store.list('subjects').map((s) => `${s.name}:${groupName.get(s.groupId)}:${staffLogin.get(s.teacherId)}`).sort(),
     ['Анатомия:01-1:teacher2', 'Анатомия:02-1:teacher2', 'Анатомия:03-1:teacher2',
-      'Информатика:01-1:teacher1', 'Информатика:02-1:teacher1', 'Информатика:03-1:teacher3']);
+      'Биология:02-1:teacher3', 'Информатика:01-1:teacher1', 'Информатика:02-1:teacher1', 'Информатика:03-1:teacher3', 'Латинский язык:03-1:teacher1',
+      'Физиология:01-1:teacher2', 'Физиология:03-1:teacher3', 'Химия:01-1:teacher2']);
   // one syllabus of the 1st semester serves both groups of teacher1, so both are on the 1st course (M6); the student numbers keep their prefixes
   assert.deepEqual(store.list('groups').map((g) => [g.name, g.course, store.list('students').find((s) => s.groupId === g.id).cardNo]),
     [['01-1', 1, 'S1001'], ['02-1', 1, 'S2001'], ['03-1', 2, 'S3001']]);
-  assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('disciplines').length], [6, 9, 2]);
+  assert.deepEqual([store.list('subjects').length, store.list('weekTemplate').length, store.list('disciplines').length], [11, 11, 6]);
   const login = new Map(store.list('staff').map((s) => [s.id, s.login]));
   const discipline = new Map(store.list('disciplines').map((d) => [d.id, d.name]));
   assert.deepEqual(store.list('syllabi').map((s) => [discipline.get(s.disciplineId), login.get(s.teacherId), s.semester, s.version, s.status]).sort(),
     [['Анатомия', 'teacher2', 1, 1, 'review'], ['Информатика', 'teacher1', 1, 1, 'archived'], ['Информатика', 'teacher1', 1, 2, 'approved'], ['Информатика', 'teacher1', 1, 3, 'returned'],
-      ['Информатика', 'teacher1', 2, 2, 'approved'], ['Информатика', 'teacher1', 2, 3, 'returned']]);   // a new version covers both halves: one number in both
+      ['Информатика', 'teacher1', 2, 2, 'approved'], ['Информатика', 'teacher1', 2, 3, 'returned'],
+      ['Физиология', 'teacher2', 1, 1, 'approved'], ['Физиология', 'teacher3', 1, 1, 'approved'], ['Химия', 'teacher2', 1, 1, 'review']]);   // a new version covers both halves: one number in both
   const informatics1 = store.list('syllabi').find((s) => login.get(s.teacherId) === 'teacher1' && s.semester === 1 && s.status === 'approved').id;
   for (const table of ['units', 'outcomes', 'selfWork', 'literature', 'software', 'grading', 'rules']) {
     assert.equal(store.list(table).some((r) => r.syllabusId === informatics1), true, table);
   }
-  // topic rows 80: «Информатика» has the rows of both halves of three versions (the first archived, the second approved, the third returned), «Анатомия» 6
-  assert.deepEqual([store.list('topics').length, store.list('pairs').length], [80, 159]);
+  // topic rows 80: «Информатика» has the rows of both halves of three versions (the first archived, the second approved, the third returned), «Анатомия» 6, «Химия» 4, «Физиология» 8
+  assert.deepEqual([store.list('topics').length, store.list('pairs').length], [92, 195]);
   const returned = store.list('syllabi').find((s) => s.status === 'returned');
   assert.deepEqual([returned.remark, store.list('topics').filter((t) => t.syllabusId === returned.id).length], ['Добавьте литературу к юниту 2', 20]);
   const anatomy = store.list('syllabi').find((s) => discipline.get(s.disciplineId) === 'Анатомия');
@@ -214,7 +216,7 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
 
   seed(store, platform);
   assert.equal(store.list('students').length, 66);
-  assert.equal(store.list('pairs').length, 159);
+  assert.equal(store.list('pairs').length, 195);
 });
 
 test('the real-data stand: its own file, one admin, never seeded with fictional people', async (t) => {

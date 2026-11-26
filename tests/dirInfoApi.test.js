@@ -279,7 +279,7 @@ test('the stand: numbers and speed', () => {
   };
   const g = timed('dir.summary', { table: 'groups' });
   const row = byId(g.rows, g02);
-  assert.deepEqual([row.students, row.inactive, row.weekPairs, row.disciplines], [22, 0, 3, ['Анатомия', 'Информатика']]);
+  assert.deepEqual([row.students, row.inactive, row.weekPairs, row.disciplines], [22, 0, 3, ['Анатомия', 'Биология', 'Информатика']]);
   assert.equal(timed('dir.card', { table: 'groups', id: g02 }).counts.repeats, 3);
   const r = timed('dir.summary', { table: 'rooms' });
   const r101 = byId(r.rows, room('101'));
@@ -288,8 +288,8 @@ test('the stand: numbers and speed', () => {
   assert.deepEqual(r101.now, { state: 'busy', until: '12:50', groupName: '03-1', subjectName: 'Анатомия' });
   assert.equal(byId(r.rows, room('204')).weekPairs, 3);
   assert.deepEqual(byId(r.rows, room('204')).now, { state: 'freeDay' });
-  assert.equal(byId(r.rows, room('305')).weekPairs, 0);
-  assert.equal(byId(r.rows, room('305')).top, null);
+  assert.equal(byId(r.rows, room('305')).weekPairs, 2);                       // «Физиология»: Friday, pairs 1 and 3
+  assert.deepEqual(byId(r.rows, room('305')).top, { disciplineName: 'Физиология', groupNames: ['01-1', '03-1'] });
   timed('dir.card', { table: 'rooms', id: room('101') });
   const d = timed('dir.summary', { table: 'disciplines' });
   assert.deepEqual(byId(d.rows, disc('Информатика')).syllabi, { approved: 1, review: 0, returned: 1, draft: 0, none: 0 });

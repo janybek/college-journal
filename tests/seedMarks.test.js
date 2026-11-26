@@ -46,7 +46,7 @@ test('no mark on the pairs of today and later; one unfilled past pair of «Ан�
   const open = store.list('pairs').filter((p) => p.date < TODAY && p.status === 'planned');
   assert.equal(open.length, 1);
   assert.equal(open[0].subjectId, subjectOf(store, 'Анатомия', '02-1').id);
-  assert.equal(store.list('pairs').length, 159);
+  assert.equal(store.list('pairs').length, 195);
 });
 
 test('the change log: three corrections and one applied request with reasons, the late one gives a status row and an activity row', () => {
