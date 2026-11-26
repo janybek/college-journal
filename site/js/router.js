@@ -17,8 +17,8 @@ export function resolveRoute(hash, user) {
   const permissions = Array.isArray(user.permissions) ? user.permissions : [];
   const dir = /^\/dir\/([^/]+)$/.exec(path);
   if (dir && DIR_TABLES.includes(dir[1]) && permissions.includes('dir.list:' + dir[1])) return { view: 'directory', params: { table: dir[1] } };
-  // #/dir/<groups|rooms|disciplines>/<id>/edit: the edit window of a record; #/dir/students/group/<groupId>: the students of a group.
-  const edit = /^\/dir\/(groups|rooms|disciplines)\/([^/]+)\/edit$/.exec(path);
+  // #/dir/<groups|rooms|disciplines|students|staff>/<id>/edit: the edit window of a record; #/dir/students/group/<groupId>: the students of a group.
+  const edit = /^\/dir\/(groups|rooms|disciplines|students|staff)\/([^/]+)\/edit$/.exec(path);
   if (edit && permissions.includes('dir.save:' + edit[1]) && idOf(edit[2]) !== null) return { view: 'directory', params: { table: edit[1], editId: idOf(edit[2]) } };
   // #/dir/<groups|rooms|disciplines>/<id>: the card of a record (the server checks dir.card itself).
   const card = /^\/dir\/([^/]+)\/([^/]+)$/.exec(path);

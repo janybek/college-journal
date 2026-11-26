@@ -97,3 +97,43 @@ export function gridRows(bells, pairs) {
 
 // The students a group card shows before «Все N студентов».
 export const FIRST_STUDENTS = 5;
+
+// ---- Progress of people, groups and disciplines (dir.people, dir.progress) ----
+
+export const PERSON_TABLES = ['students', 'staff'];
+// The states the cards count; a copy of the server's list (the site does not import core/).
+export const COUNTED_STATES = ['risk', 'fail', 'notAdmitted', 'absent', 'incomplete'];
+// Attendance below these is shown red and amber: a rule of the screen, not of the journal.
+export const ATTENDANCE_LOW = 70;
+export const ATTENDANCE_MID = 85;
+
+export const percentText = (percent) => (percent === null || percent === undefined ? '—' : percent + ' %');
+
+export function attendanceTone(percent) {
+  if (percent === null || percent === undefined) return null;
+  if (percent < ATTENDANCE_LOW) return 'danger';
+  return percent < ATTENDANCE_MID ? 'warning' : null;
+}
+
+const STATE_TONES = { going: 'neutral', risk: 'warning', passed: 'success', fail: 'danger', notAdmitted: 'danger', absent: 'danger', incomplete: 'warning', noExam: 'neutral' };
+
+// The state of a student in a subject: { key, params, tone } for a badge.
+export function stateLabel(state, total) {
+  return { key: 'dir.state.' + state, params: state === 'passed' ? { total } : {}, tone: STATE_TONES[state] ?? 'neutral' };
+}
+
+// Labels of how many students are in which state; only the states that exist.
+export function countBadges(counts) {
+  return COUNTED_STATES
+    .filter((name) => Number(counts?.[name]) > 0)
+    .map((name) => ({ key: 'dir.count.' + name, count: counts[name], tone: STATE_TONES[name] }));
+}
+
+// The edit window opened from a card by the button (not by a typed address): «Back» of the browser returns to the card.
+let editFrom = null;
+export function markEditFromCard(href) { editFrom = href; }
+export function takeEditFromCard() {
+  const href = editFrom;
+  editFrom = null;
+  return href;
+}

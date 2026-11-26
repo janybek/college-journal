@@ -4,7 +4,10 @@ import { el, errorKey, badge, emptyState, note, pageHeader, refresh } from '../u
 import { permissions } from '../shell.js';
 import { dayParts } from '../dates.js';
 import { cellPairs, examDayLabel, gridDays, pairFlags } from '../pairs.js';
-import { cardHref, FIRST_STUDENTS, fullDate, gridRows, groupNowLabel, roomNowLabel, syllabusBadges, syllabusHalves, termNote } from '../dirInfo.js';
+import {
+  attendanceTone, cardHref, countBadges, FIRST_STUDENTS, fullDate, gridRows, groupNowLabel, markEditFromCard, percentText, roomNowLabel,
+  syllabusBadges, syllabusHalves, termNote,
+} from '../dirInfo.js';
 import { cardHref as documentHref, shortFio } from '../documents.js';
 import { openChooseDialog } from './docChoose.js';
 import { dayMonth, flagBadge, weekNav } from './pairParts.js';
@@ -17,6 +20,8 @@ const blank = () => ({
   table: null,
   id: null,
   data: null,          // the answer of dir.card; null until it comes
+  progress: null,      // the answer of dir.progress (groups, disciplines); null: none, see progressFailed
+  progressFailed: false,
   loading: false,
   errorCode: null,
   ticket: 0,
@@ -36,7 +41,6 @@ export function render(root, params) {
   }
   if (state.data === null && !state.loading && state.errorCode === null) load();
   const { table } = state;
-  root.append(crumbs(state.data ? nameOf(state.data) : null));
   if (state.data === null) {
     root.append(state.errorCode === null ? el('p', { class: 'loading' }, t('common.loading')) : failure());
     return;
@@ -45,6 +49,7 @@ export function render(root, params) {
   root.append(...[
     pageHeader({ id: 'card-title', title: t(`dir.card.${table}.title`, { name: nameOf(state.data) }), lead: lead(), actions: actions() }),
     state.errorCode === null ? null : note('error', t(errorKey(state.errorCode)), { role: 'alert' }),
+    state.progressFailed ? note('info', t('dir.progress.unavailable')) : null,
     ...BODIES[table](state.data),
   ].filter(Boolean));
 }
@@ -55,10 +60,16 @@ async function load() {
   owner.loading = true;
   const request = { table: owner.table, id: owner.id };
   if (owner.table === 'rooms' && owner.from !== null) request.from = owner.from;
+  // The progress is an extra: if it fails, the card of the first part is still shown.
+  const wantsProgress = owner.table !== 'rooms' && can('dir.progress:' + owner.table);
+  const progress = wantsProgress && owner.progress === null
+    ? call('dir.progress', { table: owner.table, id: owner.id }).catch(() => false) : Promise.resolve(owner.progress);
   try {
-    const data = await call('dir.card', request);
+    const [data, figures] = await Promise.all([call('dir.card', request), progress]);
     if (state !== owner || owner.ticket !== ticket) return;
     owner.data = data;
+    owner.progress = figures || null;
+    owner.progressFailed = figures === false;
     owner.errorCode = null;
   } catch (error) {
     if (state !== owner || owner.ticket !== ticket) return;
@@ -87,17 +98,6 @@ function failure() {
   return body;
 }
 
-// «Справочники › Группы › 02-1»
-function crumbs(name) {
-  const { table } = state;
-  return el('nav', { class: 'card-crumbs', 'aria-label': t('dir.card.crumbs') },
-    el('span', {}, t('dir.card.crumbs')),
-    el('span', { class: 'card-crumbs__sep', 'aria-hidden': 'true' }, '›'),
-    can('dir.list:' + table) ? el('a', { href: '#/dir/' + table }, t('dir.' + table)) : el('span', {}, t('dir.' + table)),
-    name === null ? null : el('span', { class: 'card-crumbs__sep', 'aria-hidden': 'true' }, '›'),
-    name === null ? null : el('span', { class: 'card-crumbs__here', 'aria-current': 'page' }, name));
-}
-
 function link(id, href, text) {
   return el('a', { id, class: 'button button--secondary', href }, text);
 }
@@ -114,7 +114,11 @@ function actions() {
   if (can('dir.save:' + table)) {
     buttons.push(el('button', {
       type: 'button', id: 'card-edit', class: 'button button--primary',
-      onclick: () => location.replace(cardHref(table, id) + '/edit'),
+      onclick: () => {
+        // A new step of the history: «Back» of the browser from the window returns to this card.
+        markEditFromCard(cardHref(table, id));
+        location.hash = cardHref(table, id) + '/edit';
+      },
     }, t('common.edit')));
   }
   return buttons.length > 0 ? buttons : null;
@@ -135,9 +139,9 @@ const termLine = (data) => {
   return term ? note('info', t(term.key, term.params)) : null;
 };
 
-function tile(count, label, small = null) {
+function tile(count, label, small = null, tone = null) {
   return el('div', { class: 'card dir-stat' },
-    el('strong', { class: 'dir-stat__value' }, String(count)),
+    el('strong', { class: tone ? 'dir-stat__value dir-pct--' + tone : 'dir-stat__value' }, String(count)),
     el('span', { class: 'dir-stat__label' }, label),
     small ? el('span', { class: 'dir-stat__small muted' }, small) : null);
 }
@@ -150,37 +154,80 @@ function section(title, ...children) {
   return el('section', { class: 'card dir-block' }, el('h2', { class: 'dir-block__title' }, title), ...children);
 }
 
+const NUMERIC = ['weekPairs', 'attendance', 'average', 'students'];
 function head(...keys) {
-  return el('thead', {}, el('tr', {}, keys.map((key) => el('th', { scope: 'col', class: key === 'weekPairs' ? 'num' : null }, t('dir.card.col.' + key)))));
+  return el('thead', {}, el('tr', {}, keys.map((key) => el('th', { scope: 'col', class: NUMERIC.includes(key) ? 'num' : null }, t('dir.card.col.' + key)))));
 }
+
+// Figures of the progress: a percent with its tone, an average, the labels of the states.
+const pct = (percent) => {
+  const tone = attendanceTone(percent);
+  return el('span', { class: tone ? 'dir-pct dir-pct--' + tone : 'dir-pct' }, percentText(percent));
+};
+const average = (value) => (value === null || value === undefined ? el('span', { class: 'muted' }, '—') : el('strong', {}, String(value)));
+const countsCell = (counts) => {
+  const badges = countBadges(counts);
+  return badges.length === 0 ? el('span', { class: 'muted' }, '—')
+    : el('span', { class: 'dir-syllabi dir-counts' }, badges.map((item) => badge(t(item.key, { count: item.count }), item.tone)));
+};
+const byId = (items) => new Map((items ?? []).map((item) => [item.subjectId ?? item.id, item]));
+const personLink = (table, id, name) => (can('dir.person:' + table)
+  ? el('a', { class: 'dir-link', href: '#/dir/' + table + '/' + encodeURIComponent(id) }, name) : name);
+const riskTone = (risk) => (risk > 0 ? 'warning' : null);
 
 // ---- A group ----
 
 function groupBody(data) {
   const { counts } = data;
+  const progress = state.progress;
   const now = groupNowLabel(data.now);
   const shown = data.students.slice(0, FIRST_STUDENTS);
+  const bySubject = byId(progress?.subjects);
+  const byStudent = byId(progress?.students);
+  const tiles = [
+    tile(counts.students, tCount('dir.card.students', counts.students), counts.inactive > 0 ? tCount('dir.card.inactive', counts.inactive) : null),
+    tile(counts.subjects, tCount('dir.card.subjects', counts.subjects)),
+    tile(counts.weekPairs, tCount('dir.card.weekPairs', counts.weekPairs)),
+    tile(counts.repeats, tCount('dir.card.repeats', counts.repeats)),
+  ];
+  if (progress) {
+    tiles.push(
+      tile(percentText(progress.totals.attendance), t('dir.card.attendance'), null, attendanceTone(progress.totals.attendance)),
+      tile(progress.totals.average ?? '—', t('dir.card.average')),
+      tile(progress.totals.risk, tCount('dir.card.riskStudents', progress.totals.risk), null, riskTone(progress.totals.risk)));
+  }
+  const subjectKeys = progress ? ['discipline', 'teacher', 'syllabus', 'weekPairs', 'attendance', 'average', 'counts']
+    : ['discipline', 'teacher', 'syllabus', 'weekPairs'];
   return [
     el('div', { class: 'dir-now' }, badge(t(now.key, now.params), now.tone, true), termLine(data)),
-    el('div', { class: 'dir-stats' },
-      tile(counts.students, tCount('dir.card.students', counts.students), counts.inactive > 0 ? tCount('dir.card.inactive', counts.inactive) : null),
-      tile(counts.subjects, tCount('dir.card.subjects', counts.subjects)),
-      tile(counts.weekPairs, tCount('dir.card.weekPairs', counts.weekPairs)),
-      tile(counts.repeats, tCount('dir.card.repeats', counts.repeats))),
-    el('div', { class: 'dir-columns' },
+    el('div', { class: progress ? 'dir-stats dir-stats--7' : 'dir-stats' }, tiles),
+    el('div', { class: progress ? 'dir-columns dir-columns--wide' : 'dir-columns' },
       section(t('dir.card.subjectsTitle'),
         data.subjects.length === 0 ? el('p', { class: 'dir-block__empty muted' }, t('dir.none'))
-          : el('div', { class: 'table-scroll' }, el('table', { class: 'table' }, head('discipline', 'teacher', 'syllabus', 'weekPairs'),
-            el('tbody', {}, data.subjects.map((row) => el('tr', {},
-              el('td', {}, el('span', { class: 'table__label' }, row.disciplineName)),
-              el('td', {}, row.teacherName),
-              el('td', {}, syllabusCell(row.syllabus)),
-              el('td', { class: 'num' }, String(row.weekPairs)))))))),
+          : el('div', { class: 'table-scroll' }, el('table', { class: 'table' }, head(...subjectKeys),
+            el('tbody', {}, data.subjects.map((row) => {
+              const figures = bySubject.get(row.subjectId);
+              return el('tr', {},
+                el('td', {}, el('span', { class: 'table__label' }, row.disciplineName)),
+                el('td', {}, personLink('staff', row.teacherId, row.teacherName)),
+                el('td', {}, syllabusCell(row.syllabus)),
+                el('td', { class: 'num' }, String(row.weekPairs)),
+                progress ? [
+                  el('td', { class: 'num' }, pct(figures?.attendance ?? null)),
+                  el('td', { class: 'num' }, average(figures?.average)),
+                  el('td', {}, figures ? countsCell(figures.counts) : el('span', { class: 'muted' }, '—')),
+                ] : null);
+            }))))),
       section(t('dir.card.studentsTitle'),
         shown.length === 0 ? el('p', { class: 'dir-block__empty muted' }, t('dir.card.noStudents'))
-          : el('ul', { class: 'dir-students' }, shown.map((student) => el('li', {},
-            el('span', { class: 'dir-students__name' }, student.fullName),
-            el('span', { class: 'dir-students__no muted' }, student.cardNo)))),
+          : el('ul', { class: 'dir-students' }, shown.map((student) => {
+            const figures = byStudent.get(student.id);
+            return el('li', {},
+              el('span', { class: 'dir-students__name' }, personLink('students', student.id, student.fullName)),
+              progress ? el('span', { class: 'dir-students__figures' },
+                pct(figures?.attendance ?? null), el('span', { class: 'dir-students__avg' }, average(figures?.average)))
+                : el('span', { class: 'dir-students__no muted' }, student.cardNo));
+          })),
         shown.length > 0 && can('dir.list:students')
           ? el('a', { class: 'dir-students__all', id: 'card-all-students', href: '#/dir/students/group/' + encodeURIComponent(state.id) }, tCount('dir.card.allStudents', counts.students))
           : null)),
@@ -269,19 +316,51 @@ function reloadCard() {
   refresh();
 }
 
+// «Ю1 закрыт · Ю2 идёт»: the units of a group in a discipline.
+const unitsCell = (units) => (units.length === 0 ? el('span', { class: 'muted' }, '—')
+  : el('span', { class: 'dir-syllabi' }, units.map((item) => badge(
+    t('dir.card.unitShort', { n: item.unit }) + ' ' + t(item.closed ? 'dir.card.unitClosed' : 'dir.card.unitOpen'), item.closed ? 'success' : 'neutral'))));
+
 function disciplineBody(data) {
+  const progress = state.progress;
+  const bySubject = byId(progress?.rows);
+  const columns = progress ? ['group', 'teacher', 'syllabus', 'weekPairs', 'students', 'attendance', 'average', 'counts', 'units']
+    : ['group', 'teacher', 'syllabus', 'weekPairs'];
+  const tiles = progress ? [
+    tile(progress.totals.groups, tCount('dir.card.groupsCount', progress.totals.groups)),
+    tile(percentText(progress.totals.attendance), t('dir.card.attendance'), null, attendanceTone(progress.totals.attendance)),
+    tile(progress.totals.average ?? '—', t('dir.card.average')),
+    tile(progress.totals.risk, tCount('dir.card.riskStudents', progress.totals.risk), null, riskTone(progress.totals.risk)),
+  ] : [];
   return [
+    tiles.length > 0 ? el('div', { class: 'dir-stats' }, tiles) : null,
     syllabusSection(data),
     section(t('dir.card.where'),
       data.rows.length === 0 ? el('p', { class: 'dir-block__empty muted' }, t('dir.card.nowhere'))
-        : el('div', { class: 'table-scroll' }, el('table', { class: 'table' }, head('group', 'teacher', 'syllabus', 'weekPairs'),
-          el('tbody', {}, data.rows.map((row) => el('tr', {},
-            el('td', {}, el('span', { class: 'group-chip' }, row.groupName)),
-            el('td', {}, row.teacherName),
-            el('td', {}, syllabusCell(row.syllabus),
-              can('syllabus.get') ? el('a', { class: 'dir-syllabus-link', href: '#/syllabus/' + encodeURIComponent(row.subjectId) }, t('dir.card.syllabusLink')) : null),
-            el('td', { class: 'num' }, String(row.weekPairs)))))))),
-  ];
+        : el('div', { class: 'table-scroll' }, el('table', { class: 'table' }, head(...columns),
+          el('tbody', {}, data.rows.map((row) => {
+            const figures = bySubject.get(row.subjectId);
+            return el('tr', {},
+              el('td', {}, el('span', { class: 'group-chip' }, row.groupName)),
+              el('td', {}, personLink('staff', row.teacherId, row.teacherName)),
+              el('td', {}, syllabusCell(row.syllabus),
+                can('syllabus.get') ? el('a', { class: 'dir-syllabus-link', href: '#/syllabus/' + encodeURIComponent(row.subjectId) }, t('dir.card.syllabusLink')) : null),
+              el('td', { class: 'num' }, String(row.weekPairs)),
+              progress ? [
+                el('td', { class: 'num' }, figures ? String(figures.students) : '—'),
+                el('td', { class: 'num' }, pct(figures?.attendance ?? null)),
+                el('td', { class: 'num' }, average(figures?.average)),
+                el('td', {}, figures ? countsCell(figures.counts) : el('span', { class: 'muted' }, '—')),
+                el('td', {}, unitsCell(figures?.units ?? [])),
+              ] : null);
+          }))))),
+    progress && progress.units.length > 0 ? section(t('dir.card.unitsTitle'),
+      el('div', { class: 'table-scroll' }, el('table', { class: 'table' }, head('unit', 'closedGroups', 'average'),
+        el('tbody', {}, progress.units.map((item) => el('tr', {},
+          el('td', {}, el('span', { class: 'table__label' }, t('dir.card.unitN', { n: item.unit }))),
+          el('td', {}, t('dir.card.closedOf', { closed: item.closedGroups, groups: item.groups })),
+          el('td', { class: 'num' }, average(item.average)))))))) : null,
+  ].filter(Boolean);
 }
 
 const BODIES = { groups: groupBody, rooms: roomBody, disciplines: disciplineBody };

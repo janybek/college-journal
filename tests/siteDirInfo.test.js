@@ -98,3 +98,49 @@ test('syllabusHalves: the halves of the discipline with their marks; a waiting d
   assert.deepEqual(syllabusHalves({ waiting: true, halves }), []);
   assert.deepEqual(syllabusHalves(null), []);
 });
+
+import {
+  PERSON_TABLES, COUNTED_STATES, ATTENDANCE_LOW, ATTENDANCE_MID, percentText, attendanceTone, stateLabel, countBadges,
+  markEditFromCard, takeEditFromCard,
+} from '../site/js/dirInfo.js';
+import ru from '../site/js/i18n/ru.js';
+
+test('percentText and attendanceTone', () => {
+  assert.deepEqual(PERSON_TABLES, ['students', 'staff']);
+  assert.equal([ATTENDANCE_LOW, ATTENDANCE_MID].join(), '70,85');
+  assert.equal(percentText(null), '—');
+  assert.equal(percentText(87), '87 %');
+  assert.deepEqual([null, 69, 70, 84, 85].map(attendanceTone), [null, 'danger', 'warning', 'warning', null]);
+});
+
+test('stateLabel', () => {
+  assert.deepEqual(stateLabel('passed', 82), { key: 'dir.state.passed', params: { total: 82 }, tone: 'success' });
+  assert.deepEqual(stateLabel('risk', null), { key: 'dir.state.risk', params: {}, tone: 'warning' });
+  assert.equal(stateLabel('going', null).tone, 'neutral');
+  assert.equal(stateLabel('noExam', null).tone, 'neutral');
+  assert.equal(stateLabel('fail', null).tone, 'danger');
+  assert.equal(stateLabel('incomplete', null).tone, 'warning');
+});
+
+test('countBadges: only the states that exist, in order', () => {
+  assert.deepEqual(COUNTED_STATES, ['risk', 'fail', 'notAdmitted', 'absent', 'incomplete']);
+  assert.deepEqual(countBadges({ risk: 1, fail: 0, notAdmitted: 2, absent: 0, incomplete: 1 }), [
+    { key: 'dir.count.risk', count: 1, tone: 'warning' },
+    { key: 'dir.count.notAdmitted', count: 2, tone: 'danger' },
+    { key: 'dir.count.incomplete', count: 1, tone: 'warning' },
+  ]);
+  assert.deepEqual(countBadges({ risk: 0, fail: 0, notAdmitted: 0, absent: 0, incomplete: 0 }), []);
+});
+
+test('the edit window remembers the card it was opened from, once', () => {
+  assert.equal(takeEditFromCard(), null);
+  markEditFromCard('#/dir/groups/g1');
+  assert.equal(takeEditFromCard(), '#/dir/groups/g1');
+  assert.equal(takeEditFromCard(), null);
+});
+
+test('the new counted texts have all four forms', () => {
+  for (const key of ['dir.riskSubjects', 'dir.card.riskStudents', 'dir.card.groupsCount']) {
+    for (const form of ['one', 'few', 'many', 'other']) assert.ok(ru[`${key}.${form}`], `${key}.${form}`);
+  }
+});

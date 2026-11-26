@@ -8560,18 +8560,29 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .dir-syllabi .badge { white-space: nowrap; }
 
 /* Cards of a group, a room and a discipline. */
-.card-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); margin-bottom: var(--space-3); color: var(--text-muted); font-size: 0.875rem; }
-.card-crumbs a { color: var(--text-muted); }
-.card-crumbs a:hover { color: var(--text); }
-.card-crumbs__here { color: var(--text); font-weight: 500; }
 .dir-now { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); margin-bottom: var(--space-4); }
 .dir-now .note { margin: 0; }
 .dir-stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--space-4); margin-bottom: var(--space-5); }
 .dir-stat { display: flex; flex-direction: column; gap: var(--space-1); padding: var(--space-4); }
 .dir-stat__value { font-size: 1.75rem; line-height: 1.1; }
 .dir-stat__label, .dir-stat__small { font-size: 0.875rem; }
+.dir-stats--7 { grid-template-columns: repeat(7, minmax(0, 1fr)); gap: var(--space-3); }
+.dir-stats--7 .dir-stat { padding: var(--space-3); }
+.dir-stats--7 .dir-stat__value { font-size: 1.5rem; }
+.crumbs__link { color: var(--text-muted); text-decoration: none; }
+.crumbs__link:hover { color: var(--text); text-decoration: underline; }
+/* Attendance and risk: red below 70, amber below 85 (dirInfo.js). Tiles colour the number, tables the text. */
+.dir-pct--danger { color: var(--danger-ink, var(--danger)); }
+.dir-pct--warning { color: var(--warning-ink, var(--warning)); }
+.table td .dir-pct { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.dir-students__figures { display: inline-flex; align-items: baseline; gap: var(--space-4); font-variant-numeric: tabular-nums; }
+.dir-students__avg { min-width: 2rem; text-align: right; }
+.dir-students__name { min-width: 0; overflow-wrap: anywhere; }
+.table td.num { white-space: nowrap; }
+.dir-counts { flex-direction: column; align-items: flex-start; }
 .dir-columns { display: grid; grid-template-columns: minmax(0, 3fr) minmax(0, 2fr); gap: var(--space-4); align-items: start; margin-bottom: var(--space-5); }
 .dir-block { padding: 0; overflow: hidden; margin-bottom: var(--space-4); }
+.dir-columns--wide { grid-template-columns: minmax(0, 7fr) minmax(0, 3fr); }
 .dir-columns .dir-block { margin-bottom: 0; }
 .dir-block__title { margin: 0; padding: var(--space-4); border-bottom: 1px solid var(--border); font-size: 1rem; }
 .dir-block__empty { margin: 0; padding: var(--space-4); }
@@ -8599,8 +8610,8 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .room-pair__what { font-size: 0.875rem; }
 .room-pair__marks { display: flex; flex-wrap: wrap; gap: var(--space-1); }
 @media (max-width: 64rem) {
-  .dir-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .dir-columns { grid-template-columns: minmax(0, 1fr); }
+  .dir-stats, .dir-stats--7 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .dir-columns, .dir-columns--wide { grid-template-columns: minmax(0, 1fr); }
 }
 
 /* «Документы › Силлабусы»: tabs with counts, the cards of the disciplines, the card of a discipline. */

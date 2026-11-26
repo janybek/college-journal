@@ -230,7 +230,7 @@ function studentFrame(main, { onLang, onLogout }) {
 // The menu item of a screen. The syllabus page of a subject and its form belong to the deanery's «Предметы», and to the
 // teacher's «Мои предметы» (their home).
 function currentName(view, params, role) {
-  if (view === 'directory' || view === 'dirCard') return params.table;
+  if (view === 'directory' || view === 'dirCard' || view === 'personCard') return params.table;
   // A journal of a subject belongs to the list of journals.
   if (view === 'journal') return 'journalList';
   if (view === 'task') return 'tasks';
@@ -334,7 +334,10 @@ function crumbs(groups, view, params, current, role) {
   }
   // «Расписание › Расписание»: a page named like its group is one crumb.
   if (groupKey && t(groupKey) === t(pageKey)) groupKey = null;
+  // On the card of a record the word of its directory leads back to the list.
+  const toList = (view === 'dirCard' || view === 'personCard') && permissions().includes('dir.list:' + params.table);
   return el('p', { class: 'crumbs' },
     groupKey ? [el('span', { class: 'crumbs__group' }, t(groupKey)), icon('chevron', 'crumbs__sep')] : null,
-    el('span', { class: 'crumbs__page' }, t(pageKey)));
+    toList ? el('a', { class: 'crumbs__page crumbs__link', href: '#/dir/' + params.table }, t(pageKey))
+      : el('span', { class: 'crumbs__page' }, t(pageKey)));
 }

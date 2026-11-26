@@ -305,3 +305,11 @@ test('resolveRoute: the syllabus of a discipline has its own address, in both ha
   // the address of a subject is not touched
   assert.deepEqual(resolveRoute('#/syllabus/sb_1/2', viewer), { view: 'syllabus', params: { subjectId: 'sb_1', semester: 2 } });
 });
+
+test('resolveRoute: edit window of a student and of a member of staff', () => {
+  const user = (...permissions) => ({ mustChangePassword: false, permissions });
+  assert.deepEqual(resolveRoute('#/dir/students/s1/edit', user('dir.save:students')), { view: 'directory', params: { table: 'students', editId: 's1' } });
+  assert.deepEqual(resolveRoute('#/dir/staff/s1/edit', user('dir.save:staff')), { view: 'directory', params: { table: 'staff', editId: 's1' } });
+  assert.equal(resolveRoute('#/dir/students/s1/edit', user('dir.save:groups')).view, 'home');
+  assert.equal(resolveRoute('#/dir/staff/s1/edit', user('dir.save:students')).view, 'home');
+});

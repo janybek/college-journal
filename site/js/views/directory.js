@@ -1,6 +1,5 @@
 import { call, RETRYABLE } from '../api.js';
 import { getUser } from '../session.js';
-import { t, getLang, LANGS, DEFAULT_LANG } from '../i18n.js';
 import {
   el, errorKey, fieldErrorKey, hasText, field, selectField, searchField, switchField, checkGroup,
   modal, showModal, focusById, focusFirstInvalid, markBusy, refresh,
@@ -9,7 +8,8 @@ import {
 import { icon } from '../icons.js';
 import { permissions } from '../shell.js';
 import { DIRECTORIES, FIELDS, STAFF_ROLES } from './directoryConfig.js';
-import { cardHref, infoById, groupNowLabel, roomNowLabel, syllabusCountBadges, termNote } from '../dirInfo.js';
+import { t, tCount, getLang, LANGS, DEFAULT_LANG } from '../i18n.js';
+import { attendanceTone, cardHref, infoById, groupNowLabel, percentText, roomNowLabel, syllabusCountBadges, takeEditFromCard, termNote } from '../dirInfo.js';
 
 // One directory (#/dir/<table>): a table with search, and dialogs to add, edit, delete and issue a new
 // password. Drawn from `state`, so a redraw (language switch, texts from the sheet) keeps typed values and an
@@ -34,7 +34,8 @@ const blank = (table) => ({
 let state = blank(null);
 
 const can = (action, table) => permissions().includes(`${action}:${table}`);
-const wantsInfo = (table) => DIRECTORIES[table].extra !== undefined && can('dir.summary', table);
+const infoAction = (table) => DIRECTORIES[table].info ?? 'dir.summary';
+const wantsInfo = (table) => DIRECTORIES[table].extra !== undefined && can(infoAction(table), table);
 
 export function leave() {
   state = blank(null);
@@ -61,7 +62,7 @@ async function load(owner) {
   const refs = DIRECTORIES[table].refs.filter((ref) => can('dir.list', ref));
   try {
     // The figures are an extra: if they fail, the plain list is still shown.
-    const summary = wantsInfo(table) ? call('dir.summary', { table }).catch(() => null) : Promise.resolve(undefined);
+    const summary = wantsInfo(table) ? call(infoAction(table), { table }).catch(() => null) : Promise.resolve(undefined);
     const [main, ...others] = await Promise.all([table, ...refs].map((name) => call('dir.list', { table: name })));
     const figures = await summary;
     if (state !== owner) return;
@@ -86,7 +87,7 @@ function setSummary(owner, figures) {
 async function reloadSummary(owner) {
   if (!wantsInfo(owner.table)) return;
   try {
-    const figures = await call('dir.summary', { table: owner.table });
+    const figures = await call(infoAction(owner.table), { table: owner.table });
     if (state !== owner) return;
     setSummary(owner, figures);
     refresh();
@@ -103,8 +104,10 @@ function applyAddress(params) {
   else if (state.askedEdit !== params.editId) {
     state.askedEdit = params.editId;
     const row = state.rows.find((item) => item.id === params.editId);
-    if (row && can('dir.save', table)) state.dialog = editState(row, cardHref(table, row.id));
-    else location.replace('#/dir/' + table);
+    if (row && can('dir.save', table)) {
+      state.dialog = editState(row, cardHref(table, row.id));
+      state.dialog.pushed = takeEditFromCard() === cardHref(table, row.id);
+    } else location.replace('#/dir/' + table);
   }
   if (params.groupId !== undefined && state.askedGroup !== params.groupId) {
     state.askedGroup = params.groupId;
@@ -182,19 +185,22 @@ function display(key, row) {
 const cellClass = (key) => (FIELDS[key].kind === 'number' ? 'num' : null);
 
 // A person: initials, the name, and under it the login or student ID they sign in with.
-function personCell(row, nameId, loginKey) {
+function personCell(row, nameId, loginKey, linked) {
   const name = nameOf(row);
   return el('span', { class: 'person' },
     avatar(name),
     el('span', { class: 'person__text' },
-      el('span', { class: 'person__name', id: nameId }, name),
+      linked ? el('a', { class: 'person__name dir-link', id: nameId, href: cardHref(state.table, row.id) }, name)
+        : el('span', { class: 'person__name', id: nameId }, name),
       el('span', { class: 'person__sub' }, String(row[loginKey] ?? ''))));
 }
 
 // Whether a person can sign in, and whether they still have a temporary password.
-function statusCell(row) {
+function statusCell(row, info) {
+  const risk = row.active === true && info?.risk > 0;
   return el('span', { class: 'badges' },
-    row.active === true ? badge(t('field.active'), 'success', true) : badge(t('dir.inactive'), 'neutral', true),
+    risk ? badge(tCount('dir.riskSubjects', info.risk), 'warning', true)
+      : row.active === true ? badge(t('field.active'), 'success', true) : badge(t('dir.inactive'), 'neutral', true),
     row.active === true && row.mustChangePassword === true ? badge(t('dir.mustChange'), 'warning') : null);
 }
 
@@ -280,7 +286,7 @@ function shownColumns() {
 
 // The extra columns (figures of dir.summary); none when the answer is missing.
 const extraKeys = () => (state.info === null ? [] : DIRECTORIES[state.table].extra ?? []);
-const extraClass = (key) => (key === 'students' || key === 'weekPairs' ? 'num' : 'dir-wrap');
+const extraClass = (key) => (['students', 'weekPairs', 'attendance', 'average'].includes(key) ? 'num' : 'dir-wrap');
 
 const muted = (text) => el('span', { class: 'muted' }, text);
 
@@ -289,7 +295,13 @@ function extraCell(key, info) {
   if (key === 'students') {
     return el('span', {}, String(info.students), info.inactive > 0 ? el('span', { class: 'muted dir-inactive' }, ' ' + t('dir.inactiveShort', { count: info.inactive })) : null);
   }
-  if (key === 'weekPairs') return String(info.weekPairs);
+  if (key === 'attendance') {
+    const tone = attendanceTone(info.attendance);
+    return el('span', { class: tone ? 'dir-pct dir-pct--' + tone : 'dir-pct' }, percentText(info.attendance));
+  }
+  if (key === 'average') return info.average === null || info.average === undefined ? muted('—') : el('strong', {}, String(info.average));
+  if (key === 'subjects') return info.subjects.length > 0 ? info.subjects.join(', ') : muted('—');
+  if (key === 'weekPairs') return state.table === 'staff' && info.subjects.length === 0 ? muted('—') : String(info.weekPairs);
   if (key === 'disciplines') return info.disciplines.length > 0 ? info.disciplines.join(', ') : muted(t('dir.none'));
   if (key === 'now') {
     const label = state.table === 'rooms' ? roomNowLabel(info.now) : groupNowLabel(info.now);
@@ -309,16 +321,16 @@ function line(row, rights, withActions) {
   const person = isPerson(state.table);
   const nameId = 'dir-name-' + row.id;
   const keys = shownColumns();
-  const linked = config.card === true && can('dir.card', state.table);
+  const linked = config.card === true && can(config.cardAction ?? 'dir.card', state.table);
   const nameCell = () => (linked
     ? el('a', { class: 'table__label dir-link', id: nameId, href: cardHref(state.table, row.id) }, display(config.label, row))
     : el('span', { class: 'table__label', id: nameId }, display(config.label, row)));
   const cells = keys.map((key) => el('td', { class: cellClass(key) },
     key !== config.label ? display(key, row)
-      : person ? personCell(row, nameId, config.login)
+      : person ? personCell(row, nameId, config.login, linked)
         : nameCell()));
   const figures = extraKeys().map((key) => el('td', { class: extraClass(key) }, extraCell(key, state.info.get(row.id))));
-  const status = person ? el('td', {}, statusCell(row)) : null;
+  const status = person ? el('td', {}, statusCell(row, state.info?.get(row.id))) : null;
   const action = (kind, iconName, textKey, onClick, extra = '') => iconButton({
     id: `dir-${kind}-${row.id}`, iconName, label: t(textKey), onClick, className: 'row-action' + extra, attrs: { 'aria-describedby': nameId },
   });
@@ -348,11 +360,17 @@ function closeDialog() {
   if (!d) return;
   state.dialog = null;
   if (d.back) {
-    location.replace(d.back);
+    leaveEdit(d);
     return;
   }
   refresh();
   focusById(d.returnId, 'dir-add', 'dir-search');
+}
+
+// Out of the window opened by an address: one step back when the button of the card made that step, else to the card.
+function leaveEdit(d) {
+  if (d.pushed) history.back();
+  else location.replace(d.back);
 }
 
 function editState(row, back = null) {
@@ -476,7 +494,7 @@ async function save(d) {
     }
     owner.dialog = null;
     if (d.back) {
-      location.replace(d.back);
+      leaveEdit(d);
       return;
     }
     owner.status = { key: 'dir.saved', params: { name } };
