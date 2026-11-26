@@ -313,3 +313,13 @@ test('resolveRoute: edit window of a student and of a member of staff', () => {
   assert.equal(resolveRoute('#/dir/students/s1/edit', user('dir.save:groups')).view, 'home');
   assert.equal(resolveRoute('#/dir/staff/s1/edit', user('dir.save:students')).view, 'home');
 });
+
+test('resolveRoute: the card of a student or of a staff member needs dir.person of its table', () => {
+  const user = (...permissions) => ({ mustChangePassword: false, permissions });
+  assert.deepEqual(resolveRoute('#/dir/students/s1', user('dir.person:students')), { view: 'personCard', params: { table: 'students', id: 's1' } });
+  assert.deepEqual(resolveRoute('#/dir/staff/s%201', user('dir.person:staff')), { view: 'personCard', params: { table: 'staff', id: 's 1' } });
+  assert.equal(resolveRoute('#/dir/students/s1', user('dir.person:staff')).view, 'home');
+  assert.equal(resolveRoute('#/dir/staff/s1', user()).view, 'home');
+  assert.equal(resolveRoute('#/dir/students/%E0%A4%A', user('dir.person:students')).view, 'home');
+  assert.deepEqual(resolveRoute('#/dir/students/group/g1', user('dir.person:students', 'dir.list:students')), { view: 'directory', params: { table: 'students', groupId: 'g1' } });
+});

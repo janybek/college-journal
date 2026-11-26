@@ -144,3 +144,9 @@ test('the new counted texts have all four forms', () => {
     for (const form of ['one', 'few', 'many', 'other']) assert.ok(ru[`${key}.${form}`], `${key}.${form}`);
   }
 });
+
+test('the texts of the cards of people have all four forms', () => {
+  for (const key of ['dir.person.risk', 'dir.person.repeats', 'dir.person.weekPairs', 'dir.person.hours', 'dir.person.unfilled']) {
+    for (const form of ['one', 'few', 'many', 'other']) assert.ok(ru[`${key}.${form}`] && ru[`${key}.${form}`] !== 'undefined', `${key}.${form}`);
+  }
+});

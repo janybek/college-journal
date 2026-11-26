@@ -107,7 +107,10 @@ function applyAddress(params) {
     if (row && can('dir.save', table)) {
       state.dialog = editState(row, cardHref(table, row.id));
       state.dialog.pushed = takeEditFromCard() === cardHref(table, row.id);
-    } else location.replace('#/dir/' + table);
+    } else {
+      takeEditFromCard();
+      location.replace('#/dir/' + table);
+    }
   }
   if (params.groupId !== undefined && state.askedGroup !== params.groupId) {
     state.askedGroup = params.groupId;

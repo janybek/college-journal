@@ -2,15 +2,15 @@ import { call } from '../api.js';
 import { t, tCount } from '../i18n.js';
 import { el, errorKey, badge, emptyState, note, pageHeader, refresh } from '../ui.js';
 import { permissions } from '../shell.js';
-import { dayParts } from '../dates.js';
-import { cellPairs, examDayLabel, gridDays, pairFlags } from '../pairs.js';
+import { pairFlags } from '../pairs.js';
 import {
-  attendanceTone, cardHref, countBadges, FIRST_STUDENTS, fullDate, gridRows, groupNowLabel, markEditFromCard, percentText, roomNowLabel,
+  attendanceTone, cardHref, countBadges, FIRST_STUDENTS, fullDate, groupNowLabel, markEditFromCard, percentText, roomNowLabel,
   syllabusBadges, syllabusHalves, termNote,
 } from '../dirInfo.js';
 import { cardHref as documentHref, shortFio } from '../documents.js';
 import { openChooseDialog } from './docChoose.js';
-import { dayMonth, flagBadge, weekNav } from './pairParts.js';
+import { flagBadge, weekNav } from './pairParts.js';
+import { weekGrid } from './weekGrid.js';
 
 // The card of a group, a room or a discipline (#/dir/<table>/<id>, dir.card): what the journal knows about it, read-only.
 // The edit button is built only for whoever has dir.save of the table (the vice-rector has not). Everything that comes
@@ -29,7 +29,7 @@ const blank = () => ({
 });
 let state = blank();
 
-const can = (permission) => permissions().includes(permission);
+export const can = (permission) => permissions().includes(permission);
 
 export function leave() {
   state = blank();
@@ -139,18 +139,18 @@ const termLine = (data) => {
   return term ? note('info', t(term.key, term.params)) : null;
 };
 
-function tile(count, label, small = null, tone = null) {
+export function tile(count, label, small = null, tone = null) {
   return el('div', { class: 'card dir-stat' },
     el('strong', { class: tone ? 'dir-stat__value dir-pct--' + tone : 'dir-stat__value' }, String(count)),
     el('span', { class: 'dir-stat__label' }, label),
     small ? el('span', { class: 'dir-stat__small muted' }, small) : null);
 }
 
-function syllabusCell(syllabus) {
+export function syllabusCell(syllabus) {
   return el('span', { class: 'dir-syllabi' }, syllabusBadges(syllabus).map((item) => badge(t(item.key), item.tone)));
 }
 
-function section(title, ...children) {
+export function section(title, ...children) {
   return el('section', { class: 'card dir-block' }, el('h2', { class: 'dir-block__title' }, title), ...children);
 }
 
@@ -160,11 +160,11 @@ function head(...keys) {
 }
 
 // Figures of the progress: a percent with its tone, an average, the labels of the states.
-const pct = (percent) => {
+export const pct = (percent) => {
   const tone = attendanceTone(percent);
   return el('span', { class: tone ? 'dir-pct dir-pct--' + tone : 'dir-pct' }, percentText(percent));
 };
-const average = (value) => (value === null || value === undefined ? el('span', { class: 'muted' }, '—') : el('strong', {}, String(value)));
+export const average = (value) => (value === null || value === undefined ? el('span', { class: 'muted' }, '—') : el('strong', {}, String(value)));
 const countsCell = (counts) => {
   const badges = countBadges(counts);
   return badges.length === 0 ? el('span', { class: 'muted' }, '—')
@@ -243,30 +243,11 @@ function changeWeek(from) {
 }
 
 function roomBody(data) {
-  const dates = gridDays(data.pairs, data.from);
-  const rows = gridRows(data.bells, data.pairs);
-  const exam = data.exam?.start ? data.exam : null;
-  const dayHead = (date) => {
-    const examKey = examDayLabel(date, exam);
-    return el('th', { scope: 'col', class: 'room-grid__day' + (date === data.today ? ' is-today' : '') },
-      el('span', { class: 'room-grid__name' }, t('date.weekday.' + dayParts(date).weekday)),
-      el('span', { class: 'room-grid__date muted' }, dayMonth(date)),
-      date === data.today ? badge(t('pairs.today'), 'primary', true) : null,
-      examKey ? badge(t(examKey), 'warning') : null,
-      data.holidays.includes(date) ? badge(t('dir.card.holiday'), 'neutral') : null);
-  };
   return [
     termLine(data),
     section(t('dir.card.week'),
       weekNav({ from: data.from, onChange: changeWeek }),
-      el('div', { class: 'table-scroll room-week' },
-        el('table', { class: 'room-grid', 'data-days': dates.length },
-          el('thead', {}, el('tr', {}, el('th', { class: 'room-grid__corner' }), dates.map(dayHead))),
-          el('tbody', {}, rows.map((row) => el('tr', {},
-            el('th', { scope: 'row', class: 'room-grid__slot' },
-              el('span', { class: 'room-grid__pair' }, t('settings.pairN', { n: row.slot })),
-              el('span', { class: 'room-grid__time muted' }, row.time)),
-            dates.map((date) => roomCell(cellPairs(data.pairs, date, row.slot), date === data.today)))))))),
+      weekGrid({ data, cell: roomCell })),
   ];
 }
 
@@ -313,6 +294,8 @@ function syllabusSection(data) {
 
 function reloadCard() {
   state.data = null;
+  state.progress = null;
+  state.progressFailed = false;
   refresh();
 }
 

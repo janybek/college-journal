@@ -23,6 +23,9 @@ export function resolveRoute(hash, user) {
   // #/dir/<groups|rooms|disciplines>/<id>: the card of a record (the server checks dir.card itself).
   const card = /^\/dir\/([^/]+)\/([^/]+)$/.exec(path);
   if (card && CARD_TABLES.includes(card[1]) && permissions.includes('dir.card:' + card[1]) && idOf(card[2]) !== null) return { view: 'dirCard', params: { table: card[1], id: idOf(card[2]) } };
+  // #/dir/<students|staff>/<id>: the card of a person (the server checks dir.person itself).
+  const person = /^\/dir\/(students|staff)\/([^/]+)$/.exec(path);
+  if (person && permissions.includes('dir.person:' + person[1]) && idOf(person[2]) !== null) return { view: 'personCard', params: { table: person[1], id: idOf(person[2]) } };
   const studentsOf = /^\/dir\/students\/group\/([^/]+)$/.exec(path);
   if (studentsOf && permissions.includes('dir.list:students') && idOf(studentsOf[1]) !== null) return { view: 'directory', params: { table: 'students', groupId: idOf(studentsOf[1]) } };
   if (path === '/import' && permissions.some((p) => p.startsWith('import.apply:'))) return { view: 'import', params: {} };

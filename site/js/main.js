@@ -30,6 +30,7 @@ import * as task from './views/task.js';
 import * as ledgerList from './views/ledgerList.js';
 import * as ledger from './views/ledger.js';
 import * as dirCard from './views/dirCard.js';
+import * as personCard from './views/personCard.js';
 import * as repeats from './views/repeats.js';
 import * as repeat from './views/repeat.js';
 import * as requests from './views/requests.js';
@@ -43,7 +44,7 @@ import { initToTop } from './toTop.js';
 
 // Puts the screen chosen by the router into its frame (shell.js: sign-in card, student bar or staff sidebar).
 // A screen may export leave(): it is called when another screen replaces it, to drop what it held.
-const VIEWS = { login, changePassword, home, directory, dirCard, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm, documents, docCard, journalList, journal, journalLog, grades, lesson, checkin, tasks, task, ledgerList, ledger, repeats, repeat, requests, stateExams, stateExam, announcements };
+const VIEWS = { login, changePassword, home, directory, dirCard, personCard, import: importView, settings, weekTemplate, schedule, mySchedule, syllabus, subjects, syllabusForm, documents, docCard, journalList, journal, journalLog, grades, lesson, checkin, tasks, task, ledgerList, ledger, repeats, repeat, requests, stateExams, stateExam, announcements };
 initToTop();
 const page = document.getElementById('page');
 let shownView = null;
