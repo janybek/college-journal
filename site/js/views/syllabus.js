@@ -7,7 +7,7 @@ import { activeRole, menuParts } from '../shell.js';
 import { dayParts, isDate } from '../dates.js';
 import {
   shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, versionLine, pageActions, linesOf, safeLink, keptDone,
-  teachersText, readonlyNote, halvesDone, pageKey,
+  teachersText, responsibleText, readonlyNote, halvesDone, pageKey,
 } from '../syllabus.js';
 import { TABS, checkHalf, checkLine, submitOutcome, fileDownloadKey } from '../syllabusForm.js';
 import { cardHref, shortFio } from '../documents.js';
@@ -180,17 +180,17 @@ function head(view) {
     el('div', { class: 'syllabus-head__text' },
       el('p', { class: 'syllabus-head__kicker' }, t('syllabus.title')),
       el('h1', { class: 'page-title', id: 'syllabus-title' }, subject.name),
-      who(view),
+      who(view, getUser()),
       allDocs(view),
       fileButton(view)),
     uploadControls(view));
 }
 
 // «Группа · Преподаватели: … · Ответственный: …»: one line. The student's line has his own teacher only, and no responsible.
-function who(view) {
+function who(view, user) {
   const { subject, line } = view;
   const names = teachersText(line) || (line ? '' : shortFio(subject.teacherName));
-  const responsible = line && line.responsibleName ? shortFio(line.responsibleName) : '';
+  const responsible = responsibleText(line, user);
   if (!subject.groupName && !names && !responsible) return null;
   const parts = [
     names ? el('span', { class: 'syllabus-head__teacher', id: 'syllabus-teachers' }, icon('briefcase'), t('syllabus.teachers', { names })) : null,
@@ -719,7 +719,7 @@ function titleSection(view) {
     ['syllabus.info.volume', volume],
     ['syllabus.info.split', split],
     ['syllabus.info.teacher', teachersText(view.line) || (view.line ? '' : shortFio(subject.teacherName))],
-    ['syllabus.info.responsible', view.line && view.line.responsibleName ? shortFio(view.line.responsibleName) : ''],
+    ['syllabus.info.responsible', responsibleText(view.line, getUser())],
     ['sform.field.contacts', title.contacts, true],
     ['sform.field.place', title.place],
   ]);

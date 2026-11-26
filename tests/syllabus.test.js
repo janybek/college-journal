@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint, fileName, versionLine, pageActions, linesOf, safeLink, keptDone, teachersText, readonlyNote, halvesDone, pageKey,
+  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint, fileName, versionLine, pageActions, linesOf, safeLink, keptDone, teachersText, responsibleText, readonlyNote, halvesDone, pageKey,
 } from '../site/js/syllabus.js';
 
 // A row of the syllabus page as syllabus.get gives it.
@@ -126,6 +126,15 @@ test('teachersText: the short names in a line; no line, no names, nothing', () =
   assert.equal(teachersText(undefined), '');
   assert.equal(teachersText(null), '');
   assert.equal(teachersText({}), '');
+});
+
+test('responsibleText: the staff see the responsible, a student never, even when the key came', () => {
+  const line = { responsibleName: 'Петров Борис Ильич', teachers: [] };
+  assert.equal(responsibleText(line, { kind: 'staff' }), 'Петров Б. И.');
+  assert.equal(responsibleText(line, { kind: 'student' }), '');
+  assert.equal(responsibleText(line, null), '');
+  assert.equal(responsibleText({ responsibleName: '' }, { kind: 'staff' }), '');
+  assert.equal(responsibleText(undefined, { kind: 'staff' }), '');
 });
 
 test('readonlyNote: the open version seen by one who teaches but does not write it; nobody else', () => {

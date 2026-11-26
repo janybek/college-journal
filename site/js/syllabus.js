@@ -1,4 +1,4 @@
-import { teachersLine } from './documents.js';
+import { shortFio, teachersLine } from './documents.js';
 
 // The syllabus page of a subject (#/syllabus/<subjectId>) without the DOM: the rows are those of syllabus.get, one
 // lesson each (lessonKind, hours, number of the journal), in the order of the plan, which is the order of the pairs.
@@ -221,6 +221,12 @@ export function fileName(parts, extension = '.xlsx') {
 // «Иванова А. С., Петров Б.»: the teachers of the line (the student gets only his own). No line, no teachers: ''.
 export function teachersText(line) {
   return teachersLine(((line && line.teachers) || []).map((teacher) => teacher.fullName));
+}
+
+// «Петров Б.»: the responsible for the syllabus, for the staff only. A student never sees him, even if the key came.
+export function responsibleText(line, user) {
+  if (!user || user.kind === 'student' || !line || !line.responsibleName) return '';
+  return shortFio(line.responsibleName);
 }
 
 // A teacher who teaches the discipline but does not write the syllabus sees the open version for reading only:
