@@ -2,6 +2,8 @@ import { t } from '../i18n.js';
 import { el, badge, emptyState, iconButton, note } from '../ui.js';
 import { icon } from '../icons.js';
 import { PLAN_KINDS, canMove, emptyItem, listAdd, moveLesson, pairNumbers, tableNumbers, unitAbout, unitHasContent } from '../syllabusForm.js';
+import { teachersText } from '../syllabus.js';
+import { shortFio } from '../documents.js';
 import { fileBlock } from './syllabusAttach.js';
 import { boundField, entryField, entryList, lessonTable, listError, numberOf, pointList } from './syllabusFormParts.js';
 
@@ -56,7 +58,8 @@ function titleTab(ctx) {
         el('p', { class: 'sform-fixed__hint' }, t('sform.title.fixedHint'))),
       el('dl', { class: 'facts sform-fixed__facts' },
         fact('sform.title.discipline', subject.name || '—'),
-        fact('sform.title.teacher', subject.teacherName || '—'),
+        fact('sform.title.teacher', teachersText(ctx.form.line) || shortFio(subject.teacherName) || '—'),
+        ctx.form.line && ctx.form.line.responsibleName ? fact('sform.title.responsible', shortFio(ctx.form.line.responsibleName)) : null,
         fact('sform.title.groups', groups.length > 0 ? el('span', { class: 'badges' }, groups.map((name) => badge(name, 'primary'))) : '—'))),
     el('div', { class: 'sform-blocks' },
       block('sf-block-program', 'sform.title.block.program',

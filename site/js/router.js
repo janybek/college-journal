@@ -26,6 +26,14 @@ export function resolveRoute(hash, user) {
   const studentsOf = /^\/dir\/students\/group\/([^/]+)$/.exec(path);
   if (studentsOf && permissions.includes('dir.list:students') && idOf(studentsOf[1]) !== null) return { view: 'directory', params: { table: 'students', groupId: idOf(studentsOf[1]) } };
   if (path === '/import' && permissions.some((p) => p.startsWith('import.apply:'))) return { view: 'import', params: {} };
+  // #/syllabus/d/<disciplineId>[/<1|2>[/draft]]: the syllabus of a discipline, the same halves as below.
+  const byDiscipline = /^\/syllabus\/d\/([^/]+)(?:\/([12])(\/draft)?)?$/.exec(path);
+  if (byDiscipline && permissions.includes('syllabus.get') && idOf(byDiscipline[1]) !== null) {
+    const params = { disciplineId: idOf(byDiscipline[1]) };
+    if (byDiscipline[2]) params.semester = Number(byDiscipline[2]);
+    if (byDiscipline[3]) params.version = 'open';
+    return { view: 'syllabus', params };
+  }
   // #/syllabus/<subjectId>, #/syllabus/<subjectId>/<1|2>: the syllabus of a subject, in that semester of the year;
   // #/syllabus/<subjectId>/<1|2>/draft: its new version (the open one), not yet approved.
   const syllabus = /^\/syllabus\/([^/]+)(?:\/([12])(\/draft)?)?$/.exec(path);

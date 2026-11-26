@@ -46,11 +46,12 @@ export function teachersLine(names) {
 
 export const shortFio = shortened;
 
-// The page of the syllabus of a subject in a half of the year (draft: the open version), or the card of the discipline
-// when the row has no subject to open it by.
+// The page of the syllabus of a discipline in a half of the year (draft: the open version); the list of the syllabi
+// when the row has no discipline.
 export function openHref(row) {
-  if (!row || !row.subjectId) return cardHref(row?.disciplineId ?? '');
-  return `#/syllabus/${row.subjectId}/${row.semester}${row.draft ? '/draft' : ''}`;
+  if (!row || !row.disciplineId) return '#/documents/syllabi';
+  const half = row.semester === 1 || row.semester === 2 ? '/' + row.semester + (row.draft ? '/draft' : '') : '';
+  return '#/syllabus/d/' + encodeURIComponent(row.disciplineId) + half;
 }
 
 export const cardHref = (disciplineId) => '#/documents/discipline/' + encodeURIComponent(disciplineId);

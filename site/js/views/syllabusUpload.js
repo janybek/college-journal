@@ -87,7 +87,7 @@ async function download(view) {
   }
 }
 
-// Choose a file and check it. subject: { subjectId, disciplineName, teacherName, groupNames }; onDone(answer): after
+// Choose a file and check it. subject: { subjectId or disciplineId, disciplineName, teacherName, groupNames }; onDone(answer): after
 // the upload, with the answer of syllabus.apply. returnId: the button (or ids to try in turn) focus goes back to when
 // the window closes; a screen with several upload buttons names its own. intoDraft: the syllabus form calls it — the
 // window says the file fills the draft and its button says «Заполнить черновик».
@@ -157,7 +157,10 @@ async function readBook(XLSX, file) {
 }
 
 // Only what the server reads: the name and the cells of every sheet.
-const request = (check) => ({ subjectId: check.subject.subjectId, sheets: check.sheets.map(({ name, cells }) => ({ name, cells })) });
+const request = (check) => ({
+  ...(check.subject.subjectId ? { subjectId: check.subject.subjectId } : { disciplineId: check.subject.disciplineId }),
+  sheets: check.sheets.map(({ name, cells }) => ({ name, cells })),
+});
 
 async function preview(check) {
   Object.assign(check, { phase: 'checking', messageKey: null, retry: null });

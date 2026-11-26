@@ -290,3 +290,18 @@ test('resolveRoute: the card of a record needs dir.card of its table', () => {
   assert.equal(resolveRoute('#/dir/groups/%E0%A4%A', dean).view, 'home');
   assert.equal(resolveRoute('#/dir/groups/g1', { mustChangePassword: false, permissions: [] }).view, 'home');
 });
+
+test('resolveRoute: the syllabus of a discipline has its own address, in both halves and as the new version', () => {
+  const viewer = { mustChangePassword: false, permissions: ['syllabus.get'] };
+  assert.deepEqual(resolveRoute('#/syllabus/d/dc_1', viewer), { view: 'syllabus', params: { disciplineId: 'dc_1' } });
+  assert.deepEqual(resolveRoute('#/syllabus/d/dc_1/2', viewer), { view: 'syllabus', params: { disciplineId: 'dc_1', semester: 2 } });
+  assert.deepEqual(resolveRoute('#/syllabus/d/dc_1/1/draft', viewer), { view: 'syllabus', params: { disciplineId: 'dc_1', semester: 1, version: 'open' } });
+  assert.deepEqual(resolveRoute('#/syllabus/d/a%20b/1', viewer), { view: 'syllabus', params: { disciplineId: 'a b', semester: 1 } });
+  // «d» alone is a subject called d (no such address of a discipline); a broken escape is not found
+  for (const bad of ['#/syllabus/d/dc_1/3', '#/syllabus/d/dc_1/draft', '#/syllabus/d/dc_1/1/draft/x', '#/syllabus/d/%E0%A4%A']) {
+    assert.equal(resolveRoute(bad, viewer).view, 'home', bad);
+  }
+  assert.equal(resolveRoute('#/syllabus/d/dc_1', { mustChangePassword: false, permissions: [] }).view, 'home');
+  // the address of a subject is not touched
+  assert.deepEqual(resolveRoute('#/syllabus/sb_1/2', viewer), { view: 'syllabus', params: { subjectId: 'sb_1', semester: 2 } });
+});

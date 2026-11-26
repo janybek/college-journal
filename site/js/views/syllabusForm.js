@@ -6,9 +6,12 @@ import {
 import { icon } from '../icons.js';
 import { dayParts, isDate } from '../dates.js';
 import {
-  PLAN_KINDS, TABS, checkLine, checkTabs, emptyItem, errorKeyOf, errorMap, errorsAfterEdit, isDirty, keptOrder, placeErrors, sameValue, sectionData, statusKind,
-  submitOutcome, unitAbout,
+  PLAN_KINDS, TABS, checkHalf, checkLine, checkTabs, emptyItem, errorKeyOf, errorMap, errorsAfterEdit, halfLinks, isDirty, keptOrder, otherHalf, placeErrors, sameValue,
+  sectionData, statusKind, submitOutcome, unitAbout,
 } from '../syllabusForm.js';
+import { halvesDone, pageKey, teachersText } from '../syllabus.js';
+import { shortFio } from '../documents.js';
+import { announce } from './syllabus.js';
 import { canFillFromFile } from '../fillFromFile.js';
 import { renderTab } from './syllabusFormTabs.js';
 import { leaveAttach } from './syllabusAttach.js';
@@ -17,7 +20,8 @@ import { refreshReviewCount } from '../reviewCount.js';
 
 // The form of a syllabus version (#/syllabus-form/<syllabusId>/<tab>): the head with the status and the buttons of the
 // version (the file into the draft, the draft as a file, «Отправить на утверждение»), the remark of the deanery on a
-// returned version, what to fix before submitting, nine tabs, the body of the shown tab and its «Сохранить». Each tab
+// returned version, the switch between the halves of the year (autumn and spring are one syllabus, two versions),
+// what to fix before submitting, nine tabs, the body of the shown tab and its «Сохранить». Each tab
 // is a section of the document and is saved on its own (syllabus.saveSection); the tabs with unsaved changes carry a
 // dot, and leaving the screen asks first. The values live in the state below: typing changes the state and nothing is
 // redrawn; adding, removing, moving and saving redraw the screen, and every field has a fixed id, so focus comes back
@@ -48,7 +52,8 @@ const blank = () => ({
   cleared: false,      // the errors of that check are all fixed now
   submitting: null,    // 'check' | 'send': a request of «Отправить на утверждение» is on its way
   submitAsk: null,     // { warnings }: the question before the version is sent
-  actionError: null,   // a dictionary key: «Отправить», «Скачать» or the file did not work
+  actionError: null,   // a dictionary key: «Отправить», «Скачать», «Добавить весну» or the file did not work
+  addingHalf: false,   // syllabus.startDraft of the other half is on its way
 });
 let state = blank();
 
@@ -142,18 +147,14 @@ function failure() {
   return body;
 }
 
-// The syllabus page of the subject, in the half of the year of this version; a version of a teacher who has no group
-// with the discipline any more goes back to «Предметы».
+// The syllabus page of the discipline, in the half of the year of this version.
 function pageHref() {
   const form = state.form;
-  if (form && form.subject.id) return `#/syllabus/${form.subject.id}/${form.syllabus.semester}`;
-  return form ? '#/subjects' : '#/';
+  return form ? `#/syllabus/d/${encodeURIComponent(form.subject.disciplineId)}/${form.syllabus.semester}` : '#/';
 }
 
 function backLink() {
-  const form = state.form;
-  const key = form && form.subject.id ? 'sform.back' : form ? 'syllabus.back.office' : 'common.toHome';
-  return el('a', { class: 'back-link', href: pageHref() }, icon('chevron'), t(key));
+  return el('a', { class: 'back-link', href: pageHref() }, icon('chevron'), t(state.form ? 'sform.back' : 'common.toHome'));
 }
 
 const dayText = (date) => {
@@ -173,6 +174,7 @@ function screen() {
   return el('div', { class: 'sform' },
     backLink(),
     head(),
+    halfSwitch(),
     remark(),
     editable() ? null : note('info', t(readOnlyKey()), { class: 'sform-readonly', id: 'sf-readonly' }),
     checksPanel(),
@@ -194,9 +196,49 @@ function head() {
       el('div', { class: 'sform-head__meta' },
         badge(t('syllabus.status.' + syllabus.status), STATUS_TONES[syllabus.status] ?? 'neutral', true),
         el('span', { class: 'sform-head__version' }, t('sform.version', { n: syllabus.version })),
-        subject.teacherName ? el('span', { class: 'sform-head__who' }, icon('briefcase'), subject.teacherName) : null,
+        whoLine(),
         groups.length > 0 ? el('span', { class: 'badges', 'aria-label': t('sform.title.groups') }, groups.map((name) => badge(name, 'primary'))) : null)),
     actions());
+}
+
+// «Преподаватели: … · Ответственный: …» as on the page of the syllabus.
+function whoLine() {
+  const { subject, line } = state.form;
+  const names = teachersText(line) || shortFio(subject.teacherName);
+  const responsible = line && line.responsibleName ? shortFio(line.responsibleName) : '';
+  if (!names && !responsible) return null;
+  const parts = [names ? t('syllabus.teachers', { names }) : null, responsible ? t('syllabus.responsible', { name: responsible }) : null].filter(Boolean);
+  return el('span', { class: 'sform-head__who', id: 'sf-who' }, icon('briefcase'), parts.join(' · '));
+}
+
+// «Осень / Весна»: the two halves of the year are versions of one syllabus; a link to the other one (its saved form is
+// asked about first when this one has unsaved sections). A syllabus with one half offers «Добавить весну / осень».
+function halfSwitch() {
+  const links = halfLinks(state.form.halves, state.syllabusId);
+  if (links.length === 0) return null;
+  return el('nav', { class: 'segmented sform-halves', id: 'sf-halves', 'aria-label': t('sform.halves') },
+    links.map((half) => el('a', {
+      id: 'sf-half-' + half.semester, class: 'segmented__button', href: `#/syllabus-form/${half.syllabusId}/${state.tab}`, 'aria-current': half.current ? 'page' : null,
+    }, t('docs.half.' + half.semester))));
+}
+
+async function addHalf(half) {
+  if (state.addingHalf || state.locked || dirtyTabs().length > 0) return;
+  const owner = state;
+  Object.assign(owner, { addingHalf: true, actionError: null });
+  refresh();
+  try {
+    const { syllabusId } = await call('syllabus.startDraft', { disciplineId: owner.form.subject.disciplineId, semester: half });
+    if (state !== owner) return;
+    owner.addingHalf = false;
+    location.hash = `#/syllabus-form/${syllabusId}/${owner.tab}`;
+    return;
+  } catch (error) {
+    if (state !== owner) return;
+    owner.actionError = FINAL_ERRORS[error.code] ?? errorKey(error.code);
+  }
+  owner.addingHalf = false;
+  refresh();
 }
 
 // «Заполнить из файла» and «Отправить на утверждение» for a version that is edited. The file is for the first fill only:
@@ -211,7 +253,7 @@ function actions() {
   const described = waiting ? hintId : null;
   const first = canFillFromFile({ hasApproved: state.form.syllabus.copyOfApproved, topicRows: ((state.saved && state.saved.lessons) || []).length });
   const upload = first ? el('button', {
-    type: 'button', id: 'sf-upload', class: 'button button--secondary', disabled: waiting || state.locked || !subject.id, 'aria-describedby': described,
+    type: 'button', id: 'sf-upload', class: 'button button--secondary', disabled: waiting || state.locked || !subject.disciplineId, 'aria-describedby': described,
     onclick: uploadFile,
   }, icon('upload'), t('syllabus.fillFromFile')) : null;
   const submit = can.submit ? el('button', {
@@ -219,8 +261,14 @@ function actions() {
     onclick: checkBeforeSubmit,
   }, icon('checkCircle'), t('sform.submit')) : null;
   if (submit && state.submitting === 'check') markBusy(submit, 'sform.submit.checking');
+  const half = otherHalf(state.form);
+  const add = half && can.edit ? el('button', {
+    type: 'button', id: 'sf-add-half', class: 'button button--secondary', disabled: waiting || state.locked || state.addingHalf, 'aria-describedby': described,
+    onclick: () => addHalf(half),
+  }, icon('plus'), t('sform.halves.add.' + half)) : null;
+  if (add && state.addingHalf) markBusy(add, 'sform.halves.adding');
   return el('div', { class: 'sform-actions', id: 'sf-actions' },
-    el('div', { class: 'sform-actions__buttons' }, upload, submit),
+    el('div', { class: 'sform-actions__buttons' }, upload, add, submit),
     waiting ? el('p', { class: 'sform-actions__hint', id: hintId }, icon('info'),
       el('span', {}, t('sform.actions.saveFirst', { tabs: dirty.map((tab) => t('sform.tab.' + tab)).join(', ') }))) : null,
     state.actionError ? note('error', t(state.actionError), { role: 'alert', class: 'sform-actions__error' }) : null);
@@ -270,7 +318,9 @@ function tabs() {
 
 function checkText(item) {
   const { key, params } = checkLine(item, hasText);
-  return t(hasText(key) ? key : 'sform.checks.other', { ...params, date: dayText(params.date) });
+  const text = t(hasText(key) ? key : 'sform.checks.other', { ...params, date: dayText(params.date) });
+  const half = checkHalf(item);
+  return half ? t('syllabus.halfPrefix', { half: t('docs.half.' + half), text }) : text;
 }
 
 function checkItem(item, tone) {
@@ -614,8 +664,11 @@ async function send() {
     if (state !== owner) return;
     const outcome = submitOutcome(result);
     if (outcome === 'sent') {
+      const { disciplineId } = owner.form.subject;
       owner.submitAsk = null;
       release();
+      // The page the form goes to says which halves were sent.
+      announce({ key: halvesDone(result) ?? 'syllabus.submit.done', at: pageKey({ disciplineId, semester: owner.form.syllabus.semester }) });
       location.hash = pageHref();
       return;
     }
@@ -664,7 +717,7 @@ function uploadFile() {
   const { subject } = state.form;
   const owner = state;
   startUpload({
-    subjectId: subject.id, disciplineName: subject.name, teacherName: subject.teacherName, groupNames: subject.groups.map((g) => g.groupName).filter(Boolean),
+    disciplineId: subject.disciplineId, disciplineName: subject.name, teacherName: subject.teacherName, groupNames: subject.groups.map((g) => g.groupName).filter(Boolean),
   }, (result) => {
     if (state !== owner) return;
     const drafts = (result && result.drafts) || [];

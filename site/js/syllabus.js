@@ -1,3 +1,5 @@
+import { teachersLine } from './documents.js';
+
 // The syllabus page of a subject (#/syllabus/<subjectId>) without the DOM: the rows are those of syllabus.get, one
 // lesson each (lessonKind, hours, number of the journal), in the order of the plan, which is the order of the pairs.
 
@@ -212,4 +214,38 @@ export function fileName(parts, extension = '.xlsx') {
   const clean = parts.map((part) => String(part ?? '').replace(/[\\/:*?"<>|\u0000-\u001f]/g, ' ').replace(/\s+/g, ' ').trim().replace(/^\.+|\.+$/g, '').trim())
     .filter((part) => part !== '');
   return clean.join(' — ').slice(0, 150).trim() + extension;
+}
+
+// ---- The syllabus of a discipline: who teaches it, who writes it ----
+
+// «Иванова А. С., Петров Б.»: the teachers of the line (the student gets only his own). No line, no teachers: ''.
+export function teachersText(line) {
+  return teachersLine(((line && line.teachers) || []).map((teacher) => teacher.fullName));
+}
+
+// A teacher who teaches the discipline but does not write the syllabus sees the open version for reading only:
+// { key, params: { name } } with the responsible one, else null.
+export function readonlyNote(view) {
+  const line = view && view.line;
+  const open = view && view.state && view.state.open;
+  if (view.shown !== 'open' || !open || !line || line.mine !== 'teaches') return null;
+  if (view.can && view.can.edit) return null;
+  return { key: 'syllabus.readonly', params: { name: line.responsibleName ?? '' } };
+}
+
+const DONE = [['submitted', 'syllabus.submit.done'], ['approved', 'syllabus.approve.done'], ['returned', 'syllabus.return.done']];
+
+// The key of the note after «Отправить», «Утвердить» or «Вернуть»: the answer of the server names the halves of the year
+// (halves: [1], [2] or [1, 2]); an answer that does not keeps the note of before. Not done (an error list): null.
+export function halvesDone(result) {
+  const found = result ? DONE.find(([flag]) => result[flag] === true) : null;
+  if (!found) return null;
+  const halves = Array.isArray(result.halves) ? result.halves.filter((half) => half === 1 || half === 2) : [];
+  if (halves.length === 0) return found[1];
+  return found[1] + '.' + (halves.length > 1 ? 'both' : halves[0]);
+}
+
+// The key of an address of the syllabus page: by a subject or by a discipline (the prefix keeps the two apart).
+export function pageKey({ subjectId, disciplineId, semester = null, version = 'approved' }) {
+  return (subjectId === undefined ? ['discipline', disciplineId] : ['subject', subjectId]).concat(semester ?? '', version).join('|');
 }

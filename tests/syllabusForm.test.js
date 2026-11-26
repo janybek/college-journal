@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   TABS, tabOf, listAdd, listRemove, listMove, emptyItem, sectionData, isDirty, errorMap, tableNumbers, unitHasContent, unitAbout, withoutBlankRows,
   pairNumbers, canMove, moveLesson, checkTabs, checkLine, placeErrors, errorsAfterEdit, statusKind, keptOrder, submitOutcome,
-  syllabusFileProblem, syllabusFileErrorKey, fileDownloadKey, SYLLABUS_FILE_KINDS,
+  syllabusFileProblem, syllabusFileErrorKey, fileDownloadKey, SYLLABUS_FILE_KINDS, checkHalf, otherHalf, halfLinks,
 } from '../site/js/syllabusForm.js';
 
 const units = [{ unit: 1, title: 'Основы', lecture: [{ id: 'tp_1', name: 'Л', hours: 2, controlForms: '', selfHours: null, description: '', number: 1 }], practice: [], seminar: [], lab: [], control: [] },
@@ -212,4 +212,29 @@ test('the file of a syllabus: kinds, problems before reading, error keys, the do
     .map(syllabusFileErrorKey), ['sform.file.error.bad_file', 'sform.file.error.syllabus_locked', 'sform.file.error.too_big', 'work.upload.error.upload_slow', null, null]);
   assert.deepEqual(['pdf', 'docx', 'doc', 'xlsx', undefined].map(fileDownloadKey),
     ['syllabus.file.download.pdf', 'syllabus.file.download.word', 'syllabus.file.download.word', null, null]);
+});
+
+// ---- The halves of the year of one syllabus ----
+
+test('checkHalf: the half a check names, when the server names it', () => {
+  assert.equal(checkHalf({ section: 'plan', code: 'x', semester: 1 }), 1);
+  assert.equal(checkHalf({ section: 'plan', code: 'x', semester: 2 }), 2);
+  assert.equal(checkHalf({ section: 'plan', code: 'x' }), null);
+  assert.equal(checkHalf({ section: 'plan', code: 'x', semester: 3 }), null);
+  assert.equal(checkHalf(null), null);
+});
+
+test('otherHalf: the half the syllabus does not have yet, only for a syllabus that may have two', () => {
+  assert.equal(otherHalf({ halves: [{ semester: 1 }], line: { kind: 'main' }, syllabus: { semester: 1 } }), 2);
+  assert.equal(otherHalf({ halves: [{ semester: 2 }], line: { kind: 'main' }, syllabus: { semester: 2 } }), 1);
+  assert.equal(otherHalf({ halves: [{ semester: 1 }, { semester: 2 }], line: { kind: 'main' }, syllabus: { semester: 1 } }), null);
+  assert.equal(otherHalf({ halves: [{ semester: 1 }], line: { kind: 'own' }, syllabus: { semester: 1 } }), null);
+  assert.equal(otherHalf({ halves: [{ semester: 1 }], syllabus: { semester: 1 } }), 2);
+});
+
+test('halfLinks: the versions of both halves, the shown one marked; none when there is one half', () => {
+  const halves = [{ semester: 2, syllabusId: 'sy_2', status: 'draft' }, { semester: 1, syllabusId: 'sy_1', status: 'draft' }];
+  assert.deepEqual(halfLinks(halves, 'sy_1'), [{ semester: 1, syllabusId: 'sy_1', current: true }, { semester: 2, syllabusId: 'sy_2', current: false }]);
+  assert.deepEqual(halfLinks([halves[1]], 'sy_1'), []);
+  assert.deepEqual(halfLinks(undefined, 'sy_1'), []);
 });

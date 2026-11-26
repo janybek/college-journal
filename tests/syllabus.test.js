@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint, fileName, versionLine, pageActions, linesOf, safeLink, keptDone,
+  shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, mayHaveRenamed, renamedHint, fileName, versionLine, pageActions, linesOf, safeLink, keptDone, teachersText, readonlyNote, halvesDone, pageKey,
 } from '../site/js/syllabus.js';
 
 // A row of the syllabus page as syllabus.get gives it.
@@ -115,4 +115,60 @@ test('keptDone: the note of a decision stays only on the address it was made for
   // the other half of the year of the same subject, the new version, another subject: gone
   assert.deepEqual([keptDone(done, 'sb1|2|approved'), keptDone(done, 'sb1|1|open'), keptDone(done, 'sb2|1|approved'), keptDone(null, 'sb1|1|approved')],
     [null, null, null, null]);
+});
+
+// ---- The syllabus of a discipline: who teaches, who writes, what was done to which half ----
+
+test('teachersText: the short names in a line; no line, no names, nothing', () => {
+  assert.equal(teachersText({ teachers: [{ fullName: 'Иванова Анна Сергеевна' }, { fullName: 'Петров Борис' }] }), 'Иванова А. С., Петров Б.');
+  assert.equal(teachersText({ teachers: [{ fullName: 'Иванова Анна Сергеевна', id: 't1', groups: ['01-1'] }] }), 'Иванова А. С.');
+  assert.equal(teachersText({ teachers: [] }), '');
+  assert.equal(teachersText(undefined), '');
+  assert.equal(teachersText(null), '');
+  assert.equal(teachersText({}), '');
+});
+
+test('readonlyNote: the open version seen by one who teaches but does not write it; nobody else', () => {
+  const open = { syllabusId: 'sy_1', status: 'draft', version: 2 };
+  const seen = (over = {}) => ({
+    shown: 'open', state: { approved: null, open }, can: { edit: false }, line: { mine: 'teaches', responsibleName: 'Петров Борис' }, ...over,
+  });
+  assert.deepEqual(readonlyNote(seen()), { key: 'syllabus.readonly', params: { name: 'Петров Борис' } });
+  // the responsible one writes it: no note, whatever `can` says
+  assert.equal(readonlyNote(seen({ can: { edit: true }, line: { mine: 'responsible', responsibleName: 'Петров Борис' } })), null);
+  assert.equal(readonlyNote(seen({ can: { edit: false }, line: { mine: 'responsible', responsibleName: 'Петров Борис' } })), null);
+  // a teacher who teaches and may edit (the deanery filled the version for him): no note
+  assert.equal(readonlyNote(seen({ can: { edit: true } })), null);
+  // the approved version is not a draft to be written
+  assert.equal(readonlyNote(seen({ shown: 'approved' })), null);
+  // no open version at all
+  assert.equal(readonlyNote(seen({ state: { approved: null, open: null } })), null);
+  // the deanery and the student (who has no `mine`)
+  assert.equal(readonlyNote(seen({ line: { mine: null, responsibleName: '' } })), null);
+  assert.equal(readonlyNote(seen({ line: { teachers: [{ fullName: 'Х' }] } })), null);
+  assert.equal(readonlyNote(seen({ line: undefined })), null);
+  assert.equal(readonlyNote({}), null);
+});
+
+test('halvesDone: the text after a decision names the halves of the year it touched', () => {
+  assert.equal(halvesDone({ submitted: true, halves: [1, 2] }), 'syllabus.submit.done.both');
+  assert.equal(halvesDone({ submitted: true, halves: [1] }), 'syllabus.submit.done.1');
+  assert.equal(halvesDone({ submitted: true, halves: [2] }), 'syllabus.submit.done.2');
+  assert.equal(halvesDone({ approved: true, halves: [1, 2] }), 'syllabus.approve.done.both');
+  assert.equal(halvesDone({ approved: true, halves: [2] }), 'syllabus.approve.done.2');
+  assert.equal(halvesDone({ returned: true, halves: [1, 2] }), 'syllabus.return.done.both');
+  assert.equal(halvesDone({ returned: true, halves: [1] }), 'syllabus.return.done.1');
+  // an answer without halves (an older server) keeps the words of before
+  assert.equal(halvesDone({ submitted: true }), 'syllabus.submit.done');
+  assert.equal(halvesDone({ approved: true, halves: [] }), 'syllabus.approve.done');
+  assert.equal(halvesDone({ returned: true }), 'syllabus.return.done');
+  assert.equal(halvesDone({ submitted: false, halves: [1] }), null);
+  assert.equal(halvesDone(null), null);
+});
+
+test('pageKey: the address of the page, by a subject and by a discipline, never the same', () => {
+  assert.equal(pageKey({ subjectId: 's1' }), 'subject|s1||approved');
+  assert.equal(pageKey({ subjectId: 's1', semester: 2, version: 'open' }), 'subject|s1|2|open');
+  assert.equal(pageKey({ disciplineId: 'x1', semester: 1 }), 'discipline|x1|1|approved');
+  assert.notEqual(pageKey({ subjectId: 'd:x1' }), pageKey({ disciplineId: 'x1' }));
 });

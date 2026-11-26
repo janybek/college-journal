@@ -12,7 +12,7 @@ let current = null;
 export async function openAssignDialog(disciplineId, { onSaved, card = null }) {
   let data = card;
   if (data === null) {
-    try { data = await call('docs.discipline', { disciplineId }); } catch (error) { return; }
+    try { data = await call('docs.discipline', { disciplineId }); } catch (error) { return showFailure(error.code, disciplineId); }
   }
   if (!Array.isArray(data.staff)) return;
   const form = { teacherId: data.line ? data.line.responsibleId : '', dueDate: data.line ? data.line.dueDate : '', busy: false, errorKey: null };
@@ -22,6 +22,18 @@ export async function openAssignDialog(disciplineId, { onSaved, card = null }) {
     showModal(document.getElementById('app'), current);
   };
   draw();
+}
+
+// The staff could not be read: the window says why, in words, and closes.
+function showFailure(code, disciplineId) {
+  if (current) current.remove();
+  const dialog = modal({ id: 'docs-assign-dialog', labelledBy: 'docs-assign-title', onClose: () => { current = null; focusById('docs-assign-' + disciplineId, 'docs-assign'); } },
+    el('h2', { class: 'dialog__title', id: 'docs-assign-title' }, t('docs.assign')),
+    note('error', t(errorKey(code)), { role: 'alert' }),
+    el('div', { class: 'dialog__actions' },
+      el('button', { type: 'button', class: 'button button--secondary', autofocus: true, onclick: () => dialog.close() }, t('common.close'))));
+  current = dialog;
+  showModal(document.getElementById('app'), dialog);
 }
 
 function build(disciplineId, data, form, draw, onSaved) {

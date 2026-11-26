@@ -7,13 +7,11 @@ import { openAssignDialog } from './docAssign.js';
 
 // The card of a discipline (#/documents/discipline/<id>, docs.discipline): its syllabus by halves of the year, who writes
 // it and by when, who teaches it, the history. Buttons come from `can` of the answer. Everything from the server goes on
-// the page as text. The page of a syllabus is opened by the subject of the row of the list (docs.syllabi), until the
-// address by the discipline appears.
+// the page as text. The page of a syllabus is opened by the discipline (openHref).
 
 const blank = () => ({
   disciplineId: null,
   data: null,          // the answer of docs.discipline; null until it comes
-  subjectId: '',       // a subject to open the syllabus page by ('' - none)
   loading: false,
   errorCode: null,
   ticket: 0,
@@ -43,15 +41,10 @@ async function load() {
   const ticket = ++owner.ticket;
   owner.loading = true;
   try {
-    const [data, board] = await Promise.all([
-      call('docs.discipline', { disciplineId: owner.disciplineId }),
-      call('docs.syllabi', {}).catch(() => null),
-    ]);
+    const data = await call('docs.discipline', { disciplineId: owner.disciplineId });
     if (state !== owner || owner.ticket !== ticket) return;
     owner.data = data;
     owner.errorCode = null;
-    const row = board ? [...board.approved, ...board.review, ...board.development].find((r) => r.disciplineId === owner.disciplineId && r.subjectId) : null;
-    owner.subjectId = row ? row.subjectId : '';
   } catch (error) {
     if (state !== owner || owner.ticket !== ticket) return;
     owner.errorCode = error.code ?? 'unknown';
@@ -106,12 +99,12 @@ function halfRow(data, half) {
   const shown = open && open.status !== 'approved' ? open : approved;
   const meta = [t('docs.version', { n: shown.version }), dayOf(shown === approved ? approved.decidedAt : shown.submittedAt)].filter(Boolean).join(' · ');
   const draft = Boolean(open) && open.status !== 'approved';
-  const href = openHref({ disciplineId: data.discipline.id, subjectId: state.subjectId, semester: half.semester, draft });
+  const href = openHref({ disciplineId: data.discipline.id, semester: half.semester, draft });
   return el('li', { class: 'doc-half' },
     el('span', { class: 'doc-half__name' }, t('docs.half.' + half.semester)),
     stateText,
     el('span', { class: 'doc-half__meta' }, meta),
-    state.subjectId ? el('a', { class: 'button button--secondary doc-half__open', id: 'doc-open-' + half.semester, href }, t('docs.open')) : null);
+    el('a', { class: 'button button--secondary doc-half__open', id: 'doc-open-' + half.semester, href }, t('docs.open')));
 }
 
 function syllabusSection(data) {

@@ -38,9 +38,11 @@ test('teachersLine: surname and initials', () => {
   assert.equal(teachersLine([]), '');
 });
 
-test('openHref: the page of the subject, or the card without a subject', () => {
-  assert.equal(openHref({ disciplineId: 'd1', subjectId: 's1', semester: 2 }), '#/syllabus/s1/2');
-  assert.equal(openHref({ disciplineId: 'd1', subjectId: 's1', semester: 1, draft: true }), '#/syllabus/s1/1/draft');
-  assert.equal(openHref({ disciplineId: 'd1', subjectId: '', semester: 1 }), '#/documents/discipline/d1');
+test('openHref: the page of the discipline, in its half of the year (the new version: draft)', () => {
+  assert.equal(openHref({ disciplineId: 'd1', subjectId: 's1', semester: 2 }), '#/syllabus/d/d1/2');
+  assert.equal(openHref({ disciplineId: 'd1', semester: 1, draft: true }), '#/syllabus/d/d1/1/draft');
+  assert.equal(openHref({ disciplineId: 'a b', semester: 1 }), '#/syllabus/d/a%20b/1');
+  assert.equal(openHref({ disciplineId: 'd1' }), '#/syllabus/d/d1');
+  assert.equal(openHref({ semester: 1 }), '#/documents/syllabi');
   assert.equal(cardHref('a b'), '#/documents/discipline/a%20b');
 });

@@ -343,3 +343,26 @@ export function fileDownloadKey(kind) {
   if (kind === 'pdf') return 'syllabus.file.download.pdf';
   return kind === 'docx' || kind === 'doc' ? 'syllabus.file.download.word' : null;
 }
+
+// ---- The halves of the year of one syllabus (autumn and spring are two versions of one syllabus) ----
+
+// The half of the year a check names (1 or 2), when the version has two halves and the server says which one; else null.
+export function checkHalf(item) {
+  return item && (item.semester === 1 || item.semester === 2) ? item.semester : null;
+}
+
+// The half «Добавить …» would start: the one the syllabus does not have, or null when it has both (or may have only one).
+// form: the answer of syllabus.form.
+export function otherHalf(form) {
+  const have = new Set(((form && form.halves) || []).map((half) => half.semester));
+  if (have.size !== 1 || (form.line && form.line.kind === 'own')) return null;
+  const mine = form.syllabus ? form.syllabus.semester : [...have][0];
+  return mine === 1 ? 2 : 1;
+}
+
+// The switch «Осень / Весна» of the form: [{ semester, syllabusId, current }] by half; none when there is one half.
+export function halfLinks(halves, syllabusId) {
+  const list = Array.isArray(halves) ? halves : [];
+  if (list.length < 2) return [];
+  return [...list].sort((a, b) => a.semester - b.semester).map((half) => ({ semester: half.semester, syllabusId: half.syllabusId, current: half.syllabusId === syllabusId }));
+}

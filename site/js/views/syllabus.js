@@ -7,16 +7,19 @@ import { activeRole, menuParts } from '../shell.js';
 import { dayParts, isDate } from '../dates.js';
 import {
   shortDate, unitGroups, describedRows, hasSelfHours, undated, scheduleNotes, versionLine, pageActions, linesOf, safeLink, keptDone,
+  teachersText, readonlyNote, halvesDone, pageKey,
 } from '../syllabus.js';
-import { TABS, checkLine, submitOutcome, fileDownloadKey } from '../syllabusForm.js';
+import { TABS, checkHalf, checkLine, submitOutcome, fileDownloadKey } from '../syllabusForm.js';
+import { cardHref, shortFio } from '../documents.js';
 import { sizeText } from '../work.js';
 import { openFile } from './fileView.js';
 import { topicText, lessonTypeKey } from '../pairs.js';
 import { uploadControls, renderUpload, leaveUpload, forgetUploadNote } from './syllabusUpload.js';
 import { refreshReviewCount } from '../reviewCount.js';
 
-// The syllabus of a subject (#/syllabus/<subjectId>/<1|2>, and its new version …/draft), the same page for the
-// deanery, the teacher and the student. Every section of the version shown, under a list of the sections: the title
+// The syllabus of a subject (#/syllabus/<subjectId>/<1|2>, and its new version …/draft) or of a discipline
+// (#/syllabus/d/<disciplineId>/<1|2>, no dates of pairs: they are the group's), the same page for the deanery, the
+// teacher and the student. Every section of the version shown, under a list of the sections: the title
 // page, the aim and the outcomes, the thematic plan in the order of the pairs with the dates of the group, the units,
 // СРС, the reading list, the software, the policies; a section with nothing in it is left out. The staff see a bar
 // with the status of the version and what they may do with it (pageActions: into the form, send it, approve it or
@@ -30,7 +33,8 @@ const REMARK_MAX = 5000;
 const GRADES = [['fail', 'Fail'], ['fair', 'Fair'], ['good', 'Good'], ['excellent', 'Excellent']];
 
 const blank = () => ({
-  key: null,           // 'subjectId|semester|version' of the address; the semester part is empty when the address has none
+  key: null,           // pageKey of the address (subject or discipline, semester, version); the semester part is empty when the address has none
+  byDiscipline: false, // the address names a discipline
   shownKey: null,      // the key `view` was read for
   view: null,          // the answer of syllabus.get being drawn
   loadingKey: null,
@@ -46,6 +50,12 @@ const blank = () => ({
   done: null,          // { key, at }: what the last decision did («Силлабус утверждён…») and the address key it is shown on
 });
 let state = blank();
+let announced = null;  // { key, at }: a note another screen (the form) leaves for the page it goes to
+
+// The form sends the version and goes to the page: the page says so (the note is for the address it was made for).
+export function announce(done) {
+  announced = done;
+}
 
 const present = (value) => value !== null && value !== undefined && value !== '';
 const filled = (text) => typeof text === 'string' && text.trim() !== '';
@@ -56,15 +66,21 @@ export function leave() {
 }
 
 export function render(root, params) {
-  const { subjectId, semester = null, version = 'approved' } = params;
+  const { semester = null, version = 'approved' } = params;
   const user = getUser();
-  const key = [subjectId, semester ?? '', version].join('|');
+  const key = pageKey(params);
   if (state.key !== key) {
     // The note of a decision stays only where the page went right after it (keptDone): not on another half of the year.
-    Object.assign(state, { key, errorKey: null, errorCode: null, actionError: null, checks: null, done: keptDone(state.done, key) });
+    Object.assign(state, { key, byDiscipline: params.disciplineId !== undefined, errorKey: null, errorCode: null, actionError: null, checks: null, done: keptDone(state.done, key) });
     forgetUploadNote();
   }
-  if (state.shownKey !== key && state.loadingKey !== key && state.errorKey === null) load(state, subjectId, semester, version);
+  if (announced) {
+    if (announced.at === key) state.done = announced;
+    announced = null;
+  }
+  if (state.shownKey !== key && state.loadingKey !== key && state.errorKey === null) {
+    load(state, params.subjectId === undefined ? { disciplineId: params.disciplineId } : { subjectId: params.subjectId }, semester, version);
+  }
 
   root.append(backLink(user), body(user, key));
   if (state.view && state.submitAsk) showModal(root, submitDialog(state.submitAsk));
@@ -86,11 +102,11 @@ function reload() {
   refresh();
 }
 
-async function load(owner, subjectId, semester, version) {
+async function load(owner, what, semester, version) {
   const ticket = ++owner.ticket;
   const key = owner.key;
   owner.loadingKey = key;
-  const data = { subjectId };
+  const data = { ...what };
   if (semester !== null) data.semester = semester;
   if (version === 'open') data.version = 'open';
   try {
@@ -107,8 +123,10 @@ async function load(owner, subjectId, semester, version) {
   refresh();
 }
 
-// The deanery goes back to its «Предметы»; the teacher and the student to their home, where their subjects are.
+// The page of a discipline goes back to «Документы»; the page of a subject: the deanery to its «Предметы», the teacher
+// and the student to their home, where their subjects are.
 function backLink(user) {
+  if (state.byDiscipline) return el('a', { class: 'back-link', href: '#/documents/syllabi' }, icon('chevron'), t('docs.title'));
   const office = user.kind !== 'student' && menuParts(activeRole(user)).includes('office');
   return el('a', { class: 'back-link', href: office ? '#/subjects' : '#/' }, icon('chevron'), t(office ? 'syllabus.back.office' : 'common.toHome'));
 }
@@ -124,9 +142,14 @@ function failure() {
   return body;
 }
 
-// The addresses of the two versions of the half of the year shown.
-const approvedHref = (view) => `#/syllabus/${view.subject.id}/${view.semester}`;
+// The addresses of the two versions of the half of the year shown: by the subject, or by the discipline when there is no subject.
+const baseHref = (view) => (view.subject.id ? '#/syllabus/' + view.subject.id : '#/syllabus/d/' + encodeURIComponent(view.subject.disciplineId));
+const approvedHref = (view) => `${baseHref(view)}/${view.semester}`;
 const openHref = (view) => approvedHref(view) + '/draft';
+// The key of the address of this version's page (the half of the year is part of it).
+const keyOfView = (view, version) => pageKey({
+  ...(view.subject.id ? { subjectId: view.subject.id } : { disciplineId: view.subject.disciplineId }), semester: view.semester, version,
+});
 
 const dayText = (date) => {
   if (!isDate(date)) return '';
@@ -157,11 +180,32 @@ function head(view) {
     el('div', { class: 'syllabus-head__text' },
       el('p', { class: 'syllabus-head__kicker' }, t('syllabus.title')),
       el('h1', { class: 'page-title', id: 'syllabus-title' }, subject.name),
-      subject.groupName || subject.teacherName ? el('p', { class: 'syllabus-head__who' },
-        subject.groupName ? badge(subject.groupName, 'primary') : null,
-        subject.teacherName ? el('span', { class: 'syllabus-head__teacher' }, icon('briefcase'), subject.teacherName) : null) : null,
+      who(view),
+      allDocs(view),
       fileButton(view)),
     uploadControls(view));
+}
+
+// «Группа · Преподаватели: … · Ответственный: …»: one line. The student's line has his own teacher only, and no responsible.
+function who(view) {
+  const { subject, line } = view;
+  const names = teachersText(line) || (line ? '' : shortFio(subject.teacherName));
+  const responsible = line && line.responsibleName ? shortFio(line.responsibleName) : '';
+  if (!subject.groupName && !names && !responsible) return null;
+  const parts = [
+    names ? el('span', { class: 'syllabus-head__teacher', id: 'syllabus-teachers' }, icon('briefcase'), t('syllabus.teachers', { names })) : null,
+    responsible ? el('span', { class: 'syllabus-head__responsible', id: 'syllabus-responsible' }, t('syllabus.responsible', { name: responsible })) : null,
+  ].filter(Boolean);
+  return el('p', { class: 'syllabus-head__who' },
+    subject.groupName ? badge(subject.groupName, 'primary') : null,
+    parts.flatMap((part, i) => (i > 0 ? [el('span', { class: 'syllabus-head__dot', 'aria-hidden': 'true' }, '·'), part] : [part])));
+}
+
+// «Все документы дисциплины»: the card, for those who may open it.
+function allDocs(view) {
+  const user = getUser();
+  if (!view.subject.disciplineId || !user || !Array.isArray(user.permissions) || !user.permissions.includes('docs.discipline')) return null;
+  return el('a', { class: 'syllabus-head__docs', id: 'syllabus-all-docs', href: cardHref(view.subject.disciplineId) }, icon('book'), t('syllabus.allDocs'));
 }
 
 // The file of the shown version (the full syllabus of the college): one button that opens it; the same for everyone who sees the page.
@@ -191,6 +235,7 @@ const ACTION_BUTTONS = {
 
 function versionBar(view) {
   const line = versionLine(view);
+  const readonly = readonlyNote(view);
   const actions = pageActions(view);
   const shown = actions.filter((action) => ACTION_BUTTONS[action]);
   const main = shown.includes('approve') ? 'approve' : shown[0];
@@ -199,7 +244,8 @@ function versionBar(view) {
   return el('section', { class: 'version-bar', 'data-tone': line.tone, 'aria-labelledby': 'syllabus-status', id: 'syllabus-version' },
     el('p', { class: 'version-bar__status' },
       el('span', { class: 'version-bar__dot', 'aria-hidden': 'true' }),
-      el('span', { class: 'version-bar__text', id: 'syllabus-status' }, t(line.key, line.params))),
+      el('span', { class: 'version-bar__text', id: 'syllabus-status' }, t(line.key, line.params)),
+      readonly ? el('span', { class: 'version-bar__readonly', id: 'syllabus-readonly' }, t(readonly.key, readonly.params)) : null),
     toggle,
     buttons.length > 0 ? el('div', { class: 'version-bar__actions' }, buttons) : null,
     state.actionError ? note('error', t(state.actionError), { role: 'alert', class: 'version-bar__error' }) : null);
@@ -223,9 +269,9 @@ function actionButton(view, action, main) {
     fill: () => openForm(view), continue: () => openForm(view), edit: () => openForm(view),
     submit: () => checkBeforeSubmit(view),
     approve: () => { state.approveAsk = { errors: null, errorKey: null, warning: null }; state.actionError = null; refresh(); loadCourseWarning(); },
-    giveBack: () => openReturnDialog(view.state.open.syllabusId, () => {
+    giveBack: () => openReturnDialog(view.state.open.syllabusId, (result) => {
       if (state.view !== view) return;
-      Object.assign(state, { done: { key: 'syllabus.return.done', at: state.key }, checks: null });
+      Object.assign(state, { done: { key: halvesDone(result) ?? 'syllabus.return.done', at: state.key }, checks: null });
       refreshReviewCount();
       reload();
     }),
@@ -242,7 +288,8 @@ async function openForm(view) {
   Object.assign(owner, { starting: true, actionError: null });
   refresh();
   try {
-    const { syllabusId } = await call('syllabus.startDraft', { subjectId: view.subject.id, semester: view.semester });
+    const by = view.subject.id ? { subjectId: view.subject.id } : { disciplineId: view.subject.disciplineId };
+    const { syllabusId } = await call('syllabus.startDraft', { ...by, semester: view.semester });
     if (state !== owner) return;
     owner.starting = false;
     location.hash = '#/syllabus-form/' + syllabusId;
@@ -301,7 +348,7 @@ async function send() {
       submitAsk: null, busy: null,
       checks: outcome === 'checks' ? result.checks : null,
       actionError: outcome === 'failed' ? 'sform.submit.notSent' : null,
-      done: outcome === 'sent' ? { key: 'syllabus.submit.done', at: owner.key } : null,
+      done: outcome === 'sent' ? { key: halvesDone(result) ?? 'syllabus.submit.done', at: owner.key } : null,
     });
     if (outcome === 'sent') {
       refreshReviewCount();
@@ -344,7 +391,9 @@ function submitDialog({ warnings }) {
 // What a check found, each line a link to its tab of the form (the version can be changed only there).
 function checkText(item) {
   const { key, params } = checkLine(item, hasText);
-  return t(hasText(key) ? key : 'sform.checks.other', { ...params, date: dayText(params.date) });
+  const text = t(hasText(key) ? key : 'sform.checks.other', { ...params, date: dayText(params.date) });
+  const half = checkHalf(item);
+  return half ? t('syllabus.halfPrefix', { half: t('docs.half.' + half), text }) : text;
 }
 
 function checkList(items, syllabusId, tone) {
@@ -404,8 +453,8 @@ async function approve() {
     owner.busy = null;
     if (result.approved === true) {
       // The version approved is the one the approved address shows now: the note goes there with the page.
-      const at = view.shown === 'open' ? [view.subject.id, view.semester, 'approved'].join('|') : owner.key;
-      Object.assign(owner, { approveAsk: null, done: { key: 'syllabus.approve.done', at }, checks: null });
+      const at = view.shown === 'open' ? keyOfView(view, 'approved') : owner.key;
+      Object.assign(owner, { approveAsk: null, done: { key: halvesDone(result) ?? 'syllabus.approve.done', at }, checks: null });
       refreshReviewCount();
       if (view.shown === 'open') location.hash = approvedHref(view);
       else reload();
@@ -454,7 +503,7 @@ function approveDialog(ask) {
 // ---- «Вернуть с замечаниями»: a window of its own, opened here and from «Силлабусы на утверждении» ----
 
 // The window lives on the document, not on the screen: the screens under it are drawn again freely. It goes away
-// when the person leaves the address. onDone(): after the version is returned.
+// when the person leaves the address. onDone(result): after the version is returned (result: the answer of syllabus.return).
 export function openReturnDialog(syllabusId, onDone) {
   document.getElementById('syllabus-return')?.remove();
   let busy = false;
@@ -518,10 +567,10 @@ export function openReturnDialog(syllabusId, onDone) {
     busy = true;
     markBusy(go, 'syllabus.return.busy');
     try {
-      await call('syllabus.return', { syllabusId, remark: area.value });
+      const result = await call('syllabus.return', { syllabusId, remark: area.value });
       busy = false;
       dialog.close();
-      onDone();
+      onDone(result);
     } catch (error) {
       if (!dialog.isConnected) return;
       idle();
@@ -569,7 +618,8 @@ function noSyllabus(view, user) {
 // The group (when the teacher has the discipline in several) and the semester of the year (when both have a syllabus).
 function switches(view) {
   const draft = view.shown === 'open' ? '/draft' : '';
-  const groups = view.groups.length > 1 ? el('div', { class: 'syllabus-switch' },
+  const byDiscipline = !view.subject.id;
+  const groups = view.groups.length > (byDiscipline ? 0 : 1) ? el('div', { class: 'syllabus-switch' },
     el('nav', { class: 'segmented syllabus-switch__links', 'aria-label': t('field.groupId'), 'aria-describedby': 'syllabus-groups-hint' },
       view.groups.map((group) => el('a', {
         id: 'syllabus-group-' + group.subjectId,
@@ -577,13 +627,13 @@ function switches(view) {
         href: '#/syllabus/' + group.subjectId + '/' + view.semester + draft,
         'aria-current': group.subjectId === view.subject.id ? 'page' : null,
       }, group.groupName))),
-    el('p', { class: 'syllabus-switch__hint', id: 'syllabus-groups-hint' }, t('syllabus.groups'))) : null;
+    el('p', { class: 'syllabus-switch__hint', id: 'syllabus-groups-hint' }, t(byDiscipline ? 'syllabus.groups.dates' : 'syllabus.groups'))) : null;
   const semesters = view.semesters.length === 2 ? el('div', { class: 'syllabus-switch' },
     el('nav', { class: 'segmented syllabus-switch__links', 'aria-label': t('syllabus.semesterSwitch') },
       view.semesters.map(({ semester: n }) => el('a', {
         id: 'syllabus-semester-' + n,
         class: 'segmented__button semester-tab',
-        href: '#/syllabus/' + view.subject.id + '/' + n,
+        href: baseHref(view) + '/' + n,
         'aria-current': n === view.semester ? 'page' : null,
       },
       el('span', { class: 'semester-tab__name' }, t('syllabus.semesterN', { n })),
@@ -668,7 +718,8 @@ function titleSection(view) {
     ['syllabus.info.audience', pick('audience')],
     ['syllabus.info.volume', volume],
     ['syllabus.info.split', split],
-    ['syllabus.info.teacher', subject.teacherName],
+    ['syllabus.info.teacher', teachersText(view.line) || (view.line ? '' : shortFio(subject.teacherName))],
+    ['syllabus.info.responsible', view.line && view.line.responsibleName ? shortFio(view.line.responsibleName) : ''],
     ['sform.field.contacts', title.contacts, true],
     ['sform.field.place', title.place],
   ]);
@@ -735,7 +786,7 @@ function planSection(view) {
       group.rows.map((row) => planRow(row, view, self)));
   });
   return [
-    view.shown === 'approved' ? notes(view) : null,
+    view.shown === 'approved' && view.subject.id ? notes(view) : null,
     el('div', { class: 'table-scroll' },
       el('table', { class: 'table plan-table', 'aria-labelledby': sectionId('plan') + '-title' },
         el('thead', {}, el('tr', {}, columns.map(([key, className]) => el('th', { scope: 'col', class: className }, t(key))))),

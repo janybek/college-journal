@@ -238,6 +238,8 @@ function currentName(view, params, role) {
   if (view === 'repeat') return 'repeats';
   if (view === 'stateExam') return 'stateExams';
   if (view === 'journalLog') return menuParts(role).includes('office') ? 'journalLog' : 'journalList';
+  // The syllabus of a discipline is one of the documents.
+  if (view === 'syllabus' && params.disciplineId !== undefined) return 'documents';
   if (view === 'syllabus' || view === 'syllabusForm') return menuParts(role).includes('office') ? 'subjects' : 'home';
   return view;
 }
@@ -304,11 +306,12 @@ function topbar(groups, view, params, current, role, onLang) {
 function crumbs(groups, view, params, current, role) {
   let groupKey = null;
   let pageKey = null;
-  // The syllabus of a subject and its form: under «Расписание» for the deanery, under the teacher's own subjects otherwise.
-  if (view === 'syllabus' || view === 'syllabusForm') {
-    [groupKey, pageKey] = [menuParts(role).includes('office') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
-  } else if (view === 'documents' || view === 'docCard') {
+  // The syllabus of a discipline is one of the documents; the syllabus of a subject and its form: under «Расписание» for the
+  // deanery, under the teacher's own subjects otherwise.
+  if ((view === 'syllabus' && params.disciplineId !== undefined) || view === 'documents' || view === 'docCard') {
     [groupKey, pageKey] = ['docs.title', 'docs.syllabi'];
+  } else if (view === 'syllabus' || view === 'syllabusForm') {
+    [groupKey, pageKey] = [menuParts(role).includes('office') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
   } else {
     for (const group of groups) {
       const item = group.items.find((candidate) => candidate.name === current);
