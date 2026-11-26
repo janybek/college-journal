@@ -145,8 +145,10 @@ test('syllabus upload: semesters as in the curriculum; the spring file leaves th
   publish(sb1, A);
   reset();
   assert.equal(publish(sb1, file([T('Таблицы', 2, ''), M], [['Курс', 2], ['Семестр', 4]])).data.applied, true);      // 4-й семестр по плану — весенний
-  assert.equal(writes['updateMany:pairs'] || 0, 0);
-  assert.deepEqual([store.list('syllabi').map((s) => [s.semester, s.planSemester]), store.list('topics').length], [[[1, 1], [2, 4]], 6]);
+  // a new version covers both halves: the autumn is approved again as a copy of itself, its pairs stand on the copies of their topics
+  assert.equal(writes['updateMany:pairs'], 1);
+  const live = store.list('syllabi').filter((s) => s.status === 'approved');
+  assert.deepEqual([live.map((s) => [s.semester, s.planSemester]), store.list('topics').filter((t) => live.some((s) => s.id === t.syllabusId)).length], [[[1, 1], [2, 4]], 6]);
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);
   call('settings.save', { settings: { ...S, semester: 2 } }, dean);
   assert.deepEqual(lessons(sb1), [['2026-09-01', 'Таблицы', 'lecture', 1], ['2026-09-08', '', '', null]]);
@@ -349,30 +351,32 @@ test('the numbers of the versions of one «discipline + teacher + half»: never 
   store.update('syllabi', store.list('syllabi').find((s) => s.status === 'approved').id, { version: 7 });
   publish(sb1, file([T('Введение', 2, 2), M]));
   assert.deepEqual(numbers().map(([n]) => n).sort((a, b) => a - b), [1, 2, 7, 8]);
-  // the other half of the year goes on with the numbers of the syllabus (they are aligned in a later task)
+  // the other half of the year goes on with the numbers of the syllabus of the discipline
   publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 2]]));
   assert.deepEqual(store.list('syllabi').filter((s) => s.semester === 2).map((s) => s.version), [9]);   // the number runs through both halves of the syllabus of the discipline
 });
 
-test('a year file fills the drafts of both halves; one of them under review — the whole file is refused', () => {
-  const { send, call, fill, snapshotAll, dean, teacher1, sb1 } = setup();
+test('a year file fills the drafts of both halves; a version of the line under review — the whole file is refused', () => {
+  const { store, send, call, fill, snapshotAll, dean, teacher1, sb1 } = setup();
   const year = [{ name: 'Сведения', cells: [['Семестр', '1-2']] }, { name: 'Тематический план', cells: [['Семестр', ...HEAD], [1, ...T('Осень', 2, '')], [2, ...T('Весна', 2, '')]] }];
   const drafts = send('syllabus.apply', sb1, year, teacher1).data.drafts;
   assert.deepEqual(drafts.map((d) => d.semester), [1, 2]);
-  fill(drafts[1].syllabusId, dean);
-  assert.equal(call('syllabus.submit', { syllabusId: drafts[1].syllabusId }, dean).data.submitted, true);
+  for (const d of drafts) fill(d.syllabusId, dean);
+  assert.deepEqual(call('syllabus.submit', { syllabusId: drafts[1].syllabusId }, dean).data.halves, [1, 2]);     // a send takes every started half
   const before = snapshotAll();
   for (const action of ['syllabus.apply', 'syllabus.preview']) {
     const refused = send(action, sb1, year, teacher1).data;
-    assert.deepEqual([refused.ok, refused.applied, refused.errors], [false, false, [{ sheet: 'info', row: 0, field: 'semester', code: 'in_review', semester: 2 }]]);
+    assert.deepEqual([refused.ok, refused.applied, refused.errors], [false, false, [{ sheet: 'info', row: 0, field: 'semester', code: 'in_review', semester: 1 }, { sheet: 'info', row: 0, field: 'semester', code: 'in_review', semester: 2 }]]);
   }
   assert.equal(snapshotAll(), before);
-  // a file for the half that is not under review is accepted
+  // only one half on approval (after the move of an old base): a file for the other half is refused too, the line is not touched in any half
+  store.update('syllabi', drafts[0].syllabusId, { status: 'draft' });
+  const snap = snapshotAll();
   const autumn = send('syllabus.apply', sb1, file([T('Осень 2', 2, ''), M]), teacher1).data;
-  assert.deepEqual([autumn.applied, autumn.drafts.map((d) => d.semester)], [true, [1]]);
-  // while the same teacher cannot put a file into the half under review, nor can the deanery
+  assert.deepEqual([autumn.applied, autumn.errors.map((e) => [e.code, e.semester])], [false, [['in_review', 1]]]);
   const spring = send('syllabus.apply', sb1, file([T('Весна 2', 2, ''), M], [['Семестр', 2]]), dean).data;
-  assert.deepEqual([spring.applied, spring.errors.map((e) => e.code)], [false, ['in_review']]);
+  assert.deepEqual([spring.applied, spring.errors.map((e) => [e.code, e.semester])], [false, [['in_review', 2]]]);
+  assert.equal(snapshotAll(), snap);
 });
 
 test('who uploads: the teacher of the subject, the deanery, the administrator; nobody else', () => {

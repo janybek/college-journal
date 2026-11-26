@@ -7,9 +7,9 @@ import { planSyllabusUpload } from '../core/syllabus.js';
 import { plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES } from '../core/syllabusDoc.js';
 import { copiesOf } from '../core/syllabusFlow.js';
-import { draftTarget, lineFor, lineSubjects, versionsOfLine } from '../core/disciplineSyllabus.js';
+import { draftTarget, lineFor, lineSubjects, reviewRows, versionsOfLine } from '../core/disciplineSyllabus.js';
 import { todayOf } from './scheduleData.js';
-import { createDraft, draftForm, saveSection, teacherOfNew } from './syllabusDraft.js';
+import { draftForm, firstGroup, openDrafts, saveSection } from './syllabusDraft.js';
 import { approveSyllabus } from './syllabusFlow.js';
 import { openLine } from './syllabusLines.js';
 
@@ -22,17 +22,19 @@ const isManager = (user) => user.roles.includes('admin') || user.roles.includes(
 // A cell is text, a finite number, a boolean or empty: an object or an array would be stored as «[object Object]» or «a,b».
 const isCell = (v) => v === null || v === undefined || typeof v === 'string' || typeof v === 'boolean' || (typeof v === 'number' && Number.isFinite(v));
 
-// The request carries the subject (a plain id) and 1-10 sheets of cells.
+// The request carries the subject or the discipline (exactly one of them, a plain id) and 1-10 sheets of cells.
 function checkRequest(data) {
-  const { subjectId, sheets } = isObject(data) ? data : {};
-  if (plainId(subjectId) === null) throw new AppError('bad_request');
+  const { subjectId, disciplineId, sheets } = isObject(data) ? data : {};
+  if ((subjectId === undefined) === (disciplineId === undefined) || plainId(subjectId === undefined ? disciplineId : subjectId) === null) {
+    throw new AppError('bad_request');
+  }
   if (!Array.isArray(sheets) || sheets.length < 1 || sheets.length > MAX_SHEETS) throw new AppError('bad_request');
   for (const sheet of sheets) {
     if (!isObject(sheet) || typeof sheet.name !== 'string' || !Array.isArray(sheet.cells) || sheet.cells.some((row) => !Array.isArray(row) || !row.every(isCell))) {
       throw new AppError('bad_request');
     }
   }
-  return { subjectId, sheets };
+  return { subjectId: subjectId ?? null, disciplineId: disciplineId ?? null, sheets };
 }
 
 // Held pairs by the id of the row they stand on.
@@ -127,13 +129,23 @@ function planFile(doc, subject, ctx) {
 
 // 'syllabus.preview' / 'syllabus.apply'. -> { ok, applied, found, summaries, errors, warnings, drafts }
 export function uploadSyllabus(store, platform, data, user, write) {
-  const { subjectId, sheets: cells } = checkRequest(data);
+  const { subjectId, disciplineId, sheets: cells } = checkRequest(data);
+  const byDiscipline = subjectId === null;
   const subjects = store.list('subjects');
-  const subject = subjects.find((s) => s.id === subjectId);
-  if (!subject) throw new AppError('not_found');
-  if (!(isManager(user) || user.roles.includes('teacher'))) throw new AppError('forbidden');
-  if (typeof subject.disciplineId !== 'string' || subject.disciplineId === '') {
-    throw new AppError('invalid', { fields: [{ field: 'disciplineId', code: 'bad_ref' }] });
+  let subject;
+  if (byDiscipline) {
+    // a file by the discipline has no subject: the teacher of the version is the responsible, the group of an empty draft the first one of the discipline
+    if (!(isManager(user) || user.roles.includes('teacher'))) throw new AppError('forbidden');
+    const discipline = store.list('disciplines').find((d) => d.id === disciplineId);
+    if (!discipline) throw new AppError('not_found');
+    subject = { id: '', name: discipline.name, disciplineId, groupId: '', teacherId: '' };
+  } else {
+    subject = subjects.find((s) => s.id === subjectId);
+    if (!subject) throw new AppError('not_found');
+    if (!(isManager(user) || user.roles.includes('teacher'))) throw new AppError('forbidden');
+    if (typeof subject.disciplineId !== 'string' || subject.disciplineId === '') {
+      throw new AppError('invalid', { fields: [{ field: 'disciplineId', code: 'bad_ref' }] });
+    }
   }
   // the right is the one of a new draft of each half the file names (draftTarget); a person who may start none gets no word about the file
   const syllabi = store.list('syllabi');
@@ -149,14 +161,22 @@ export function uploadSyllabus(store, platform, data, user, write) {
   const tables = { syllabi, topics: store.list('topics'), pairs: store.list('pairs'), units: store.list('units'), literature: store.list('literature') };
   const ctx = { staff, groups, subjects, tables, platform, lines };
   const { plan, found, keyOf } = planFile(parsed.doc, subject, ctx);
+  // by the discipline a half that waits for the choice (no line of its own to take the file) is a mistake of the file; any other refusal is a refusal of the request
+  const waiting = [];
   for (const part of plan.parts) {
     const { code } = target(part.semester);
-    if (code !== 'ok') throw new AppError(code);
+    if (code === 'choose_first' && byDiscipline) waiting.push({ sheet: 'info', row: 0, field: 'semester', code: 'choose_first', semester: part.semester });
+    else if (code !== 'ok') throw new AppError(code);
+  }
+  if (waiting.length > 0) {
+    return { ok: false, applied: false, found: parsed.found, summaries: [], errors: [...parsed.errors, ...waiting], warnings: parsed.warnings, drafts: [] };
   }
 
-  // a version under review is not touched: the file is refused as a whole
-  const busy = plan.parts.filter((p) => found[p.semester].open && found[p.semester].open.status === 'review')
-    .map((p) => ({ sheet: 'info', row: 0, field: 'semester', code: 'in_review', semester: p.semester }));
+  // a line with a version under review is not touched in any half: the file is refused as a whole
+  const busy = plan.parts.filter((p) => {
+    const lineId = lineFor(lines, keyOf(p.semester));
+    return lineId !== null && reviewRows(syllabi, lineId).length > 0;
+  }).map((p) => ({ sheet: 'info', row: 0, field: 'semester', code: 'in_review', semester: p.semester }));
   if (busy.length > 0) {
     return { ok: false, applied: false, found: parsed.found, summaries: [], errors: [...parsed.errors, ...busy], warnings: parsed.warnings, drafts: [] };
   }
@@ -185,33 +205,36 @@ function writeDrafts(store, platform, { subject, user, doc, found, keyOf, ctx, p
   const { tables } = ctx;
   const today = todayOf(platform);
   const made = {};                                                       // half -> { version, units (rows), books (rows) }
-  let others = null;                                                     // the sheets only a copy of an approved version needs
+  const missing = [];                                                    // the halves of the file that have no open version yet
   for (const part of planned.parts) {
-    const half = part.semester;
-    const { open, approved } = found[half];
-    if (open) {
-      made[half] = { version: open, units: tables.units.filter((u) => u.syllabusId === open.id), books: tables.literature.filter((b) => b.syllabusId === open.id) };
-      continue;
-    }
-    const rows = { syllabusLines: ctx.lines, syllabi: tables.syllabi, subjects: ctx.subjects };
+    const { open } = found[part.semester];
+    if (open) made[part.semester] = { version: open, units: tables.units.filter((u) => u.syllabusId === open.id), books: tables.literature.filter((b) => b.syllabusId === open.id) };
+    else missing.push(part.semester);
+  }
+  // the line of each missing half (made when there is none), then the new versions of every line at once (openDrafts: a new version covers both halves)
+  const byLine = new Map();
+  const rows = { syllabusLines: ctx.lines, syllabi: tables.syllabi, subjects: ctx.subjects };
+  for (const half of missing) {
     const line = openLine(store, platform, keyOf(half), user, rows);
-    ctx.lines = rows.syllabusLines;                                      // a line made now is a part of the lines for the next look at the file
-    const teacherId = teacherOfNew(line, ctx.subjects, () => tables.pairs, user.id);
-    let copy;
-    if (approved) {
-      if (others === null) {
-        others = {};
-        for (const name of DOC_TABLES) if (!tables[name]) others[name] = store.list(name);
-      }
-      copy = createDraft(store, platform, { line, half, approved, group: null, userId: user.id, teacherId }, { ...tables, ...others });
-      made[half] = { version: copy.version, units: copy.rows.units, books: copy.rows.literature };
-    } else {
-      const group = ctx.groups.find((g) => g.id === subject.groupId) || null;
-      copy = createDraft(store, platform, { line, half, approved: null, group, userId: user.id, teacherId }, { syllabi: tables.syllabi });
-      made[half] = { version: copy.version, units: [], books: [] };
+    if (!byLine.has(line.id)) byLine.set(line.id, { line, halves: [] });
+    byLine.get(line.id).halves.push(half);
+  }
+  ctx.lines = rows.syllabusLines;                                        // a line made now is a part of the lines for the next look at the file
+  let others = null;                                                     // the sheets only a copy of an approved version needs
+  for (const { line, halves } of byLine.values()) {
+    if (others === null && [1, 2].some((h) => versionsOfLine(tables.syllabi, line.id, h).approved)) {
+      others = {};
+      for (const name of DOC_TABLES) if (!tables[name]) others[name] = store.list(name);
     }
-    tables.syllabi = [...tables.syllabi, copy.version];
-    if (approved) tables.topics = [...tables.topics, ...copy.rows.topics];
+    const group = subject.id !== '' ? ctx.groups.find((g) => g.id === subject.groupId) || null : firstGroup(ctx.groups, ctx.subjects, subject.disciplineId);
+    const opened = openDrafts(store, platform, { line, halves, group, user, subjects: ctx.subjects, pairs: tables.pairs }, { ...tables, ...others });
+    for (const [half, version] of opened) {
+      const copied = opened.rows.get(half) || {};
+      if (halves.includes(half)) made[half] = { version, units: copied.units || [], books: copied.literature || [] };
+      if (!opened.created.has(half)) continue;
+      tables.syllabi = [...tables.syllabi, version];
+      if (copied.topics) tables.topics = [...tables.topics, ...copied.topics];
+    }
   }
 
   // the file again, now against the rows of the versions it will fill (for a copy: the rows of the copy)
@@ -269,7 +292,11 @@ export function publishSyllabusDoc(store, platform, subjectId, doc, user, title 
     const form = draftForm(store, platform, { syllabusId }, user).doc;
     saveSection(store, platform, { syllabusId, section: 'title', data: { ...form.title, ...title } }, user);
     saveSection(store, platform, { syllabusId, section: 'goals', data: { ...form.goals, goal: goal || form.goals.goal } }, user);
-    const done = approveSyllabus(store, platform, { syllabusId }, user);
-    if (!done.approved) throw new Error('publishSyllabusDoc: ' + JSON.stringify(done.checks.errors));
   }
+  // one approval for the first half approves every started half of the line; the others are only checked
+  const [firstHalf, ...rest] = written.list;
+  const done = approveSyllabus(store, platform, { syllabusId: firstHalf.syllabusId }, user);
+  if (!done.approved) throw new Error('publishSyllabusDoc: ' + JSON.stringify(done.checks.errors));
+  const status = new Map(store.list('syllabi').map((s) => [s.id, s.status]));
+  for (const { syllabusId } of rest) if (status.get(syllabusId) !== 'approved') throw new Error('publishSyllabusDoc: a half is not approved: ' + syllabusId);
 }

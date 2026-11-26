@@ -18,6 +18,12 @@ const topic = (unit, name) => [unit, '', name, 2, '', '', 'О теме ' + name]
 const plan = (p) => [topic(1, p + '1'), topic(1, p + '2'), topic(1, p + '3'), UNIT_END(1), topic(2, p + '4'), topic(2, p + '5'), UNIT_END(2)];
 export const FILE_A = file(plan('А'), INFO);
 export const FILE_B = file(plan('Б'), INFO);
+// a file for both halves of the year: the topics of semester 1 (АО1…АО5) and of semester 2 (АВ1…АВ5)
+export const FILE_AB = [
+  { name: 'Сведения', cells: [['Семестр', '1-2'], ...INFO.slice(1)] },
+  { name: 'Тематический план', cells: [['Семестр', 'Юнит', '№', 'Тема', 'Лекция, ч', 'Практика, ч', 'Вид занятия', 'Описание'],
+    ...plan('АО').map((r) => [1, ...r]), ...plan('АВ').map((r) => [2, ...r])] },
+];
 
 const SETTINGS = { semesterStart: '2026-09-01', semesterEnd: '2026-12-20', holidays: [], bells: DEFAULT_BELLS, semester: 1 };
 
@@ -95,8 +101,13 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
       const title = { ...form.doc.title, department: form.doc.title.department || 'Кафедра', academicYear: form.doc.title.academicYear || '2026–2027', course: form.doc.title.course || 1, credits: form.doc.title.credits || 1 };
       call('syllabus.saveSection', { syllabusId, section: 'title', data: title }, t.dean);
       call('syllabus.saveSection', { syllabusId, section: 'goals', data: { ...form.doc.goals, goal: form.doc.goals.goal || 'Цель курса' } }, t.dean);
-      const approved = call('syllabus.approve', { syllabusId }, t.dean);
-      if (!approved.ok || !approved.data.approved) throw new Error('publish: not approved: ' + JSON.stringify(approved));
+    }
+    // one approval for the first half approves every started half of the line; the others are only checked
+    const [first, ...rest] = done.data.drafts;
+    const approved = call('syllabus.approve', { syllabusId: first.syllabusId }, t.dean);
+    if (!approved.ok || !approved.data.approved) throw new Error('publish: not approved: ' + JSON.stringify(approved));
+    for (const { syllabusId } of rest) {
+      if (store.list('syllabi').find((x) => x.id === syllabusId).status !== 'approved') throw new Error('publish: a half is not approved: ' + syllabusId);
     }
     return done;
   };
@@ -131,7 +142,7 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   };
   const snapshot = () => Object.fromEntries(Object.keys(SCHEMA).map((name) => [name, store.list(name)]));
   return {
-    store, files, spied: spy, spy, platform, call, ids, names, t, ds1, ds2, groups, sb1, sb2, sb3, sb4, FILE_A, FILE_B, at, publish, hold, closeUnit,
+    store, files, spied: spy, spy, platform, call, ids, names, t, ds1, ds2, groups, sb1, sb2, sb3, sb4, FILE_A, FILE_B, FILE_AB, at, publish, hold, closeUnit,
     topicsOf, snapshot, failingOn: (method, table) => failingOn(store, method, table), main, lines, old,
     oneMain: () => oneMain(store.list('syllabusLines')), upgrade: () => applyLinesUpgrade(store, platform),
   };

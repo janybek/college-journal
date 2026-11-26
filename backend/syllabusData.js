@@ -6,7 +6,7 @@ import { controlMarks, lessonKey, lessonsOf } from '../core/topics.js';
 import { lessonNumbers } from '../core/syllabusPlan.js';
 import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
 import { rightsOn } from '../core/syllabusFlow.js';
-import { draftTarget, lineFor, versionsOfLine } from '../core/disciplineSyllabus.js';
+import { draftTarget, lineFor, partOf, versionsOfLine } from '../core/disciplineSyllabus.js';
 import { loadSettings, todayOf } from './scheduleData.js';
 import { fileMetaOf, readTables } from './syllabusDraft.js';
 import { lineGroups, lineView, viewerOf } from './syllabusLines.js';
@@ -59,14 +59,24 @@ function shownVersion(store, version, rows, own, settings, subject, index, curre
 // 'syllabus.get' { subjectId, semester?, version? }: the syllabus of the line the subject follows (the syllabus of the discipline), with the dates of THIS subject's group.
 // version: 'approved' (default) or 'open'.
 export function syllabusPage(store, platform, data, user) {
-  const { subjectId, semester: asked, version: want = 'approved' } = data;
-  if (typeof subjectId !== 'string') throw new AppError('bad_request');
+  const { subjectId, disciplineId, semester: asked, version: want = 'approved' } = data;
+  const byDiscipline = disciplineId !== undefined;
+  if (byDiscipline === (subjectId !== undefined) || typeof (byDiscipline ? disciplineId : subjectId) !== 'string') throw new AppError('bad_request');
   if (asked !== undefined && asked !== 1 && asked !== 2) throw new AppError('bad_request');
   if (want !== 'approved' && want !== 'open') throw new AppError('bad_request');
 
   const subjects = store.list('subjects');
-  const subject = subjects.find((s) => s.id === subjectId);
-  if (!subject) throw new AppError('not_found');
+  let subject;
+  if (byDiscipline) {
+    // the page of the syllabus of a discipline needs no subject: the deanery, the administrator, the prorector and the teachers of the discipline read it
+    if (user.kind !== 'staff') throw new AppError('forbidden');
+    const discipline = store.list('disciplines').find((d) => d.id === disciplineId);
+    if (!discipline) throw new AppError('not_found');
+    subject = { id: '', name: discipline.name, disciplineId, groupId: '', teacherId: '' };
+  } else {
+    subject = subjects.find((s) => s.id === subjectId);
+    if (!subject) throw new AppError('not_found');
+  }
   const groups = store.list('groups');
   const staff = store.list('staff');
   const syllabi = store.list('syllabi');
@@ -81,7 +91,7 @@ export function syllabusPage(store, platform, data, user) {
   const covers = isTeacher && pairs.some((p) => p.subjectId === subject.id && p.teacherId === user.id);
   const isStudent = user.kind === 'student';
   const ownGroup = isStudent && typeof subject.groupId === 'string' && subject.groupId !== '' && subject.groupId === user.row.groupId;
-  if (!(isManager || isOwnTeacher || covers || ownGroup)) throw new AppError('forbidden');
+  if (!byDiscipline && !(isManager || isOwnTeacher || covers || ownGroup)) throw new AppError('forbidden');
 
   const groupName = (id) => (groups.find((g) => g.id === id) || { name: '' }).name;
   const group = groups.find((g) => g.id === subject.groupId);
@@ -97,6 +107,10 @@ export function syllabusPage(store, platform, data, user) {
     const { approved, open } = line ? versionsOfLine(syllabi, line.id, half) : { approved: null, open: null };
     halves[half] = { line, approved, open, rights: open ? rightsOn(open, viewerOf(user, line, subjects, lines)) : null };
   }
+  // by the discipline a teacher reads it when he is on the line of a half (responsible or leads it), nobody else but the staff who see everything
+  if (byDiscipline && !isManager && !(isTeacher && [1, 2].some((h) => halves[h].line && partOf(halves[h].line, user.id, subjects, lines) !== null))) {
+    throw new AppError('forbidden');
+  }
   const seenOpen = (half) => halves[half].rights !== null && halves[half].rights.see;
   // the half hidden from a student stays in the list: else he would be shown the other half instead of «updating»
   const loaded = [1, 2].filter((h) => halves[h].approved || seenOpen(h))
@@ -106,11 +120,14 @@ export function syllabusPage(store, platform, data, user) {
 
   // the groups: the staff who see everything get every group of the line (the teachers are named when there are several), a teacher his own, the others only this one
   const sameCourse = hasDiscipline ? subjects.filter((s) => s.disciplineId === subject.disciplineId && s.teacherId === subject.teacherId) : [subject];
-  const shownGroups = line && seeAllGroups
-    ? lineGroups({ subjects, groups, staff, syllabusLines: lines }, line, user, semester, subject)
-    : (seeAllGroups ? sameCourse : [subject])
+  let shownGroups;
+  if (byDiscipline) shownGroups = line ? lineGroups({ subjects, groups, staff, syllabusLines: lines }, line, user, semester) : [];
+  else if (line && seeAllGroups) shownGroups = lineGroups({ subjects, groups, staff, syllabusLines: lines }, line, user, semester, subject);
+  else {
+    shownGroups = (seeAllGroups ? sameCourse : [subject])
       .map((s) => ({ subjectId: s.id, groupName: groupName(s.groupId) }))
       .sort((a, b) => cmp(a.groupName, b.groupName) || cmp(a.subjectId, b.subjectId));
+  }
 
   // a new draft of the half: where it would go and whether this person may start it (draftTarget; a student never)
   const mayCreate = hasDiscipline && !isStudent
@@ -133,7 +150,7 @@ export function syllabusPage(store, platform, data, user) {
   let syllabus = null;
   if (version) {
     const own = shown === 'open' ? [] : pairs.filter((p) => p.subjectId === subject.id);
-    syllabus = shownVersion(store, version, rowsOfVersion(tables, version.id), own, settings, subject, index, shown === 'approved' && semester === settings.semester);
+    syllabus = shownVersion(store, version, rowsOfVersion(tables, version.id), own, settings, subject, index, !byDiscipline && shown === 'approved' && semester === settings.semester);
   }
   const rights = halves[semester].rights || { edit: false, submit: false, approve: false, giveBack: false };
   const can = {

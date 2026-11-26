@@ -60,7 +60,7 @@ function ready() {
 test('draft → review → returned → review → approved: the lessons reach the pairs of every group only at the approval', () => {
   const { store, call, save, reset, lists, writes, calls, lessons, pick, syllabusId, teacher1, dean, sb1, sb3, staff } = ready();
   assert.deepEqual(lessons(sb1).map((x) => x[1]), ['', '']);
-  assert.deepEqual(call('syllabus.submit', { syllabusId, dryRun: true }, teacher1).data, { submitted: false, checks: { errors: [], warnings: FOUR_EMPTY } });
+  assert.deepEqual(call('syllabus.submit', { syllabusId, dryRun: true }, teacher1).data, { submitted: false, checks: { errors: [], warnings: FOUR_EMPTY }, halves: [1] });
   assert.equal(store.get('syllabi', syllabusId).status, 'draft');
   reset();
   assert.equal(call('syllabus.submit', { syllabusId }, teacher1).data.submitted, true);
@@ -69,7 +69,7 @@ test('draft → review → returned → review → approved: the lessons reach t
   assert.deepEqual(pick(syllabusId, 'status', 'submittedBy', 'submittedAt'), ['review', staff.teacher1, '2026-08-31']);
   assert.deepEqual(lessons(sb1).map((x) => x[1]), ['', '']);
   reset();
-  assert.deepEqual(call('syllabus.return', { syllabusId, remark: '  Допишите литературу  ' }, dean).data, { returned: true });
+  assert.deepEqual(call('syllabus.return', { syllabusId, remark: '  Допишите литературу  ' }, dean).data, { returned: true, halves: [1] });
   assert.deepEqual([lists, writes, calls.get], [{ syllabi: 1, subjects: 1, syllabusLines: 1 }, { 'updateMany:syllabi': 1 }, 1]);
   assert.deepEqual(pick(syllabusId, 'status', 'remark', 'decidedBy'), ['returned', 'Допишите литературу', staff.dean]);
   assert.equal(save(syllabusId, 'literature', { main: [book], extra: [] }, teacher1).ok, true);
@@ -156,7 +156,7 @@ test('a new version and held pairs: nothing held changes, new lessons stand afte
   const before = snapshotAll();
   const expected = [{ section: 'plan', code: 'held_missing', name: 'Введение', date: '2026-09-02' }];
   assert.deepEqual([call('syllabus.submit', { syllabusId: third }, teacher1).data, call('syllabus.approve', { syllabusId: third }, dean).data.checks.errors],
-    [{ submitted: false, checks: { errors: expected, warnings: FOUR_EMPTY } }, expected]);
+    [{ submitted: false, checks: { errors: expected, warnings: FOUR_EMPTY }, halves: [1] }, expected]);
   assert.equal(call('syllabus.approve', { syllabusId: third }, dean).data.approved, false);
   assert.equal(snapshotAll(), before);
 });
@@ -186,9 +186,10 @@ test('a running pair keeps its lesson; planned pairs of every group move to the 
   assert.equal(lessons(sb3)[0][1], 'Нулевая');
 });
 
-test('the other half of the year: approving it touches no pair; the semester switch lays it', () => {
+test('the other half of the year: approving it lays no spring pair; the semester switch lays it', () => {
   const { call, lessons, approveSpring, dean, sb1, S } = ready();
-  assert.deepEqual([approveSpring().changedPairs, lessons(sb1).map((x) => x[1])], [0, ['Введение', 'Введение']]);
+  // the new version covers both halves: the autumn goes through the approval as a copy of itself, its four pairs move onto the copies of their topics, the lessons are the same
+  assert.deepEqual([approveSpring().changedPairs, lessons(sb1).map((x) => x[1])], [4, ['Введение', 'Введение']]);
   call('settings.save', { settings: { ...S, semester: 2 } }, dean);
   assert.deepEqual(lessons(sb1).map((x) => x[1]), ['Весенняя тема', 'Весенняя тема']);
 });
@@ -267,7 +268,7 @@ test('a row of an unknown kind (typed by hand in the sheet) is named and stops b
   const before = snapshotAll();
   const expected = [{ section: 'plan', code: 'bad_kind', id: row.id, name: 'Практикум' }];
   assert.deepEqual([call('syllabus.submit', { syllabusId }, teacher1).data.checks.errors, call('syllabus.approve', { syllabusId }, dean).data], [expected,
-    { approved: false, checks: { errors: expected, warnings: FOUR_EMPTY }, changedPairs: 0 }]);
+    { approved: false, checks: { errors: expected, warnings: FOUR_EMPTY }, changedPairs: 0, halves: [1] }]);
   assert.equal(snapshotAll(), before);
 });
 

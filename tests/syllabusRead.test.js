@@ -197,21 +197,24 @@ test('a draft and its remark never reach a student, whatever the status', () => 
   }
 });
 
-test('the halves of the year are hidden separately', () => {                                          // Review Focus 32
-  const { call, draft, fill, dean, teacher1, s1, sb1 } = ready();
+test('a half under review is hidden from the student: «updating», and the other half does not stand in for it', () => {          // Review Focus 32
+  const { store, call, draft, fill, dean, teacher1, s1, sb1 } = ready();
   const spring = draft(sb1, 2, teacher1);
   fill(spring, teacher1);
-  call('syllabus.submit', { syllabusId: spring }, teacher1);
+  call('syllabus.submit', { syllabusId: spring }, teacher1);                // a send takes every started half: the autumn copy goes too
   const page = (data = {}) => call('syllabus.get', { subjectId: sb1, ...data }, s1).data;
-  assert.deepEqual([page().hidden, page().syllabus !== null, page({ semester: 2 }).syllabus, page({ semester: 2 }).hidden,
-    call('student.subjects', {}, s1).data.subjects.find((x) => x.id === sb1).hasSyllabus], [false, true, null, false, true]);
-  // both halves approved, the current one (1st) under review again: without the parameter semester the student reads «updating», not the other half;
-  // the hidden half stays in `semesters`
+  const subject = () => call('student.subjects', {}, s1).data.subjects.find((x) => x.id === sb1);
+  assert.deepEqual([page().hidden, page().syllabus, page({ semester: 2 }).syllabus, page({ semester: 2 }).hidden, subject().hasSyllabus, subject().updating], [true, null, null, false, false, true]);
+  // both halves approved, then both under review again: «updating» in both, the hidden halves stay in `semesters`
   call('syllabus.approve', { syllabusId: spring }, dean);
   const autumn = draft(sb1, 1, teacher1);
   call('syllabus.submit', { syllabusId: autumn }, teacher1);
   assert.deepEqual([page().hidden, page().syllabus, page().semesters.map((x) => x.semester)], [true, null, [1, 2]]);
-  assert.deepEqual([page({ semester: 2 }).hidden, page({ semester: 2 }).syllabus !== null], [false, true]);
+  assert.deepEqual([page({ semester: 2 }).hidden, page({ semester: 2 }).syllabus], [true, null]);
+  // only the autumn under review (a base moved from the old build): the spring stays readable
+  const onSpring = store.list('syllabi').find((x) => x.semester === 2 && x.status === 'review');
+  store.update('syllabi', onSpring.id, { status: 'draft' });
+  assert.deepEqual([page().hidden, page({ semester: 2 }).hidden, page({ semester: 2 }).syllabus !== null, page().semesters.map((x) => x.semester)], [true, false, true, [1, 2]]);
 });
 
 test('can: what each person may do from the page', () => {

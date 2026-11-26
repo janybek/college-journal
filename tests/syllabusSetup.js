@@ -80,10 +80,13 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   const publish = (subjectId, sheets, token = tokens.dean) => {
     const done = send('syllabus.apply', subjectId, sheets, token);
     if (!done.ok || !done.data.applied) return done;
-    for (const { syllabusId } of done.data.drafts) {
-      fill(syllabusId, tokens.dean);
-      const approved = call('syllabus.approve', { syllabusId }, tokens.dean);
-      if (!approved.ok || !approved.data.approved) throw new Error('publish: not approved: ' + JSON.stringify(approved));
+    for (const { syllabusId } of done.data.drafts) fill(syllabusId, tokens.dean);
+    // one approval for the first half approves every started half of the line; the others are only checked
+    const [first, ...rest] = done.data.drafts;
+    const approved = call('syllabus.approve', { syllabusId: first.syllabusId }, tokens.dean);
+    if (!approved.ok || !approved.data.approved) throw new Error('publish: not approved: ' + JSON.stringify(approved));
+    for (const { syllabusId } of rest) {
+      if (store.list('syllabi').find((x) => x.id === syllabusId).status !== 'approved') throw new Error('publish: a half is not approved: ' + syllabusId);
     }
     return done;
   };
