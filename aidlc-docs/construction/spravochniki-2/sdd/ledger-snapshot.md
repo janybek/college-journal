@@ -64,3 +64,11 @@
 - Task 7: complete (commits 5d1fa19..fe10a81, review clean); waiting for owner acceptance of block 2.
 - **Block 2 (task 7) accepted by the owner 26.11.2026** («Принимаю»), no remarks; the «— —» of a repeat card without marks left as is. Coordinator stand stopped.
 - Next: new coordinator chat (rule 6б) → task 8 step 1, final review (opus, strict), deferred minors of tasks 1–7 and the flaky test included.
+- Task 8 step 1 dispatched: journal-reviewer (opus, strict), range 4a13bae..fe10a81, brief final-review-brief.md; answer saved by the coordinator to final-fix-brief.md. Port 5273 free: yes.
+- Task 8 step 1 review (opus, strict, probes scratchpad/final): ready after fixes — Important: traceless student of a closed past half lost for repeat (repeatSnapshot pastStudents) and his card debt vanishes after a new-half mark (dirStudents debtsOf); Minor: flaky tests/checkinLoad.test.js:83 elapsed<5000 under parallel runs. Deferred minors of tasks 1–7: leave (task 6 ones already fixed in task 7). Saved to final-fix-brief.md.
+- Ruling: fix both in one wave by journal-server (sonnet) — the Important is the risk named in the task 3 ruling, and a silently lost debtor is worse than a loud one; the newcomer case of the task 3 ruling stays as is.
+- Task 8 step 2 dispatched: journal-server (sonnet), BASE 6703e97, brief final-fix-brief.md, probes scratchpad/final.
+- Task 8 step 2 report: DONE (52bc20b; 1512 tests, build:gas OK); repeatSnapshot pastStudents = all active students of the group + others with traces; debtsOf empty-row substitute removed; p10/p10b fixed; checkinLoad threshold 5000→20000 ms; old test repeatSnapshot «moved, switched off or joined later» expectation updated (newcomers and moved-in students now in the past half, as in the ledger).
+- Task 8 step 2 re-review dispatched: same reviewer (opus), only 6703e97..52bc20b.
+- Task 8 step 2 re-review (opus): принять, no findings (p10/p10b pass; moved-out student once, switched-off without traces excluded, snapshot not recomputed; candidates = not passed by the ledger; 1512 tests, build:gas). Task 8 steps 1–2 complete.
+- Task 8 steps 3–4: ky keys → proofreading list; plan decisions 1–17 → decision table; design.md «собрано»; CLAUDE.md line on part 2; ledger snapshot. Stand not running (5273 free). Next: step 5 only on the owner's request.
