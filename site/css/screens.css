@@ -8686,3 +8686,77 @@ a.gr-card:hover { border-color: var(--primary-line); }
   .dir-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .dir-columns { grid-template-columns: minmax(0, 1fr); }
 }
+
+/* «Документы › Силлабусы»: tabs with counts, the cards of the disciplines, the card of a discipline. */
+.doc-tabs { display: flex; gap: var(--space-2); margin-bottom: var(--space-5); overflow-x: auto; scrollbar-width: none; }
+.doc-tabs::-webkit-scrollbar { display: none; }
+.doc-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+  padding: 0 var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  flex: none;
+  color: var(--text-muted);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.doc-tab:hover { color: var(--text); }
+.doc-tab[aria-current="page"] { background: var(--seg-active); border-color: var(--primary); color: var(--text); }
+.doc-tab__n {
+  min-width: 1.5rem;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--primary-wash);
+  color: var(--primary-ink);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-align: center;
+}
+.doc-tab__n--warn { background: var(--warning-wash); color: var(--warning); }
+
+.doc-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 18rem), 1fr)); gap: var(--space-3); }
+.doc-card { position: relative; display: grid; align-content: center; gap: 2px; min-height: 64px; padding: var(--space-3) var(--space-4); }
+.doc-card:hover { border-color: var(--primary); }
+.doc-card__top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.doc-card__link { color: var(--text); font-size: 1rem; font-weight: 600; text-decoration: none; }
+/* The link covers the whole card; the buttons above it stay clickable. */
+.doc-card__link::after { content: ''; position: absolute; inset: 0; border-radius: inherit; }
+.doc-card__link:focus-visible { outline: none; }
+.doc-card:has(.doc-card__link:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+.doc-card__sub { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.doc-card__meta { color: var(--text-muted); font-size: 0.875rem; }
+.doc-card__late { color: var(--danger); font-weight: 600; }
+.doc-card__mini {
+  position: relative;
+  z-index: 1;
+  min-height: 44px;
+  padding: 0 var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: none;
+  color: var(--primary-ink);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.doc-card__mini--text { padding: 0; border: 0; }
+.doc-card__edit { position: relative; z-index: 1; display: grid; gap: var(--space-2); width: 100%; margin-top: var(--space-2); }
+.doc-card__edit-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+
+.doc-section { display: grid; gap: var(--space-3); margin-bottom: var(--space-4); padding: var(--space-5); }
+.doc-section__title { margin: 0; font-size: 1rem; font-weight: 600; }
+.doc-section__head { display: flex; justify-content: flex-end; }
+.doc-halves, .doc-teachers { display: grid; margin: 0; padding: 0; list-style: none; }
+.doc-half { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); padding: var(--space-3) 0; border-top: 1px solid var(--border); }
+.doc-half:first-child { border-top: 0; }
+.doc-half__name { min-width: 5rem; font-weight: 600; }
+.doc-half__meta { flex: 1 1 8rem; color: var(--text-muted); font-size: 0.875rem; }
+.doc-teachers__row { display: flex; flex-wrap: wrap; justify-content: space-between; gap: var(--space-2); padding: var(--space-2) 0; border-top: 1px solid var(--border); }
+.doc-teachers__row:first-child { border-top: 0; }
+.doc-teachers__groups { color: var(--text-muted); font-size: 0.875rem; }
+.doc-section .facts { margin-top: 0; }

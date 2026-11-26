@@ -46,8 +46,13 @@ export function resolveRoute(hash, user) {
   if (journalsOf && permissions.includes('journal.list') && idOf(journalsOf[1]) !== null) return { view: 'journalList', params: { groupId: idOf(journalsOf[1]) } };
   // «Предметы» of the deanery: who teaches what and whose syllabus. Subjects are no longer an ordinary directory.
   if (path === '/subjects' && permissions.includes('subjects.overview')) return { view: 'subjects', params: {} };
-  // «Силлабусы на утверждении»: the versions sent to the deanery.
-  if (path === '/review' && permissions.includes('syllabus.queue')) return { view: 'review', params: {} };
+  // «Документы»: #/documents and #/documents/syllabi[/<approved|review|development>] are the syllabi in tabs;
+  // #/documents/discipline/<id>: the card of a discipline. The old #/review is the tab «На утверждении».
+  const documents = /^\/documents(?:\/syllabi(?:\/(approved|review|development))?)?$/.exec(path);
+  if (documents && permissions.includes('docs.syllabi')) return { view: 'documents', params: { tab: documents[1] ?? 'approved' } };
+  const docCard = /^\/documents\/discipline\/([^/]+)$/.exec(path);
+  if (docCard && permissions.includes('docs.discipline') && idOf(docCard[1]) !== null) return { view: 'docCard', params: { disciplineId: idOf(docCard[1]) } };
+  if (path === '/review' && permissions.includes('docs.syllabi')) return { view: 'documents', params: { tab: 'review' } };
   // #/template, #/template/<groupId>, #/template/<groupId>/<weekday 1–5>: the group to show and the day to mark.
   const template = /^\/template(?:\/([^/]+)(?:\/([1-5]))?)?$/.exec(path);
   if (template && permissions.includes('dir.list:weekTemplate')) {

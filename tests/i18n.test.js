@@ -266,18 +266,19 @@ test('task 43: the syllabus page has texts of the states, the buttons, the windo
 });
 
 test('task 44: the review queue, the syllabus marks of the subject lists; the texts of the time of «загружен» are gone', () => {
-  assert.equal(ru['review.title'], 'Силлабусы на утверждении');
-  assert.equal(ru['review.empty'], 'Нет силлабусов, ожидающих утверждения');
-  assert.equal(ru['review.noSubjects'], 'у преподавателя больше нет групп по этой дисциплине');
+  assert.deepEqual(['title', 'syllabi', 'tab.approved', 'tab.review', 'tab.development', 'responsible', 'responsible.none', 'assign', 'due', 'reviewDue', 'teachers',
+    'state.none', 'state.draft', 'state.returned', 'next.draft', 'next.review', 'choose'].map((k) => ru['docs.' + k]),
+  ['Документы', 'Силлабусы', 'Утверждённые', 'На утверждении', 'В разработке', 'Ответственный за разработку', 'не назначен', 'Назначить ответственного', 'Срок разработки',
+    'Срок рассмотрения', 'Ведут', 'силлабуса нет', 'черновик', 'возвращён с замечанием', 'идёт новая версия', 'новая версия на утверждении', 'Выберите силлабус']);
   assert.deepEqual(['approved', 'returned', 'review', 'draft', 'other', 'none', 'approvedNote'].map((k) => ru['subjects.syllabus.' + k]),
     ['Утверждён: {hours} ч, {pairs}', 'Возвращён', 'На утверждении', 'Черновик', 'Есть только на другой семестр', 'Нет силлабуса', 'утверждён: {hours} ч, {pairs}']);
   assert.deepEqual(['returned', 'review', 'draft', 'approved', 'none'].map((k) => ru['home.syllabusState.' + k]),
     ['Возвращён', 'На утверждении', 'Черновик', 'Утверждён', 'Нет силлабуса']);
   for (const [lang, dict] of Object.entries({ ru, ky, en })) {
-    for (const key of ['review.title', 'review.hint', 'review.lead', 'review.empty', 'review.col.discipline', 'review.col.teacher', 'review.col.semester', 'review.col.sent',
-      'review.col.version', 'review.col.status', 'review.emptyHint', 'review.sentBy', 'review.version', 'review.noSubjects', 'review.openForm',
+    for (const key of ['docs.title', 'docs.hint', 'docs.syllabi', 'docs.assign.short', 'docs.until', 'docs.version', 'error.choose_first', 'error.not_teacher',
       'subjects.syllabus.approvedNote', 'subjects.uploadedDraft', 'subjects.openForm']) assert.ok(dict[key], lang + ' ' + key);
     for (const gone of ['subjects.syllabus.uploaded', 'syllabus.notUploaded']) assert.equal(gone in dict, false, lang + ' ' + gone);
+    assert.equal(Object.keys(dict).some((key) => key.startsWith('review.')), false, lang + ' review.*');
     assert.equal(Object.keys(dict).some((key) => key.startsWith('syllabus.notUploaded')), false, lang);
     assert.match(dict['subjects.syllabus.approved'], /\{hours\}.*\{pairs\}/);
   }

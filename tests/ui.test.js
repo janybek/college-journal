@@ -85,15 +85,18 @@ test('navFor: «Предметы» of the deanery is in the schedule group, «Д
   assert.equal(navFor(['subjects.overview'], 'teacher').flatMap((g) => g.items).some((i) => i.name === 'subjects'), false);
 });
 
-test('navFor: «Силлабусы на утверждении» comes after «Предметы» with the right to the queue, and carries the count', () => {
-  const office = ['schedule.list', 'dir.list:weekTemplate', 'subjects.overview', 'settings.get'];
+test('navFor: «Документы» takes the place of the review queue; the count only with the right to the queue; no item «review»', () => {
+  const office = ['schedule.list', 'dir.list:weekTemplate', 'subjects.overview', 'settings.get', 'docs.syllabi'];
   const nav = navFor([...office, 'syllabus.queue'], 'dean');
-  assert.deepEqual(nav.find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['schedule', 'weekTemplate', 'subjects', 'review', 'settings']);
+  assert.deepEqual(nav.find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['schedule', 'weekTemplate', 'subjects', 'documents', 'settings']);
   assert.deepEqual(nav.find((g) => g.titleKey === 'nav.schedule').items[3],
-    { name: 'review', href: '#/review', textKey: 'review.title', icon: 'clipboard', hintKey: 'review.hint', count: true });
-  assert.deepEqual(navFor(office, 'dean').find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['schedule', 'weekTemplate', 'subjects', 'settings']);
-  assert.equal(navFor(['syllabus.queue', 'teacher.mySubjects'], 'teacher').flatMap((g) => g.items).some((i) => i.name === 'review'), false);
-  assert.deepEqual(navFor(['subjects.overview', 'syllabus.queue'], 'prorector').find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['subjects', 'review']);
+    { name: 'documents', href: '#/documents', textKey: 'docs.title', icon: 'clipboard', count: true, hintKey: 'docs.hint' });
+  assert.equal(navFor(office, 'prorector').flatMap((g) => g.items).find((i) => i.name === 'documents').count, false);
+  assert.deepEqual(navFor(['subjects.overview', 'docs.syllabi', 'syllabus.queue'], 'prorector').find((g) => g.titleKey === 'nav.schedule').items.map((i) => i.name), ['subjects', 'documents']);
+  const teacher = navFor(['teacher.mySubjects', 'docs.syllabi', 'announce.list'], 'teacher').flatMap((g) => g.items);
+  assert.deepEqual(teacher.map((i) => i.name), ['home', 'documents', 'announcements']);
+  assert.equal(teacher[1].count, false);
+  for (const roleNav of [nav, navFor(['docs.syllabi', 'syllabus.queue'], 'admin')]) assert.equal(roleNav.flatMap((g) => g.items).some((i) => i.name === 'review'), false);
 });
 
 test('navFor: the deanery menu has no «Темы» any more', () => {

@@ -89,10 +89,19 @@ test('resolveRoute: «Предметы» of the deanery is a screen of its own; 
   assert.equal(resolveRoute('#/subjects', { mustChangePassword: false, permissions: ['teacher.mySubjects'] }).view, 'home');
 });
 
-test('resolveRoute: «Силлабусы на утверждении» (#/review) with the right to the queue, home without it', () => {
-  assert.deepEqual(resolveRoute('#/review', { mustChangePassword: false, permissions: ['syllabus.queue', 'subjects.overview'] }), { view: 'review', params: {} });
-  assert.equal(resolveRoute('#/review', { mustChangePassword: false, permissions: ['subjects.overview', 'teacher.mySubjects'] }).view, 'home');
-  assert.equal(resolveRoute('#/review/x', { mustChangePassword: false, permissions: ['syllabus.queue'] }).view, 'home');
+test('resolveRoute: «Документы» - tabs, the card of a discipline, and the old #/review as a tab', () => {
+  const user = { mustChangePassword: false, permissions: ['docs.syllabi', 'docs.discipline'] };
+  assert.deepEqual(resolveRoute('#/documents', user), { view: 'documents', params: { tab: 'approved' } });
+  assert.deepEqual(resolveRoute('#/documents/syllabi', user), { view: 'documents', params: { tab: 'approved' } });
+  assert.deepEqual(resolveRoute('#/documents/syllabi/review', user), { view: 'documents', params: { tab: 'review' } });
+  assert.deepEqual(resolveRoute('#/documents/syllabi/development', user), { view: 'documents', params: { tab: 'development' } });
+  assert.equal(resolveRoute('#/documents/syllabi/other', user).view, 'home');
+  assert.deepEqual(resolveRoute('#/documents/discipline/d%201', user), { view: 'docCard', params: { disciplineId: 'd 1' } });
+  assert.equal(resolveRoute('#/documents/discipline/%E0%A4%A', user).view, 'home');
+  assert.deepEqual(resolveRoute('#/review', user), { view: 'documents', params: { tab: 'review' } });
+  assert.equal(resolveRoute('#/documents', { mustChangePassword: false, permissions: ['teacher.mySubjects'] }).view, 'home');
+  assert.equal(resolveRoute('#/review', { mustChangePassword: false, permissions: ['syllabus.queue'] }).view, 'home');
+  assert.equal(resolveRoute('#/documents/discipline/d1', { mustChangePassword: false, permissions: ['docs.syllabi'] }).view, 'home');
 });
 
 test('resolveRoute tolerates an empty hash and a user without permissions', () => {

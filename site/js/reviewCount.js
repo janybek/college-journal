@@ -1,8 +1,8 @@
 import { getToken, getUser } from './session.js';
 
-// The number beside «Силлабусы на утверждении» in the menu: the versions under review. Read with one light request
+// The number beside «Документы» in the menu: the versions of syllabi under review. Read with one light request
 // (syllabus.queue { countOnly }) once per opening of the site, and again after a version is approved or returned;
-// the queue and «Предметы» put in the number of their own answer. The number belongs to the session it was read in.
+// «Предметы» puts in the number of its own answer. The number belongs to the session it was read in.
 // Whoever draws it subscribes with onReviewCount: a new number changes the menu in place, not the screen under it.
 // The menu (shell.js) reads this file in the tests too, so the request module is loaded only when a number is asked for.
 

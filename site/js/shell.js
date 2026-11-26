@@ -15,6 +15,8 @@ const DIR_ICONS = { groups: 'layers', students: 'cap', staff: 'briefcase', disci
 // Menu parts each staff role works with; inside a part only what `permissions` allow is shown.
 const MENU_BY_ROLE = new Map([['admin', ['office']], ['dean', ['office']], ['prorector', ['office']], ['teacher', ['subjects']]]);
 const HOME = { name: 'home', href: '#/', textKey: 'nav.home', icon: 'home' };
+// «Документы»; the number of the versions on approval only for whoever has the queue.
+const documentsItem = (list) => ({ name: 'documents', href: '#/documents', textKey: 'docs.title', icon: 'clipboard', count: list.includes('syllabus.queue') });
 const ANNOUNCEMENTS = { name: 'announcements', href: '#/announcements', textKey: 'announce.title', icon: 'bell' };
 // Keep in step with the breakpoint in app.css where the sidebar becomes a drawer.
 const WIDE = '(min-width: 900px)';
@@ -50,6 +52,7 @@ export function navFor(permissionList, role) {
     if (list.includes('repeat.list')) items.push({ name: 'repeats', href: '#/repeats', textKey: 'repeat.mine.title', icon: 'sheet' });
     if (list.includes('request.mine')) items.push({ name: 'requests', href: '#/requests', textKey: 'request.mine.title', icon: 'clipboard' });
     if (list.includes('stateExam.list')) items.push({ name: 'stateExams', href: '#/state-exams', textKey: 'stateExam.title', icon: 'sheet' });
+    if (list.includes('docs.syllabi')) items.push({ ...documentsItem(list), hintKey: 'docs.hint' });
     if (list.includes('announce.list')) items.push(ANNOUNCEMENTS);
     return [{ titleKey: 'nav.teaching', items }];
   }
@@ -76,9 +79,7 @@ export function navFor(permissionList, role) {
   if (list.includes('subjects.overview')) {
     schedule.push({ name: 'subjects', href: '#/subjects', textKey: 'subjects.title', icon: 'book', hintKey: 'subjects.hint' });
   }
-  if (list.includes('syllabus.queue')) {
-    schedule.push({ name: 'review', href: '#/review', textKey: 'review.title', icon: 'clipboard', hintKey: 'review.hint', count: true });
-  }
+  if (list.includes('docs.syllabi')) schedule.push({ ...documentsItem(list), hintKey: 'docs.hint' });
   if (list.includes('settings.get')) {
     schedule.push({ name: 'settings', href: '#/settings', textKey: 'settings.title', icon: 'settings', hintKey: 'settings.hint' });
   }
@@ -306,6 +307,8 @@ function crumbs(groups, view, params, current, role) {
   // The syllabus of a subject and its form: under «Расписание» for the deanery, under the teacher's own subjects otherwise.
   if (view === 'syllabus' || view === 'syllabusForm') {
     [groupKey, pageKey] = [menuParts(role).includes('office') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
+  } else if (view === 'documents' || view === 'docCard') {
+    [groupKey, pageKey] = ['docs.title', 'docs.syllabi'];
   } else {
     for (const group of groups) {
       const item = group.items.find((candidate) => candidate.name === current);
@@ -319,7 +322,6 @@ function crumbs(groups, view, params, current, role) {
     else if (view === 'settings') [groupKey, pageKey] = ['nav.schedule', 'settings.title'];
     else if (view === 'weekTemplate') [groupKey, pageKey] = ['nav.schedule', 'template.title'];
     else if (view === 'subjects') [groupKey, pageKey] = ['nav.schedule', 'subjects.title'];
-    else if (view === 'review') [groupKey, pageKey] = ['nav.schedule', 'review.title'];
     else if (view === 'mySchedule') [groupKey, pageKey] = ['nav.teaching', 'my.title'];
     else if (view === 'journalLog') [groupKey, pageKey] = ['nav.journal', 'journalLog.title'];
     else if (view === 'journalList' || view === 'journal') [groupKey, pageKey] = ['nav.journal', 'journal.list.title'];
