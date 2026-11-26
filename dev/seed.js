@@ -265,7 +265,7 @@ function seedDocuments(store, platform, adminRow) {
 
 // The common filling: groups, students, disciplines, subjects, the week, syllabi, pairs. The staff of the stand
 // (everyone except the administrator) is made here; the administrator is made by the caller or already is in the store.
-function fill(store, platform, { passwordHash, names, studentsMustChange, admin, files, repeats = true }) {
+function fill(store, platform, { passwordHash, names, studentsMustChange, admin, files, repeats = true, progress = false }) {
   const common = { passwordHash, mustChangePassword: false, active: true };
   const staff = STAFF.filter((person) => person.login !== 'admin')
     .map((person) => store.insert('staff', { ...person, fullName: names.staff[person.login], ...common, lang: 'ru' }));
@@ -316,6 +316,7 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin,
   seedLedger(store, platform);
   seedExam(store, platform);
   if (repeats) seedRepeat(store, platform);
+  if (progress) seedProgress(store, platform);
 }
 
 // A small real PDF (one page, the text «Syllabus sample»), with a proper cross-reference table.
@@ -359,12 +360,12 @@ export function seedSyllabusFile(store, platform, files) {
 }
 
 // Fills an empty dev store with fictional data. Does nothing when `staff` already has rows.
-export function seed(store, platform, files = null, { repeats = true } = {}) {
+export function seed(store, platform, files = null, { repeats = true, progress = false } = {}) {
   if (store.list('staff').length > 0) return;
   // The stored hash carries its own salt, so one hash serves every person.
   const passwordHash = hashPassword(platform, DEV_PASSWORD);
   const admin = store.insert('staff', { ...STAFF[0], passwordHash, mustChangePassword: false, active: true, lang: 'ru' });
-  fill(store, platform, { passwordHash, names: NAMES.latin, studentsMustChange: true, admin, files, repeats });
+  fill(store, platform, { passwordHash, names: NAMES.latin, studentsMustChange: true, admin, files, repeats, progress });
   seedSyllabusFile(store, platform, files);
 }
 
@@ -826,4 +827,50 @@ export function seedRepeat(store, platform) {
   closeRepeat(store, platform, { repeatId: passedId }, teacher);
 
   card(oneSitA, 'full', 3, addDays(today, -2), teacher3.id);
+}
+
+// The figures for the directories: students at risk, a debt of a past half with and without a repeat course (all fictional).
+// «Информатика» of 03-1 (teacher3): the current half gets two weak students (unit 1, S3001 and S3002), the others stay without marks (unit 1 is «not filled»);
+// the past half (plan semester 2, 60-70 days before the start of the semester) is written straight into the old tables, like seedExam:
+// S3001 fails the exam (47), S3002 is not admitted (25), S3003 passes (88); S3001 gets a repeat course by the order «14-с».
+export function seedProgress(store, platform) {
+  const find = (login) => {
+    const row = store.list('staff').find((p) => p.login === login);
+    if (!row) throw new Error(`seed: no person ${login} for the progress figures`);
+    return row;
+  };
+  const [teacher3, dean] = ['teacher3', 'dean'].map((login) => staffUser(find(login)));
+  const group = store.list('groups').find((g) => g.name === '03-1');
+  const subject = group && store.list('subjects').find((s) => s.name === 'Информатика' && s.groupId === group.id && s.teacherId === teacher3.id);
+  if (!subject) throw new Error('seed: no «Информатика» of teacher3 in 03-1 for the progress figures');
+  const student = (cardNo) => {
+    const row = store.list('students').find((s) => s.cardNo === cardNo);
+    if (!row) throw new Error(`seed: no student ${cardNo} for the progress figures`);
+    return row;
+  };
+  const today = todayOf(platform);
+
+  const items = (values) => Object.entries(values).map(([cardNo, value]) => ({ studentId: student(cardNo).id, value }));
+  const save = (field, values) => saveUnitResults(store, platform, { subjectId: subject.id, unit: 1, field, items: items(values) }, teacher3);
+  save('control', { S3001: 6, S3002: 8 });
+  save('self', { S3001: 3, S3002: 4 });
+
+  const { semesterStart } = readSettings(store.list('settings'));
+  const ago = (days) => addDays(semesterStart, -days);
+  const stamp = (days, time) => ({ updatedBy: teacher3.id, updatedAt: `${ago(days)} ${time}` });
+  const result = (cardNo, currentManual, self, control) => ({
+    subjectId: subject.id, studentId: student(cardNo).id, planSemester: 2, unit: 1, currentManual, self, control, ...stamp(70, '10:00:00'),
+  });
+  store.insertMany('unitResults', [result('S3001', 30, 15, 25), result('S3002', 10, 5, 10), result('S3003', 35, 18, 35)]);
+  store.insertMany('closures', [[1, 65], [0, 61]].map(([unit, days]) => ({
+    subjectId: subject.id, planSemester: 2, unit, closedBy: teacher3.id, closedAt: `${ago(days)} 12:00:00`, reopenedBy: '', reopenedAt: '',
+  })));
+  store.insertMany('subjectExams', [{ subjectId: subject.id, planSemester: 2, date: ago(62), examiner: '', assistants: '', ...stamp(62, '09:00:00') }]);
+  store.insertMany('examAttempts', [['S3001', 5], ['S3003', 30]].map(([cardNo, score]) => ({
+    subjectId: subject.id, planSemester: 2, studentId: student(cardNo).id, no: 1, date: ago(62), outcome: 'score', score, commission: '', ...stamp(62, '12:00:00'),
+  })));
+
+  enrol(store, platform, {
+    subjectId: subject.id, planSemester: 2, studentId: student('S3001').id, kind: 'full', orderNo: '14-с', orderDate: today, deadline: addDays(today, 30), teacherId: teacher3.id,
+  }, dean);
 }
