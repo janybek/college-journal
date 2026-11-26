@@ -4,10 +4,10 @@ import { AppError } from '../core/errors.js';
 import { localDate, localDateTime } from '../core/dates.js';
 import { FILE_LIMITS, SYLLABUS_FILE_KINDS, base64Bytes, cleanFileName, isStoredName, kindByName, sniffKind } from '../core/files.js';
 import { rightsOn } from '../core/syllabusFlow.js';
-import { lineSubjects, versionsOfLine } from '../core/syllabusLines.js';
+import { lineSubjects, versionsOfLine } from '../core/disciplineSyllabus.js';
 import { todayOf } from './scheduleData.js';
-import { readTables, versionOf } from './syllabusDraft.js';
-import { LINE_TABLES, lineOfVersion, viewerOf, worksOn } from './syllabusLines.js';
+import { versionOf } from './syllabusDraft.js';
+import { lineOfVersion, viewerOf, worksOn } from './syllabusLines.js';
 
 const MANAGER_ROLES = ['admin', 'dean', 'prorector'];
 
@@ -16,8 +16,8 @@ function editableVersion(store, data, user) {
   const syllabi = store.list('syllabi');
   const version = versionOf(syllabi, data.syllabusId);
   const subjects = store.list('subjects');
-  const lines = readTables(store, LINE_TABLES);
-  const viewer = viewerOf(user, lineOfVersion(lines.syllabusLines, version), lines.syllabusMembers, subjects);
+  const lines = store.list('syllabusLines');
+  const viewer = viewerOf(user, lineOfVersion(lines, version), subjects, lines);
   const rights = rightsOn(version, viewer);
   if (!rights.see || !worksOn(viewer)) throw new AppError('forbidden');
   if (!rights.edit) throw new AppError('syllabus_locked');
@@ -61,19 +61,19 @@ export function dropSyllabusFile(store, platform, files, data, user) {
   return { file: null };
 }
 
-// A student reads the file of the approved version of the line that leads his group's subject (not while a new version of it is under review).
-function studentMayRead(version, line, members, syllabi, subjects, user) {
+// A student reads the file of the approved version of the line his group's subject follows in that half (not while a new version of the half is under review).
+function studentMayRead(version, line, lines, syllabi, subjects, user) {
   if (version.status !== 'approved') return false;
   const groupId = user.row.groupId;
   if (typeof groupId !== 'string' || groupId === '') return false;
-  if (!lineSubjects(subjects, line, members).some((s) => s.groupId === groupId)) return false;
-  const { open } = versionsOfLine(syllabi, line.id);
+  if (!lineSubjects(subjects, line, lines, version.semester).some((s) => s.groupId === groupId)) return false;
+  const { open } = versionsOfLine(syllabi, line.id, version.semester);
   return open === null || open.status !== 'review';
 }
 
-// A teacher who leads a pair of a subject of the line (a replacement); the pairs are read only here.
-function covers(store, line, members, subjects, user) {
-  const ids = new Set(lineSubjects(subjects, line, members).map((s) => s.id));
+// A teacher who leads a pair of a subject that follows the line in the half of the version (a replacement); the pairs are read only here.
+function covers(store, line, lines, version, subjects, user) {
+  const ids = new Set(lineSubjects(subjects, line, lines, version.semester).map((s) => s.id));
   return store.list('pairs').some((p) => p.teacherId === user.id && ids.has(p.subjectId));
 }
 
@@ -83,18 +83,18 @@ export function readSyllabusFile(store, platform, files, data, user) {
   const syllabi = store.list('syllabi');
   const version = versionOf(syllabi, data.syllabusId);
   const subjects = store.list('subjects');
-  const lines = readTables(store, LINE_TABLES);
-  const line = lineOfVersion(lines.syllabusLines, version);
-  const members = lines.syllabusMembers;
+  const lines = store.list('syllabusLines');
+  const line = lineOfVersion(lines, version);
   const roles = Array.isArray(user.roles) ? user.roles : [];
   if (user.kind === 'student') {
-    if (!studentMayRead(version, line, members, syllabi, subjects, user)) throw new AppError('not_found');
+    if (!studentMayRead(version, line, lines, syllabi, subjects, user)) throw new AppError('not_found');
   } else {
-    const viewer = viewerOf(user, line, members, subjects);
+    const viewer = viewerOf(user, line, subjects, lines);
     let may = false;
     if (version.status === 'approved') {
-      may = roles.some((r) => MANAGER_ROLES.includes(r))
-        || (roles.includes('teacher') && ((viewer.teaches && viewer.part !== null) || covers(store, line, members, subjects, user)));
+      // the file of a line of the history is for the deanery and the administrator only
+      may = viewer.archived ? roles.includes('admin') || roles.includes('dean')
+        : roles.some((r) => MANAGER_ROLES.includes(r)) || (roles.includes('teacher') && (viewer.part !== null || covers(store, line, lines, version, subjects, user)));
     } else {
       may = rightsOn(version, viewer).see;
     }

@@ -17,7 +17,7 @@ import { closedUnitsOf } from '../core/ledger.js';
 import { relayout } from './scheduleData.js';
 import { settleLessons } from './lessonSettle.js';
 
-export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'syllabusMembers', 'units', 'settings', 'attendance', 'unitResults', 'assignments', 'submissions', 'closures'];
+export const JOURNAL_TABLES = ['subjects', 'groups', 'staff', 'students', 'pairs', 'topics', 'syllabi', 'syllabusLines', 'units', 'settings', 'attendance', 'unitResults', 'assignments', 'submissions', 'closures'];
 
 // Every table of the journal, each read once. `settings` stays the rows of the sheet.
 export function readJournalRows(store) {
@@ -84,7 +84,7 @@ export function pairKeyOf(rows, pair) {
 // The half of the plan of the subject and its closed units and final sheet: of the syllabus in force; without one (the teacher changed to someone
 // without a syllabus), of the halves the held pairs of the subject belong to, so closures and the exam stay (final review, I2).
 export function closedOfSubject(rows, subject, settings, pairs) {
-  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusMembers);
+  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusLines);
   if (syllabus) {
     const planSemester = Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
     return { planSemester, closed: closedUnitsOf(rows.closures, subject.id, planSemester) };
@@ -141,7 +141,7 @@ export function journalView(rows, platform, subjectId, user) {
 
   const nowMs = platform.now();
   const now = { date: localDate(nowMs), time: localTime(nowMs) };
-  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusMembers);
+  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusLines);
   const { planSemester, closed } = closedOfSubject(rows, subject, settings, all);
 
   // lessons of the pairs
@@ -452,7 +452,7 @@ export function saveUnitResults(store, platform, data, user) {
 
   const settings = readSettings(rows.settings);
   const scheme = readScheme(rows.settings);
-  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusMembers);
+  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusLines);
   if (!syllabus) throw new AppError('no_syllabus');
   const planSemester = Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
 

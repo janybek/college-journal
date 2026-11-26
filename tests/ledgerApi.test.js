@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup } from './journalSetup.js';
+import { setup, waitForChoice } from './journalSetup.js';
 import { LEDGER_LIST_TABLES, LEDGER_TABLES } from '../backend/ledgerData.js';
 
 const rowOf = (v, id) => v.students.find((x) => x.id === id);
@@ -230,6 +230,7 @@ test('ledger.closeFinal: the credit week, what is missing, the record, the right
 test('the teacher of a closed subject changes to one without a syllabus: the closures and the exam stay in the ledger and for the student (final review, I2)', () => {
   const s = setup();
   s.allUnits(); s.examHead(); s.examRow(s.a1); s.examRow(s.a2, { score: 20 }); s.closeFinal(); s.at('2026-12-26');
+  waitForChoice(s);
   const grades = () => s.call('student.grades', {}, s.t.a1).data.subjects.find((x) => x.subjectId === s.sb1);
   const finalBefore = grades().final;
   s.store.update('subjects', s.sb1, { teacherId: s.ids.teacher2 });
@@ -247,6 +248,7 @@ test('the teacher of a closed subject changes to one without a syllabus: the clo
 test('ledger.list after the teacher changed to one without a syllabus: the closures stay, no pairs are read (final review, N1)', () => {
   const s = setup();
   s.allUnits(); s.examHead(); s.examRow(s.a1); s.examRow(s.a2, { score: 20 }); s.closeFinal(); s.at('2026-12-26');
+  waitForChoice(s);
   s.store.update('subjects', s.sb1, { teacherId: s.ids.teacher2 });
   s.spy.reset();
   const row = s.call('ledger.list', {}, s.t.dean).data.subjects.find((x) => x.subjectId === s.sb1);

@@ -187,10 +187,6 @@ function seedSyllabi(store, platform, subjects, teacherName, adminRow) {
   writeSection(store, platform, admin, anatomy, 'goals', { goal: 'Дать будущему медику знание строения тела человека.' });
   saveSection(store, platform, { syllabusId: anatomy, section: 'plan', data: ANATOMY_PLAN }, admin);
   if (!submitSyllabus(store, platform, { syllabusId: anatomy }, admin).submitted) throw new Error('seed: the anatomy syllabus is not submitted');
-
-  // «Информатика» of teacher3 in 03-1: a draft with the title only
-  const draft = startDraft(store, platform, { subjectId: subjects.thirdInformatics, semester: 1 }, admin).syllabusId;
-  writeSection(store, platform, admin, draft, 'title', { department: 'Кафедра информатики и медицинской техники', academicYear: '2026–2027', course: 2 });
 }
 
 // The common filling: groups, students, disciplines, subjects, the week, syllabi, pairs. The staff of the stand

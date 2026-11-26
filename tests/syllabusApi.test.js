@@ -1,10 +1,10 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup, INFO, HEAD, T, M, file, A, FIRST, READS, READS_WITH_LINES } from './syllabusSetup.js';
+import { setup, INFO, HEAD, T, M, file, A, FIRST, READS } from './syllabusSetup.js';
 
 const book = { authors: 'Автор', title: 'Книга', year: '2020', publisher: 'Издат', availability: 'библиотека' };
 // a copy of an approved version reads every sheet of the document, once
-const COPY_READS = { ...READS_WITH_LINES, outcomes: 1, selfWork: 1, software: 1, grading: 1, rules: 1 };
+const COPY_READS = { ...READS, outcomes: 1, selfWork: 1, software: 1, grading: 1, rules: 1 };
 const topicsOf = (store, syllabusId) => store.list('topics').filter((t) => t.syllabusId === syllabusId).sort((a, b) => a.order - b.order);
 
 test('syllabus upload: one syllabus of a teacher; the file fills the draft, the approval lays it over every group of that teacher', () => {
@@ -18,8 +18,8 @@ test('syllabus upload: one syllabus of a teacher; the file fills the draft, the 
   reset();
   const done = send('syllabus.apply', sb1, A, dean).data;
   assert.deepEqual([done.ok, done.applied, done.drafts.length], [true, true, 1]);
-  assert.deepEqual(lists, READS_WITH_LINES);
-  assert.deepEqual(writes, { 'insertMany:syllabusLines': 1, 'insertMany:syllabusMembers': 1, 'insertMany:syllabi': 1, 'updateMany:syllabi': 1, 'insertMany:topics': 1, 'insertMany:units': 1 });
+  assert.deepEqual(lists, READS);
+  assert.deepEqual(writes, { 'insertMany:syllabusLines': 1, 'insertMany:syllabi': 1, 'updateMany:syllabi': 1, 'insertMany:topics': 1, 'insertMany:units': 1 });
   assert.deepEqual([calls.get, calls.insert || 0, calls.update || 0, calls.remove || 0], [1, 0, 0, 0]);  // get — only the check of the token
   assert.deepEqual(lessons(sb1).map((x) => x[1]), ['', '']);
   const { id: syllabusId, ...sheetRow } = store.list('syllabi')[0];
@@ -119,7 +119,7 @@ test('syllabus upload: held pairs keep their topic, whichever group held them', 
   assert.deepEqual(lessons(sb3)[0], ['2026-09-02', 'Введение в предмет', 'lecture', 1]);
 });
 
-test('a group follows the syllabus of its own teacher', () => {                   // Review Focus 17
+test('a group stays on the syllabus of the discipline when its teacher changes', () => {                   // Review Focus 17
   const { publish, store, send, call, pairOf, lessons, lists, writes, reset, dean, staff, sb1, sb3 } = setup();
   publish(sb1, A);
   // разовая замена на паре тему не меняет
@@ -129,16 +129,14 @@ test('a group follows the syllabus of its own teacher', () => {                 
   store.update('pairs', pairOf(sb3, '2026-09-02').id, { status: 'closed' });
   reset();
   assert.equal(call('dir.save', { table: 'subjects', row: { id: sb3, teacherId: staff.teacher2 } }, dean).ok, true);
-  assert.deepEqual(lessons(sb3), [['2026-09-02', ...FIRST[0]], ['2026-09-09', '', '', null]]);          // у teacher2 силлабуса нет: пара без темы
+  assert.deepEqual(lessons(sb3), [['2026-09-02', ...FIRST[0]], ['2026-09-09', ...FIRST[1]]]);            // группа идёт по силлабусу дисциплины и после смены преподавателя
   for (const [table, n] of Object.entries(lists)) assert.equal(n, 1, table);
   assert.ok((writes['updateMany:pairs'] || 0) <= 1);
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);            // группа 01-1 не тронута
-  // teacher2 получает свой силлабус: он продолжается со второго занятия (одна пара уже проведена)
-  assert.equal(publish(sb3, file([T('Основы', 2, ''), T('Сети', 2, ''), M])).data.applied, true);
-  assert.equal(store.list('syllabi').length, 2);
-  assert.deepEqual(lessons(sb3), [['2026-09-02', ...FIRST[0]], ['2026-09-09', 'Сети', 'lecture', 1]]);
+  // у дисциплины один силлабус: новая версия не заводит второй, обе группы идут по нему
+  assert.deepEqual([store.list('syllabi').length, store.list('syllabusLines').length], [1, 1]);
   assert.deepEqual(lessons(sb1), [['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]]);
-  // тему, проведённую в группе 02-1, нельзя убрать из силлабуса teacher1, хотя группа уже у другого преподавателя
+  // тему, проведённую в группе 02-1, нельзя убрать из силлабуса, хотя группа уже у другого преподавателя
   assert.deepEqual(publish(sb1, file([T('Практикум', '', 2), M])).data.errors.map((e) => e.code), ['held_missing']);
 });
 
@@ -351,9 +349,9 @@ test('the numbers of the versions of one «discipline + teacher + half»: never 
   store.update('syllabi', store.list('syllabi').find((s) => s.status === 'approved').id, { version: 7 });
   publish(sb1, file([T('Введение', 2, 2), M]));
   assert.deepEqual(numbers().map(([n]) => n).sort((a, b) => a - b), [1, 2, 7, 8]);
-  // the other half of the year has its own numbers
+  // the other half of the year goes on with the numbers of the syllabus (they are aligned in a later task)
   publish(sb1, file([T('Таблицы', 2, ''), M], [['Семестр', 2]]));
-  assert.deepEqual(store.list('syllabi').filter((s) => s.semester === 2).map((s) => s.version), [1]);
+  assert.deepEqual(store.list('syllabi').filter((s) => s.semester === 2).map((s) => s.version), [9]);   // the number runs through both halves of the syllabus of the discipline
 });
 
 test('a year file fills the drafts of both halves; one of them under review — the whole file is refused', () => {
@@ -394,9 +392,12 @@ test('who uploads: the teacher of the subject, the deanery, the administrator; n
   const underReview = snapshotAll();
   for (const token of [teacher1, dean]) assert.equal(send('syllabus.apply', sb1, A, token).data.errors[0].code, 'in_review');
   assert.equal(snapshotAll(), underReview);
-  // a teacher whose discipline was taken away loses the right with the subject
+  // the right belongs to the responsible: a teacher who leads the discipline now is not the responsible until the deanery says so
   assert.equal(call('syllabus.return', { syllabusId: mine, remark: 'Доработать' }, dean).data.returned, true);
   assert.equal(call('dir.save', { table: 'subjects', row: { id: sb1, teacherId: staff.teacher2 } }, dean).ok, true);
+  assert.equal(send('syllabus.preview', sb1, A, teacher2).error.code, 'forbidden');
+  assert.equal(send('syllabus.preview', sb1, A, teacher1).ok, true);
+  store.update('syllabusLines', store.list('syllabusLines')[0].id, { responsibleId: staff.teacher2 });
   assert.deepEqual(send('syllabus.apply', sb1, A, teacher1).error, { code: 'forbidden' });
   assert.equal(send('syllabus.preview', sb1, A, teacher2).ok, true);
   assert.equal(store.list('syllabi').find((s) => s.id === mine).status, 'returned');

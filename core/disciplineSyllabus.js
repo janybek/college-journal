@@ -1,9 +1,8 @@
 // One syllabus per discipline: its row («line»), the halves of the year, who is responsible, which line a subject follows,
 // where a new draft goes and how the old syllabi move onto lines. Pure functions over rows; no storage, no network.
 import { versionsIn, versionsOf } from './syllabusFlow.js';
-import { OPEN_STATUSES } from './schema.js';
+import { LINE_KINDS, OPEN_STATUSES } from './schema.js';
 
-const KINDS = ['main', 'own', 'archived'];
 const HALVES = [1, 2];
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const arr = (rows) => (Array.isArray(rows) ? rows.filter((r) => r && typeof r === 'object') : []);
@@ -182,8 +181,8 @@ export function disciplineMigration(args) {
   const { syllabi, lines, subjects, pairs, half } = args || {};
   const allSyllabi = arr(syllabi);
   const allLines = arr(lines);
-  const wipe = allLines.filter((l) => !KINDS.includes(l.kind)).map((l) => l.id);
-  const live = allLines.filter((l) => KINDS.includes(l.kind));
+  const wipe = allLines.filter((l) => !LINE_KINDS.includes(l.kind)).map((l) => l.id);
+  const live = allLines.filter((l) => LINE_KINDS.includes(l.kind));
   const liveIds = new Set(live.map((l) => l.id));
 
   const skipped = [];

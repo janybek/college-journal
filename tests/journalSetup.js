@@ -214,3 +214,12 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
     a1: ids.a1, a2: ids.a2, a3: ids.a3, a4: ids.a4, b1: ids.b1, g1, g2, ds1, ds2, sb1, sb2, p0901, p0908, p0915, p0922, q0904, q0911, syllabusId,
   };
 }
+
+// The discipline of sb1 waits for the choice of the deanery: two old syllabi of their own (teacher1 and teacher3), so a teacher without his own has none.
+export function waitForChoice(s) {
+  const main = s.store.list('syllabusLines').find((l) => l.kind === 'main' && l.disciplineId === s.ds1);
+  s.store.update('syllabusLines', main.id, { kind: 'own', semester: 1, teacherId: s.ids.teacher1 });
+  const line = s.store.insert('syllabusLines', { disciplineId: s.ds1, kind: 'own', semester: 1, teacherId: s.ids.teacher3, createdAt: '2026-08-01 10:00:00' });
+  s.store.insert('syllabi', { disciplineId: s.ds1, teacherId: s.ids.teacher3, semester: 1, planSemester: 1, status: 'approved', version: 1, lineId: line.id });
+  s.store.insert('subjects', { name: 'Информатика', disciplineId: s.ds1, groupId: s.g2, teacherId: s.ids.teacher3, scheme: 'A' });
+}

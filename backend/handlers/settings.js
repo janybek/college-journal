@@ -31,7 +31,7 @@ function cutsClosedUnit(pairs, rows, settings) {
     const subject = subjects.get(pair.subjectId);
     if (!topic || !Number.isInteger(topic.unit) || !subject) continue;
     if (!closed.has(subject.id)) {
-      const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusMembers);
+      const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusLines);
       const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
       closed.set(subject.id, closedUnitsOf(rows.closures, subject.id, planSemester).units);
     }
@@ -61,7 +61,7 @@ function save(data, ctx) {
   let rows = {};
   if (hasExtra || moved) pairs = store.list('pairs');
   if (datesMoved) {
-    rows = { subjects: store.list('subjects'), syllabi: store.list('syllabi'), syllabusMembers: store.list('syllabusMembers'), topics: store.list('topics') };
+    rows = { subjects: store.list('subjects'), syllabi: store.list('syllabi'), syllabusLines: store.list('syllabusLines'), topics: store.list('topics') };
     if (cutsClosedUnit(pairs, { ...rows, closures: store.list('closures') }, settings)) throw new AppError('unit_closed');
   }
 

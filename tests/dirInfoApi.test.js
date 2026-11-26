@@ -292,9 +292,9 @@ test('the stand: numbers and speed', () => {
   assert.equal(byId(r.rows, room('305')).top, null);
   timed('dir.card', { table: 'rooms', id: room('101') });
   const d = timed('dir.summary', { table: 'disciplines' });
-  assert.deepEqual(byId(d.rows, disc('Информатика')).syllabi, { approved: 1, review: 0, returned: 1, draft: 1, none: 0 });
+  assert.deepEqual(byId(d.rows, disc('Информатика')).syllabi, { approved: 1, review: 0, returned: 1, draft: 0, none: 0 });
   assert.deepEqual(byId(d.rows, disc('Анатомия')).syllabi, { approved: 0, review: 1, returned: 0, draft: 0, none: 0 });
   const dp = timed('dir.summary', { table: 'disciplines' }, 'prorector');
-  assert.deepEqual(byId(dp.rows, disc('Информатика')).syllabi, { approved: 1, review: 0, returned: 1, draft: 0, none: 1 });
+  assert.deepEqual(byId(dp.rows, disc('Информатика')).syllabi, { approved: 1, review: 0, returned: 1, draft: 0, none: 0 });
   timed('dir.card', { table: 'disciplines', id: disc('Информатика') });
 });

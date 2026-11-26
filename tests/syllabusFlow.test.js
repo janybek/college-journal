@@ -24,9 +24,9 @@ test('versionsOf: two matching rows (two simultaneous «Fill») give one answer,
 
 // ---- задача 36: права, проверка перед отправкой, проведённые пары, план утверждения ----
 
-const viewers = { owner: { id: 'sf_t', roles: ['teacher'], teaches: true, part: 'author' }, former: { id: 'sf_t', roles: ['teacher'], teaches: false, part: 'author' },
-  other: { id: 'sf_x', roles: ['teacher'], teaches: true, part: null }, dean: { id: 'sf_d', roles: ['dean', 'teacher'], teaches: false, part: null },
-  prorector: { id: 'sf_p', roles: ['prorector'], teaches: false, part: null }, student: { id: 'st_1', roles: ['student'], teaches: false, part: null } };
+const viewers = { owner: { id: 'sf_t', roles: ['teacher'], part: 'responsible' }, former: { id: 'sf_t', roles: ['teacher'], part: null },
+  other: { id: 'sf_x', roles: ['teacher'], part: null }, dean: { id: 'sf_d', roles: ['dean', 'teacher'], part: null },
+  prorector: { id: 'sf_p', roles: ['prorector'], part: null }, student: { id: 'st_1', roles: ['student'], part: null } };
 const flags = (status, who) => Object.entries(rightsOn(v(status), viewers[who])).filter(([, yes]) => yes).map(([name]) => name).join();
 
 test('rightsOn: who sees and does what in each status', () => {
@@ -37,7 +37,7 @@ test('rightsOn: who sees and does what in each status', () => {
   assert.deepEqual(['owner', 'dean', 'student'].map((who) => flags('approved', who)), ['see', 'see', 'see']);
   assert.deepEqual(['owner', 'dean'].map((who) => flags('archived', who)), ['', '']);
   // сотрудник деканата, который сам ведёт дисциплину, свою версию утверждает (решение владельца)
-  assert.equal(rightsOn(v('draft'), { id: 'sf_t', roles: ['dean', 'teacher'], teaches: true, part: 'author' }).approve, true);
+  assert.equal(rightsOn(v('draft'), { id: 'sf_t', roles: ['dean', 'teacher'], part: 'responsible' }).approve, true);
 });
 
 test('rightsOn: the place on the syllabus of the discipline (responsible, teaches) and the line of the history', () => {
@@ -65,15 +65,14 @@ test('rightsOn: attempts to get around the rules', () => {
     const r = rightsOn(v(status), viewers.prorector);
     assert.deepEqual([r.edit, r.submit, r.approve, r.giveBack], [false, false, false, false], status);
   }
-  // чужая линия (человек не на ней), роли строкой вместо массива, teaches не булево
+  // чужая линия (человек не на ней), роли строкой вместо массива
   assert.deepEqual(rightsOn(v('draft'), { ...viewers.owner, part: null }), none);
-  assert.deepEqual(rightsOn(v('draft'), { id: 'sf_t', roles: 'teacher', teaches: true, part: 'author' }), none);
-  assert.deepEqual(rightsOn(v('draft'), { id: 'sf_t', roles: ['teacher'], teaches: 'yes', part: 'author' }), none);
+  assert.deepEqual(rightsOn(v('draft'), { id: 'sf_t', roles: 'teacher', part: 'responsible' }), none);
   // без места на линии прав нет (раньше владельцем считался тот, чей id стоит в колонке версии)
-  assert.deepEqual(rightsOn(v('draft'), { id: 'sf_t', roles: ['teacher'], teaches: true }), none);
+  assert.deepEqual(rightsOn(v('draft'), { id: 'sf_t', roles: ['teacher'] }), none);
   // пустой или неизвестный id зрителя прав не даёт, даже с местом на линии
-  assert.deepEqual(rightsOn(v('draft'), { id: undefined, roles: ['teacher'], teaches: true, part: 'author' }), none);
-  assert.deepEqual(rightsOn(v('draft'), { id: '', roles: ['teacher'], teaches: true, part: 'author' }), none);
+  assert.deepEqual(rightsOn(v('draft'), { id: undefined, roles: ['teacher'], part: 'responsible' }), none);
+  assert.deepEqual(rightsOn(v('draft'), { id: '', roles: ['teacher'], part: 'responsible' }), none);
   // нет версии, неизвестный статус, нет зрителя
   assert.deepEqual(rightsOn(null, viewers.dean), none);
   assert.deepEqual(rightsOn(v('weird'), viewers.dean), none);

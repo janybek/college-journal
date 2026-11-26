@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { setup } from './journalSetup.js';
+import { setup, waitForChoice } from './journalSetup.js';
 import { WORK_TABLES } from '../backend/workData.js';
 
 // Assignments of the staff: overview, list, give, change, remove, read. Fictional people only.
@@ -187,6 +187,7 @@ test('the teacher of the subject changes: the new one works, the old one does no
   at('2026-09-22', '10:00');
   const save = saver(s);
   const id = save({}).data.assignment.id;
+  waitForChoice(s);
   store.update('subjects', sb1, { teacherId: ids.teacher2 });
   const before = snapshot();
   assert.equal(save({ id }, t.teacher1).error.code, 'forbidden');

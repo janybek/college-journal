@@ -303,20 +303,19 @@ test('--demo: the ledger, the requests, the announcements and the exams come wit
   second.close();
 });
 
-test('--demo: the syllabi come on lines; --wipe erases an old line and its member and writes the lines again, the same count', async (t) => {
+test('--demo: the syllabi come on lines; --wipe erases an old line and writes the lines again, the same count', async (t) => {
   const config = emptyBase(t);
   assert.equal((await run(config, [])).code, EXIT.ok);
   const first = open(t, config);
-  const counts = ['syllabi', 'syllabusLines', 'syllabusMembers'].map((name) => first.store.list(name).length);
+  const counts = ['syllabi', 'syllabusLines'].map((name) => first.store.list(name).length);
   assert.equal(counts.every((n) => n > 0), true);
   assert.equal(first.store.list('syllabi').every((v) => v.lineId !== ''), true);
-  const old = first.store.insert('syllabusLines', { disciplineId: 'ds_old', semester: 1, authorId: 'sf_old', createdBy: '', createdAt: '2026-01-01 10:00:00' });
-  first.store.insert('syllabusMembers', { lineId: old.id, disciplineId: 'ds_old', semester: 1, teacherId: 'sf_old', state: 'joined', joinedAt: '2026-01-01 10:00:00' });
+  const old = first.store.insert('syllabusLines', { disciplineId: 'ds_old', kind: 'main', semester: null, responsibleId: 'sf_old', createdBy: '', createdAt: '2026-01-01 10:00:00' });
   first.close();
   fs.rmSync(passwordFile(config));
   assert.equal((await runWipe(config, [])).code, EXIT.ok);
   const second = open(t, config);
-  assert.deepEqual(['syllabi', 'syllabusLines', 'syllabusMembers'].map((name) => second.store.list(name).length), counts);
+  assert.deepEqual(['syllabi', 'syllabusLines'].map((name) => second.store.list(name).length), counts);
   assert.equal(second.store.list('syllabusLines').some((l) => l.id === old.id), false);
   second.close();
 });

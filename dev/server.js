@@ -74,8 +74,9 @@ export function standArgs(argv, root = ROOT) {
   return lessonNow ? { mode: 'demo', dataFile: DATA_FILES.demo, lessonNow: true } : { mode: 'demo', dataFile: DATA_FILES.demo };
 }
 
-// A stand file that still has syllabus versions without a line is copied beside itself before the move (an existing copy is kept).
-function copyBeforeLines(dataPath) {
+// A stand file that still has syllabus versions without a line, or a line without a kind (the shared lines of the earlier build), is copied beside itself
+// before the move to the syllabus of the discipline (an existing copy is kept).
+function copyBeforeDisciplineSyllabus(dataPath) {
   if (!fs.existsSync(dataPath)) return;
   let data = null;
   try {
@@ -84,8 +85,9 @@ function copyBeforeLines(dataPath) {
     return;
   }
   const versions = data !== null && typeof data === 'object' ? data.syllabi : null;
-  if (!Array.isArray(versions) || !versions.some((v) => !v || !v.lineId)) return;
-  const copy = dataPath + '.before-shared-syllabus.bak';
+  const lines = data !== null && typeof data === 'object' && Array.isArray(data.syllabusLines) ? data.syllabusLines : [];
+  if (!Array.isArray(versions) || !(versions.some((v) => !v || !v.lineId) || lines.some((l) => !l || !l.kind))) return;
+  const copy = dataPath + '.before-discipline-syllabus.bak';
   if (!fs.existsSync(copy)) fs.copyFileSync(dataPath, copy);
 }
 
@@ -106,11 +108,11 @@ export async function startDevServer({ port = 5273, dataFile = DATA_FILES.demo, 
   if (upgraded.changed) {
     console.log(`stand file carried over: versions ${upgraded.versions}, split rows ${upgraded.split}, units ${upgraded.units}, untouched rows ${upgraded.skipped.length}, zero-hour rows ${upgraded.zeroHours.length}; copy: ${path.basename(dataPath)}.before-addendum-3.bak`);
   }
-  copyBeforeLines(dataPath);
+  copyBeforeDisciplineSyllabus(dataPath);
   const store = createFileStore(SCHEMA, platform, dataPath);
   applySchemeUpgrade(store);
   const lines = applyLinesUpgrade(store, platform);
-  if (lines.lines > 0) console.log(`syllabus lines made: ${lines.lines}${lines.skipped > 0 ? `, rows without a line: ${lines.skipped}` : ''}; copy: ${path.basename(dataPath)}.before-shared-syllabus.bak`);
+  if (lines.lines > 0) console.log(`discipline syllabi made: ${lines.lines}, waiting for a choice: ${lines.waiting}, pairs laid: ${lines.relaid}${lines.skipped > 0 ? `, rows without a syllabus: ${lines.skipped}` : ''}; copy: ${path.basename(dataPath)}.before-discipline-syllabus.bak`);
   // the box of the files lies beside the data file: files for the fictional stand, real-files for the real one
   const filesDir = path.join(path.dirname(dataPath), seederFor(dataPath, mode) === seedAdmin ? 'real-files' : FILES_DIR);
   const files = createDiskFiles(filesDir);

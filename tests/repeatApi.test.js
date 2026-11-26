@@ -262,7 +262,7 @@ test('repeat.candidates: subjects with a closed final sheet; students who may re
 
 test('repeat.enrol and repeat.candidates read every table once', () => {
   const { s, enrol } = ready();
-  const tables = ['repeats', 'repeatAttempts', 'subjects', 'groups', 'staff', 'students', 'settings', 'syllabi', 'syllabusMembers', 'closures', 'pairs', 'attendance', 'unitResults', 'subjectExams', 'examAttempts'];
+  const tables = ['repeats', 'repeatAttempts', 'subjects', 'groups', 'staff', 'students', 'settings', 'syllabi', 'syllabusLines', 'closures', 'pairs', 'attendance', 'unitResults', 'subjectExams', 'examAttempts'];
   const once = (call, need) => {
     s.spy.reset();
     assert.equal(call().ok, true);
@@ -270,7 +270,7 @@ test('repeat.enrol and repeat.candidates read every table once', () => {
     for (const t of need) assert.equal(s.spy.lists[t], 1, t);
   };
   once(() => s.call('repeat.candidates', { subjectId: s.sb1 }, s.t.dean), tables);
-  once(() => s.call('repeat.candidates', {}, s.t.dean), ['subjects', 'groups', 'staff', 'closures', 'syllabi', 'syllabusMembers', 'settings']);
+  once(() => s.call('repeat.candidates', {}, s.t.dean), ['subjects', 'groups', 'staff', 'closures', 'syllabi', 'syllabusLines', 'settings']);
   once(() => enrol({ studentId: s.ids.a3 }), tables);
   once(() => s.call('repeat.list', {}, s.t.dean), ['repeats', 'repeatAttempts', 'subjects', 'groups', 'staff', 'students', 'settings']);
   once(() => s.call('repeat.get', { repeatId: s.store.list('repeats')[0].id }, s.t.dean), ['repeats', 'repeatAttempts', 'settings']);

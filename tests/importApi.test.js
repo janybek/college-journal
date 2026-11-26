@@ -138,6 +138,11 @@ test('a subjects import that changes the teacher re-lays the group and hands it 
   const sb = store.insert('subjects', { name: 'Информатика', disciplineId: ds, groupId: g1, teacherId: t1, scheme: 'A' }).id;
   const sy = store.insert('syllabi', { disciplineId: ds, teacherId: t1, semester: 1, planSemester: 1, status: 'approved', version: 1 }).id;
   for (const [order, lessonKind] of [[1, 'lecture'], [2, 'practice']]) store.insert('topics', { syllabusId: sy, order, unit: 1, lessonKind, name: 'Введение', hours: 2, description: '' });
+  // a second teacher of the discipline with an approved syllabus of his own: the half waits for the choice, so a teacher without his own syllabus has no topics
+  const t3 = teacher('tea3');
+  const g2 = store.insert('groups', { name: '02-1', course: 1 }).id;
+  store.insert('subjects', { name: 'Информатика', disciplineId: ds, groupId: g2, teacherId: t3, scheme: 'A' });
+  store.insert('syllabi', { disciplineId: ds, teacherId: t3, semester: 1, planSemester: 1, status: 'approved', version: 1 });
   applyLinesUpgrade(store, platform);
   assert.equal(call('settings.save', { settings: { semesterStart: '2026-09-01', semesterEnd: '2026-09-25', holidays: [], bells: ['08:00', '09:40'], semester: 1 } }, dean).ok, true);
   store.insert('weekTemplate', { weekday: 2, slot: 1, subjectId: sb, roomId: '' });

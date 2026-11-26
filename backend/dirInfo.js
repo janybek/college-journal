@@ -4,9 +4,7 @@ import { readSettings, readExtra } from '../core/settings.js';
 import { localDate, localTime, isDate, mondayOf, addDays } from '../core/dates.js';
 import { isSubstitution } from '../core/schedule.js';
 import { compareNames } from '../core/names.js';
-import { isLive, lineSubjects, teachingOf, versionsOfLine } from '../core/syllabusLines.js';
-import { rightsOn } from '../core/syllabusFlow.js';
-import { sharedMark } from './syllabusLines.js';
+import { ownLines } from '../core/disciplineSyllabus.js';
 import { CARD_TABLES, pairEnd, nowOf, termOf, topOf, syllabusState, syllabusCounts } from '../core/dirInfo.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -123,7 +121,6 @@ function disciplinesSummary(c) {
   const groups = mapOf(read('groups'));
   const subjects = read('subjects');
   const syllabi = read('syllabi');
-  const members = read('syllabusMembers');
   const lines = read('syllabusLines');
   const semester = c.settings.semester;
   const rows = read('disciplines').map((d) => {
@@ -138,17 +135,19 @@ function disciplinesSummary(c) {
       const person = staff.get(teacherId);
       return { teacherId, teacherName: person ? person.fullName : '', groupNames: [...new Set(names)].sort(compareNames) };
     }).sort(byName('teacherName'));
-    // one state per live line of this half that somebody leads now; a teacher without a line counts alone
-    const stateOf = (teacherId) => syllabusState(syllabi, { disciplineId: d.id, teacherId, semester }, c.viewer, members);
+    // one state for the syllabus of the discipline in this half; while the half waits for the choice, one per old own syllabus and «none» for a teacher without one
+    const stateOf = (teacherId) => syllabusState(syllabi, { disciplineId: d.id, teacherId, semester }, c.viewer, lines);
     const states = [];
-    for (const line of lines.filter((l) => l.disciplineId === d.id && l.semester === semester)) {
-      const leaders = teachingOf(members, line, mine);
-      if (leaders.length > 0) states.push(stateOf(leaders[0].teacherId));
+    const own = ownLines(lines, d.id, semester);
+    if (own.length > 1) {
+      for (const line of own) states.push(stateOf(line.teacherId));
+      const owners = new Set(own.map((l) => l.teacherId));
+      for (const t of teachers) if (!owners.has(t.teacherId)) states.push({ approved: false, open: null });
+    } else {
+      const state = stateOf('');
+      if (state.approved || state.open !== null || mine.length > 0) states.push(state);
     }
-    const led = new Set(members.filter((m) => m.state === 'joined' && m.disciplineId === d.id && m.semester === semester).map((m) => m.teacherId));
-    for (const t of teachers) if (!led.has(t.teacherId)) states.push({ approved: false, open: null });
-    const shared = lines.filter((l) => l.disciplineId === d.id && l.semester === semester && teachingOf(members, l, mine).length > 1).length;
-    return { id: d.id, teachers, syllabi: { ...syllabusCounts(states), ...(shared > 0 ? { shared } : {}) } };
+    return { id: d.id, teachers, syllabi: syllabusCounts(states) };
   });
   return { table: 'disciplines', currentSemester: semester, rows };
 }
@@ -164,8 +163,7 @@ export function dirSummary(store, platform, user, table) {
 const syllabusOf = (c, subject) => {
   if (!subject.disciplineId) return { approved: false, open: null };
   const key = { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: c.settings.semester };
-  const members = c.read('syllabusMembers');
-  return { ...syllabusState(c.read('syllabi'), key, c.viewer, members), ...sharedMark(members, c.read('subjects'), key) };
+  return syllabusState(c.read('syllabi'), key, c.viewer, c.read('syllabusLines'));
 };
 
 function groupCard(c, group) {
@@ -253,29 +251,6 @@ function roomCard(c, room, from) {
   };
 }
 
-// The live lines of a discipline of both halves of the year: who leads, the approved and the open version as the viewer may see them.
-function disciplineLines(c, discipline) {
-  const { read } = c;
-  const members = read('syllabusMembers');
-  const syllabi = read('syllabi');
-  const subjects = read('subjects').filter((s) => s.disciplineId === discipline.id);
-  const staff = mapOf(read('staff'));
-  const groups = mapOf(read('groups'));
-  const nameOf = (id) => (staff.get(id) || { fullName: '' }).fullName;
-  const groupName = (s) => (groups.get(s.groupId) || { name: '' }).name;
-  return read('syllabusLines').filter((l) => l.disciplineId === discipline.id && isLive(l, members)).map((line) => {
-    const teaching = teachingOf(members, line, subjects);
-    const { approved, open } = versionsOfLine(syllabi, line.id);
-    const seen = open && rightsOn(open, { ...c.viewer, teaches: false }).see ? open : null;
-    const first = lineSubjects(subjects, line, members).sort((a, b) => cmp(groupName(a), groupName(b)) || cmp(a.id, b.id))[0];
-    return {
-      lineId: line.id, semester: line.semester, authorName: nameOf(line.authorId), shared: teaching.length > 1, members: teaching.length,
-      teachers: teaching.map((m) => nameOf(m.teacherId)).sort(compareNames), approved: approved !== null, open: seen ? seen.status : null,
-      syllabusId: seen ? seen.id : approved ? approved.id : '', subjectId: first ? first.id : '',
-    };
-  }).sort((a, b) => (a.semester - b.semester) || compareNames(a.authorName, b.authorName) || cmp(a.lineId, b.lineId));
-}
-
 function disciplineCard(c, discipline) {
   const { read } = c;
   const groups = mapOf(read('groups'));
@@ -294,11 +269,7 @@ function disciplineCard(c, discipline) {
       weekPairs: template.get(s.id) || 0,
     };
   }).sort(byName('groupName'));
-  const manager = c.viewer.roles.includes('admin') || c.viewer.roles.includes('dean');
-  return {
-    table: 'disciplines', currentSemester: c.settings.semester, discipline: { id: discipline.id, name: discipline.name }, rows,
-    lines: disciplineLines(c, discipline),
-  };
+  return { table: 'disciplines', currentSemester: c.settings.semester, discipline: { id: discipline.id, name: discipline.name }, rows };
 }
 
 export function dirCard(store, platform, user, data) {

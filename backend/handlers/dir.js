@@ -4,8 +4,9 @@ import { generateTempPassword, hashPassword, TEMP_HASH_ROUNDS } from '../../core
 import { readSettings } from '../../core/settings.js';
 import { USER_TABLES } from '../users.js';
 import { teacherHandover } from '../../core/schedule.js';
-import { versionsOfLine, joinedLineId } from '../../core/syllabusLines.js';
-import { sharedMark } from '../syllabusLines.js';
+import { lineFor, versionsOfLine } from '../../core/disciplineSyllabus.js';
+import { rightsOn } from '../../core/syllabusFlow.js';
+import { viewerOf } from '../syllabusLines.js';
 import { dirSummary, dirCard } from '../dirInfo.js';
 import { loadSettings, relayout, todayOf } from '../scheduleData.js';
 
@@ -127,7 +128,7 @@ const BLOCKERS = {
   ],
   staff: (id) => [
     ['subjects', (r) => r.teacherId === id], ['pairs', (r) => r.teacherId === id], ['syllabi', (r) => r.teacherId === id],
-    ['syllabusLines', (r) => r.authorId === id || r.createdBy === id], ['syllabusMembers', (r) => r.teacherId === id || r.byId === id || r.endedBy === id],
+    ['syllabusLines', (r) => r.teacherId === id || r.responsibleId === id || r.createdBy === id],
     ['attendance', (r) => r.markedBy === id], ['unitResults', (r) => r.updatedBy === id], ['changeLog', (r) => r.actorId === id],
     ['assignments', (r) => r.createdBy === id], ['assignments', (r) => r.updatedBy === id], ['submissions', (r) => r.checkedBy === id],
     ['closures', (r) => r.closedBy === id || r.reopenedBy === id], ['requests', (r) => r.authorId === id || r.deanBy === id || r.finalBy === id],
@@ -185,18 +186,21 @@ function mySubjects(data, ctx, user) {
   const all = store.list('subjects');
   const mine = all.filter((s) => s.teacherId === user.id);
   const syllabi = store.list('syllabi');
-  const members = store.list('syllabusMembers');
+  const lines = store.list('syllabusLines');
   const half = loadSettings(store).semester;
   const subjects = mine.map((s) => {
     const group = groups.find((g) => g.id === s.groupId);
-    const { approved, open } = s.disciplineId ? versionsOfLine(syllabi, joinedLineId(members, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester: half })) : { approved: null, open: null };
+    const lineId = s.disciplineId ? lineFor(lines, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester: half }) : null;
+    const line = lineId === null ? null : lines.find((l) => l.id === lineId);
+    const { approved, open } = line ? versionsOfLine(syllabi, line.id, half) : { approved: null, open: null };
+    const seen = open && rightsOn(open, viewerOf(user, line, all, lines)).see ? open : null;
     return {
       id: s.id,
       name: s.name,
       groupId: s.groupId,
       groupName: group ? group.name : '',
       studentCount: students.filter((st) => st.groupId === s.groupId).length,
-      syllabus: { approved: approved !== null, open: open ? open.status : null, ...(s.disciplineId ? sharedMark(members, all, { disciplineId: s.disciplineId, teacherId: s.teacherId, semester: half }) : {}) },
+      syllabus: { approved: approved !== null, open: seen ? seen.status : null },
     };
   });
   return { subjects };

@@ -163,13 +163,13 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   const login = new Map(store.list('staff').map((s) => [s.id, s.login]));
   const discipline = new Map(store.list('disciplines').map((d) => [d.id, d.name]));
   assert.deepEqual(store.list('syllabi').map((s) => [discipline.get(s.disciplineId), login.get(s.teacherId), s.semester, s.version, s.status]).sort(),
-    [['Анатомия', 'teacher2', 1, 1, 'review'], ['Информатика', 'teacher1', 1, 1, 'approved'], ['Информатика', 'teacher1', 1, 2, 'returned'],
-      ['Информатика', 'teacher1', 2, 1, 'approved'], ['Информатика', 'teacher3', 1, 1, 'draft']]);
-  const informatics1 = store.list('syllabi').find((s) => login.get(s.teacherId) === 'teacher1' && s.semester === 1 && s.version === 1).id;
+    [['Анатомия', 'teacher2', 1, 1, 'review'], ['Информатика', 'teacher1', 1, 1, 'approved'], ['Информатика', 'teacher1', 1, 3, 'returned'],
+      ['Информатика', 'teacher1', 2, 2, 'approved']]);   // one number runs through both halves of the syllabus of the discipline (they are aligned in a later task)
+  const informatics1 = store.list('syllabi').find((s) => login.get(s.teacherId) === 'teacher1' && s.semester === 1 && s.status === 'approved').id;
   for (const table of ['units', 'outcomes', 'selfWork', 'literature', 'software', 'grading', 'rules']) {
     assert.equal(store.list(table).some((r) => r.syllabusId === informatics1), true, table);
   }
-  // topic rows 53: 27 of the approved versions of «Информатика» (as after task 34), 20 of the copy (version 2), 6 of «Анатомия», 0 of the draft of teacher3
+  // topic rows 53: 27 of the approved versions of «Информатика» (as after task 34), 20 of the copy, 6 of «Анатомия»
   assert.deepEqual([store.list('topics').length, store.list('pairs').length], [53, 159]);
   const returned = store.list('syllabi').find((s) => s.status === 'returned');
   assert.deepEqual([returned.remark, store.list('topics').filter((t) => t.syllabusId === returned.id).length], ['Добавьте литературу к юниту 2', 20]);
@@ -181,11 +181,11 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   const groupByName = new Map(store.list('groups').map((g) => [g.name, g.id]));
   const subjectOf = (name, group) => store.list('subjects').find((s) => s.name === name && s.groupId === groupByName.get(group));
   const pairsOf = (subject) => store.list('pairs').filter((p) => p.subjectId === subject.id).sort((a, b) => a.date.localeCompare(b.date) || a.slot - b.slot);
-  // the pairs of 01-1 and 02-1 carry the lessons of the approved version 1; «Анатомия» and 03-1 have no pair with a lesson
+  // the pairs of 01-1, 02-1 and 03-1 carry the lessons of the approved version 1 (one syllabus of the discipline); «Анатомия» has no approved one, so no pair with a lesson
   const approvedRows = new Set(store.list('topics').filter((t) => t.syllabusId === informatics1).map((t) => t.id));
   const withTopic = (name, group) => pairsOf(subjectOf(name, group)).filter((p) => p.topicId !== '');
-  assert.equal(['01-1', '02-1'].every((g) => withTopic('Информатика', g).length > 0 && withTopic('Информатика', g).every((p) => approvedRows.has(p.topicId))), true);
-  assert.deepEqual([withTopic('Информатика', '03-1').length, ...['01-1', '02-1', '03-1'].map((g) => withTopic('Анатомия', g).length)], [0, 0, 0, 0]);
+  assert.equal(['01-1', '02-1', '03-1'].every((g) => withTopic('Информатика', g).length > 0 && withTopic('Информатика', g).every((p) => approvedRows.has(p.topicId))), true);
+  assert.deepEqual([withTopic('Информатика', '03-1').length, ...['01-1', '02-1', '03-1'].map((g) => withTopic('Анатомия', g).length)], [18, 0, 0, 0]);
   const INTRO = 'Цифровой пост медсестры: введение в IT';
   const PROGRAMS = 'Рабочие программы: Windows, МИС и утилиты';
   const TABLES = 'Электронные таблицы: учёт лекарств и расчёт доз';
@@ -200,8 +200,8 @@ test('seed creates the documented data set and is a no-op when staff exist', () 
   // 02-1 (same teacher, same syllabus): one pair is cancelled — 17 lessons stand on their dates, the last one (the tables topic, practice) did not fit
   const of02 = pairsOf(subjectOf('Информатика', '02-1'));
   assert.deepEqual([of02.length, of02.filter((p) => p.status === 'cancelled').length, lessonsOfGroup('02-1')], [18, 1, lessonsOfGroup('01-1').slice(0, 17)]);
-  // 03-1 (teacher3, no syllabus) and «Анатомия»: no pair has a lesson
-  const bare = new Set([subjectOf('Информатика', '03-1').id, ...store.list('subjects').filter((s) => s.name === 'Анатомия').map((s) => s.id)]);
+  // «Анатомия» (only a version under review): no pair has a lesson
+  const bare = new Set(store.list('subjects').filter((s) => s.name === 'Анатомия').map((s) => s.id));
   assert.equal(store.list('pairs').filter((p) => bare.has(p.subjectId)).every((p) => p.topicId === '' && p.lessonType === '' && p.part === null), true);
   // no pair holds a topic of the second-semester syllabus
   const spring = new Set(store.list('syllabi').filter((s) => s.semester === 2).map((s) => s.id));

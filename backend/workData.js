@@ -10,7 +10,7 @@ import { checkAssignment, currentAttempt, workState } from '../core/work.js';
 import { closedUnitsOf } from '../core/ledger.js';
 import { viewerOf } from './journalData.js';
 
-export const WORK_TABLES = ['subjects', 'groups', 'staff', 'students', 'syllabi', 'syllabusMembers', 'topics', 'units', 'settings', 'pairs', 'assignments', 'submissions', 'files', 'closures'];
+export const WORK_TABLES = ['subjects', 'groups', 'staff', 'students', 'syllabi', 'syllabusLines', 'topics', 'units', 'settings', 'pairs', 'assignments', 'submissions', 'files', 'closures'];
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const LESSON_LETTER = { lecture: 'Л', practice: 'П', control: 'М', seminar: 'С', lab: 'ЛР' };
@@ -76,7 +76,7 @@ function attemptsByStudent(rows, assignmentId) {
 
 // The units and the topics of the current approved syllabus of the subject (empty without one).
 function planOf(rows, subject, settings) {
-  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusMembers);
+  const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusLines);
   const topics = syllabus ? rows.topics.filter((t) => t.syllabusId === syllabus.id).sort((a, b) => a.order - b.order) : [];
   const titles = new Map(syllabus ? rows.units.filter((u) => u.syllabusId === syllabus.id).map((u) => [u.unit, u.title ?? '']) : []);
   const numbers = syllabus ? lessonNumbers(topics) : new Map();
@@ -226,7 +226,7 @@ export function removeAssignment(store, platform, data, user) {
 // The topic of the assignment and the title of its unit in the syllabus it follows.
 export function assignmentPlace(rows, subject, assignment, settings) {
   const topic = assignment.topicId ? rows.topics.find((t) => t.id === assignment.topicId) : undefined;
-  const syllabus = topic ? rows.syllabi.find((s) => s.id === topic.syllabusId) : syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusMembers);
+  const syllabus = topic ? rows.syllabi.find((s) => s.id === topic.syllabusId) : syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusLines);
   const unitRow = syllabus ? rows.units.find((u) => u.syllabusId === syllabus.id && u.unit === assignment.unit) : undefined;
   return { topic, unitTitle: unitRow ? unitRow.title ?? '' : '' };
 }

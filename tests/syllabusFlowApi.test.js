@@ -64,13 +64,13 @@ test('draft → review → returned → review → approved: the lessons reach t
   assert.equal(store.get('syllabi', syllabusId).status, 'draft');
   reset();
   assert.equal(call('syllabus.submit', { syllabusId }, teacher1).data.submitted, true);
-  assert.deepEqual([lists, writes], [{ subjects: 1, syllabi: 1, syllabusLines: 1, syllabusMembers: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, groups: 1 },
+  assert.deepEqual([lists, writes], [{ subjects: 1, syllabi: 1, syllabusLines: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, groups: 1 },
     { 'updateMany:syllabi': 1 }]);
   assert.deepEqual(pick(syllabusId, 'status', 'submittedBy', 'submittedAt'), ['review', staff.teacher1, '2026-08-31']);
   assert.deepEqual(lessons(sb1).map((x) => x[1]), ['', '']);
   reset();
   assert.deepEqual(call('syllabus.return', { syllabusId, remark: '  Допишите литературу  ' }, dean).data, { returned: true });
-  assert.deepEqual([lists, writes, calls.get], [{ syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1 }, { 'updateMany:syllabi': 1 }, 1]);
+  assert.deepEqual([lists, writes, calls.get], [{ syllabi: 1, subjects: 1, syllabusLines: 1 }, { 'updateMany:syllabi': 1 }, 1]);
   assert.deepEqual(pick(syllabusId, 'status', 'remark', 'decidedBy'), ['returned', 'Допишите литературу', staff.dean]);
   assert.equal(save(syllabusId, 'literature', { main: [book], extra: [] }, teacher1).ok, true);
   call('syllabus.submit', { syllabusId }, teacher1);
@@ -80,7 +80,7 @@ test('draft → review → returned → review → approved: the lessons reach t
   assert.deepEqual(pick(syllabusId, 'status', 'remark', 'decidedBy', 'decidedAt'), ['approved', '', staff.dean, '2026-08-31']);
   assert.deepEqual([lessons(sb1), lessons(sb3)], [[['2026-09-01', ...FIRST[0]], ['2026-09-08', ...FIRST[1]]], [['2026-09-02', ...FIRST[0]], ['2026-09-09', ...FIRST[1]]]]);
   assert.deepEqual(writes, { 'updateMany:syllabi': 1, 'updateMany:pairs': 1 });
-  assert.deepEqual(lists, { subjects: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, settings: 1, groups: 1, syllabusLines: 1, syllabusMembers: 1 });
+  assert.deepEqual(lists, { subjects: 1, syllabi: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1, settings: 1, groups: 1, syllabusLines: 1 });
   assert.deepEqual([calls.get, calls.update || 0, calls.insert || 0], [1, 0, 0]);
 });
 
@@ -198,11 +198,11 @@ test('the queue: versions under review for the deanery, the administrator and th
   call('syllabus.submit', { syllabusId }, teacher1);
   reset();
   const queue = call('syllabus.queue', {}, prorector).data;
-  assert.deepEqual([queue.count, queue.rows], [1, [{ syllabusId, subjectId: sb1, disciplineName: 'Информатика', teacherName: 'teacher1', authorName: 'teacher1', members: 1, semester: 1, planSemester: 1,
+  assert.deepEqual([queue.count, queue.rows], [1, [{ syllabusId, subjectId: sb1, disciplineName: 'Информатика', teacherName: 'teacher1', semester: 1, planSemester: 1,
     version: 1, submittedAt: '2026-08-31', submittedByName: 'teacher1' }]]);
-  assert.deepEqual([lists, writes], [{ syllabi: 1, subjects: 1, disciplines: 1, staff: 1, groups: 1, syllabusLines: 1, syllabusMembers: 1 }, {}]);
+  assert.deepEqual([lists, writes], [{ syllabi: 1, subjects: 1, disciplines: 1, staff: 1, groups: 1, syllabusLines: 1 }, {}]);
   reset();
-  assert.deepEqual([call('syllabus.queue', { countOnly: true }, dean).data, lists, call('syllabus.queue', { countOnly: 'yes' }, dean).error], [{ count: 1 }, { syllabi: 1 }, { code: 'bad_request' }]);
+  assert.deepEqual([call('syllabus.queue', { countOnly: true }, dean).data, lists, call('syllabus.queue', { countOnly: 'yes' }, dean).error], [{ count: 1 }, { syllabi: 1, syllabusLines: 1 }, { code: 'bad_request' }]);
   assert.deepEqual([call('syllabus.queue', {}, teacher1).error, call('syllabus.queue', {}, s1).error], [{ code: 'forbidden' }, { code: 'forbidden' }]);
   call('syllabus.return', { syllabusId, remark: 'x' }, dean);
   assert.equal(call('syllabus.queue', {}, dean).data.count, 0);
@@ -288,12 +288,13 @@ test('a group of another course than the title warns at the form, submitting and
   assert.deepEqual([done.approved, groupWarnings(done.checks)], [true, expected]);
 });
 
-test('the groups of another teacher of the same discipline are not named in the warning', () => {
+test('the groups of another teacher of the same discipline are named in the warning: one syllabus serves them all', () => {
   const { store, call, syllabusId, ds1, teacher1, staff } = ready();
   const g3 = store.insert('groups', { name: '03-1', course: 3 }).id;
   store.insert('subjects', { name: 'Информатика', disciplineId: ds1, groupId: g3, teacherId: staff.teacher2, scheme: 'A' });
-  assert.deepEqual(groupWarnings(call('syllabus.form', { syllabusId }, teacher1).data.checks), []);
-  assert.deepEqual(groupWarnings(call('syllabus.submit', { syllabusId, dryRun: true }, teacher1).data.checks), []);
+  const named = [{ section: 'title', code: 'group_course', groups: ['03-1'] }];
+  assert.deepEqual(groupWarnings(call('syllabus.form', { syllabusId }, teacher1).data.checks), named);
+  assert.deepEqual(groupWarnings(call('syllabus.submit', { syllabusId, dryRun: true }, teacher1).data.checks), named);
 });
 
 test('a title of the 2nd course with the plan semester of the 1st is refused at submitting and approving, nothing is written', () => {

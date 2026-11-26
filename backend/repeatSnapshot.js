@@ -16,7 +16,7 @@ const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
 // The half of the plan of the syllabus in force of the subject, or null.
 function currentHalf(rows, subject) {
-  const syllabus = syllabusFor(subject, rows.syllabi, readSettings(rows.settings).semester, rows.syllabusMembers);
+  const syllabus = syllabusFor(subject, rows.syllabi, readSettings(rows.settings).semester, rows.syllabusLines);
   return syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
 }
 

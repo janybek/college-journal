@@ -2,22 +2,23 @@
 // and the plan of an upload (which rows are added, changed or dropped; held pairs are protected).
 import { FIXED_STATUSES } from './schema.js';
 import { HOURS_PER_PAIR, inSemester, lessonKey, lessonTypeOf, lessonsOf, partsOf } from './topics.js';
-import { joinedLineId, versionsOfLine } from './syllabusLines.js';
+import { lineFor, versionsOfLine } from './disciplineSyllabus.js';
 import { docLessons } from './syllabusPlan.js';
 
 // The plan semester (1-8, as in the curriculum) -> the semester of the year: odd is autumn (1), even is spring (2).
 export const semesterHalf = (planSemester) => (planSemester % 2 === 1 ? 1 : 2);
 
-// The approved syllabus of the line where the subject's teacher leads the discipline in this half of the year; null if there is none.
-export function syllabusFor(subject, syllabi, half, members) {
+// The approved syllabus of the line the subject follows in this half of the year (the syllabus of the discipline, or the old «own» one of the teacher
+// while the deanery has not chosen); null if there is none. `lines`: the rows of «Силлабусы дисциплин» (not an array: TypeError).
+export function syllabusFor(subject, syllabi, half, lines) {
+  if (!Array.isArray(lines)) throw new TypeError('syllabusFor: the lines of the syllabi are required');
   if (!subject || !subject.disciplineId) return null;
   const key = { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: half };
-  if (!Array.isArray(members)) throw new TypeError('syllabusFor: the members of the lines are required');
-  return versionsOfLine(syllabi, joinedLineId(members, key)).approved;
+  return versionsOfLine(syllabi, lineFor(lines, key), half).approved;
 }
 
-// -> { syllabi, members, topicsOf: Map(syllabus id -> its rows by order), syllabusOf: Map(topic id -> syllabus row) }
-export function syllabusIndex(syllabi, topics, members) {
+// -> { syllabi, lines, topicsOf: Map(syllabus id -> its rows by order), syllabusOf: Map(topic id -> syllabus row) }
+export function syllabusIndex(syllabi, topics, lines) {
   const byId = new Map((syllabi || []).map((s) => [s.id, s]));
   const topicsOf = new Map((syllabi || []).map((s) => [s.id, []]));
   const syllabusOf = new Map();
@@ -27,12 +28,12 @@ export function syllabusIndex(syllabi, topics, members) {
     syllabusOf.set(row.id, byId.get(row.syllabusId));
   }
   for (const rows of topicsOf.values()) rows.sort((a, b) => a.order - b.order);
-  return { syllabi: syllabi || [], members, topicsOf, syllabusOf };
+  return { syllabi: syllabi || [], lines, topicsOf, syllabusOf };
 }
 
 // Narrows the pairs of ONE subject (one group) to its current semester, for layoutLessons.
 export function subjectScope(subject, pairs, index, settings) {
-  const syllabus = syllabusFor(subject, index.syllabi, settings.semester, index.members);
+  const syllabus = syllabusFor(subject, index.syllabi, settings.semester, index.lines);
   const topics = syllabus ? index.topicsOf.get(syllabus.id) || [] : [];
   const own = new Set(topics.map((t) => t.id));
   const all = pairs || [];

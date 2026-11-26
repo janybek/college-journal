@@ -34,7 +34,6 @@ const hasRole = (viewer, role) => Array.isArray(viewer.roles) && viewer.roles.in
 
 // What the viewer may do with a version. viewer: { id, roles (array), part ('responsible' | 'teaches' | null: the place on the syllabus of the
 // discipline, from partOf), archived (true: the version lies on a line of the history) }.
-// TEMP task 3: the parts 'author', 'member', 'invited' of the old shared lines work as before, with teaches === true.
 export function rightsOn(version, viewer) {
   if (!version || !viewer || typeof viewer !== 'object') return { ...NO_RIGHTS };
   const status = version.status;
@@ -42,17 +41,16 @@ export function rightsOn(version, viewer) {
   const teacher = hasRole(viewer, 'teacher') && typeof viewer.id === 'string' && viewer.id !== '';
   const part = viewer.part ?? null;
   const archived = viewer.archived === true;
-  const old = teacher && viewer.teaches === true ? part : null; // TEMP task 3
   const responsible = teacher && part === 'responsible';
-  const worker = !archived && (manager || responsible || old === 'author' || old === 'member'); // TEMP task 3 (old)
+  const worker = !archived && (manager || responsible);
   let see = false;
   if (status === 'approved') see = !archived || manager;
   else if (OPEN_STATUSES.includes(status)) {
     see = worker || (archived && manager)
-      || (!archived && ((teacher && part === 'teaches') || old === 'invited' || (hasRole(viewer, 'prorector') && (status === 'review' || status === 'returned'))));
+      || (!archived && ((teacher && part === 'teaches') || (hasRole(viewer, 'prorector') && (status === 'review' || status === 'returned'))));
   }
   const edit = EDITABLE_STATUSES.includes(status) && worker;
-  const submit = edit && (manager || responsible || old === 'author'); // TEMP task 3 (old)
+  const submit = edit && (manager || responsible);
   const open = OPEN_STATUSES.includes(status) && !archived && manager;
   return { see, edit, submit, approve: open, giveBack: open && status === 'review' };
 }

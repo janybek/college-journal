@@ -1,4 +1,4 @@
-// Shared helper of the tests of shared syllabus lines (not a *.test.js file: `npm test` does not run it on its own).
+// Shared helper of the tests of the syllabus of a discipline (not a *.test.js file: `npm test` does not run it on its own).
 // Fictional people only: staff admin, dean (dean + teacher), prorector, t1…t5; students s1…s3 of the groups 01-1, 02-1, 03-1.
 // Anatomy (ds1) is led by t1 (01-1, Tuesday), t2 (02-1, Wednesday), t3 (03-1, Thursday); Chemistry (ds2) by t4 (01-1, Friday); t5 teaches nothing.
 import { createNodePlatform } from '../backend/platform/nodePlatform.js';
@@ -7,7 +7,10 @@ import { SCHEMA } from '../core/schema.js';
 import { DEFAULT_BELLS } from '../core/settings.js';
 import { hashPassword } from '../core/auth.js';
 import { handleRequest } from '../backend/api.js';
-import { oneJoined } from '../core/syllabusLines.js';
+import { oneMain, mainLine } from '../core/disciplineSyllabus.js';
+import { parseSyllabus } from '../core/syllabusFile.js';
+import { docLessons } from '../core/syllabusPlan.js';
+import { applyLinesUpgrade } from '../backend/linesUpgrade.js';
 import { INFO, file } from './syllabusSetup.js';
 
 const UNIT_END = (unit) => [unit, '', '', '', '', 'модуль', ''];
@@ -97,16 +100,22 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
     }
     return done;
   };
-  const lineOf = (key, half = 1) => {
-    const row = store.list('syllabusMembers').find((m) => m.teacherId === ids[key] && m.state === 'joined' && m.semester === half);
-    return row ? store.list('syllabusLines').find((l) => l.id === row.lineId) : null;
-  };
-  const share = (lineId, key, state = 'joined', over = {}) => {
-    const line = store.list('syllabusLines').find((l) => l.id === lineId);
-    return store.insert('syllabusMembers', {
-      lineId, disciplineId: line.disciplineId, semester: line.semester, teacherId: ids[key], state, byId: line.authorId,
-      invitedAt: '2026-09-01 09:00:00', joinedAt: state === 'joined' || state === 'left' ? '2026-09-01 10:00:00' : '', endedAt: '', endedBy: '', ...over,
+  const main = (disciplineId) => mainLine(store.list('syllabusLines'), disciplineId) ?? undefined;
+  const lines = (disciplineId) => store.list('syllabusLines').filter((l) => l.disciplineId === disciplineId);
+  // a version «as the earlier build kept it»: a row of «Силлабусы» without a line, under the key of the teacher of the subject, and its rows of «Темы»
+  const old = (subjectId, sheets, { status = 'approved', semester = 1, version = 1 } = {}) => {
+    const subject = store.list('subjects').find((x) => x.id === subjectId);
+    const { doc } = parseSyllabus(sheets);
+    const half = docLessons(doc).find((x) => x.semester === semester);
+    const row = store.insert('syllabi', {
+      disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester, planSemester: half ? half.planSemester : null, status, version,
+      ...(status === 'approved' ? { decidedAt: '2026-08-31' } : {}),
     });
+    (half ? half.rows : []).forEach((r, i) => store.insert('topics', {
+      syllabusId: row.id, order: i + 1, unit: r.unit, unitTitle: r.unitTitle, lessonKind: r.lessonKind, name: r.name, hours: r.hours,
+      selfHours: r.selfHours, description: r.description, controlForms: '', sourceId: '',
+    }));
+    return row.id;
   };
   const hold = (subjectId, date) => {
     const pair = store.list('pairs').find((p) => p.subjectId === subjectId && p.date === date);
@@ -122,7 +131,8 @@ export function setup({ makeStore = (schema, platform) => createMemoryStore(sche
   };
   const snapshot = () => Object.fromEntries(Object.keys(SCHEMA).map((name) => [name, store.list(name)]));
   return {
-    store, files, spied: spy, spy, platform, call, ids, names, t, ds1, ds2, groups, sb1, sb2, sb3, sb4, FILE_A, FILE_B, at, publish, lineOf, share, hold, closeUnit,
-    topicsOf, snapshot, failingOn: (method, table) => failingOn(store, method, table), oneJoined: () => oneJoined(store.list('syllabusMembers')),
+    store, files, spied: spy, spy, platform, call, ids, names, t, ds1, ds2, groups, sb1, sb2, sb3, sb4, FILE_A, FILE_B, at, publish, hold, closeUnit,
+    topicsOf, snapshot, failingOn: (method, table) => failingOn(store, method, table), main, lines, old,
+    oneMain: () => oneMain(store.list('syllabusLines')), upgrade: () => applyLinesUpgrade(store, platform),
   };
 }

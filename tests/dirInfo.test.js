@@ -40,7 +40,7 @@ test('topOf', () => {
 
 test('syllabusState and syllabusCounts', () => {
   const Y = (status, version, over = {}) => ({ id: 'y' + version, disciplineId: 'd', teacherId: 't', semester: 1, lineId: 'l1', status, version, ...over });
-  const members = [{ id: 'm1', lineId: 'l1', disciplineId: 'd', teacherId: 't', semester: 1, state: 'joined', joinedAt: '' }];
+  const members = [{ id: 'l1', disciplineId: 'd', kind: 'main', semester: null, teacherId: '', responsibleId: 'u', createdAt: '' }];   // the syllabus of the discipline
   const key = { disciplineId: 'd', teacherId: 't', semester: 1 };
   const dean = { id: 'u', roles: ['dean'] };
   const pro = { id: 'p', roles: ['prorector'] };
@@ -49,6 +49,7 @@ test('syllabusState and syllabusCounts', () => {
   assert.deepEqual(syllabusState([Y('draft', 1)], key, pro, members), { approved: false, open: null });
   assert.deepEqual(syllabusState([Y('review', 1)], key, pro, members), { approved: false, open: 'review' });
   assert.deepEqual(syllabusState([Y('approved', 1, { semester: 2, lineId: 'l2' })], key, dean, members), { approved: false, open: null });
+  assert.throws(() => syllabusState([Y('draft', 1)], key, dean, undefined), TypeError);
   assert.deepEqual(syllabusCounts([{ approved: true, open: 'returned' }, { approved: false, open: 'draft' }, { approved: false, open: null }, { approved: false, open: 'review' }]),
     { approved: 1, review: 1, returned: 1, draft: 1, none: 1 });
   assert.deepEqual(syllabusCounts([]), { approved: 0, review: 0, returned: 0, draft: 0, none: 0 });

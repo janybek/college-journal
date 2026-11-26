@@ -15,8 +15,7 @@ export const M = [1, '', '', '', '', 'модуль', ''];                       
 export const file = (rows, info = INFO) => [{ name: 'Сведения', cells: info }, { name: 'Тематический план', cells: [HEAD, ...rows] }];
 export const A = file([T('Введение', 2, 2), T('Практикум', '', 2), M]);             // lessons: Введение — lecture, practice; Практикум — practice
 export const FIRST = [['Введение', 'lecture', 1], ['Введение', 'practice', 1]];
-export const READS = { subjects: 1, staff: 1, groups: 1, syllabi: 1, topics: 1, units: 1, literature: 1, pairs: 1, syllabusMembers: 1 };   // sheets of one upload of a file: each once (the members find the line of the teacher)
-export const READS_WITH_LINES = { ...READS, syllabusLines: 1 };                                                                         // an upload that makes a version also reads the lines
+export const READS = { subjects: 1, staff: 1, groups: 1, syllabi: 1, topics: 1, units: 1, literature: 1, pairs: 1, syllabusLines: 1 };   // sheets of one upload of a file: each once (the lines find the syllabus of the discipline)
 
 export const S = { semesterStart: '2026-09-01', semesterEnd: '2026-09-11', holidays: ['2026-09-07'], bells: DEFAULT_BELLS, semester: 1 };
 

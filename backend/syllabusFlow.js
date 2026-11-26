@@ -4,47 +4,49 @@ import { AppError } from '../core/errors.js';
 import { LIMITS, plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES, buildDoc, rowsOfVersion } from '../core/syllabusDoc.js';
 import { approvalPlan, checkSubmit, rightsOn } from '../core/syllabusFlow.js';
-import { lineSubjects, teachingOf, versionsOfLine } from '../core/syllabusLines.js';
+import { lineSubjects, versionsOfLine } from '../core/disciplineSyllabus.js';
 import { loadSettings, relayout, todayOf } from './scheduleData.js';
 import { heldErrors, readTables, versionOf } from './syllabusDraft.js';
-import { LINE_TABLES, groupsOfLine, lineOfVersion, viewerOf } from './syllabusLines.js';
+import { groupsOfLine, lineOfVersion, viewerOf, worksOn } from './syllabusLines.js';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const isManager = (user) => user.roles.includes('admin') || user.roles.includes('dean');
 
-// The version of the request with its line and the sheets that decide who may do what: { syllabi, version, subjects, line, members }.
+// The version of the request with its line and the sheets that decide who may do what: { syllabi, version, subjects, line, lines }.
 function load(store, data) {
   const syllabi = store.list('syllabi');
   const version = versionOf(syllabi, data.syllabusId);
   const subjects = store.list('subjects');
-  const lines = readTables(store, LINE_TABLES);
-  const line = lineOfVersion(lines.syllabusLines, version);
-  return { syllabi, version, subjects, line, members: lines.syllabusMembers };
+  const lines = store.list('syllabusLines');
+  const line = lineOfVersion(lines, version);
+  return { syllabi, version, subjects, line, lines };
 }
 
 // The rights of the user on the version for one action. Someone who may not even see the version, or who never does this action, gets `forbidden`;
-// someone who does it in general but not with a version in this status gets `syllabus_locked`. Only the author of the line (who teaches the discipline) submits.
+// someone who does it in general but not with a version in this status gets `syllabus_locked`. The deanery, the administrator and the responsible submit.
 function allow(ctx, user, action) {
-  const viewer = viewerOf(user, ctx.line, ctx.members, ctx.subjects);
+  const viewer = viewerOf(user, ctx.line, ctx.subjects, ctx.lines);
   const rights = rightsOn(ctx.version, viewer);
   if (!rights.see) throw new AppError('forbidden');
-  const owner = viewer.roles.includes('teacher') && viewer.teaches && viewer.part === 'author';
-  const may = action === 'submit' ? isManager(user) || owner : isManager(user);
+  const may = action === 'submit' ? worksOn(viewer) : isManager(user);
   if (!may) throw new AppError('forbidden');
   if (!rights[action === 'return' ? 'giveBack' : action]) throw new AppError('syllabus_locked');
 }
 
-// The checks before submitting and approving: the version against the approved one of its line and the held pairs of every group of the line.
+// The checks before submitting and approving: the version against the approved one of its half of the line and the held pairs of every group of the line.
 function examine(store, ctx) {
-  const { version, line, members, subjects, syllabi } = ctx;
+  const { version, line, lines, subjects, syllabi } = ctx;
   const tables = readTables(store, DOC_TABLES);
   const pairs = store.list('pairs');
   const groups = store.list('groups');
-  const { approved } = versionsOfLine(syllabi, line.id);
+  const { approved } = versionsOfLine(syllabi, line.id, version.semester);
   const rows = rowsOfVersion(tables, version.id);
   const previous = approved && approved.id !== version.id ? rowsOfVersion(tables, approved.id) : null;
-  const held = previous ? heldErrors(store, { subjects, groups, line, members }, version, approved, rows, previous, pairs) : [];
-  return { tables, pairs, approved: previous ? approved : null, rows, previous, checks: checkSubmit(buildDoc(version, rows), held, groupsOfLine(line, members, subjects, groups)) };
+  const held = previous ? heldErrors(store, { subjects, groups, line, lines }, version, approved, rows, previous, pairs) : [];
+  return {
+    tables, pairs, approved: previous ? approved : null, rows, previous,
+    checks: checkSubmit(buildDoc(version, rows), held, groupsOfLine(line, lines, subjects, groups, version.semester)),
+  };
 }
 
 // 'syllabus.submit' { syllabusId, dryRun? } -> { submitted, checks }
@@ -65,7 +67,7 @@ export function approveSyllabus(store, platform, data, user) {
   const syllabusId = plainId(data.syllabusId);
   if (syllabusId === null) throw new AppError('bad_request');
   const ctx = load(store, data);
-  const { version, syllabi, subjects, line, members } = ctx;
+  const { version, syllabi, subjects, line, lines } = ctx;
   allow(ctx, user, 'approve');
   const { tables, pairs, approved, rows, previous, checks } = examine(store, ctx);
   if (checks.errors.length > 0) return { approved: false, checks, changedPairs: 0 };
@@ -79,8 +81,8 @@ export function approveSyllabus(store, platform, data, user) {
 
   // «Пары» go first, «Силлабусы» second: if the second write fails, the version stays open with the pairs already on its rows,
   // and «Утвердить» again finishes the job (approvalPlan moves nothing, the layout is the same).
-  const ids = lineSubjects(subjects, line, members).map((s) => s.id);       // the groups of everybody who leads the line at this moment
-  const result = relayout(store, ids, { subjects, syllabi: after, syllabusMembers: members, topics: tables.topics, pairs: afterPairs, settings }, plan.pairs);
+  const ids = lineSubjects(subjects, line, lines, version.semester).map((s) => s.id);   // the groups that follow the line in this half at this moment
+  const result = relayout(store, ids, { subjects, syllabi: after, syllabusLines: lines, topics: tables.topics, pairs: afterPairs, settings }, plan.pairs);
   store.updateMany('syllabi', plan.syllabi);
   return { approved: true, checks, changedPairs: result.changed };
 }
@@ -100,25 +102,25 @@ export function returnSyllabus(store, platform, data, user) {
 }
 
 // 'syllabus.queue' { countOnly? } -> { today, count, rows } or { count }
-// A row names the author of the line ('' - the deanery) and the number of the teachers who lead the discipline on it now; teacherName is the old key of the same meaning.
+// The versions on approval of the lines that are not a history. teacherName: the responsible (the syllabus of the discipline) or the teacher (an old own one), '' - nobody.
 export function reviewQueue(store, platform, data) {
   if (data.countOnly !== undefined && typeof data.countOnly !== 'boolean') throw new AppError('bad_request');
-  const queue = store.list('syllabi').filter((s) => s.status === 'review');
+  const lines = store.list('syllabusLines');
+  const lineOf = new Map(lines.map((l) => [l.id, l]));
+  const queue = store.list('syllabi').filter((s) => s.status === 'review' && !(lineOf.has(s.lineId) && lineOf.get(s.lineId).kind === 'archived'));
   if (data.countOnly === true) return { count: queue.length };
   const subjects = store.list('subjects');
   const disciplines = store.list('disciplines');
   const staff = store.list('staff');
   const groups = store.list('groups');
-  const lines = readTables(store, LINE_TABLES);
   const nameOf = (rows, id, field) => (rows.find((r) => r.id === id) || {})[field] ?? '';
   const rows = queue.map((s) => {
-    const line = lines.syllabusLines.find((l) => l.id === s.lineId);
-    const authorName = line ? nameOf(staff, line.authorId, 'fullName') : nameOf(staff, s.teacherId, 'fullName');
-    const first = line ? lineSubjects(subjects, line, lines.syllabusMembers)
+    const line = lineOf.get(s.lineId);
+    const first = line ? lineSubjects(subjects, line, lines, s.semester)
       .map((x) => ({ id: x.id, group: nameOf(groups, x.groupId, 'name') })).sort((a, b) => cmp(a.group, b.group) || cmp(a.id, b.id))[0] : undefined;
+    const who = !line ? s.teacherId : line.kind === 'main' ? line.responsibleId : line.teacherId;
     return {
-      syllabusId: s.id, subjectId: first ? first.id : '', disciplineName: nameOf(disciplines, s.disciplineId, 'name'), teacherName: authorName, authorName,
-      members: line ? teachingOf(lines.syllabusMembers, line, subjects).length : 0,
+      syllabusId: s.id, subjectId: first ? first.id : '', disciplineName: nameOf(disciplines, s.disciplineId, 'name'), teacherName: nameOf(staff, who, 'fullName'),
       semester: s.semester, planSemester: s.planSemester ?? null, version: s.version, submittedAt: s.submittedAt ?? '', submittedByName: nameOf(staff, s.submittedBy, 'fullName'),
     };
   }).sort((a, b) => cmp(a.submittedAt, b.submittedAt) || cmp(a.disciplineName, b.disciplineName) || cmp(a.syllabusId, b.syllabusId));

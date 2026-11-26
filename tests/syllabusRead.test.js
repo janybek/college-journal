@@ -84,14 +84,14 @@ test('subjects.overview and student.subjects', () => {
   assert.deepEqual(view.disciplines, [{ id: ds2, name: 'Анатомия' }, { id: ds1, name: 'Информатика' }]);
   assert.deepEqual(view.groups, [{ id: g1, name: '01-1' }, { id: g2, name: '02-1' }]);
   assert.deepEqual(view.teachers, [{ id: staff.dean, fullName: 'dean' }, { id: staff.teacher1, fullName: 'teacher1' }, { id: staff.teacher2, fullName: 'teacher2' }]);
-  // one discipline, two teachers: two rows; the second has no syllabus
+  // one discipline, two teachers: two rows; both follow the one syllabus of the discipline
   call('dir.save', { table: 'subjects', row: { id: sb3, teacherId: staff.teacher2 } }, dean);
   assert.deepEqual(call('subjects.overview', {}, dean).data.rows.map((r) => [r.disciplineName, r.teacherName, r.groups.map((g) => g.groupName), r.syllabusStatus]),
-    [['Анатомия', 'teacher2', ['02-1'], 'none'], ['Информатика', 'teacher1', ['01-1'], 'approved'], ['Информатика', 'teacher2', ['02-1'], 'none']]);
+    [['Анатомия', 'teacher2', ['02-1'], 'none'], ['Информатика', 'teacher1', ['01-1'], 'approved'], ['Информатика', 'teacher2', ['02-1'], 'approved']]);
   for (const token of [teacher1, s1]) assert.deepEqual(call('subjects.overview', {}, token).error, { code: 'forbidden' });
   assert.deepEqual(call('student.subjects', {}, s1).data, { subjects: [{ id: sb1, name: 'Информатика', teacherName: 'teacher1', hasSyllabus: true, updating: false }] });
   assert.deepEqual(call('student.subjects', {}, s2).data, { subjects: [{ id: sb2, name: 'Анатомия', teacherName: 'teacher2', hasSyllabus: false, updating: false },
-    { id: sb3, name: 'Информатика', teacherName: 'teacher2', hasSyllabus: false, updating: false }] });
+    { id: sb3, name: 'Информатика', teacherName: 'teacher2', hasSyllabus: true, updating: false }] });
   assert.deepEqual(call('student.subjects', {}, teacher1).error, { code: 'forbidden' });
   assert.deepEqual(call('topics.plan', { subjectId: sb1 }, dean).error, { code: 'bad_request' });       // the action is gone
 });
@@ -106,11 +106,11 @@ test('a syllabus of another semester only counts as otherSemester in the overvie
 
 test('reading: every sheet once, nothing written', () => {
   const { call, lists, calls, writes, reset, sb1, dean, teacher1, s1 } = ready();
-  const overview = { subjects: 1, groups: 1, staff: 1, syllabi: 1, syllabusMembers: 1, topics: 1, pairs: 1, settings: 1, disciplines: 1 };
-  const page = { subjects: 1, groups: 1, staff: 1, syllabi: 1, syllabusLines: 1, syllabusMembers: 1, pairs: 1, settings: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1 };
+  const overview = { subjects: 1, groups: 1, staff: 1, syllabi: 1, syllabusLines: 1, topics: 1, pairs: 1, settings: 1, disciplines: 1 };
+  const page = { subjects: 1, groups: 1, staff: 1, syllabi: 1, syllabusLines: 1, pairs: 1, settings: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1 };
   for (const [action, data, token, expected] of [['syllabus.get', { subjectId: sb1 }, s1, page], ['syllabus.get', { subjectId: sb1 }, teacher1, page],
     ['syllabus.get', { subjectId: sb1, version: 'open' }, dean, page], ['subjects.overview', {}, dean, overview],
-    ['student.subjects', {}, s1, { subjects: 1, staff: 1, syllabi: 1, syllabusMembers: 1 }]]) {
+    ['student.subjects', {}, s1, { subjects: 1, staff: 1, syllabi: 1, syllabusLines: 1 }]]) {
     reset();
     assert.equal(call(action, data, token).ok, true);
     assert.deepEqual(lists, expected, action);
@@ -242,7 +242,7 @@ test('statuses in the lists: the overview of the deanery and the subjects of a t
   // speed: «My subjects» reads every sheet once and writes nothing
   reset();
   call('teacher.mySubjects', {}, teacher1);
-  assert.deepEqual([lists, writes, calls.get], [{ groups: 1, students: 1, subjects: 1, syllabi: 1, syllabusMembers: 1, settings: 1 }, {}, 1]);
+  assert.deepEqual([lists, writes, calls.get], [{ groups: 1, students: 1, subjects: 1, syllabi: 1, syllabusLines: 1, settings: 1 }, {}, 1]);
 });
 
 test('the earlier answer fields of the page, the pairs and the overview are gone', () => {

@@ -233,21 +233,21 @@ test('ensureTables on a unit 5 base adds the seven unit 6 tables and changeLog.r
   assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
 });
 
-test('ensureTables on a base before the shared syllabus adds the line and member tables; syllabi get lineId and sourceId read as empty', (t) => {
+test('ensureTables on a base before the syllabus of the discipline adds the line table; syllabi get lineId and sourceId read as empty', (t) => {
   const { db } = tmpBase(t, { empty: true });
   ensureTables(SCHEMA, db);
-  db.exec('DROP TABLE "syllabi"; DROP TABLE "syllabusLines"; DROP TABLE "syllabusMembers"');
+  db.exec('DROP TABLE "syllabi"; DROP TABLE "syllabusLines"');
   const oldColumns = SCHEMA.syllabi.columns.slice(0, -2);
   db.exec(`CREATE TABLE "syllabi" (${oldColumns.map((c) => `"${c.key}" TEXT`).join(', ')}); INSERT INTO "syllabi" ("id", "goal") VALUES ('sy_1', 'Цель')`);
   const result = ensureTables(SCHEMA, db);
-  assert.deepEqual(result.created, ['syllabusLines', 'syllabusMembers']);
+  assert.deepEqual(result.created, ['syllabusLines']);
   assert.deepEqual(result.added, [['syllabi', 'lineId'], ['syllabi', 'sourceId']]);
   const store = createSqliteStore(SCHEMA, platform, db);
   const old = store.get('syllabi', 'sy_1');
   assert.deepEqual([old.lineId, old.sourceId], ['', '']);
-  assert.deepEqual([store.list('syllabusLines'), store.list('syllabusMembers')], [[], []]);
-  const line = store.insert('syllabusLines', { disciplineId: 'ds_1', semester: 1, authorId: 'sf_1', createdBy: 'sf_1', createdAt: '2026-11-25 10:00:00' });
+  assert.deepEqual(store.list('syllabusLines'), []);
+  const line = store.insert('syllabusLines', { disciplineId: 'ds_1', kind: 'main', semester: null, responsibleId: 'sf_1', createdBy: 'sf_1', createdAt: '2026-11-25 10:00:00' });
   assert.match(line.id, /^sl_/);
-  assert.equal(store.insert('syllabusMembers', { lineId: line.id, disciplineId: 'ds_1', semester: 1, teacherId: 'sf_1', state: 'joined' }).id.startsWith('sm_'), true);
+  assert.deepEqual([line.semester, line.dueDate, line.reviewDue], [null, '', '']);
   assert.deepEqual(ensureTables(SCHEMA, db), { created: [], added: [] });
 });

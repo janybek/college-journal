@@ -7,10 +7,11 @@ import { planSyllabusUpload } from '../core/syllabus.js';
 import { plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES } from '../core/syllabusDoc.js';
 import { copiesOf } from '../core/syllabusFlow.js';
-import { joinedLineId, lineSubjects, teacherSubjects, versionsOfLine } from '../core/syllabusLines.js';
+import { draftTarget, lineFor, lineSubjects, versionsOfLine } from '../core/disciplineSyllabus.js';
 import { todayOf } from './scheduleData.js';
-import { createDraft, draftForm, ensureLine, saveSection } from './syllabusDraft.js';
+import { createDraft, draftForm, saveSection, teacherOfNew } from './syllabusDraft.js';
 import { approveSyllabus } from './syllabusFlow.js';
+import { openLine } from './syllabusLines.js';
 
 const MAX_SHEETS = 10;
 const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
@@ -95,27 +96,31 @@ function unitWrites(units, unitRows, syllabusId) {
   return { insert, update };
 }
 
-// Everything about a file for a subject: the plan against the versions there are now, on the lines where the teacher of the subject leads the discipline.
-// `tables`: syllabi, topics, units, literature, pairs; `members`: the rows of the sheet of the members (those of the lines the request has just made too).
+// Everything about a file for a subject: the plan against the versions there are now, on the line the subject follows in each half of the year.
+// `tables`: syllabi, topics, pairs, units, literature; `lines`: the rows of «Силлабусы дисциплин» (those the request has just made too).
+// The teacher of the file is the owner of an old «own» syllabus when the subject follows one; the syllabus of the discipline has no single teacher.
 function planFile(doc, subject, ctx) {
-  const { staff, groups, tables, platform, members } = ctx;
-  const teacher = staff.find((s) => s.id === subject.teacherId);
+  const { staff, groups, tables, platform, lines } = ctx;
   const discipline = { id: subject.disciplineId, name: subject.name };
-  const owner = { id: subject.teacherId, fullName: teacher ? teacher.fullName : '' };
-  const keyOf = (semester) => ({ disciplineId: discipline.id, teacherId: owner.id, semester });
+  const keyOf = (semester) => ({ disciplineId: discipline.id, teacherId: subject.teacherId, semester });
   const groupName = new Map(groups.map((g) => [g.id, g.name]));
   const found = {};
   const versions = {};
   const taught = new Map();
+  let ownerId = '';
   for (const half of [1, 2]) {
-    const lineId = joinedLineId(members, keyOf(half));
-    const { approved, open } = versionsOfLine(tables.syllabi, lineId);
+    const lineId = lineFor(lines, keyOf(half));
+    const line = lineId === null ? null : lines.find((l) => l.id === lineId) || null;
+    const { approved, open } = versionsOfLine(tables.syllabi, lineId, half);
     found[half] = { approved, open };
     versions[half] = partOf(open, approved, tables, tables.pairs);
-    const line = lineId === null ? null : { id: lineId, disciplineId: discipline.id };
-    for (const s of line ? lineSubjects(ctx.subjects, line, members) : teacherSubjects(ctx.subjects, discipline.id, owner.id)) taught.set(s.id, s);
+    if (line && line.kind === 'own' && ownerId === '') ownerId = line.teacherId;
+    const followers = line ? lineSubjects(ctx.subjects, line, lines, half) : ctx.subjects.filter((x) => x.disciplineId === discipline.id);
+    for (const x of followers) taught.set(x.id, x);
   }
-  const names = [...new Set([...taught.values()].map((s) => groupName.get(s.groupId) ?? '').filter((name) => name !== ''))].sort();
+  const person = staff.find((x) => x.id === ownerId);
+  const owner = { id: ownerId, fullName: person ? person.fullName : '' };
+  const names = [...new Set([...taught.values()].map((x) => groupName.get(x.groupId) ?? '').filter((name) => name !== ''))].sort();
   const plan = planSyllabusUpload(doc, { discipline, teacher: owner, versions, today: todayOf(platform), groups: names });
   return { plan, found, keyOf };
 }
@@ -126,19 +131,28 @@ export function uploadSyllabus(store, platform, data, user, write) {
   const subjects = store.list('subjects');
   const subject = subjects.find((s) => s.id === subjectId);
   if (!subject) throw new AppError('not_found');
-  if (!(isManager(user) || (user.roles.includes('teacher') && subject.teacherId === user.id))) throw new AppError('forbidden');
+  if (!(isManager(user) || user.roles.includes('teacher'))) throw new AppError('forbidden');
   if (typeof subject.disciplineId !== 'string' || subject.disciplineId === '') {
     throw new AppError('invalid', { fields: [{ field: 'disciplineId', code: 'bad_ref' }] });
   }
+  // the right is the one of a new draft of each half the file names (draftTarget); a person who may start none gets no word about the file
+  const syllabi = store.list('syllabi');
+  const lines = store.list('syllabusLines');
+  const target = (half) => draftTarget(lines, syllabi, subjects, { disciplineId: subject.disciplineId, teacherId: subject.teacherId, semester: half }, user);
+  if (![1, 2].some((half) => target(half).code === 'ok')) throw new AppError(target(1).code);
 
   const parsed = parseSyllabus(cells);
   if (parsed.doc === null) return { ok: false, applied: false, found: parsed.found, summaries: [], errors: parsed.errors, warnings: parsed.warnings, drafts: [] };
 
   const staff = store.list('staff');
   const groups = store.list('groups');
-  const tables = { syllabi: store.list('syllabi'), topics: store.list('topics'), pairs: store.list('pairs'), units: store.list('units'), literature: store.list('literature') };
-  const ctx = { staff, groups, subjects, tables, platform, members: store.list('syllabusMembers') };
+  const tables = { syllabi, topics: store.list('topics'), pairs: store.list('pairs'), units: store.list('units'), literature: store.list('literature') };
+  const ctx = { staff, groups, subjects, tables, platform, lines };
   const { plan, found, keyOf } = planFile(parsed.doc, subject, ctx);
+  for (const part of plan.parts) {
+    const { code } = target(part.semester);
+    if (code !== 'ok') throw new AppError(code);
+  }
 
   // a version under review is not touched: the file is refused as a whole
   const busy = plan.parts.filter((p) => found[p.semester].open && found[p.semester].open.status === 'review')
@@ -172,7 +186,6 @@ function writeDrafts(store, platform, { subject, user, doc, found, keyOf, ctx, p
   const today = todayOf(platform);
   const made = {};                                                       // half -> { version, units (rows), books (rows) }
   let others = null;                                                     // the sheets only a copy of an approved version needs
-  let lines = null;                                                      // the sheet of the lines with the members, read when the first version is made
   for (const part of planned.parts) {
     const half = part.semester;
     const { open, approved } = found[half];
@@ -180,20 +193,21 @@ function writeDrafts(store, platform, { subject, user, doc, found, keyOf, ctx, p
       made[half] = { version: open, units: tables.units.filter((u) => u.syllabusId === open.id), books: tables.literature.filter((b) => b.syllabusId === open.id) };
       continue;
     }
-    if (lines === null) lines = { syllabusLines: store.list('syllabusLines'), syllabusMembers: ctx.members };
-    const { line } = ensureLine(store, platform, { ...keyOf(half), userId: user.id }, lines);
-    ctx.members = lines.syllabusMembers;                                 // the new member is a part of the line for the next look at the file
+    const rows = { syllabusLines: ctx.lines, syllabi: tables.syllabi, subjects: ctx.subjects };
+    const line = openLine(store, platform, keyOf(half), user, rows);
+    ctx.lines = rows.syllabusLines;                                      // a line made now is a part of the lines for the next look at the file
+    const teacherId = teacherOfNew(line, ctx.subjects, () => tables.pairs, user.id);
     let copy;
     if (approved) {
       if (others === null) {
         others = {};
         for (const name of DOC_TABLES) if (!tables[name]) others[name] = store.list(name);
       }
-      copy = createDraft(store, platform, { line, approved, group: null, userId: user.id }, { ...tables, ...others });
+      copy = createDraft(store, platform, { line, half, approved, group: null, userId: user.id, teacherId }, { ...tables, ...others });
       made[half] = { version: copy.version, units: copy.rows.units, books: copy.rows.literature };
     } else {
       const group = ctx.groups.find((g) => g.id === subject.groupId) || null;
-      copy = createDraft(store, platform, { line, approved: null, group, userId: user.id }, { syllabi: tables.syllabi });
+      copy = createDraft(store, platform, { line, half, approved: null, group, userId: user.id, teacherId }, { syllabi: tables.syllabi });
       made[half] = { version: copy.version, units: [], books: [] };
     }
     tables.syllabi = [...tables.syllabi, copy.version];
@@ -246,7 +260,7 @@ export function publishSyllabusDoc(store, platform, subjectId, doc, user, title 
   const staff = store.list('staff');
   const groups = store.list('groups');
   const tables = { syllabi: store.list('syllabi'), topics: store.list('topics'), pairs: store.list('pairs'), units: store.list('units'), literature: store.list('literature') };
-  const ctx = { staff, groups, subjects: store.list('subjects'), tables, platform, members: store.list('syllabusMembers') };
+  const ctx = { staff, groups, subjects: store.list('subjects'), tables, platform, lines: store.list('syllabusLines') };
   const first = planFile(doc, subject, ctx);
   if (first.plan.errors.length > 0) throw new Error('publishSyllabusDoc: ' + JSON.stringify(first.plan.errors));
   const written = writeDrafts(store, platform, { subject, user, doc, found: first.found, keyOf: first.keyOf, ctx, planned: first.plan });

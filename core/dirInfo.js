@@ -3,7 +3,7 @@ import { minutesOf, addMinutes, isTime, isDate } from './dates.js';
 import { PAIR_MINUTES } from './settings.js';
 import { rightsOn } from './syllabusFlow.js';
 import { compareNames } from './names.js';
-import { joinedLineId, versionsOfLine } from './syllabusLines.js';
+import { lineFor, versionsOfLine } from './disciplineSyllabus.js';
 
 export const CARD_TABLES = ['groups', 'rooms', 'disciplines'];
 
@@ -54,10 +54,10 @@ export function topOf(items) {
 }
 
 // viewer: { id, roles }. The open version is shown only to those who may see it.
-export function syllabusState(syllabi, { disciplineId, teacherId, semester }, viewer, members) {
-  if (!Array.isArray(members)) throw new TypeError('syllabusState: the members of the lines are required');
-  const { approved, open } = versionsOfLine(syllabi, joinedLineId(members, { disciplineId, teacherId, semester }));
-  const visible = open && rightsOn(open, { ...viewer, teaches: false }).see;
+export function syllabusState(syllabi, { disciplineId, teacherId, semester }, viewer, lines) {
+  if (!Array.isArray(lines)) throw new TypeError('syllabusState: the lines of the syllabi are required');
+  const { approved, open } = versionsOfLine(syllabi, lineFor(lines, { disciplineId, teacherId, semester }), semester);
+  const visible = open && rightsOn(open, { id: viewer.id, roles: viewer.roles, part: null, archived: false }).see;
   return { approved: approved !== null, open: visible ? open.status : null };
 }
 

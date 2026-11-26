@@ -12,7 +12,7 @@ import { settleLessons } from './lessonSettle.js';
 import { JOURNAL_TABLES, journalView, lastOf, viewerOf } from './journalData.js';
 import { attemptsOfCard, repeatMark, shownCard } from './repeatData.js';
 
-export const LEDGER_LIST_TABLES = ['subjects', 'groups', 'staff', 'syllabi', 'syllabusMembers', 'topics', 'settings', 'closures'];
+export const LEDGER_LIST_TABLES = ['subjects', 'groups', 'staff', 'syllabi', 'syllabusLines', 'topics', 'settings', 'closures'];
 export const LEDGER_TABLES = [...JOURNAL_TABLES, 'subjectExams', 'examAttempts', 'repeats', 'repeatAttempts'];
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -57,7 +57,7 @@ export function ledgerList(store, platform, user) {
   for (const subject of rows.subjects) {
     const own = isOwner(viewer, subject);
     if (!viewer.manager && !viewer.reader && !own) continue;
-    const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusMembers);
+    const syllabus = syllabusFor(subject, rows.syllabi, settings.semester, rows.syllabusLines);
     const planSemester = syllabus && Number.isInteger(syllabus.planSemester) ? syllabus.planSemester : null;
     const closed = syllabus ? closedUnitsOf(rows.closures, subject.id, planSemester) : closedWithoutSyllabus(rows.closures, subject.id);
     const units = syllabus ? [...(unitsOf.get(syllabus.id) || [])].sort((a, b) => a - b) : closed.units;

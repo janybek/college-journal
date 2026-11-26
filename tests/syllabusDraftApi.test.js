@@ -49,7 +49,7 @@ test('startDraft: an empty draft; a second click gives the same one and writes n
   const [row] = store.list('syllabi');
   assert.deepEqual([first.created, row.id, row.status, row.version, row.disciplineId, row.teacherId, row.semester, row.planSemester, row.course, row.editedBy, row.manualOrder],
     [true, first.syllabusId, 'draft', 1, ds1, staff.teacher1, 1, 1, 1, staff.teacher1, false]);
-  assert.deepEqual([lists, writes], [{ subjects: 1, groups: 1, syllabi: 1, syllabusLines: 1, syllabusMembers: 1 }, { 'insertMany:syllabusLines': 1, 'insertMany:syllabusMembers': 1, 'insertMany:syllabi': 1 }]);
+  assert.deepEqual([lists, writes], [{ subjects: 1, groups: 1, syllabi: 1, syllabusLines: 1 }, { 'insertMany:syllabusLines': 1, 'insertMany:syllabi': 1 }]);
   reset();
   assert.deepEqual([call('syllabus.startDraft', { subjectId: sb1, semester: 1 }, teacher1).data, writes, store.list('syllabi').length], [{ syllabusId: row.id, created: false }, {}, 1]);
   // у другой группы того же преподавателя — та же версия; у второй половины года — своя
@@ -202,18 +202,24 @@ test('rights: someone else\'s syllabus, a row of another version, an array or sp
   // a row of another version in the plan
   assert.deepEqual(save(syllabusId, 'plan', { units: [{ lecture: [{ id: topicOfOtherVersion, name: 'Чужая', hours: 2 }] }] }, teacher1).error,
     { code: 'invalid', fields: [{ unit: 1, list: 'lecture', index: 0, field: 'id', code: 'bad_ref' }] });
-  // the discipline went to another teacher: the former one no longer edits or reads his version
+  // the discipline went to another teacher: the responsible stays the responsible until the deanery names another one, then the former one neither edits nor reads
   for (const id of [sb1, sb3]) assert.equal(call('dir.save', { table: 'subjects', row: { id, teacherId: staff.teacher2 } }, dean).ok, true);
+  assert.equal(save(syllabusId, 'goals', { ...SECTIONS_VALUE.goals, goal: 'Ещё его' }, teacher1).ok, true);
+  assert.equal(code(save(syllabusId, 'goals', { goal: 'x' }, teacher2)), 'forbidden');
+  const line = store.list('syllabusLines').find((l) => l.kind === 'main' && l.disciplineId === store.get('syllabi', syllabusId).disciplineId);
+  store.update('syllabusLines', line.id, { responsibleId: staff.teacher2 });
   const before = snapshotAll();
   assert.deepEqual([code(save(syllabusId, 'goals', { goal: 'x' }, teacher1)), code(call('syllabus.form', { syllabusId }, teacher1))], ['forbidden', 'forbidden']);
   assert.equal(snapshotAll(), before);
+  assert.equal(save(syllabusId, 'goals', { ...SECTIONS_VALUE.goals, goal: 'Теперь его' }, teacher2).ok, true);
 });
 
-test('rights: a draft of another teacher stays closed to a teacher who teaches the same discipline', () => {
+test('rights: a teacher who leads the same discipline reads the draft of the responsible, but does not change it', () => {
   const { store, call, save, teacher1, teacher2, staff, sb1, ds1, g2 } = setup();
   const id = call('syllabus.startDraft', { subjectId: sb1, semester: 1 }, teacher1).data.syllabusId;
   store.insert('subjects', { name: 'Информатика', disciplineId: ds1, groupId: g2, teacherId: staff.teacher2, scheme: 'A' });
-  assert.deepEqual([code(call('syllabus.form', { syllabusId: id }, teacher2)), code(save(id, 'goals', { goal: 'x' }, teacher2))], ['forbidden', 'forbidden']);
+  const form = call('syllabus.form', { syllabusId: id }, teacher2);
+  assert.deepEqual([form.ok, form.data.can.edit, form.data.line.mine, code(save(id, 'goals', { goal: 'x' }, teacher2))], [true, false, 'teaches', 'forbidden']);
 });
 
 test('a version under review or approved is locked', () => {
@@ -258,13 +264,13 @@ test('speed: a section reads only its own sheets, each once; the form reads ever
     const answer = save(syllabusId, section, changed[section], teacher1);
     assert.equal(answer.ok, true, section + ' ' + JSON.stringify(answer));
     assert.equal(answer.data.lessons === null, !['plan', 'order'].includes(section), section);
-    assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, ...own }, section);
+    assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, ...own }, section);
     assert.deepEqual([calls.get, calls.insert || 0, calls.update || 0, calls.remove || 0], [1, 0, 0, 0], section);
     assert.equal(Object.values(writes).every((n) => n === 1) && writes['updateMany:syllabi'] === 1, true, section);
   }
   reset();
   call('syllabus.form', { syllabusId }, teacher1);
-  assert.deepEqual([lists, writes], [{ subjects: 1, staff: 1, groups: 1, syllabi: 1, syllabusLines: 1, syllabusMembers: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1 }, {}]);
+  assert.deepEqual([lists, writes], [{ subjects: 1, staff: 1, groups: 1, syllabi: 1, syllabusLines: 1, topics: 1, units: 1, outcomes: 1, selfWork: 1, literature: 1, software: 1, grading: 1, rules: 1, pairs: 1 }, {}]);
 });
 
 test('saveSection: the answer carries the section, the order of lessons, the flag and the date', () => {

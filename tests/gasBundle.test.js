@@ -186,11 +186,11 @@ test('hashes made inside the Apps Script bundle verify with the Node platform', 
 
 const SECTION_SHEETS = ['Юниты', 'Результаты обучения', 'СРС', 'Литература', 'Программное обеспечение', 'Оценивание', 'Правила'];
 
-test('setup creates all 37 sheets, adds nineteen columns to an old syllabus sheet and a second setup changes nothing', () => {
+test('setup creates all 36 sheets, adds nineteen columns to an old syllabus sheet and a second setup changes nothing', () => {
   const { gas, sandbox } = load();
   sandbox.setup();
   const [fresh] = gas.spreadsheets.values();
-  assert.equal(Object.keys(SCHEMA).length, 37);
+  assert.equal(Object.keys(SCHEMA).length, 36);
   for (const def of Object.values(SCHEMA)) assert.ok(fresh.getSheetByName(def.sheet), def.sheet);
   for (const name of SECTION_SHEETS) assert.ok(fresh.getSheetByName(name), name);
 

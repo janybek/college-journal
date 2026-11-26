@@ -220,7 +220,7 @@ export async function main(argv, { env = process.env, root, out: given, echo, no
         logger.info(`base upgraded: ${upgraded.created.length} tables made, ${upgraded.added.length} columns added`);
       }
       if (upgraded.moved.length > 0) logger.info(`scheme moved to the regulation: ${upgraded.moved.join(', ')}`);
-      if (upgraded.lines > 0) logger.info(`syllabus lines made: ${upgraded.lines}${upgraded.skipped > 0 ? `, rows without a line: ${upgraded.skipped}` : ''}`);
+      if (upgraded.lines > 0) logger.info(`discipline syllabi made: ${upgraded.lines}, waiting for a choice: ${upgraded.waiting}, pairs laid: ${upgraded.relaid}${upgraded.skipped > 0 ? `, rows without a syllabus: ${upgraded.skipped}` : ''}`);
       upkeep();
       server = await startServer({ config, base, logger, files, version: readVersion({ env }) });
     } catch (error) {

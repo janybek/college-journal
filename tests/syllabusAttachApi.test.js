@@ -248,23 +248,23 @@ test('reads and writes', () => {
   const { call, store, id, attach, read, fill, reset, lists, writes, sb1, pairOf, dean, teacher1, teacher2, s1 } = env();
   reset();
   assert.equal(attach({}).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, files: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, files: 1 });
   assert.deepEqual(writes, { 'insertMany:files': 1, 'updateMany:syllabi': 1 });
   fill(id);
   call('syllabus.submit', { syllabusId: id }, teacher1);
   call('syllabus.approve', { syllabusId: id }, dean);
   reset();
   assert.equal(read(s1).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, files: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, files: 1 });
   assert.deepEqual(writes, {});
   reset();
   assert.equal(read(teacher1).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, files: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, files: 1 });
   const teacherId = store.list('staff').find((x) => x.login === 'teacher2').id;
   assert.equal(call('schedule.changePair', { id: pairOf(sb1, '2026-09-08').id, teacherId }, dean).ok, true);
   reset();
   assert.equal(read(teacher2).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1, pairs: 1, files: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, pairs: 1, files: 1 });
   assert.deepEqual(writes, {});
 });
 
@@ -301,6 +301,7 @@ test('rights on a returned version, an archived one and the version of another t
 
   // archived: attach, drop and read are refused
   const next = draft(sb1, 1, teacher1);
+  assert.equal(call('syllabus.attachFile', { syllabusId: next, name: 'o.pdf', data: b64(SAMPLE.pdf) }, teacher1).ok, true);
   fill(next);
   call('syllabus.submit', { syllabusId: next }, teacher1);
   assert.equal(call('syllabus.approve', { syllabusId: next }, dean).ok, true);
@@ -313,22 +314,25 @@ test('rights on a returned version, an archived one and the version of another t
   }
   assert.equal(state(), before);
 
-  // another teacher of the same discipline: a student of a group led by the other one does not read this file
+  // another teacher of the same discipline: his group follows the same syllabus of the discipline, so he and his student read the file; he does not write
   const ds1 = store.get('syllabi', id).disciplineId;
   const g3 = store.insert('groups', { name: '03-1', course: 1 }).id;
   const t2 = store.list('staff').find((x) => x.login === 'teacher2').id;
-  const sb4 = store.insert('subjects', { name: 'Информатика', disciplineId: ds1, groupId: g3, teacherId: t2, scheme: 'A' }).id;
+  store.insert('subjects', { name: 'Информатика', disciplineId: ds1, groupId: g3, teacherId: t2, scheme: 'A' });
   store.insert('students', { fullName: 's3', groupId: g3, cardNo: 's3', passwordHash: store.get('students', store.list('students')[0].id).passwordHash, lang: 'ky', mustChangePassword: false, active: true });
   const s3 = call('auth.login', { login: 's3', password: 'secret12' }, undefined).data.token;
-  const other = draft(sb4, 1, teacher2);
-  call('syllabus.attachFile', { syllabusId: other, name: 'o.pdf', data: b64(SAMPLE.pdf) }, teacher2);
-  fill(other);
-  call('syllabus.submit', { syllabusId: other }, teacher2);
-  assert.equal(call('syllabus.approve', { syllabusId: other }, dean).ok, true);
   before = state();
-  assert.equal(read(s3, other).ok, true);
-  assert.equal(code(read(s3, next)), 'not_found');
-  assert.equal(code(read(s1, other)), 'not_found');
+  assert.equal(read(teacher2, next).ok, true);
+  assert.equal(read(s3, next).ok, true);
+  assert.equal(read(s1, next).ok, true);
+  assert.equal(code(read(s3, id)), 'not_found');
+  assert.equal(code(attach({ syllabusId: next }, teacher2)), 'forbidden');
+  assert.equal(state(), before);
+  // a teacher who leads nothing of this discipline reads nothing
+  const free = store.insert('staff', { fullName: 'Свободный', login: 'free', passwordHash: store.get('students', store.list('students')[0].id).passwordHash, roles: 'teacher', lang: 'ky', mustChangePassword: false, active: true }).id;
+  assert.equal(typeof free, 'string');
+  const freeToken = call('auth.login', { login: 'free', password: 'secret12' }, undefined).data.token;
+  assert.equal(code(read(freeToken, next)), 'forbidden');
   assert.equal(state(), before);
 });
 
@@ -347,10 +351,10 @@ test('a student cannot hand in the id of a syllabus file as a work file; dropFil
 
   reset();
   assert.equal(call('syllabus.dropFile', { syllabusId: id }, teacher1).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1 });
   assert.deepEqual(writes, { 'updateMany:syllabi': 1 });
   reset();
   assert.equal(call('syllabus.dropFile', { syllabusId: id }, teacher1).ok, true);
-  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1, syllabusMembers: 1 });
+  assert.deepEqual(lists, { syllabi: 1, subjects: 1, syllabusLines: 1 });
   assert.deepEqual(writes, {});
 });
