@@ -9,6 +9,7 @@ import { rightsOn } from '../../core/syllabusFlow.js';
 import { viewerOf } from '../syllabusLines.js';
 import { dirSummary, dirCard } from '../dirInfo.js';
 import { dirProgress } from '../dirProgress.js';
+import { dirPeople, dirPerson } from '../dirPeople.js';
 import { loadSettings, relayout, todayOf } from '../scheduleData.js';
 
 const DIR_TABLES = ['groups', 'students', 'staff', 'disciplines', 'subjects', 'rooms', 'weekTemplate'];
@@ -216,6 +217,8 @@ export const dirHandlers = {
   'dir.list': list,
   'dir.summary': (data, ctx, user) => dirSummary(ctx.store, ctx.platform, user, data.table),
   'dir.card': (data, ctx, user) => dirCard(ctx.store, ctx.platform, user, data),
+  'dir.people': (data, ctx, user) => dirPeople(ctx.store, ctx.platform, user, data.table),
+  'dir.person': (data, ctx, user) => dirPerson(ctx.store, ctx.platform, user, data),
   'dir.progress': (data, ctx, user) => dirProgress(ctx.store, ctx.platform, user, data),
   'dir.save': save,
   'dir.remove': remove,
