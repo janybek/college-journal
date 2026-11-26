@@ -17,6 +17,30 @@ test('can: role-gated table actions', () => {
   assert.equal(can(['admin'], 'dir.list'), false);
 });
 
+test('can: dir.people, dir.person and dir.progress are read-only for admin, dean, prorector', () => {
+  for (const role of ['admin', 'dean', 'prorector']) {
+    for (const action of ['dir.people', 'dir.person']) {
+      assert.equal(can([role], action, 'students'), true);
+      assert.equal(can([role], action, 'staff'), true);
+    }
+    assert.equal(can([role], 'dir.progress', 'groups'), true);
+    assert.equal(can([role], 'dir.progress', 'disciplines'), true);
+  }
+  for (const bad of ['groups', 'weekTemplate', undefined, ['students']]) {
+    assert.equal(can(['dean'], 'dir.person', bad), false);
+  }
+  assert.equal(can(['dean'], 'dir.progress', 'students'), false);
+  assert.equal(can(['dean'], 'dir.progress', 'rooms'), false);
+  for (const role of ['teacher', 'student']) {
+    for (const [action, table] of [['dir.people', 'students'], ['dir.person', 'staff'], ['dir.progress', 'groups']]) {
+      assert.equal(can([role], action, table), false);
+    }
+  }
+  const list = listPermissions(['prorector']);
+  assert.ok(list.includes('dir.person:staff'));
+  assert.ok(list.includes('dir.progress:disciplines'));
+});
+
 test('can: table-less, public and any actions', () => {
   assert.equal(can(['dean', 'teacher'], 'teacher.mySubjects'), true);
   assert.equal(can(['dean'], 'teacher.mySubjects'), false);

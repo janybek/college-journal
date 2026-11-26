@@ -6,6 +6,8 @@ const SCHEDULE_TABLES = ['weekTemplate'];
 const LIST_TABLES = [...ALL_TABLES, ...SCHEDULE_TABLES];
 const DEAN_EDIT_TABLES = [...DEAN_TABLES, ...SCHEDULE_TABLES];
 const CARD = ['groups', 'rooms', 'disciplines'];
+const PEOPLE = ['students', 'staff'];
+const PROGRESS = ['groups', 'disciplines'];
 const IMPORT_TABLES = ALL_TABLES;
 const DEAN_IMPORT_TABLES = DEAN_TABLES;
 
@@ -17,6 +19,9 @@ const ROLE_ACTIONS = {
   'dir.list': { admin: LIST_TABLES, dean: LIST_TABLES, prorector: LIST_TABLES },
   'dir.summary': { admin: CARD, dean: CARD, prorector: CARD },
   'dir.card': { admin: CARD, dean: CARD, prorector: CARD },
+  'dir.people': { admin: PEOPLE, dean: PEOPLE, prorector: PEOPLE },
+  'dir.person': { admin: PEOPLE, dean: PEOPLE, prorector: PEOPLE },
+  'dir.progress': { admin: PROGRESS, dean: PROGRESS, prorector: PROGRESS },
   'dir.save': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES },
   'dir.remove': { admin: LIST_TABLES, dean: DEAN_EDIT_TABLES },
   'syllabus.preview': { admin: true, dean: true, teacher: true },
