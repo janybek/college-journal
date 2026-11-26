@@ -57,8 +57,9 @@ test('students who moved, were switched off or joined later', () => {
   const after = half();
   assert.deepEqual(byId(after)[s.a2], before[s.a2]);
   const ids = after.students.map((x) => x.id);
-  assert.ok(!ids.includes(joined) && !ids.includes(s.b1) && !ids.includes(s.a4));
-  assert.deepEqual(ids.sort(), [s.a1, s.a2, s.a3].sort());
+  // like the ledger: every active student of the group is listed, also one who joined after the half was closed; a switched-off one only with a trace
+  assert.ok(!ids.includes(s.a4));
+  assert.deepEqual(ids.sort(), [s.a1, s.a2, s.a3, joined, s.b1].sort());
 });
 
 test('next comes from the attempts only: a card of the repeat and a student who left change nothing; both halves agree', () => {

@@ -80,9 +80,10 @@ function pastStudents(rows, platform, subject, planSemester, scheme, split) {
   const { attempts } = examRowsOf(rows, subject.id, planSemester);
   const traced = new Set([...marks.keys(), ...unitRows.keys(), ...attempts.keys()]);
   const byName = (a, b) => compareNames(a.fullName, b.fullName) || cmp(a.id, b.id);
-  const found = rows.students.filter((s) => traced.has(s.id));
-  const listed = found.filter((s) => s.groupId === subject.groupId && s.active === true).sort(byName);
-  const rest = found.filter((s) => !(s.groupId === subject.groupId && s.active === true)).sort(byName);
+  // Like the ledger: every active student of the group is listed (with or without a trace), the others only with a trace.
+  const own = (s) => s.groupId === subject.groupId && s.active === true;
+  const listed = rows.students.filter(own).sort(byName);
+  const rest = rows.students.filter((s) => !own(s) && traced.has(s.id)).sort(byName);
   const nowMs = platform.now();
 
   return [...listed, ...rest].map((s) => {

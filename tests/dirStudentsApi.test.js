@@ -195,3 +195,29 @@ test('a student without marks keeps his debt of a closed past half, as the ledge
   s.store.update('students', s.a3, { active: false });
   assert.deepEqual(person(s, s.a3).debts, []);
 });
+
+function newcomerAfterSwitch() {
+  const s = setup();
+  const id = s.store.insert('students', { fullName: 'Пятый Новый', cardNo: 'A5', groupId: s.g1, passwordHash: '', mustChangePassword: false, lang: 'ky', active: true }).id;
+  s.failed();
+  s.switchSemester();
+  return { s, id };
+}
+
+test('a student without a trace in the closed past half can be enrolled for a repeat', () => {
+  const { s, id } = newcomerAfterSwitch();
+  const past = s.call('repeat.candidates', { subjectId: s.sb1 }, s.t.dean).data.halves.find((h) => h.planSemester === 1);
+  assert.ok(past.students.some((x) => x.id === id));
+  const r = s.call('repeat.enrol', { subjectId: s.sb1, planSemester: 1, studentId: id, kind: 'full', orderNo: '1', orderDate: '2027-01-11', deadline: '2027-02-11', teacherId: s.ids.teacher1 }, s.t.dean);
+  assert.equal(r.ok, true, JSON.stringify(r.error));
+});
+
+test('the past-half debt of a student without a trace stays after a mark of the same subject in the new half', () => {
+  const { s, id } = newcomerAfterSwitch();
+  const debts = () => person(s, id).debts.map((d) => [d.planSemester, d.state]);
+  assert.deepEqual(debts(), [[1, 'notAdmitted']]);
+  const base = s.store.list('pairs').find((p) => p.id === s.p0922);
+  const spring = s.store.insert('pairs', { ...base, id: '', date: '2027-01-12', planDate: '2027-01-12', status: 'closed', topicId: '' });
+  s.store.insert('attendance', { pairId: spring.id, studentId: id, status: 'present', noCoat: false, activity: null, source: 'teacher', markedBy: s.ids.teacher1, markedAt: '2027-01-12 08:10:00' });
+  assert.deepEqual(debts(), [[1, 'notAdmitted']]);
+});
