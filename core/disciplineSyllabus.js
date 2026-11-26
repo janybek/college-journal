@@ -142,12 +142,13 @@ export function draftTarget(lines, syllabi, subjects, { disciplineId, teacherId 
   const leads = teacher && teacherSubjects(subjects, disciplineId, viewer.id).length > 0;
   const own = ownLines(lines, disciplineId, semester);
   const forLine = (line) => (line && (manager || (leads && line.teacherId === viewer.id)) ? answer('ok', line) : answer('forbidden'));
+  // only the requested half counts: the other half may wait for the choice while this one already follows the 'main' line
   if (own.length > 1) {
+    if (!(manager || leads)) return answer('forbidden');
     const theirs = nonEmpty(teacherId) ? own.find((l) => l.teacherId === teacherId) : null;
     return theirs ? forLine(theirs) : answer('choose_first');
   }
   if (own.length === 1) return forLine(own[0]);
-  if (waitingHalves(lines, disciplineId).length) return answer('choose_first');
   const main = mainLine(lines, disciplineId);
   if (main) {
     if (manager || (teacher && main.responsibleId === viewer.id)) return answer('ok', main);

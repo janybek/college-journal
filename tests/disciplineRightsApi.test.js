@@ -219,7 +219,7 @@ test('syllabus.apply and preview without the right write nothing', () => {
   ln('t1', 2); ln('t2', 2);
   const year = [{ name: 'Сведения', cells: [['Семестр', '1-2']] }, { name: 'Тематический план', cells: [['Семестр', 'Юнит', '№', 'Тема', 'Лекция, ч', 'Практика, ч', 'Вид занятия', 'Описание'], [1, 1, '', 'Осень', 2, '', '', 'о'], [2, 1, '', 'Весна', 2, '', '', 'о']] }];
   const snap = t.snapshot();
-  for (const key of ['t1', 'dean']) assert.equal(code(t.call('syllabus.apply', { subjectId: t.sb1, sheets: year }, t.t[key])), 'choose_first');
+  for (const key of ['t3', 'dean']) assert.equal(code(t.call('syllabus.apply', { subjectId: t.sb3, sheets: year }, t.t[key])), 'choose_first');
   assert.deepEqual(t.snapshot(), snap);
 });
 

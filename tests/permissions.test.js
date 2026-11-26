@@ -117,7 +117,7 @@ test('syllabus form actions by role', () => {
   for (const action of ['syllabus.startDraft', 'syllabus.saveSection', 'syllabus.submit']) assert.deepEqual(who(action), [true, true, false, true, false], action);
   assert.deepEqual([who('syllabus.form'), who('syllabus.approve'), who('syllabus.return'), who('syllabus.queue')],
     [[true, true, true, true, false], [true, true, false, false, false], [true, true, false, false, false], [true, true, true, false, false]]);
-  for (const action of ['syllabus.assign', 'syllabus.setReviewDue']) assert.deepEqual(who(action), [true, true, false, false, false], action);
+  for (const action of ['syllabus.assign', 'syllabus.setReviewDue', 'syllabus.choose']) assert.deepEqual(who(action), [true, true, false, false, false], action);
   for (const action of ['docs.syllabi', 'docs.discipline']) assert.deepEqual(who(action), [true, true, true, true, false], action);
 });
 

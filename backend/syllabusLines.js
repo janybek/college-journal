@@ -131,6 +131,9 @@ export function assignResponsible(store, platform, data, user) {
   let line;
   if (main) {
     [line] = store.updateMany('syllabusLines', [{ id: main.id, patch: { responsibleId: teacherId, dueDate: data.dueDate } }]);
+  } else if (teacherId === '' && data.dueDate === '') {
+    // nobody and no date on a discipline that has no line: there is nothing to keep, so nothing is written (the view is of an empty line)
+    line = { id: '', disciplineId, kind: 'main', semester: null, teacherId: '', responsibleId: '', dueDate: '', reviewDue: '', createdBy: '', createdAt: '' };
   } else {
     [line] = store.insertMany('syllabusLines', [{
       disciplineId, kind: 'main', semester: null, teacherId: '', responsibleId: teacherId, dueDate: data.dueDate, reviewDue: '',
@@ -144,11 +147,12 @@ export function assignResponsible(store, platform, data, user) {
 // 'syllabus.setReviewDue' { lineId, date } -> { line }: the date by which the deanery looks at the versions of the line on approval ('' clears it).
 export function setReviewDue(store, platform, data, user) {
   const lineId = plainId(data.lineId);
-  if (lineId === null || typeof data.date !== 'string' || !isDay(data.date)) throw new AppError('bad_request');
+  if (lineId === null) throw new AppError('bad_request');
   if (!isManagerRoles(user)) throw new AppError('forbidden');
   const lines = store.list('syllabusLines');
   const found = lines.find((l) => l.id === lineId);
   if (!found || found.kind === 'archived') throw new AppError('not_found');
+  if (typeof data.date !== 'string' || !isDay(data.date)) throw new AppError('bad_request');
   if (reviewRows(store.list('syllabi'), found.id).length === 0) throw new AppError('syllabus_locked');
   const [line] = store.updateMany('syllabusLines', [{ id: found.id, patch: { reviewDue: data.date } }]);
   const after = lines.map((l) => (l.id === line.id ? line : l));

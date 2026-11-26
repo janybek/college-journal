@@ -74,7 +74,7 @@ test('partOf, lineSubjects, teacherSubjects', () => {
 test('draftTarget: where a new draft goes', () => {
   assert.deepEqual(draftTarget([], [], SB, key('t2'), T('t2')), { code: 'ok', line: null, make: { responsibleId: 't2' }, claim: false });
   assert.equal(draftTarget([MAIN], S, SB, key('t2'), T('t2')).code, 'forbidden');                   // силлабус есть — правит только ответственный
-  assert.deepEqual([draftTarget(OWN, [], SB, key(''), { id: 'd', roles: ['dean'] }).code, draftTarget(OWN, [], SB, key('t1', 2), T('t1')).code], ['choose_first', 'choose_first']);
+  assert.deepEqual([draftTarget(OWN, [], SB, key(''), { id: 'd', roles: ['dean'] }).code, draftTarget(OWN, [], SB, key('t1', 2), T('t1')).code], ['choose_first', 'ok']);
   const dean = { id: 'd', roles: ['dean'] };
   // (1) несколько «своих» в половине: линия этого преподавателя
   assert.equal(draftTarget(OWN, [], SB, key('t1'), T('t1')).line.id, 'sl_2');
@@ -86,8 +86,14 @@ test('draftTarget: where a new draft goes', () => {
   assert.equal(draftTarget([OWN[0]], [], SB, key('t2'), T('t1')).line.id, 'sl_2');
   assert.equal(draftTarget([OWN[0]], [], SB, key('t2'), T('t2')).code, 'forbidden');
   assert.equal(draftTarget([OWN[0]], [], SB, key('t2'), dean).code, 'ok');
-  // (3) своих в этой половине нет, но другая ждёт выбора — раньше «главного»
-  assert.equal(draftTarget([MAIN, ...OWN], [], SB, key('t1', 2), dean).code, 'choose_first');
+  // (3) своих в этой половине нет, а другая ждёт выбора — эта половина идёт по «главному» (смотрим только на запрошенную половину)
+  assert.equal(draftTarget([MAIN, ...OWN], [], SB, key('t1', 2), dean).code, 'ok');
+  assert.equal(draftTarget([MAIN, ...OWN], [], SB, key('t1', 2), T('t1')).code, 'ok');             // t1 ведёт и он ответственный
+  assert.equal(draftTarget([], [], SB, key('t1', 2), dean).line, null);
+  // не ведущий преподаватель не узнаёт, что ждёт выбора: forbidden раньше choose_first
+  assert.equal(draftTarget(OWN, [], SB, key('t3'), T('t9')).code, 'forbidden');
+  assert.equal(draftTarget(OWN, [], SB, key(''), T('t9')).code, 'forbidden');
+  assert.equal(draftTarget(OWN, [], SB, key('t3'), T('t1')).code, 'choose_first');                  // ведёт — узнаёт
   // (4) есть главный
   assert.equal(draftTarget([MAIN], S, SB, key('t1'), T('t1')).line.id, 'sl_1');
   assert.equal(draftTarget([MAIN], S, SB, key('t9'), dean).code, 'ok');

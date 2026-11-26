@@ -47,6 +47,7 @@ const ROLE_ACTIONS = {
   'syllabus.queue': { admin: true, dean: true, prorector: true },
   'syllabus.assign': { admin: true, dean: true },
   'syllabus.setReviewDue': { admin: true, dean: true },
+  'syllabus.choose': { admin: true, dean: true },
   'docs.syllabi': { admin: true, dean: true, prorector: true, teacher: true },
   'docs.discipline': { admin: true, dean: true, prorector: true, teacher: true },
   'student.subjects': { student: true },
