@@ -1,3 +1,5 @@
+import { t } from './i18n.js';
+
 // The screen «Документы › Силлабусы» without the DOM: tabs, counts, overdue dates, the words of states, names, addresses.
 
 export const DOC_TABS = ['approved', 'review', 'development'];
@@ -55,3 +57,44 @@ export function openHref(row) {
 }
 
 export const cardHref = (disciplineId) => '#/documents/discipline/' + encodeURIComponent(disciplineId);
+
+// ---- The window «Выберите силлабус»: one candidate (a row of `candidates` of docs.discipline), the words of the refusals ----
+
+const STATUS_KEYS = { approved: 'docs.candidate.approved', review: 'docs.candidate.review', returned: 'docs.candidate.returned', draft: 'docs.candidate.draft' };
+const statusText = (status) => t(STATUS_KEYS[status] ?? 'docs.candidate.none');
+const groupsOf = (row) => (Array.isArray(row.groups) ? row.groups : []);
+
+// The two lines of the window: «Фамилия И. · утверждён · версия 2» and «1 семестр · 1 курс · 01-1, 02-1».
+export function candidateParts(row) {
+  const head = [shortened(row.teacherName), statusText(row.status), row.version ? t('docs.version', { n: row.version }) : ''].filter(Boolean);
+  const meta = [
+    Number.isInteger(row.planSemester) ? t('docs.candidate.semester', { n: row.planSemester }) : '',
+    Number.isInteger(row.course) ? t('docs.candidate.course', { n: row.course }) : '',
+    groupsOf(row).join(', '),
+  ].filter(Boolean);
+  return { head: head.join(' · '), meta: meta.join(' · ') };
+}
+
+// One line for a screen reader and the like: «Иванова А. С. · утверждён, версия 2 · 1 семестр, 1 курс · группы: 01-1, 02-1».
+export function candidateLine(row) {
+  const state = [statusText(row.status), row.version ? t('docs.version', { n: row.version }) : ''].filter(Boolean).join(', ');
+  const plan = [
+    Number.isInteger(row.planSemester) ? t('docs.candidate.semester', { n: row.planSemester }) : '',
+    Number.isInteger(row.course) ? t('docs.candidate.course', { n: row.course }) : '',
+  ].filter(Boolean).join(', ');
+  const groups = groupsOf(row);
+  return [shortened(row.teacherName), state, plan, groups.length > 0 ? t('docs.candidate.groups', { groups: groups.join(', ') }) : ''].filter(Boolean).join(' · ');
+}
+
+// What the window says to a refused choice: { key, params }. line_locked names the groups and why (a closed unit, an exam);
+// needs_confirm is the warning with the button «Всё равно выбрать» (confirm: true). Any other code is its own error text.
+export function chooseError(error) {
+  const code = error && typeof error.code === 'string' ? error.code : 'internal';
+  if (code === 'needs_confirm') return { key: 'docs.choose.warning', params: {}, confirm: true };
+  if (code === 'line_locked') {
+    const fields = Array.isArray(error.fields) ? error.fields : [];
+    const reasons = [...new Set(fields.map((f) => f.code))].map((reason) => t('docs.choose.reason.' + reason));
+    return { key: 'docs.choose.locked', params: { groups: fields.map((f) => f.name).filter(Boolean).join(', '), reason: reasons.join('; ') } };
+  }
+  return { key: 'error.' + code, params: {} };
+}

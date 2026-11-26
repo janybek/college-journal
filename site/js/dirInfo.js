@@ -77,6 +77,13 @@ export function syllabusBadges(syllabus) {
   return badges.length > 0 ? badges : [{ key: 'home.syllabusState.none', tone: 'danger' }];
 }
 
+// The short «Силлабус» of the card of a discipline: the halves of the year with their marks. A discipline that waits for
+// the choice of the deanery has no halves to show.
+export function syllabusHalves(syllabus) {
+  if (!syllabus || syllabus.waiting === true || !Array.isArray(syllabus.halves)) return [];
+  return syllabus.halves.map((half) => ({ semester: half.semester, badges: syllabusBadges(half) }));
+}
+
 // The rows of the week of a room: every bell, and the numbers past the bells that some pair has (with its own time).
 export function gridRows(bells, pairs) {
   const rows = bells.map((time, i) => ({ slot: i + 1, time }));

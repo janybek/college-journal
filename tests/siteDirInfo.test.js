@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  CARD_TABLES, cardHref, infoById, groupNowLabel, roomNowLabel, syllabusCountBadges, fullDate, termNote,
+  CARD_TABLES, cardHref, infoById, groupNowLabel, roomNowLabel, syllabusCountBadges, fullDate, termNote, syllabusHalves,
 } from '../site/js/dirInfo.js';
 
 test('cardHref and the tables with a card', () => {
@@ -87,4 +87,14 @@ test('gridRows: the bells, and pair numbers past them', () => {
 test('dir.card.inactive has the four plural forms in Russian', () => {
   const ru = readFileSync(new URL('../site/js/i18n/ru.js', import.meta.url), 'utf8');
   for (const form of ['one', 'few', 'many', 'other']) assert.ok(ru.includes(`'dir.card.inactive.${form}'`), form);
+});
+
+test('syllabusHalves: the halves of the discipline with their marks; a waiting discipline has none', () => {
+  const halves = [{ semester: 1, approved: true, open: 'review' }, { semester: 2, approved: false, open: null }];
+  assert.deepEqual(syllabusHalves({ waiting: false, halves }), [
+    { semester: 1, badges: [{ key: 'home.syllabusState.approved', tone: 'success' }, { key: 'home.syllabusState.review', tone: 'info' }] },
+    { semester: 2, badges: [{ key: 'home.syllabusState.none', tone: 'danger' }] },
+  ]);
+  assert.deepEqual(syllabusHalves({ waiting: true, halves }), []);
+  assert.deepEqual(syllabusHalves(null), []);
 });

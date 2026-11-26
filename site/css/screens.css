@@ -8676,3 +8676,32 @@ a.gr-card:hover { border-color: var(--primary-line); }
 .doc-teachers__row:first-child { border-top: 0; }
 .doc-teachers__groups { color: var(--text-muted); font-size: 0.875rem; }
 .doc-section .facts { margin-top: 0; }
+
+/* The window «Выберите силлабус»: the candidates are two lines each, the picked one is outlined. */
+.dialog--choose { width: min(calc(100% - 2rem), 32rem); }
+.dialog--choose .segmented__button { min-height: 44px; }
+.choose-halves { justify-self: start; }
+.choose-list { display: grid; gap: var(--space-2); }
+.choose-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 44px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+  cursor: pointer;
+}
+.choose-option:hover { border-color: var(--border-strong); }
+.choose-option.is-picked { border-color: var(--primary); background: var(--primary-wash); }
+.choose-option:has(:focus-visible) { outline: 2px solid var(--primary); outline-offset: 2px; }
+.choose-option__input { flex: none; width: 1.25rem; height: 1.25rem; margin: 0; accent-color: var(--primary); }
+.choose-option__text { display: grid; gap: 2px; min-width: 0; }
+.choose-option__head { font-weight: 600; }
+.choose-option__meta { color: var(--text-muted); font-size: 0.875rem; }
+.doc-waiting { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.dir-syllabus { display: grid; gap: var(--space-3); padding: var(--space-4); }
+.dir-syllabus .doc-halves { gap: 0; }
+.dir-syllabus__who { margin: 0; font-size: 0.875rem; }
+.dir-syllabus .dir-syllabus-link { margin-left: 0; justify-self: start; }

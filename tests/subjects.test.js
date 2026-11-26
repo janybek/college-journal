@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { freeGroups, nextRow, addRequest, syllabusBadge, approvedNote, teacherBadge, pairsNote, addedTeachers, withoutRow } from '../site/js/subjects.js';
+import { freeGroups, nextRow, addRequest, syllabusBadge, approvedNote, teacherBadge, teacherAction, pairsNote, addedTeachers, withoutRow } from '../site/js/subjects.js';
 
 const groups = [{ id: 'g1', name: '01-1' }, { id: 'g2', name: '02-1' }, { id: 'g3', name: '03-1' }];
 const rows = [
@@ -72,4 +72,11 @@ test('addedTeachers: the rows of the discipline that hold a subject just created
   assert.deepEqual(addedTeachers(rows, 'ds1', ['sb3']).map((r) => r.teacherId), ['t3']);
   assert.deepEqual(addedTeachers(rows, 'ds1', ['sb2', 'sb3']).map((r) => r.teacherId), ['t1', 't3']);
   assert.deepEqual(addedTeachers(rows, 'ds2', ['sb3']), []);
+});
+
+test('teacherAction: the teacher who only teaches the discipline opens the syllabus, the responsible one edits it', () => {
+  assert.equal(teacherAction({ approved: true, open: null, mine: 'teaches' }), 'open');
+  assert.equal(teacherAction({ approved: false, open: 'draft', mine: 'responsible' }), 'edit');
+  assert.equal(teacherAction({ approved: false, open: null }), 'edit');
+  assert.equal(teacherAction(null), 'edit');
 });

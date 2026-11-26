@@ -4,6 +4,7 @@ import { el, errorKey, badge, emptyState, pageHeader, refresh } from '../ui.js';
 import { fullDate } from '../dirInfo.js';
 import { openHref, shortFio, teachersLine } from '../documents.js';
 import { openAssignDialog } from './docAssign.js';
+import { openChooseDialog } from './docChoose.js';
 
 // The card of a discipline (#/documents/discipline/<id>, docs.discipline): its syllabus by halves of the year, who writes
 // it and by when, who teaches it, the history. Buttons come from `can` of the answer. Everything from the server goes on
@@ -109,7 +110,15 @@ function halfRow(data, half) {
 
 function syllabusSection(data) {
   if (data.waiting.length > 0) {
-    return section('doc-syllabus-title', t('docs.syllabi'), el('p', {}, badge(t('docs.choose'), 'warning')));
+    return section('doc-syllabus-title', t('docs.syllabi'),
+      el('div', { class: 'doc-waiting' },
+        badge(t('docs.waiting'), 'warning'),
+        data.can.choose
+          ? el('button', {
+            type: 'button', class: 'button button--primary', id: 'docs-choose',
+            onclick: () => openChooseDialog(data.discipline.id, { card: data, onChosen: reload, returnTo: 'docs-choose' }),
+          }, t('docs.choose'))
+          : null));
   }
   return section('doc-syllabus-title', t('docs.syllabi'),
     data.halves.length === 0

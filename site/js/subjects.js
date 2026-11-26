@@ -54,6 +54,12 @@ export function teacherBadge(syllabus) {
   return { tone: 'danger', key: 'home.syllabusState.none' };
 }
 
+// What the teacher's button does on «Мои предметы»: the one who only teaches the discipline (the syllabus is written
+// by the responsible) opens it, the others edit it.
+export function teacherAction(syllabus) {
+  return syllabus && syllabus.mine === 'teaches' ? 'open' : 'edit';
+}
+
 // Under a group of the row: the schedule of the semester holds another number of pairs than the plan. A group with
 // no pairs at all has simply not had its schedule made yet: a calm line says so instead of «0 in the schedule».
 export function pairsNote(row, group) {

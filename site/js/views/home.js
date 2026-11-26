@@ -6,7 +6,7 @@ import { icon } from '../icons.js';
 import { activeRole, menuParts, navFor, countBadge } from '../shell.js';
 import { pairCard, weekdayDate, lessonPieces } from './pairParts.js';
 import { inExamWeek } from '../pairs.js';
-import { teacherBadge } from '../subjects.js';
+import { teacherBadge, teacherAction } from '../subjects.js';
 import { todayAction, clockText, cameMark } from '../lesson.js';
 import { homeCardLines } from '../work.js';
 import { topItems, firstLine, dayText } from '../announce.js';
@@ -596,7 +596,7 @@ function subjectsBody(user, redraw) {
 // Beside the syllabus, the journal of the subject.
 function subjectRow(subject, rights) {
   const mark = teacherBadge(subject.syllabus);
-  const returned = mark.key === 'home.syllabusState.returned';
+  const returned = mark.key === 'home.syllabusState.returned' && teacherAction(subject.syllabus) === 'edit';
   const nameId = 'subject-' + subject.id;
   const markId = 'subject-mark-' + subject.id;
   return el('li', { class: 'list__row subject' + (returned ? ' is-returned' : '') },
@@ -611,7 +611,7 @@ function subjectRow(subject, rights) {
       rights.plans ? el('a', {
         class: 'button subject__plan ' + (returned ? 'button--primary' : 'button--secondary'),
         href: '#/syllabus/' + subject.id, 'aria-describedby': nameId + ' ' + markId,
-      }, icon('clipboard'), t('home.syllabus')) : null,
+      }, icon('clipboard'), t(teacherAction(subject.syllabus) === 'open' ? 'docs.open' : 'home.syllabus')) : null,
       rights.journal ? el('a', {
         class: 'button button--secondary subject__plan', href: '#/journal/' + subject.id, 'aria-describedby': nameId,
       }, icon('table'), t('journal.title')) : null) : null);

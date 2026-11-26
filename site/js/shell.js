@@ -308,10 +308,12 @@ function crumbs(groups, view, params, current, role) {
   let pageKey = null;
   // The syllabus of a discipline is one of the documents; the syllabus of a subject and its form: under «Расписание» for the
   // deanery, under the teacher's own subjects otherwise.
-  if ((view === 'syllabus' && params.disciplineId !== undefined) || view === 'documents' || view === 'docCard') {
+  // The form is opened by the deanery from «Документы» (and from «Предметы»): for them it stands under the documents too.
+  const office = menuParts(role).includes('office');
+  if ((view === 'syllabus' && params.disciplineId !== undefined) || view === 'documents' || view === 'docCard' || (view === 'syllabusForm' && office)) {
     [groupKey, pageKey] = ['docs.title', 'docs.syllabi'];
   } else if (view === 'syllabus' || view === 'syllabusForm') {
-    [groupKey, pageKey] = [menuParts(role).includes('office') ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
+    [groupKey, pageKey] = [office ? 'nav.schedule' : 'home.mySubjects', 'syllabus.title'];
   } else {
     for (const group of groups) {
       const item = group.items.find((candidate) => candidate.name === current);

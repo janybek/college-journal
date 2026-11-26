@@ -48,8 +48,11 @@ export function render(root) {
   const add = state.data !== null && can('subjects.add')
     ? el('button', { type: 'button', id: 'subjects-add', class: 'button button--primary', onclick: openAdd }, icon('plus'), t('subjects.add'))
     : null;
+  const documents = can('docs.syllabi')
+    ? el('a', { id: 'subjects-documents', class: 'button button--secondary', href: '#/documents/syllabi' }, icon('clipboard'), t('docs.title'))
+    : null;
   root.append(
-    pageHeader({ id: 'subjects-title', title: t('subjects.title'), lead: t('subjects.lead'), actions: add }),
+    pageHeader({ id: 'subjects-title', title: t('subjects.title'), lead: t('subjects.lead'), actions: [documents, add] }),
     state.data === null ? loadingBody() : body());
   if (state.dialog) showModal(root, state.dialog.kind === 'add' ? addDialog(state.dialog) : groupDialog(state.dialog));
   renderUpload(root);

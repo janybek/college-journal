@@ -4,7 +4,9 @@ import { el, errorKey, badge, emptyState, note, pageHeader, refresh } from '../u
 import { permissions } from '../shell.js';
 import { dayParts } from '../dates.js';
 import { cellPairs, examDayLabel, gridDays, pairFlags } from '../pairs.js';
-import { cardHref, FIRST_STUDENTS, gridRows, groupNowLabel, roomNowLabel, syllabusBadges, termNote } from '../dirInfo.js';
+import { cardHref, FIRST_STUDENTS, fullDate, gridRows, groupNowLabel, roomNowLabel, syllabusBadges, syllabusHalves, termNote } from '../dirInfo.js';
+import { cardHref as documentHref, shortFio } from '../documents.js';
+import { openChooseDialog } from './docChoose.js';
 import { dayMonth, flagBadge, weekNav } from './pairParts.js';
 
 // The card of a group, a room or a discipline (#/dir/<table>/<id>, dir.card): what the journal knows about it, read-only.
@@ -237,8 +239,39 @@ function roomCell(here, today) {
 
 // ---- A discipline ----
 
+// The short «Силлабус» of the discipline: its halves of the year with the marks, who writes it and by when. The full
+// card is in «Документы». «Выберите силлабус» only for whoever may choose; the vice-rector gets the link and no buttons.
+function syllabusSection(data) {
+  const { syllabus } = data;
+  const halves = syllabusHalves(syllabus);
+  const choose = syllabus.waiting && can('syllabus.choose')
+    ? el('button', {
+      type: 'button', class: 'button button--primary', id: 'card-choose',
+      onclick: () => openChooseDialog(data.discipline.id, { onChosen: reloadCard, returnTo: 'card-choose' }),
+    }, t('docs.choose'))
+    : null;
+  const open = can('docs.discipline')
+    ? el('a', { class: 'dir-syllabus-link', id: 'card-documents', href: documentHref(data.discipline.id) }, t('dir.card.syllabus.open'))
+    : null;
+  const who = [syllabus.responsibleName ? t('docs.responsible') + ': ' + shortFio(syllabus.responsibleName) : '', syllabus.dueDate ? t('docs.until', { date: fullDate(syllabus.dueDate) }) : ''].filter(Boolean).join(' · ');
+  return section(t('dir.card.syllabus.title'),
+    el('div', { class: 'dir-syllabus' },
+      syllabus.waiting ? el('div', { class: 'doc-waiting' }, badge(t('docs.waiting'), 'warning'), choose)
+        : el('ul', { class: 'doc-halves' }, halves.map((half) => el('li', { class: 'doc-half' },
+          el('span', { class: 'doc-half__name' }, t('docs.half.' + half.semester)),
+          el('span', { class: 'dir-syllabi' }, half.badges.map((item) => badge(t(item.key), item.tone)))))),
+      who ? el('p', { class: 'dir-syllabus__who muted' }, who) : null,
+      open));
+}
+
+function reloadCard() {
+  state.data = null;
+  refresh();
+}
+
 function disciplineBody(data) {
   return [
+    syllabusSection(data),
     section(t('dir.card.where'),
       data.rows.length === 0 ? el('p', { class: 'dir-block__empty muted' }, t('dir.card.nowhere'))
         : el('div', { class: 'table-scroll' }, el('table', { class: 'table' }, head('group', 'teacher', 'syllabus', 'weekPairs'),

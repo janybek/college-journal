@@ -4,6 +4,7 @@ import { el, errorKey, badge, emptyState, note, pageHeader, refresh, markBusy, f
 import { fullDate } from '../dirInfo.js';
 import { DOC_TABS, tabCounts, overdue, nextKey, stateKey, teachersLine, shortFio, cardHref } from '../documents.js';
 import { openAssignDialog } from './docAssign.js';
+import { openChooseDialog } from './docChoose.js';
 
 // «Документы › Силлабусы» (#/documents/syllabi/<tab>, docs.syllabi): the disciplines as cards in three tabs. The whole
 // card opens the card of the discipline; the small buttons on it (assign, change the review date) are shown by `can`
@@ -100,7 +101,11 @@ function card(tab, row) {
     el('div', { class: 'doc-card__top' },
       el('a', { class: 'doc-card__link', id: `docs-open-${tab}-${row.disciplineId}`, href: cardHref(row.disciplineId) }, row.disciplineName || '—'),
       badgeOf(tab, row)),
-    el('div', { class: 'doc-card__sub' }, ...subOf(tab, row, can)));
+    el('div', { class: 'doc-card__sub' }, ...subOf(tab, row, can),
+      row.waiting && can.choose ? el('button', {
+        type: 'button', class: 'doc-card__mini', id: 'docs-choose-' + row.disciplineId,
+        onclick: () => openChooseDialog(row.disciplineId, { onChosen: reload, returnTo: 'docs-choose-' + row.disciplineId }),
+      }, t('docs.choose.pick')) : null));
 }
 
 function subOf(tab, row, can) {
