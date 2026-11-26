@@ -4,7 +4,7 @@ import { AppError } from '../core/errors.js';
 import { SECTIONS, SECTION_TABLES, checkSection, plainId } from '../core/syllabusSections.js';
 import { DOC_TABLES, buildDoc, copyRows, draftVersion, rowsOfVersion, sectionWrites } from '../core/syllabusDoc.js';
 import { checkHeld, checkSubmit, rightsOn } from '../core/syllabusFlow.js';
-import { isLive, joinedLineId, joinedOf, lineSubjects, nextVersion, versionsOfLine } from '../core/syllabusLines.js';
+import { joinedLineId, joinedOf, lineSubjects, nextVersion, versionsOfLine } from '../core/syllabusLines.js';
 import { compareNames } from '../core/names.js';
 import { localDateTime } from '../core/dates.js';
 import { todayOf } from './scheduleData.js';
@@ -79,12 +79,6 @@ export function createDraft(store, platform, { line, approved, group, userId }, 
   return { version, rows };
 }
 
-// The first group of a line: the course of a draft that has no approved version gives its plan semester. A line without a subject has none.
-const firstGroup = (line, members, subjects, groups) => {
-  const first = lineSubjects(subjects, line, members).sort((a, b) => cmp(a.id, b.id))[0];
-  return first ? groups.find((g) => g.id === first.groupId) || null : null;
-};
-
 // The draft of a line: the open version if there is one, else a new one (a copy of the approved version when there is one). `group` is asked only when it is needed.
 function draftOfLine(store, platform, line, group, user) {
   const syllabi = store.list('syllabi');
@@ -95,23 +89,12 @@ function draftOfLine(store, platform, line, group, user) {
   return { syllabusId: version.id, created: true };
 }
 
-// 'syllabus.startDraft' { subjectId, semester } or { lineId } (exactly one of the two) -> { syllabusId, created }
-// By a subject: the line where the teacher of the subject leads the discipline (a line of his own is made when there is none).
-// By a line: the deanery, the administrator, and a teacher who leads the line; a line nobody leads any more is not found.
+// 'syllabus.startDraft' { subjectId, semester } -> { syllabusId, created }
+// The line where the teacher of the subject leads the discipline (a line of his own is made when there is none).
 export function startDraft(store, platform, data, user) {
-  if ((data.subjectId === undefined) === (data.lineId === undefined)) throw new AppError('bad_request');
+  if (data.lineId !== undefined) throw new AppError('bad_request');
   const subjects = store.list('subjects');
   const lines = readTables(store, LINE_TABLES);
-
-  if (data.lineId !== undefined) {
-    const lineId = plainId(data.lineId);
-    if (lineId === null) throw new AppError('bad_request');
-    const line = lines.syllabusLines.find((l) => l.id === lineId);
-    if (!line || !isLive(line, lines.syllabusMembers)) throw new AppError('not_found');
-    if (!worksOn(viewerOf(user, line, lines.syllabusMembers, subjects))) throw new AppError('forbidden');
-    return draftOfLine(store, platform, line, () => firstGroup(line, lines.syllabusMembers, subjects, store.list('groups')), user);
-  }
-
   const subjectId = plainId(data.subjectId);
   if (subjectId === null || !isHalf(data.semester)) throw new AppError('bad_request');
   const subject = subjects.find((s) => s.id === subjectId);

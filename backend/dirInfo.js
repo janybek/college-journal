@@ -297,7 +297,7 @@ function disciplineCard(c, discipline) {
   const manager = c.viewer.roles.includes('admin') || c.viewer.roles.includes('dean');
   return {
     table: 'disciplines', currentSemester: c.settings.semester, discipline: { id: discipline.id, name: discipline.name }, rows,
-    lines: disciplineLines(c, discipline), can: { newLine: manager },
+    lines: disciplineLines(c, discipline),
   };
 }
 

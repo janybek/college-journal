@@ -9,7 +9,6 @@ import { syllabusFor, syllabusIndex } from '../core/syllabus.js';
 import { rightsOn, checkHeld } from '../core/syllabusFlow.js';
 import { syllabusState } from '../core/dirInfo.js';
 import { draftVersion } from '../core/syllabusDoc.js';
-import { can, listPermissions } from '../core/permissions.js';
 
 const L = { id: 'sl_1', disciplineId: 'ds_1', semester: 1, authorId: 't1' };
 const m = (id, teacherId, state, joinedAt = '', lineId = 'sl_1') => ({ id, lineId, disciplineId: 'ds_1', semester: 1, teacherId, state, joinedAt, invitedAt: '2026-09-01 09:00:00' });
@@ -197,17 +196,4 @@ test('draftVersion on a line: the discipline and half of the line, the author, t
     ['ds_1', 1, 't1', 'sl_1', 'sy_2', 'draft', 3, 'sf_u']);
   const first = draftVersion({ line: L, teacherId: '', approved: null, planSemester: 3, course: 2, userId: 'sf_u', today: '2026-09-10', number: 1 });
   assert.deepEqual([first.teacherId, first.sourceId, first.lineId, first.planSemester, first.course], ['', '', 'sl_1', 3, 2]);
-});
-
-test('the new actions: who may call them', () => {
-  const roles = ['admin', 'dean', 'prorector', 'teacher', 'student'];
-  const who = (action) => roles.map((r) => can([r], action));
-  for (const action of ['syllabus.invite', 'syllabus.join', 'syllabus.decline', 'syllabus.leave', 'syllabus.invitations']) {
-    assert.deepEqual(who(action), [false, false, false, true, false], action);
-  }
-  for (const action of ['syllabus.withdraw', 'syllabus.remove']) assert.deepEqual(who(action), [true, true, false, true, false], action);
-  for (const action of ['syllabus.add', 'syllabus.setAuthor', 'syllabus.newLine']) assert.deepEqual(who(action), [true, true, false, false, false], action);
-  assert.equal(can(['dean', 'teacher'], 'syllabus.invite'), true);
-  assert.equal(listPermissions(['student']).some((a) => ['syllabus.invite', 'syllabus.join', 'syllabus.invitations'].includes(a)), false);
-  assert.equal(listPermissions(['prorector']).some((a) => ['syllabus.invite', 'syllabus.add', 'syllabus.newLine'].includes(a)), false);
 });

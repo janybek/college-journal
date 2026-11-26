@@ -2,11 +2,7 @@
 // Pure functions over rows the request has already read. No Node or Apps Script objects here.
 import { AppError } from '../core/errors.js';
 import { compareNames } from '../core/names.js';
-import { localDateTime } from '../core/dates.js';
-import { plainId } from '../core/syllabusSections.js';
-import { rightsOn } from '../core/syllabusFlow.js';
-import { invitedOf, isLive, joinedLineId, joinedOf, lineSubjects, partOf, teacherSubjects, teachingOf, versionsOfLine } from '../core/syllabusLines.js';
-import { createDraft } from './syllabusDraft.js';
+import { invitedOf, isLive, joinedLineId, joinedOf, lineSubjects, partOf, teacherSubjects, teachingOf } from '../core/syllabusLines.js';
 
 export const LINE_TABLES = ['syllabusLines', 'syllabusMembers'];
 
@@ -99,135 +95,6 @@ export function lineView(rows, line, user) {
       .map((p) => ({ id: p.id, fullName: p.fullName, groups: groupsOf(p.id) }));
   }
   return view;
-}
-
-// ---- members of a line without a switch: call, withdraw, decline, the author, a ready syllabus of the deanery ----
-
-export const MEMBER_TABLES = ['syllabusLines', 'syllabusMembers', 'subjects', 'staff', 'groups'];
-
-const isObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
-const readRows = (store, names) => Object.fromEntries(names.map((n) => [n, store.list(n)]));
-
-// The line of a request: the id is a plain string (else bad_request), the line is there (else not_found).
-function requestLine(lines, id) {
-  const lineId = plainId(id);
-  if (lineId === null) throw new AppError('bad_request');
-  const line = lines.find((l) => l.id === lineId);
-  if (!line) throw new AppError('not_found');
-  return line;
-}
-const teachesIt = (rows, line, id) => teacherSubjects(rows.subjects, line.disciplineId, id).length > 0;
-const isAuthor = (rows, line, user) => partOf(line, rows.syllabusMembers, user.id) === 'author' && teachesIt(rows, line, user.id);
-
-// The line view for the caller after a write; rows are the sheets the request read, with what it wrote.
-const answer = (rows, line, user) => ({ line: lineView(rows, rows.syllabusLines.find((l) => l.id === line.id), user) });
-const replaced = (list, row) => list.map((x) => (x.id === row.id ? row : x));
-
-// 'syllabus.invite' { lineId, teacherId } -> { line }: the author of the line calls a colleague who teaches the discipline.
-export function inviteMember(store, platform, data, user) {
-  const d = isObject(data) ? data : {};
-  const lineId = plainId(d.lineId);
-  const teacherId = plainId(d.teacherId);
-  if (lineId === null || teacherId === null) throw new AppError('bad_request');
-  const rows = readRows(store, MEMBER_TABLES);
-  const line = requestLine(rows.syllabusLines, lineId);
-  if (!isLive(line, rows.syllabusMembers)) throw new AppError('not_found');
-  if (!isAuthor(rows, line, user)) throw new AppError('forbidden');
-  const target = rows.staff.find((p) => p.id === teacherId);
-  if (!target || target.active === false || !rolesOf(target).includes('teacher') || !teachesIt(rows, line, teacherId)) throw new AppError('not_teaching');
-  if (partOf(line, rows.syllabusMembers, teacherId) !== null) throw new AppError('already_member');
-  const [member] = store.insertMany('syllabusMembers', [{
-    lineId: line.id, disciplineId: line.disciplineId, semester: line.semester, teacherId, state: 'invited', byId: user.id,
-    invitedAt: localDateTime(platform.now()), joinedAt: '', endedAt: '', endedBy: '',
-  }]);
-  rows.syllabusMembers = [...rows.syllabusMembers, member];
-  return answer(rows, line, user);
-}
-
-// 'syllabus.withdraw' { lineId, teacherId } -> { line }: the deanery, the administrator or the author takes back a waiting invitation.
-export function withdrawInvite(store, platform, data, user) {
-  const d = isObject(data) ? data : {};
-  const lineId = plainId(d.lineId);
-  const teacherId = plainId(d.teacherId);
-  if (lineId === null || teacherId === null) throw new AppError('bad_request');
-  const rows = readRows(store, MEMBER_TABLES);
-  const line = requestLine(rows.syllabusLines, lineId);
-  if (!(isManagerUser(user) || isAuthor(rows, line, user))) throw new AppError('forbidden');
-  const row = invitedOf(rows.syllabusMembers, line.id).find((m) => m.teacherId === teacherId);
-  if (!row) throw new AppError('not_found');
-  const [done] = store.updateMany('syllabusMembers', [{ id: row.id, patch: { state: 'withdrawn', endedAt: localDateTime(platform.now()), endedBy: user.id } }]);
-  rows.syllabusMembers = replaced(rows.syllabusMembers, done);
-  return answer(rows, line, user);
-}
-
-// 'syllabus.decline' { lineId } -> { declined: true }: an invited teacher says no.
-export function declineInvite(store, platform, data, user) {
-  const d = isObject(data) ? data : {};
-  const lineId = plainId(d.lineId);
-  if (lineId === null) throw new AppError('bad_request');
-  const line = requestLine(store.list('syllabusLines'), lineId);
-  const row = invitedOf(store.list('syllabusMembers'), line.id).find((m) => m.teacherId === user.id);
-  if (!row) throw new AppError('forbidden');
-  store.updateMany('syllabusMembers', [{ id: row.id, patch: { state: 'declined', endedAt: localDateTime(platform.now()), endedBy: user.id } }]);
-  return { declined: true };
-}
-
-// 'syllabus.setAuthor' { lineId, teacherId } -> { line }: the deanery or the administrator names a member who leads the line the author.
-export function setAuthor(store, platform, data, user) {
-  const d = isObject(data) ? data : {};
-  const lineId = plainId(d.lineId);
-  const teacherId = plainId(d.teacherId);
-  if (lineId === null || teacherId === null) throw new AppError('bad_request');
-  if (!isManagerUser(user)) throw new AppError('forbidden');
-  const rows = readRows(store, MEMBER_TABLES);
-  const line = requestLine(rows.syllabusLines, lineId);
-  if (!joinedOf(rows.syllabusMembers, line.id).some((m) => m.teacherId === teacherId)) throw new AppError('not_found');
-  const [done] = store.updateMany('syllabusLines', [{ id: line.id, patch: { authorId: teacherId } }]);
-  rows.syllabusLines = replaced(rows.syllabusLines, done);
-  return answer(rows, line, user);
-}
-
-// 'syllabus.newLine' { disciplineId, semester } -> { lineId, syllabusId }: the deanery starts a syllabus nobody leads yet (an empty draft; people come later).
-export function newLine(store, platform, data, user) {
-  const d = isObject(data) ? data : {};
-  const disciplineId = plainId(d.disciplineId);
-  if (disciplineId === null || (d.semester !== 1 && d.semester !== 2)) throw new AppError('bad_request');
-  if (!isManagerUser(user)) throw new AppError('forbidden');
-  if (!store.list('disciplines').some((x) => x.id === disciplineId)) throw new AppError('not_found');
-  const syllabi = store.list('syllabi');
-  const [line] = store.insertMany('syllabusLines', [{ disciplineId, semester: d.semester, authorId: '', createdBy: user.id, createdAt: localDateTime(platform.now()) }]);
-  const { version } = createDraft(store, platform, { line, approved: null, group: null, userId: user.id }, { syllabi });
-  return { lineId: line.id, syllabusId: version.id };
-}
-
-// 'syllabus.invitations' {} -> { invitations: [row] }: what a teacher is called to, only lines that are alive and disciplines he still teaches.
-export function myInvitations(store, platform, user) {
-  const rows = readRows(store, MEMBER_TABLES);
-  const mine = rows.syllabusMembers.filter((m) => m.state === 'invited' && m.teacherId === user.id);
-  if (mine.length === 0) return { invitations: [] };
-  const disciplines = nameMap(store.list('disciplines'));
-  const syllabi = store.list('syllabi');
-  const staff = nameMap(rows.staff);
-  const groups = nameMap(rows.groups);
-  const nameOf = (id) => (staff.get(id) || { fullName: '' }).fullName;
-  const groupName = (s) => (groups.get(s.groupId) || { name: '' }).name;
-  const invitations = [];
-  for (const m of [...mine].sort((a, b) => cmp(a.invitedAt || '', b.invitedAt || '') || cmp(a.id, b.id))) {
-    const line = rows.syllabusLines.find((l) => l.id === m.lineId);
-    const own = line ? teacherSubjects(rows.subjects, line.disciplineId, user.id) : [];
-    if (!line || !isLive(line, rows.syllabusMembers) || own.length === 0) continue;
-    const { approved, open } = versionsOfLine(syllabi, line.id);
-    const seen = open && rightsOn(open, { id: user.id, roles: user.roles, teaches: true, part: 'invited' }).see;
-    const hisNow = versionsOfLine(syllabi, joinedLineId(rows.syllabusMembers, { disciplineId: line.disciplineId, teacherId: user.id, semester: line.semester })).approved;
-    const first = [...own].sort((a, b) => cmp(groupName(a), groupName(b)) || cmp(a.id, b.id))[0];
-    invitations.push({
-      lineId: line.id, disciplineId: line.disciplineId, disciplineName: (disciplines.get(line.disciplineId) || { name: '' }).name, semester: line.semester,
-      authorName: nameOf(line.authorId), byName: nameOf(m.byId), invitedAt: m.invitedAt || '',
-      hasApproved: approved !== null, approvedId: approved ? approved.id : '', openId: seen ? open.id : '', subjectId: first.id,
-      losesTopics: approved === null && hisNow !== null,
-    });
-  }
-  return { invitations };
 }
 
 // {} or { shared: true, members: N }: how many teachers lead the line where this teacher leads the discipline now (more than one: shared).

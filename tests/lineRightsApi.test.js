@@ -274,36 +274,6 @@ test('the administrator who starts a draft or loads a file for a member of a sha
   assert.deepEqual([s.store.list('syllabusLines').length, s.oneJoined(), row.lineId], [lines, [], line.id]);
 });
 
-test('startDraft: exactly one of subjectId and lineId; a line of a discipline of another teacher is refused', () => {
-  const { s, line } = base();
-  const start = (data, k = 't1') => s.call('syllabus.startDraft', data, s.t[k]);
-  assert.deepEqual([{ subjectId: s.sb1, semester: 1, lineId: line.id }, {}, { semester: 1 }, { lineId: ['x'] }, { lineId: 5 }].map((d) => code(start(d))), Array(5).fill('bad_request'));
-  assert.equal(code(start({ lineId: line.id }, 't4')), 'forbidden');
-  assert.equal(code(start({ lineId: line.id }, 't3')), 'forbidden');
-  assert.equal(code(start({ lineId: 'sl_none' })), 'not_found');
-  const open = s.store.list('syllabi').find((v) => v.status === 'draft');
-  assert.deepEqual(start({ lineId: line.id }, 't2').data, { syllabusId: open.id, created: false });
-  assert.deepEqual(start({ lineId: line.id }, 'dean').data, { syllabusId: open.id, created: false });
-  s.store.update('syllabi', open.id, { status: 'archived' });
-  const made = start({ lineId: line.id }, 't2').data;
-  assert.equal(made.created, true);
-  assert.deepEqual(s.store.list('syllabi').filter((v) => v.id === made.syllabusId).map((v) => [v.lineId, v.teacherId, v.sourceId !== '']), [[line.id, s.ids.t1, true]]);
-});
-
-test('startDraft with a line: a ready syllabus of the deanery, and a dead line is not found', () => {
-  const s = setup();
-  const ready = s.store.insert('syllabusLines', { disciplineId: s.ds1, semester: 1, authorId: '', createdBy: s.ids.dean, createdAt: '2026-09-01 08:00:00' });
-  assert.equal(code(s.call('syllabus.startDraft', { lineId: ready.id }, s.t.t1)), 'forbidden');
-  const made = s.call('syllabus.startDraft', { lineId: ready.id }, s.t.dean).data;
-  const row = s.store.list('syllabi').find((v) => v.id === made.syllabusId);
-  assert.deepEqual([made.created, row.lineId, row.teacherId, row.status], [true, ready.id, s.ids.dean, 'draft']);
-  // the line has no author: the deanery submits
-  assert.equal(code(s.call('syllabus.submit', { syllabusId: row.id, dryRun: true }, s.t.dean)), 'ok');
-  const dead = s.store.insert('syllabusLines', { disciplineId: s.ds1, semester: 2, authorId: s.ids.t1, createdBy: s.ids.dean, createdAt: '2026-09-01 08:00:00' });
-  s.store.insert('syllabusMembers', { lineId: dead.id, disciplineId: s.ds1, semester: 2, teacherId: s.ids.t1, state: 'left', byId: s.ids.dean, invitedAt: '', joinedAt: '2026-09-01 08:00:00', endedAt: '2026-09-02 08:00:00', endedBy: s.ids.t1 });
-  assert.equal(code(s.call('syllabus.startDraft', { lineId: dead.id }, s.t.dean)), 'not_found');
-});
-
 test('a line without an author: the name is empty and the deanery sends the version', () => {
   const { s, line, draft } = base();
   s.store.update('syllabusLines', line.id, { authorId: '' });
@@ -418,4 +388,20 @@ test('no place of the server looks for a version by the old key', () => {
     assert.equal(/\bversionsOf\(/.test(text), false, f);
     assert.equal(/groupsOfTeacher/.test(text), false, f);
   }
+});
+
+test('the invitations, the joining and the leaving are gone: ten actions refused like an unknown one, startDraft by a line is a bad request', () => {
+  const { s, line } = base();
+  const removed = ['invite', 'join', 'decline', 'leave', 'invitations', 'withdraw', 'remove', 'add', 'setAuthor', 'newLine'];
+  const before = JSON.stringify(s.snapshot());
+  for (const k of ['dean', 't1']) {
+    const unknown = s.call('syllabus.nothing', { lineId: line.id, teacherId: s.ids.t3 }, s.t[k]);
+    assert.equal(unknown.ok, false);
+    for (const name of removed) {
+      const r = s.call(`syllabus.${name}`, { lineId: line.id, teacherId: s.ids.t3, disciplineId: s.ds1, semester: 1 }, s.t[k]);
+      assert.deepEqual([name, r.ok, r.error.code], [name, false, unknown.error.code]);
+    }
+  }
+  assert.equal(code(s.call('syllabus.startDraft', { lineId: line.id }, s.t.t1)), 'bad_request');
+  assert.equal(JSON.stringify(s.snapshot()), before);
 });

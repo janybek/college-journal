@@ -83,7 +83,6 @@ test('a file fills the draft: the deanery, the administrator and a teacher (of h
     ['journal.get', 'journal.list', 'journal.log', 'journal.saveResults', 'journal.savePair',
       'lesson.mine', 'lesson.get', 'lesson.start', 'lesson.endCheckin', 'lesson.finish',
       'schedule.mine', 'syllabus.apply', 'syllabus.attachFile', 'syllabus.dropFile', 'syllabus.file', 'syllabus.form', 'syllabus.get', 'syllabus.preview', 'syllabus.saveSection', 'syllabus.startDraft', 'syllabus.submit', 'teacher.mySubjects',
-      'syllabus.decline', 'syllabus.invitations', 'syllabus.invite', 'syllabus.join', 'syllabus.leave', 'syllabus.remove', 'syllabus.withdraw',
       'work.file', 'work.get', 'work.grade', 'work.list', 'work.overview', 'work.remove', 'work.save',
       'announce.list', 'announce.remove', 'announce.save', 'ledger.addAttempt', 'ledger.closeFinal', 'ledger.closeUnit', 'ledger.get', 'ledger.list', 'ledger.saveExam',
       'repeat.close', 'repeat.get', 'repeat.list', 'repeat.saveAttempt', 'repeat.saveWorks',

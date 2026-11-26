@@ -21,8 +21,6 @@ import { halfResults } from '../backend/repeatSnapshot.js';
 import { createRequest, decideRequest } from '../backend/requestData.js';
 import { saveStateExam, saveStateExamScores } from '../backend/stateExamData.js';
 import { saveAnnouncement } from '../backend/announceData.js';
-import { inviteMember } from '../backend/syllabusLines.js';
-import { addMember } from '../backend/lineSwitch.js';
 
 // One password for every fictional person of the dev stand.
 export const DEV_PASSWORD = 'journal2026';
@@ -248,7 +246,6 @@ function fill(store, platform, { passwordHash, names, studentsMustChange, admin,
   seedLedger(store, platform);
   seedExam(store, platform);
   if (repeats) seedRepeat(store, platform);
-  seedShared(store, platform);
 }
 
 // A small real PDF (one page, the text «Syllabus sample»), with a proper cross-reference table.
@@ -759,19 +756,4 @@ export function seedRepeat(store, platform) {
   closeRepeat(store, platform, { repeatId: passedId }, teacher);
 
   card(oneSitA, 'full', 3, addDays(today, -2), teacher3.id);
-}
-
-// A shared syllabus for the stand, written only through the functions of the line requests. «Информатика», the 2nd half (not the current one): the deanery
-// puts teacher3 on the line of teacher1, so it is shared by two. The 1st half (the current one): teacher1 calls teacher3, the call waits; no pair changes.
-export function seedShared(store, platform) {
-  const person = (login) => store.list('staff').find((p) => p.login === login);
-  const asUser = (login) => ({ id: person(login).id, roles: String(person(login).roles).split(',').map((r) => r.trim()), kind: 'staff' });
-  const discipline = store.list('disciplines').find((d) => d.name === 'Информатика');
-  const lineOf = (semester) => {
-    const lines = store.list('syllabusLines').filter((l) => l.disciplineId === discipline.id && l.semester === semester && l.authorId === person('teacher1').id);
-    if (lines.length !== 1) throw new Error(`seed: no single line of teacher1 for the half ${semester}`);
-    return lines[0];
-  };
-  addMember(store, platform, { lineId: lineOf(2).id, teacherId: person('teacher3').id }, asUser('dean'));
-  inviteMember(store, platform, { lineId: lineOf(1).id, teacherId: person('teacher3').id }, asUser('teacher1'));
 }
