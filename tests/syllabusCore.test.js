@@ -182,6 +182,12 @@ test('planSyllabusUpload: other discipline or teacher in the file, semesters', (
   assert.deepEqual([third.semester, third.planSemester, third.syllabus.id, third.syllabus.row.planSemester, third.toRemove], [1, 3, 'sy_1', 3, ['tp_1', 'tp_2', 'tp_3', 'tp_4']]);
 });
 
+test('planSyllabusUpload: no teacher_differs when the teacher has no name (a syllabus of the discipline has several)', () => {
+  assert.deepEqual(planSyllabusUpload(doc(base, { teacher: 'Колин А.' }), ctx({ teacher: { id: '', fullName: '' } })).warnings, []);
+  assert.deepEqual(planSyllabusUpload(doc(base, { teacher: 'Колин А.' }), ctx({ teacher: { id: '', fullName: '  ' } })).warnings, []);
+  assert.deepEqual(planSyllabusUpload(doc(base, { teacher: '' }), ctx({ teacher: { id: '', fullName: '' } })).warnings, []);
+});
+
 test('planSyllabusUpload: a file of another curriculum semester over the stored one warns which groups it replaces', () => {   // I3
   const groups = ['01-1', '02-1'];
   const third = planSyllabusUpload(doc([row('Тема', 2, 0, 2, { semester: 3 })], { semester: 3 }), { ...have, groups });

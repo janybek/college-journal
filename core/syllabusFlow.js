@@ -32,21 +32,29 @@ export const EDITABLE_STATUSES = ['draft', 'returned'];
 const NO_RIGHTS = { see: false, edit: false, submit: false, approve: false, giveBack: false };
 const hasRole = (viewer, role) => Array.isArray(viewer.roles) && viewer.roles.includes(role);
 
-// What the viewer may do with a version. viewer: { id, roles (array), teaches (true: teaches the discipline now),
-// part ('author' | 'member' | 'invited' | null: the place on the line of the version, from partOf) }.
+// What the viewer may do with a version. viewer: { id, roles (array), part ('responsible' | 'teaches' | null: the place on the syllabus of the
+// discipline, from partOf), archived (true: the version lies on a line of the history) }.
+// TEMP task 3: the parts 'author', 'member', 'invited' of the old shared lines work as before, with teaches === true.
 export function rightsOn(version, viewer) {
   if (!version || !viewer || typeof viewer !== 'object') return { ...NO_RIGHTS };
   const status = version.status;
   const manager = hasRole(viewer, 'admin') || hasRole(viewer, 'dean');
-  const teacher = hasRole(viewer, 'teacher') && viewer.teaches === true && typeof viewer.id === 'string' && viewer.id !== '';
+  const teacher = hasRole(viewer, 'teacher') && typeof viewer.id === 'string' && viewer.id !== '';
   const part = viewer.part ?? null;
-  const worker = manager || (teacher && (part === 'author' || part === 'member'));
+  const archived = viewer.archived === true;
+  const old = teacher && viewer.teaches === true ? part : null; // TEMP task 3
+  const responsible = teacher && part === 'responsible';
+  const worker = !archived && (manager || responsible || old === 'author' || old === 'member'); // TEMP task 3 (old)
   let see = false;
-  if (status === 'approved') see = true;
-  else if (OPEN_STATUSES.includes(status)) see = worker || (teacher && part === 'invited') || (hasRole(viewer, 'prorector') && (status === 'review' || status === 'returned'));
+  if (status === 'approved') see = !archived || manager;
+  else if (OPEN_STATUSES.includes(status)) {
+    see = worker || (archived && manager)
+      || (!archived && ((teacher && part === 'teaches') || old === 'invited' || (hasRole(viewer, 'prorector') && (status === 'review' || status === 'returned'))));
+  }
   const edit = EDITABLE_STATUSES.includes(status) && worker;
-  const submit = edit && (manager || part === 'author');
-  return { see, edit, submit, approve: manager && OPEN_STATUSES.includes(status), giveBack: manager && status === 'review' };
+  const submit = edit && (manager || responsible || old === 'author'); // TEMP task 3 (old)
+  const open = OPEN_STATUSES.includes(status) && !archived && manager;
+  return { see, edit, submit, approve: open, giveBack: open && status === 'review' };
 }
 
 const byOrder = (a, b) => (a.order || 0) - (b.order || 0);

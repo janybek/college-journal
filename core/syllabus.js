@@ -206,7 +206,7 @@ export function planSyllabusUpload(doc, { discipline, teacher, versions = {}, to
     warnings.push({ code: 'discipline_differs', file: info.discipline, discipline: discipline.name });
   }
   const surname = norm(teacher.fullName).split(' ')[0];
-  if (norm(info.teacher) && !norm(info.teacher).split(/[\s,;.]+/).includes(surname)) {
+  if (norm(info.teacher) && surname && !norm(info.teacher).split(/[\s,;.]+/).includes(surname)) {
     warnings.push({ code: 'teacher_differs', file: info.teacher, teacher: teacher.fullName });
   }
 

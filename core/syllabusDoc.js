@@ -219,9 +219,9 @@ const COPIED = [...TITLE_FIELDS, 'goal'];
 
 // The row of a new version of a key. With an approved version it is a copy of its title and goal; without — the plan semester and course given.
 // line: the line of the version (its discipline and half of the year); teacherId: the author of the version.
-export function draftVersion({ line, teacherId, approved, planSemester, course, userId, today, number }) {
+export function draftVersion({ line, half, teacherId, approved, planSemester, course, userId, today, number }) {
   const row = {
-    disciplineId: line.disciplineId, teacherId, semester: line.semester, lineId: line.id, sourceId: approved ? approved.id : '',
+    disciplineId: line.disciplineId, teacherId, semester: half ?? line.semester, lineId: line.id, sourceId: approved ? approved.id : '',
     status: 'draft', version: number, remark: '', submittedBy: '', submittedAt: '', decidedBy: '', decidedAt: '', editedBy: userId, updated: today,
   };
   const source = approved || {};

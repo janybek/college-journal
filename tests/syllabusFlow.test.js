@@ -40,6 +40,16 @@ test('rightsOn: who sees and does what in each status', () => {
   assert.equal(rightsOn(v('draft'), { id: 'sf_t', roles: ['dean', 'teacher'], teaches: true, part: 'author' }).approve, true);
 });
 
+test('rightsOn: the place on the syllabus of the discipline (responsible, teaches) and the line of the history', () => {
+  const flagsOf = (status, viewer) => Object.entries(rightsOn(v(status), viewer)).filter(([, yes]) => yes).map(([name]) => name).join();
+  const teacher = (part, extra = {}) => ({ id: 'sf_t', roles: ['teacher'], part, ...extra });
+  assert.deepEqual(['draft', 'review', 'returned', 'approved'].map((s) => flagsOf(s, teacher('responsible'))), ['see,edit,submit', 'see', 'see,edit,submit', 'see']);   // дисциплину может уже не вести
+  assert.deepEqual(['draft', 'review', 'approved'].map((s) => flagsOf(s, teacher('teaches'))), ['see', 'see', 'see']);
+  assert.equal(flagsOf('returned', viewers.prorector), 'see');
+  assert.equal(flagsOf('draft', { ...viewers.dean, archived: true }), 'see');
+  assert.equal(flagsOf('approved', teacher('responsible', { archived: true })), '');
+});
+
 test('rightsOn: attempts to get around the rules', () => {
   const none = { see: false, edit: false, submit: false, approve: false, giveBack: false };
   // преподаватель не утверждает и не возвращает сам себе
