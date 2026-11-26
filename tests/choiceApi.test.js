@@ -212,16 +212,36 @@ test('syllabus.choose: the other discipline, the column «teacher» and the othe
   for (const [t, rows] of Object.entries(before.tables)) assert.deepEqual(s.store.list(t), rows, t);
 });
 
-test('syllabus.choose: a pick shorter than what is held in the other group leaves the future pairs without topics, with no error', () => {
-  const { s, B } = world();
-  for (const p of s.store.list('pairs').filter((x) => x.subjectId === s.sb2).sort((a, b) => a.date.localeCompare(b.date)).slice(0, 12)) {
-    if (p.status !== 'closed') s.store.update('pairs', p.id, { status: 'closed' });
-  }
-  const heldBefore = s.store.list('pairs').filter((p) => p.subjectId === s.sb2 && p.status === 'closed').map(({ id, topicId, lessonType, part }) => [id, topicId, lessonType, part]);
-  assert.equal(code(chooseOf(s, B)({})), 'ok');
-  const heldAfter = s.store.list('pairs').filter((p) => p.subjectId === s.sb2 && p.status === 'closed').map(({ id, topicId, lessonType, part }) => [id, topicId, lessonType, part]);
-  assert.deepEqual(heldAfter.filter(([, t]) => t !== ''), heldBefore.filter(([, t]) => t !== ''));      // a held pair with a topic never changes
-  assert.equal(s.store.list('pairs').filter((p) => p.subjectId === s.sb2 && p.status === 'planned').every((p) => p.topicId === '' || p.topicId), true);
+test('syllabus.choose: a pick shorter than what was held in the group that changes keeps the held topics and leaves the future pairs without topics', () => {
+  const { s, A } = world();
+  const mine = () => s.store.list('pairs').filter((p) => p.subjectId === s.sb2).sort((x, y) => x.date.localeCompare(y.date));
+  for (const p of mine().slice(0, 5)) if (p.status !== 'closed') s.store.update('pairs', p.id, { status: 'closed' });     // five held pairs with the topics of «Б»
+  const held = () => mine().filter((p) => p.status === 'closed').map(({ id, topicId, lessonType, part }) => [id, topicId, lessonType, part]);
+  const before = held();
+  assert.equal(before.length, 5);
+  assert.equal(before.every(([, topicId]) => topicId !== ''), true);
+  const r = chooseOf(s, A)({});                                                       // «А» has five topics: all of them are used up by the held pairs of «Б»
+  assert.deepEqual([code(r), s.oneMain()], ['ok', []]);
+  assert.deepEqual(held(), before);                                                   // (1) the held pairs keep topic, kind and part
+  const future = mine().filter((p) => p.status === 'planned');
+  assert.equal(future.length > 0, true);
+  assert.deepEqual(future.map((p) => p.topicId), future.map(() => ''));              // (2) nothing is left for the future pairs
+});
+
+test('a file for the whole year, sent to a discipline whose spring waits: the autumn goes to the main line, the spring to the own line of the sender; the later pick keeps one main', () => {
+  const s = setup();
+  const ln = (key, half) => s.store.insert('syllabusLines', { disciplineId: s.ds1, kind: 'own', semester: half, teacherId: s.ids[key], createdAt: '2026-08-01 10:00:00' });
+  const own1 = ln('t1', 2);
+  const own2 = ln('t2', 2);
+  const r = s.call('syllabus.apply', { subjectId: s.sb1, sheets: s.FILE_AB }, s.t.t1);
+  assert.deepEqual([code(r), r.data.applied], ['ok', true]);
+  const main = s.main(s.ds1);
+  assert.equal(main.responsibleId, s.ids.t1);
+  assert.deepEqual(s.store.list('syllabi').map((x) => [x.semester, x.lineId === main.id ? 'main' : x.lineId === own1.id ? 'own t1' : 'other']).sort(), [[1, 'main'], [2, 'own t1']]);
+  assert.deepEqual(s.oneMain(), []);
+  const done = s.call('syllabus.choose', { disciplineId: s.ds1, semester: 2, lineId: own2.id }, s.t.dean);
+  assert.deepEqual([code(done), done.data.resolved, s.oneMain()], ['ok', true, []]);
+  assert.equal(s.lines(s.ds1).filter((l) => l.kind === 'main').length, 1);
 });
 
 test('syllabus.choose: after the pick the documents show one approved syllabus and the history', () => {
