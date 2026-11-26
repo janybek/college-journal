@@ -12,6 +12,8 @@
 
 **Исходное состояние:** `HEAD af8f1bb`, `npm test` — **1459 тестов**, все зелёные (прогон 26.11.2026). Тестовый журнал: сервер `55c01bb`, сайт `506813b`. Боевой не трогаем.
 
+**Сверка плана.** 26.11.2026, opus — «вернуть» (`.superpowers/sdd/plan-spravochniki-2/preflight.md`); внесено всё: 4 важные (`semester` карточки сотрудника без роли «преподаватель», новый `setup()` в шаге задачи 4, тест черновика у проректора в «Что ведёт», решение 7 по Ruling — предмет с парами в датах семестра без силлабуса входит в расчёт) и 8 мелких (вызов сида в `dev/server.js`, половина `halfOf` не попадает в «Долги», «Долги» — только предметы со следами студента, комментарий о `state` в списке, свой `COUNTED_STATES` сайта, текст решения 9, пара закрытого юнита не «не заполнена», сданный повтор в метках). Числа задач 2–5 пересчитаны пробой (`scratchpad/probe/impl.mjs`, `unit.mjs`, `stand.mjs`, `sw.mjs`). Дизайн поправлен `9d2e7b5`.
+
 **Порядок.** Сначала сверка плана (opus): имена, поля, ключи словарей, числа тестов и стенда — против готового кода; находки правит отдельный агент в этом файле. Затем задачи 1 → 8 строго по одной; после каждой `npm test` зелёное и `npm run build:gas` собирается. Задачи 1–5 (логика и сервер) — без остановки; после задачи 5 — итоги в `aidlc-state.md` и журнал хода, новый чат координатора (правило 6б). Задача 6 — **блок владельца 1**, остановка и приёмка на стенде по скриншотам. Задача 7 — **блок владельца 2**, остановка. Потом задача 8.
 
 | № | Кто | Задача | Проверка ИИ |
@@ -72,13 +74,13 @@
 | --- | --- | --- |
 | 1 | **Путь показывается один раз — верхний** «Справочники › Группы»; в карточке (группы, аудитории, дисциплины, студента, сотрудника) слово справочника в нём — ссылка на список. Строка пути внутри карточки убрана; имя записи — заголовок карточки | дизайн: «остаётся верхний» |
 | 2 | **«Назад» из окна «Изменить», открытого в карточке**, возвращает в карточку; «Отмена» и «Сохранить» тоже возвращают в карточку, не оставляя лишнего шага в истории (ещё одно «Назад» — в список). Окно «Изменить», открытое из списка, работает как раньше | дизайн, вторая мелочь |
-| 3 | **«Не заполнено» — пары:** пары текущего семестра, которые уже закончились (90 минут от начала прошли), а в журнале стоят «не заполнена» или «просрочена» — их не отметили проведёнными. Пары, которые деканат сам отметил «не проведена», не считаются: решение по ним уже принято. Пара считается за тем, кто должен был её вести (с заменой) | дизайн: «прошли, а в журнале не проведены»; вопрос владельцу 1 |
+| 3 | **«Не заполнено» — пары:** пары текущего семестра, которые уже закончились (90 минут от начала прошли), а в журнале стоят «не заполнена» или «просрочена» — их не отметили проведёнными. Пары, которые деканат сам отметил кнопкой «Не проведена» (`missed`), не считаются: заполнять там нечего. Пара закрытого юнита, оставшаяся `planned`, тоже не считается (отметить её уже нельзя). Пара считается за тем, кто должен был её вести (с заменой) | дизайн (уточнён `9d2e7b5`), Ruling сверки |
 | 4 | **«Не заполнено» — юнит:** все его пары (кроме отменённых) закончились, юнит не закрыт, а у активных студентов нет рубежного или СРС; строка «Анатомия · 03-1 · Юнит 1 — нет рубежного: 20, нет СРС: 20». Если максимум рубежного или СРС в «Баллах и журнале» — 0, этот столбец не требуется. Только предметы, которые сотрудник ведёт сейчас | дизайн, решение владельца 4 |
 | 5 | **Состояние предмета словами:** «идёт», «под угрозой», «сдано 82», «неуд.», «не допущен», «не явился(ась)», «I», «нет экзамена» (ведомость закрыта, а сдачи нет — бывает у выбывшего) | дизайн, решение владельца 2 |
-| 6 | **Метки в группе и дисциплине:** «под угрозой N», «неуд. N», «не допущ. N», «не явились N», «I N»; нулевые не показываются, все нули — «—». «Не явились» и «I» — отдельными метками, не внутри «неуд.» | решение владельца 6; честнее, чем прятать неявку в «неуд.» |
-| 7 | **Предметы текущей половины:** предмет попадает в таблицу студента, если его семестр по плану (по силлабусу в силе или по проведённым парам, как в журнале) — этой половины года. Предмет без силлабуса и без проведённых пар с темами в карточку студента не попадает; в карточках группы и дисциплины его строка остаётся (часть 1) с «—» в новых колонках | дизайн, «Правила подсчёта» |
+| 6 | **Метки в группе и дисциплине:** «под угрозой N», «неуд. N», «не допущ. N», «не явились N», «I N»; нулевые не показываются, все нули — «—». «Не явились» и «I» — отдельными метками, не внутри «неуд.». Студент со сданным повтором остаётся в метках закрытой итоговой со своим прежним результатом — как в ведомости | решение владельца 6; честнее, чем прятать неявку в «неуд.» |
+| 7 | **Предметы текущей половины:** предмет входит в расчёт (таблица студента, цифры группы и дисциплины), если его семестр по плану (по силлабусу в силе или по проведённым парам, как в журнале) — этой половины года, **или** если семестра по плану у него нет, но есть неотменённые пары в датах текущего семестра: тогда посещаемость — по его парам, итоги юнитов — «—» (`units: []`). Предмет с семестром другой половины или без пар в датах семестра не входит; в карточках группы и дисциплины его строка остаётся (часть 1) с «—» в новых колонках. На стенде так входит «Анатомия» (силлабус на утверждении) | дизайн (уточнён `9d2e7b5`), Ruling сверки |
 | 8 | **Средний** — целое число, округление как в журнале. У студента — среднее всех его выставленных итогов юнитов по всем предметам половины; у предмета — среднее его итогов; у группы и дисциплины — всех активных студентов | решение владельца 1 |
-| 9 | **Задания:** «сдано» — принято (проверено), «ждёт проверки», «возвращено», «не сдано» — срок прошёл, ничего не сдано. Задания с ещё не наступившим сроком не считаются. Только задания этого семестра (срок не раньше начала семестра), как в «Заданиях» студента. Нет заданий — «нет» | макет `student-a` |
+| 9 | **Задания:** «сдано» — принято (проверено), «ждёт проверки», «возвращено» — при любом сроке; «не сдано» — срок прошёл, ничего не сдано. Несданное задание, срок которого ещё не наступил, не считается нигде. Только задания этого семестра (срок не раньше начала семестра), как в «Заданиях» студента. Нет заданий — «нет» | макет `student-a` |
 | 10 | **Долги:** по всем предметам, где у студента закрыта итоговая ведомость прошлой половины (в том числе в прежней группе); строка «Информатика · 2 семестр · неуд. · повтор записан» / «повтор не записан». Сданный повтор долг снимает; отменённая карточка не считается | дизайн, решение координатора |
 | 11 | **Карточка группы:** плитки — прежние 4 и новые 3 (посещаемость, средний балл, студентов под угрозой), в два ряда; в «Предметах» — «Посещ.», «Средний» и метки; у первых 5 студентов — посещаемость и средний (макет); ФИО студентов и преподавателей — ссылки на их карточки | макет `group-card` |
 | 12 | **Карточка дисциплины:** плитки «групп», посещаемость, средний, студентов под угрозой; в «Где идёт» — «Студентов», «Посещ.», «Средний», метки, «Юниты» (Ю1 закрыт, Ю2 идёт); блок «Юниты» — «Юнит 1 · закрыто 2 из 3 · средний 74» | макет `discipline-card` |
@@ -90,17 +92,17 @@
 
 ## Скорость
 
-Пилот — 3 группы × 22 студента, ~160 пар; на стенде каждый новый запрос должен отвечать быстрее 1 секунды (тест задачи 5), владелец требует «заметно меньше 2 секунд». Листов на запрос (запасной Google читает каждый лист один раз, как `ledger.get` — 19 листов):
+Пилот — 3 группы × 22 студента, ~160 пар. «Меньше 2 секунд» — требование к серверу на SQLite (Ruling сверки): на стенде каждый новый запрос должен отвечать быстрее 1 секунды (тест задачи 5; проба на памяти — 2–14 мс). Для запасного Google (больше не обновляется) достаточно, чтобы каждый лист читался один раз и `npm run build:gas` собирался. Листов на запрос:
 
 | Запрос | Листов |
 | --- | --- |
 | `dir.people` студентов | 14 (`PROGRESS_SHEETS`) |
 | `dir.person` студента | 18 (+ `subjectExams`, `examAttempts`, `repeats`, `repeatAttempts`) |
 | `dir.people` сотрудников | 3 (`staff`, `subjects`, `weekTemplate`) |
-| `dir.person` сотрудника | 1 без роли «преподаватель»; 16 с ней |
+| `dir.person` сотрудника | 1 без роли «преподаватель» (`staff`); 16 с ней |
 | `dir.progress` | 16 (+ `subjectExams`, `examAttempts`; у дисциплины + `disciplines` — 17) |
 
-Если на Google карточка студента окажется медленной, блоки не урезаются молча: «Долги» и «Повторный курс» выносятся во второй запрос, который читает 6 листов и вызывается после первого (решение — владельцу, сейчас не делается: сайт ходит на сервер владельца).
+Если Google вернётся в работу — читать все листы запроса одним `batchGet` (сейчас не делается).
 
 ## Откат
 
@@ -260,8 +262,10 @@ export function readSheets(store, names);
 // { [name]: store.list(name) } — каждый лист один раз; units, subjectExams, examAttempts, repeats, repeatAttempts, которых нет в names, -> [].
 // Только чтение: никакого settleLessons. (journalView берёт из units лишь заголовки юнитов — они новым ответам не нужны.)
 export function halfOf(rows, subject, settings);
-// planSemester из closedOfSubject(rows, subject, settings, пары предмета в датах семестра);
-// null, если он null или semesterHalf(planSemester) !== settings.semester
+// -> { planSemester } | null — входит ли предмет в расчёт текущей половины (решение плана 7).
+// all — пары предмета в датах семестра (inSemester); planSemester — из closedOfSubject(rows, subject, settings, all).
+// planSemester !== null: semesterHalf(planSemester) === settings.semester ? { planSemester } : null;
+// planSemester === null: есть пара из all со status !== 'cancelled' ? { planSemester: null } : null
 export function subjectProgress(rows, platform, subject, user);
 // user — администратор, деканат или проректор (journalView отдаёт им весь журнал).
 // -> { subjectId, planSemester, units: [номера], closedUnits, finalClosed, pairs /* view.pairs */,
@@ -275,7 +279,7 @@ export function subjectProgress(rows, platform, subject, user);
 
 Проверки входа (в этом порядке): `data` не объект — как `{}`; `table` не из `PROGRESS_TABLES` — `bad_request`; `id` не строка или `''` — `bad_request`; листы — `readSheets(store, [...PROGRESS_SHEETS, ...EXAM_SHEETS, ...(table === 'disciplines' ? ['disciplines'] : [])])`; запись — `rows[table].find((r) => r.id === id)` (никогда по ключу объекта), нет — `not_found`.
 
-«Активные» — студенты предмета с `left === false` (в группе и `active === true`). Для предмета текущей половины (`halfOf !== null`): `attendance = attendanceTotal(активные.attendance).percent`, `average = meanOf(выставленные total активных)`, `counts = stateCounts(активные.state)`. Не текущей половины: `inHalf: false`, `attendance: null`, `average: null`, `counts` — пять нулей, `units: []`, `subjectProgress` не вызывается.
+«Активные» — студенты предмета с `left === false` (в группе и `active === true`). Для предмета в расчёте (`halfOf !== null`; у предмета без семестра — `units: []`, все `state: 'going'`): `attendance = attendanceTotal(активные.attendance).percent`, `average = meanOf(выставленные total активных)`, `counts = stateCounts(активные.state)`. Не текущей половины: `inHalf: false`, `attendance: null`, `average: null`, `counts` — пять нулей, `units: []`, `subjectProgress` не вызывается.
 
 **Ответы** (ровно эти ключи):
 
@@ -303,9 +307,9 @@ assert.deepEqual(byId(g.students, s.a1), { id: s.a1, attendance: 100, average: 8
 assert.deepEqual(byId(g.students, s.a2), { id: s.a2, attendance: 50, average: 57 });
 assert.deepEqual(byId(g.students, s.a3), { id: s.a3, attendance: 0, average: null });
 assert.deepEqual(g.students.map((x) => x.id), call('dir.card', { table: 'groups', id: s.g1 }, t.dean).data.students.map((x) => x.id));   // без a4, тот же порядок
-const g2 = call('dir.progress', { table: 'groups', id: s.g2 }, t.dean).data;     // sb2 без силлабуса — не текущей половины
-assert.deepEqual(g2.subjects, [{ subjectId: s.sb2, inHalf: false, attendance: null, average: null, counts: { risk: 0, fail: 0, notAdmitted: 0, absent: 0, incomplete: 0 } }]);
-assert.deepEqual([g2.totals, g2.students], [{ attendance: null, average: null, risk: 0 }, [{ id: s.b1, attendance: null, average: null }]]);
+const g2 = call('dir.progress', { table: 'groups', id: s.g2 }, t.dean).data;     // sb2 без силлабуса, но с парами в датах семестра — в расчёте
+assert.deepEqual(g2.subjects, [{ subjectId: s.sb2, inHalf: true, attendance: 100, average: null, counts: { risk: 0, fail: 0, notAdmitted: 0, absent: 0, incomplete: 0 } }]);
+assert.deepEqual([g2.totals, g2.students], [{ attendance: 100, average: null, risk: 0 }, [{ id: s.b1, attendance: 100, average: null }]]);
 const d = call('dir.progress', { table: 'disciplines', id: s.ds1 }, t.dean).data;
 assert.deepEqual(d.rows, [{ subjectId: s.sb1, groupId: s.g1, inHalf: true, students: 3, attendance: 50, average: 71,
   counts: { risk: 1, fail: 0, notAdmitted: 0, absent: 0, incomplete: 0 }, units: [{ unit: 1, closed: false }, { unit: 2, closed: false }] }]);
@@ -315,6 +319,8 @@ assert.deepEqual(d.totals, { groups: 1, attendance: 50, average: 71, risk: 1 });
 
 `byId` — помощник файла. Ещё в этом файле:
 - **Те же числа, что журнал:** `const j = call('journal.get', { subjectId: s.sb1 }, t.dean).data.journal`; по `j.students` с `left === false`: `meanOf` их `results[id].units[].total` (выставленных) === `g.subjects[0].average`; сумма `attended` / `marked` их `results[id].attendance` даёт `g.subjects[0].attendance`.
+- **Не текущей половины:** новый `setup()`, `s.switchSemester()` (у sb1 и sb2 нет пар в новых датах) → у g1 и g2 `subjects[0]` — `{ inHalf: false, attendance: null, average: null, counts: нули }`, `totals: { attendance: null, average: null, risk: 0 }`; ds2 — `rows[0].inHalf: false`, `units: []`.
+- **Предмет без силлабуса:** `dir.progress` ds2 (до переключения) → `rows: [{ subjectId: s.sb2, groupId: s.g2, inHalf: true, students: 1, attendance: 100, average: null, counts: нули, units: [] }]`, `units: []`, `totals: { groups: 1, attendance: 100, average: null, risk: 0 }`.
 - **Пороги из настроек:** `call('scoring.save', { scheme: { ...DEFAULT_SCHEME, fair: 50 }, split: DEFAULT_SPLIT }, t.dean)` → `counts.risk` 0; затем `split: { semester: 60, exam: 40, admission: 50 }` (fair снова 60) → 2 (у a1 семестр 50 ≤ 50). Сохранение — до закрытия юнитов.
 - **Закрытый юнит и итоговая:** `s.closeUnit(1)` → `d.rows[0].units[0].closed === true`, `d.units[0].closedGroups === 1`. Новый `setup()`, `s.failed()` → `g.subjects[0].counts` `{ risk: 0, fail: 1, notAdmitted: 1, absent: 0, incomplete: 0 }` и то же — по `call('ledger.get', { subjectId: s.sb1 }, t.dean).data.ledger.students` (`status` / `word`).
 - **Отключённый не считается:** `store.update('students', s.a2, { active: false })` → `g.totals.risk === 0`, `d.rows[0].students === 2`, a2 нет в `g.students`.
@@ -347,7 +353,8 @@ export function dirPerson(store, platform, user, data);
 'dir.people': (data, ctx, user) => dirPeople(ctx.store, ctx.platform, user, data.table),
 'dir.person': (data, ctx, user) => dirPerson(ctx.store, ctx.platform, user, data),
 // backend/dirStudents.js
-export function studentsList(store, platform, user);           // читает PROGRESS_SHEETS
+export function studentsList(store, platform, user);           // читает PROGRESS_SHEETS; без EXAM_SHEETS state и total закрытых итоговых неверны —
+                                                               // в коде комментарий: список берёт из них только risk, на него это не влияет
 export function studentCard(store, platform, user, id);        // читает PROGRESS_SHEETS, EXAM_SHEETS, 'repeats', 'repeatAttempts'
 ```
 
@@ -362,13 +369,15 @@ export function studentCard(store, platform, user, id);        // читает P
 { table: 'students', today, semester,
   student: { id, fullName, cardNo, groupId, groupName, active: active === true },
   totals: { attendance /* percent */, absent, average, risk, repeats /* repeats.length */, debts /* debts.length */ },
-  subjects: [{ subjectId, name, teacherName, planSemester, attendance: { percent, absent, marked }, units: [{ unit, total }], average /* meanOf итогов */, state, total }],
+  subjects: [{ subjectId, name, teacherName, planSemester /* null у предмета без семестра */, attendance: { percent, absent, marked }, units: [{ unit, total }], average /* meanOf итогов */, state, total }],
   works: [{ subjectId, name, checked, submitted, returned, missing }],
   debts: [{ subjectId, name, groupName, planSemester, state, total, repeat }],
   repeats: studentRepeats(rows, platform, id) }
 // works — по предметам группы студента (любой половины) с заданиями isCurrent(a, settings): попытка — currentAttempt(сдачи студента), workCounts(workState(...));
 //   предмет, где все четыре числа 0, не выводится; по name
-// debts — по ВСЕМ предметам: halvesOf(rows, subject) с current === false -> строка студента в halfResults(rows, platform, subject, planSemester, user).students
+// debts — по предметам любой группы, где у студента есть следы: отметка (attendance -> pairs.subjectId), строка unitResults или examAttempts;
+//   halvesOf(rows, subject) с current === false и planSemester !== halfOf(...)?.planSemester (половина в расчёте — в «Предметах», не в «Долгах»)
+//   -> строка студента в halfResults(rows, platform, subject, planSemester, user).students
 //   -> debtOf(строка, карточки rows.repeats этого студента, предмета и половины); null — пропуск; по name, затем planSemester
 ```
 
@@ -380,7 +389,7 @@ const list = call('dir.people', { table: 'students' }, t.dean).data;
 assert.deepEqual(list.rows.map((r) => r.id), store.list('students').map((x) => x.id));
 assert.deepEqual([byId(list.rows, s.a1), byId(list.rows, s.a2), byId(list.rows, s.a3), byId(list.rows, s.a4), byId(list.rows, s.b1)], [
   { id: s.a1, attendance: 100, average: 84, risk: 0 }, { id: s.a2, attendance: 50, average: 57, risk: 1 }, { id: s.a3, attendance: 0, average: null, risk: 0 },
-  { id: s.a4, attendance: null, average: null, risk: 0 }, { id: s.b1, attendance: null, average: null, risk: 0 }]);
+  { id: s.a4, attendance: null, average: null, risk: 0 }, { id: s.b1, attendance: 100, average: null, risk: 0 }]);
 const c = call('dir.person', { table: 'students', id: s.a2 }, t.dean).data;
 assert.deepEqual(c.student, { id: s.a2, fullName: 'Өмүров Канат', cardNo: 'A2', groupId: s.g1, groupName: '01-1', active: true });
 assert.deepEqual(c.totals, { attendance: 50, absent: 1, average: 57, risk: 1, repeats: 0, debts: 0 });
@@ -391,9 +400,9 @@ assert.deepEqual([c.works, c.debts, c.repeats], [[], [], []]);
 
 Ещё в этом файле:
 - **Те же числа, что журнал и «Оценки» (Review Focus 6):** для a1, a2, a3 — `units[].total`, `attendance.percent`, `attendance.absent`, `average` строки sb1 равны `journal.get` (`results[id].units[].total`, `results[id].attendance.percent` / `.absent`, `results[id].preliminary`); для a2 — то же по `call('student.grades', {}, t.a2).data.subjects` (предмет sb1). Новый `setup()`, `s.failed()`: состояние sb1 — a1 `'passed'` и `total` 82, a2 `'fail'` и 58, a3 `'notAdmitted'` и `null`; равны `ledger.get` (`students[].status`, `word`, `total`) и `student.grades` a1 и a2 (`final.status`, `final.total`).
-- **Долги прошлой половины:** новый `setup()`, `s.failed()`, `s.switchSemester()` → у a2 `subjects: []`, `debts: [{ subjectId: s.sb1, name: 'Информатика', groupName: '01-1', planSemester: 1, state: 'fail', total: 58, repeat: null }]`, `totals.debts: 1`; у a3 — `state: 'notAdmitted'`, `total: null`; у a1 — `debts: []`. `s.repeatCard()` (a2, `open`) → `repeat: 'open'`, `totals.repeats: 1`, `repeats[0]` с `subjectName: 'Информатика'`, `status: 'open'`, `kind: 'full'`, `orderNo: '15-с'`; `s.repeatCard({ status: 'passed' })` → у a2 `debts: []`.
+- **Долги прошлой половины:** новый `setup()`, `s.failed()`, `s.switchSemester()` → у a2 `subjects: []`, `debts: [{ subjectId: s.sb1, name: 'Информатика', groupName: '01-1', planSemester: 1, state: 'fail', total: 58, repeat: null }]`, `totals.debts: 1`; у a3 — `state: 'notAdmitted'`, `total: null`; у a1 — `debts: []`. `s.repeatCard()` (a2, `open`) → `repeat: 'open'`, `totals.repeats: 1`, `repeats[0]` с `subjectName: 'Информатика'`, `status: 'open'`, `kind: 'full'`, `orderNo: '15-с'`; `s.repeatCard({ status: 'passed' })` → у a2 `debts: []`. Долги не дублируют «Предметы»: на `setup()` без переключения после `s.failed()` у a2 `debts: []` (половина 1 — в расчёте).
 - **Задания:** `s.task()` (СРС юнита 2, срок 20.09) и `s.attempt(id, 'a2')` (ждёт проверки); `s.task({ title: 'СРС Б', dueAt: '2026-09-25 23:59:00' })` без сдачи; `s.task({ title: 'СРС В', dueAt: '2026-10-05 23:59:00' })` без сдачи → у a2 `works: [{ subjectId: s.sb1, name: 'Информатика', checked: 0, submitted: 1, returned: 0, missing: 1 }]`.
-- **Тихие пропуски (Review Focus 7):** b1 — `subjects: []`, `totals: { attendance: null, absent: 0, average: null, risk: 0, repeats: 0, debts: 0 }`; a4 — `student.active: false`, ответ `ok`; темы силлабуса удалены (`store.removeMany('topics', темы s.syllabusId)`) → у a1 строка sb1 есть, `units: []`, `average: null`, `state: 'going'`.
+- **Тихие пропуски (Review Focus 7):** b1 (sb2 без силлабуса) — `subjects: [{ subjectId: s.sb2, name: 'Анатомия', teacherName: 'Петров Эрмек', planSemester: null, attendance: { percent: 100, absent: 0, marked: 2 }, units: [], average: null, state: 'going', total: null }]`, `totals: { attendance: 100, absent: 0, average: null, risk: 0, repeats: 0, debts: 0 }`; новый `setup()`, `s.switchSemester()` → у b1 `subjects: []`, `totals: { attendance: null, absent: 0, average: null, risk: 0, repeats: 0, debts: 0 }`; a4 — `student.active: false`, ответ `ok`; темы силлабуса удалены (`store.removeMany('topics', темы s.syllabusId)`) → у a1 строка sb1 есть, `units: []`, `average: null`, `state: 'going'`.
 - **Обход (Review Focus 1, 2, 5):** оба действия: `t.a1`, `t.teacher1` → `forbidden`; без токена → `unauthorized`; `t.dean`, `t.prorector`, `t.admin` → `ok`; `table` `'groups'`, `'weekTemplate'`, `'__proto__'`, `['students']`, `5`, нет поля → `forbidden`; `dir.person` с `id` `[s.a1]`, `5`, `{}`, `null`, `''` → `bad_request`; `'  '`, `' ' + s.a1`, `'__proto__'`, `'constructor'`, `'st_none'`, `s.g1` → `not_found`; `from: 'junk'` у студента — `ok`. Удалённый: новый студент без следов `dir.save` → `dir.remove` деканатом → `not_found`. `dir.save` студента проректором → `forbidden`, деканатом — `ok` (прежнее). Ни одного `internal`.
 - **Чужие данные (Review Focus 4):** в JSON списка нет `passwordHash`, `mustChangePassword`, `lang`, `fullName`, `cardNo`; каждая строка — ровно `['attendance', 'average', 'id', 'risk']`; в карточке a2 нет `passwordHash`, `mustChangePassword`, `lang`, `login`, `tempPassword`, `commission` и ФИО a1, a3, a4.
 - **Ничего не пишется (Review Focus 3):** как в задаче 2, для `dir.people` и `dir.person` (a2), с запущенной парой `p0922` и концом окна.
@@ -425,7 +434,7 @@ export function staffCard(store, platform, user, id, from);
 // dir.people, staff — строки в порядке листа staff, ровно эти ключи
 { table: 'staff', rows: [{ id, subjects: [/* имена его предметов без повторов, compareNames */], weekPairs /* строки шаблона его предметов */ }] }
 // dir.person, staff
-{ table: 'staff', today, time, semester,
+{ table: 'staff', today, time, semester /* settings.semester; null, если teacher === null (settings не читается) */,
   person: { id, fullName, roles: roleList(roles), active: active === true },
   teacher: null | {
     weekPairs, hours: hoursOf(weekPairs), subjects /* rows.length */, unfilled /* unfilledPairs.length + unfilledUnits.length */,
@@ -433,7 +442,8 @@ export function staffCard(store, platform, user, id, from);
     // все предметы с teacherId === id, по name, затем groupName; syllabus — как syllabusOf части 1 (syllabusState по disciplineId, teacherId, settings.semester; без дисциплины — { approved: false, open: null });
     // responsible — mainLine(syllabusLines, disciplineId)?.responsibleId === id
     unfilledPairs: [{ pairId, subjectId, date, slot, startTime, groupName, subjectName }],
-    // пары с pair.teacherId === id (тот, кто ведёт на самом деле) и unfilledPair; новые сверху: date, затем slot по убыванию
+    // пары с pair.teacherId === id (тот, кто ведёт на самом деле), unfilledPair и не в закрытом юните (!pairUnitClosed(rows, subject, pair), backend/journalData.js);
+    // новые сверху: date, затем slot по убыванию
     unfilledUnits: [{ subjectId, name, groupName, unit, control, self }],
     // предметы с teacherId === id и halfOf !== null: unitGap по каждому юниту subjectProgress (pairs, closedUnits, students); по name, groupName, unit
     from, to /* from + 6 */, bells, exam: { start, end }, holidays /* даты недели */,
@@ -463,10 +473,11 @@ assert.deepEqual([c.teacher.weekPairs, c.teacher.hours, c.teacher.subjects, c.te
 ```
 
 Ещё в этом файле:
-- `s.unitNumbers()` (тоже 30.09) → юнит 1 `{ control: 1, self: 1 }`; `s.closeUnit(1)` → юнита 1 нет; `s.at('2026-09-22')` → только юнит 1 (пара 29.09 юнита 2 впереди), `unfilledPairs` — только `'2026-09-22'`.
+- `s.unitNumbers()` (тоже 30.09) → юнит 1 `{ control: 1, self: 1 }`; `s.closeUnit(1)` → юнита 1 нет; **новый `setup()`**, `s.at('2026-09-22')` → только юнит 1 `{ control: 3, self: 3 }` (пара 29.09 юнита 2 впереди), `unfilledPairs` — только `'2026-09-22'`. Пара закрытого юнита: новый `setup()`, `s.at('2026-09-30')`, `s.closeUnit(2)` → 22.09 и 29.09 в `unfilledPairs` teacher1 нет.
 - teacher3: `unfilledPairs` — одна пара `s.p0915`; `rows: []`, `weekPairs: 0`; неделя `{ from: '2026-09-16' }` → `from: '2026-09-14'`, `to: '2026-09-20'`, одна пара `p0915` с `substitution: true`, `groupName: '01-1'`, `subjectName: 'Информатика'`; у teacher1 в эту неделю `pairs: []`.
 - Отменённая пара: `store.update('pairs', s.p0922, { status: 'cancelled' })` → у teacher1 неделя `'2026-09-21'` содержит её со `status: 'cancelled'`, в `unfilledPairs` её нет. Пара, отмеченная деканатом «не проведена» (`status: 'missed'`), в `unfilledPairs` тоже не попадает.
-- **Без роли «преподаватель»:** проректор и администратор → `teacher: null`, `roles: ['prorector']` / `['admin']`; у проректора `s.spy.lists` — только `staff` (и ничего не пишется). Деканат (`dean,teacher`) → `roles: ['dean', 'teacher']`, `teacher` с `weekPairs: 0`, `rows: []`, `unfilledPairs: []`, `unfilledUnits: []`.
+- **Без роли «преподаватель»:** проректор и администратор → `teacher: null`, `roles: ['prorector']` / `['admin']`; у проректора `semester: null`, `s.spy.lists` — только `staff` (и ничего не пишется). Деканат (`dean,teacher`) → `roles: ['dean', 'teacher']`, `teacher` с `weekPairs: 0`, `rows: []`, `unfilledPairs: []`, `unfilledUnits: []`.
+- **Черновик не виден проректору:** `store.insert('syllabi', { disciplineId: s.ds2, teacherId: ids.teacher2, semester: 1, planSemester: 1, status: 'draft', version: 1 })`, `applyLinesUpgrade(store, s.platform)` (как `tests/dirInfoApi.test.js`) → в карточке teacher2 `rows[0].syllabus` деканату — `{ approved: false, open: 'draft' }`, проректору — `{ approved: false, open: null }`.
 - **Обход (Review Focus 1, 2, 5):** как в задаче 3, для `table: 'staff'`; `id` студента (`s.a1`) в `staff` → `not_found`; `from` `'2026-13-01'`, `5`, `''`, `null` → `bad_request`. `dir.save` сотрудника (`{ table: 'staff', row: { id: ids.teacher1, fullName: 'x', login: 'teacher1', roles: 'teacher' } }`) деканатом и проректором → `forbidden`, администратором — `ok`. Ни одного `internal`.
 - **Чужие данные (Review Focus 4):** в JSON обоих ответов нет `passwordHash`, `mustChangePassword`, `lang`, `login`, `tempPassword` и ФИО студентов (`'Асанов Айдар'`, `'Өмүров Канат'`); строки списка — ровно `['id', 'subjects', 'weekPairs']`.
 - **Ничего не пишется (Review Focus 3):** как в задаче 2, для `dir.people` и `dir.person` teacher1.
@@ -488,7 +499,8 @@ assert.deepEqual([c.teacher.weekPairs, c.teacher.hours, c.teacher.subjects, c.te
 ```js
 export function seedProgress(store, platform);
 // seed(store, platform, files = null, { repeats = true, progress = false } = {}) — при progress после seedRepeat вызывает seedProgress (через fill);
-// seedDemo его не вызывает. dev/server.js: вымышленный стенд сеется как seed(store, platform, files, { progress: true }) (seedAdmin режима real — как раньше).
+// seedDemo его не вызывает. dev/server.js: seederFor не меняется (отдаёт сам seed: devServer.test.js и server.js:120 сравнивают === seed);
+// меняется только строка вызова 119: seederFor(dataPath, mode)(store, platform, files, { progress: true }) (seedAdmin лишний аргумент не читает).
 ```
 
 Что пишет `seedProgress` (всё вымышленное; предмет — «Информатика» группы 03-1, `teacher3`; студенты — по номеру билета):
@@ -498,13 +510,13 @@ export function seedProgress(store, platform);
 
 - [ ] **Step 1: тесты** (`tests/seedProgress.test.js`): стенд как в `tests/seedRepeat.test.js` (`TODAY = '2026-11-18'`, 12:00, среда), `seed(store, platform, null, { progress: true })`; свой шпион на все методы хранилища: `lists[table]` и счётчик `get`. Помощник `timed(action, data, who)`: обнулить счётчики, вызвать, `performance.now()` — меньше 1000 мс, `ok`, каждое `lists[...]` — 1, `get` ≤ 1, записей нет. Числа:
   - `dir.people` студентов: S3001 и S3002 — `risk: 1`, S1001 — `risk: 0`.
-  - `dir.person` S3001: строка «Информатика» `state: 'risk'`; `debts: [{ name: 'Информатика', groupName: '03-1', planSemester: 2, state: 'fail', total: 47, repeat: 'open', subjectId }]`; `totals.repeats: 1`. S3002: `debts` — одна, `state: 'notAdmitted'`, `total: null`, `repeat: null`. S3003: `debts: []`.
-  - `dir.progress` 03-1: «Информатика» `counts.risk: 2`, `totals.risk: 2`. 02-1: «Информатика» `counts: { risk: 0, fail: 3, notAdmitted: 3, absent: 1, incomplete: 1 }`; «Анатомия» и «Биология» — `inHalf: false`.
-  - `dir.progress` дисциплины «Информатика»: `units` — `[{ unit: 1, groups: 3, closedGroups: 2, … }, { unit: 2, groups: 3, closedGroups: 1, … }]`.
+  - `dir.person` S3001: предметы `['Анатомия', 'Информатика', 'Физиология']` с состояниями `['going', 'risk', 'going']`; `debts: [{ name: 'Информатика', groupName: '03-1', planSemester: 2, state: 'fail', total: 47, repeat: 'open', subjectId }]`; `totals.repeats: 1`. S3002: `debts` — одна, `state: 'notAdmitted'`, `total: null`, `repeat: null`. S3003: `debts: []`.
+  - `dir.progress` 03-1: «Информатика» `counts.risk: 2`, `totals.risk: 2`. 02-1: «Информатика» `counts: { risk: 0, fail: 3, notAdmitted: 3, absent: 1, incomplete: 1 }`; «Анатомия» — `inHalf: true` (силлабус на утверждении, пары есть), `counts` нули; «Биология» — `inHalf: false` (пар нет). 01-1: «Химия» — `inHalf: false`.
+  - `dir.progress` дисциплины «Информатика»: `units` — `[{ unit: 1, groups: 3, closedGroups: 2, average: 78 }, { unit: 2, groups: 3, closedGroups: 1, average: 70 }]`.
   - `dir.people` сотрудников: teacher1 — `subjects: ['Информатика', 'Латинский язык']`, `weekPairs: 2`; teacher2 — `['Анатомия', 'Физиология', 'Химия']`, 7; teacher3 — `['Биология', 'Информатика', 'Физиология']`, 2; dean, prorector, admin — `[]`, 0.
   - `dir.person` teacher2: `unfilledPairs` — три пары «Анатомии»: 18.11 02-1, 18.11 01-1, 12.11 02-1 (в этом порядке); `unfilledUnits` — `[{ name: 'Физиология', groupName: '01-1', unit: 1, control: 22, self: 22, subjectId }]`. teacher3: `unfilledPairs: []`; `unfilledUnits` — «Информатика» 03-1 юнит 1 `control: 20, self: 20` и «Физиология» 03-1 юнит 1 `22, 22`. prorector — `teacher: null`.
   - `seed(store, platform)` без `progress`: в «Итогах юнитов» нет строк `planSemester: 2`, карточек повтора — 4 (как раньше).
-  Если число стенда не сходится — остановиться и написать в отчёте (числа сняты пробой координатора на `seed()` 18.11 12:00; сверка плана проверяет их заранее).
+  Если число стенда не сходится — остановиться и написать в отчёте (числа сняты пробой на `seed()` 18.11 12:00 и пересчитаны после сверки плана, `scratchpad/probe/stand.mjs`).
 - [ ] **Step 2:** падает. **Step 3:** написать. **Step 4:** `npm test` (прежние `seed*.test.js`, `demo.test.js`, `devServer.test.js`, `dirInfoApi.test.js` — без правок), `npm run build:gas`.
 - [ ] **Step 5:** коммит `feat: the stand gets students at risk and a debt of a past half with and without a repeat course`.
 - [ ] **Step 6 (координатор):** итоги задач 1–5 — в `aidlc-state.md` и журнал хода; новый чат координатора (правило 6б).
@@ -521,6 +533,7 @@ export function seedProgress(store, platform);
 
 ```js
 export const PERSON_TABLES = ['students', 'staff'];
+export const COUNTED_STATES = ['risk', 'fail', 'notAdmitted', 'absent', 'incomplete'];   // своя копия: сайт не импортирует core/
 export const ATTENDANCE_LOW = 70;
 export const ATTENDANCE_MID = 85;
 export function percentText(percent);       // null -> '—'; 87 -> '87 %'
