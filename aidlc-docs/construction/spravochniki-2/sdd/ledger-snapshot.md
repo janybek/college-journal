@@ -57,3 +57,8 @@
 - **Block 1 (task 6) accepted by the owner 26.11.2026** («да принимаю продолжаем журнал»), no remarks.
 - Ruling: task 7 dispatched in a new coordinator chat; the two task-6 minors (state.progress on reloadCard, remembered edit address when the row is not found) go into task 7 brief.
 - Task 7 dispatched: journal-screens (sonnet), BASE 5d1fa19, brief task-7-brief.md, report task-7-report.txt, shots task-7-shots/. Port 5273 free.
+- Task 7 report: DONE_WITH_CONCERNS (fe10a81; 1510 tests, build:gas OK); shell.js untouched (already knew personCard); dirCard.js exports tile/section/percent helpers; 58 dir.person.* keys; repeat total shown as a bare number (no max in the answer); room 101 no «before» shot; S1001 work counts not cross-checked.
+- Task 7 review dispatched (sonnet, strict: student data, prorector/dean buttons).
+- Task 7 review (sonnet, strict, probe scratchpad/probe.mjs): принять, no Critical/Important.
+- Task 7: minor (deferred): idOf lets a whitespace-only id through (#/dir/students/%20 → personCard, server answers not_found) — same for all cards, harmless; room 101 no before/after shot (code moved verbatim per diff).
+- Task 7: complete (commits 5d1fa19..fe10a81, review clean); waiting for owner acceptance of block 2.
