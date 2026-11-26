@@ -149,14 +149,17 @@ export function draftTarget(lines, syllabi, subjects, { disciplineId, teacherId 
     return theirs ? forLine(theirs) : answer('choose_first');
   }
   if (own.length === 1) return forLine(own[0]);
+  // the other half waits for the choice: nobody becomes responsible meanwhile (the choice fills the responsible)
+  const waiting = waitingHalves(lines, disciplineId).length > 0;
   const main = mainLine(lines, disciplineId);
   if (main) {
     if (manager || (teacher && main.responsibleId === viewer.id)) return answer('ok', main);
     const started = arr(syllabi).some((s) => s.lineId === main.id);
-    if (teacher && main.responsibleId === '' && !started && leads) return answer('ok', main, null, true);
+    if (teacher && main.responsibleId === '' && !started && leads) return waiting ? answer('choose_first') : answer('ok', main, null, true);
     return answer('forbidden');
   }
-  if (manager) return answer('ok', null, { responsibleId: teacherId });
+  if (manager) return answer('ok', null, { responsibleId: waiting ? '' : teacherId });
+  if (leads && waiting) return answer('choose_first');
   if (leads) return answer('ok', null, { responsibleId: viewer.id });
   return answer('forbidden');
 }

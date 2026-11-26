@@ -74,7 +74,7 @@ test('partOf, lineSubjects, teacherSubjects', () => {
 test('draftTarget: where a new draft goes', () => {
   assert.deepEqual(draftTarget([], [], SB, key('t2'), T('t2')), { code: 'ok', line: null, make: { responsibleId: 't2' }, claim: false });
   assert.equal(draftTarget([MAIN], S, SB, key('t2'), T('t2')).code, 'forbidden');                   // силлабус есть — правит только ответственный
-  assert.deepEqual([draftTarget(OWN, [], SB, key(''), { id: 'd', roles: ['dean'] }).code, draftTarget(OWN, [], SB, key('t1', 2), T('t1')).code], ['choose_first', 'ok']);
+  assert.deepEqual([draftTarget(OWN, [], SB, key(''), { id: 'd', roles: ['dean'] }).code, draftTarget(OWN, [], SB, key('t1', 2), T('t1')).code], ['choose_first', 'choose_first']);
   const dean = { id: 'd', roles: ['dean'] };
   // (1) несколько «своих» в половине: линия этого преподавателя
   assert.equal(draftTarget(OWN, [], SB, key('t1'), T('t1')).line.id, 'sl_2');
@@ -425,4 +425,15 @@ test('migration: garbage in the arguments does not throw', () => {
     const p = disciplineMigration(arg);
     assert.deepEqual([p.lines, p.versions, p.retire], [[], [], []]);
   }
+});
+
+test('draftTarget: while a half waits for the choice nobody becomes responsible by starting the other half', () => {
+  const dean = { id: 'd', roles: ['dean'] };
+  const spring = key('t3', 2);
+  assert.equal(draftTarget(OWN, [], SB, spring, T('t1')).code, 'choose_first');
+  assert.deepEqual(draftTarget(OWN, [], SB, spring, dean), { code: 'ok', line: null, make: { responsibleId: '' }, claim: false });
+  const unowned = line('sl_7', 'main');
+  assert.equal(draftTarget([...OWN, unowned], [], SB, key('t2', 2), T('t2')).code, 'choose_first');       // no claim while waiting
+  assert.equal(draftTarget([...OWN, unowned], [], SB, key('t2', 2), dean).claim, false);
+  assert.equal(draftTarget(OWN, [], SB, spring, T('t9')).code, 'forbidden');
 });

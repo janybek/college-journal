@@ -38,11 +38,18 @@ function showFailure(code, returnTo) {
   showModal(document.getElementById('app'), dialog);
 }
 
+// the window is drawn again after a pick: the focus goes back to the picked option so the arrow keys go on working
+function refocus(lineId) {
+  const options = [...current.querySelectorAll('.choose-option__input')];
+  const input = options.find((o) => o.value === lineId);
+  if (input) input.focus();
+}
+
 function candidate(row, form, draw) {
   const parts = candidateParts(row);
   const input = el('input', { type: 'radio', name: 'docs-choose-' + form.half, value: row.lineId, class: 'choose-option__input' });
   input.checked = form.picks[form.half] === row.lineId;
-  input.addEventListener('change', () => { form.picks[form.half] = row.lineId; form.confirm = false; form.warning = null; form.errorKey = null; draw(); });
+  input.addEventListener('change', () => { form.picks[form.half] = row.lineId; form.confirm = false; form.warning = null; form.errorKey = null; draw(); refocus(row.lineId); });
   return el('label', { class: 'choose-option' + (input.checked ? ' is-picked' : '') },
     input,
     el('span', { class: 'choose-option__text' },

@@ -134,6 +134,7 @@ test('syllabus.choose: a pick without an approved version needs the confirm; the
   const choose = chooseOf(s, A);
   const was = s.snapshot();
   assert.equal(code(choose({})), 'needs_confirm');
+  assert.deepEqual(choose({}).error.fields, [{ field: 'line', code: 'no_approved' }]);
   assert.deepEqual(s.snapshot(), was);
   assert.equal(code(choose({ confirm: false })), 'needs_confirm');
   assert.equal(code(choose({ confirm: true })), 'ok');
@@ -233,15 +234,16 @@ test('a file for the whole year, sent to a discipline whose spring waits: the au
   const ln = (key, half) => s.store.insert('syllabusLines', { disciplineId: s.ds1, kind: 'own', semester: half, teacherId: s.ids[key], createdAt: '2026-08-01 10:00:00' });
   const own1 = ln('t1', 2);
   const own2 = ln('t2', 2);
-  const r = s.call('syllabus.apply', { subjectId: s.sb1, sheets: s.FILE_AB }, s.t.t1);
+  const r = s.call('syllabus.apply', { subjectId: s.sb1, sheets: s.FILE_AB }, s.t.dean);   // a teacher is refused here: nobody becomes responsible while a half waits
   assert.deepEqual([code(r), r.data.applied], ['ok', true]);
   const main = s.main(s.ds1);
-  assert.equal(main.responsibleId, s.ids.t1);
+  assert.equal(main.responsibleId, '');
   assert.deepEqual(s.store.list('syllabi').map((x) => [x.semester, x.lineId === main.id ? 'main' : x.lineId === own1.id ? 'own t1' : 'other']).sort(), [[1, 'main'], [2, 'own t1']]);
   assert.deepEqual(s.oneMain(), []);
   const done = s.call('syllabus.choose', { disciplineId: s.ds1, semester: 2, lineId: own2.id }, s.t.dean);
   assert.deepEqual([code(done), done.data.resolved, s.oneMain()], ['ok', true, []]);
   assert.equal(s.lines(s.ds1).filter((l) => l.kind === 'main').length, 1);
+  assert.equal(s.main(s.ds1).responsibleId, s.ids.t2);                                                                 // the last pick fills the responsible
 });
 
 test('syllabus.choose: after the pick the documents show one approved syllabus and the history', () => {
@@ -321,4 +323,23 @@ test('syllabus.assign without a line writes nothing for nobody and no date; syll
   assert.equal(s.lines(s.ds2).length, 1);
   assert.equal(code(s.call('syllabus.setReviewDue', { lineId: 'sl_none', date: '2026-13-45' }, s.t.dean)), 'not_found');
   assert.equal(code(s.call('syllabus.setReviewDue', { lineId: s.lines(s.ds2)[0].id, date: '2026-13-45' }, s.t.dean)), 'bad_request');
+});
+
+test('syllabus.startDraft: a teacher without a syllabus of his own is refused while a half waits for the choice; nothing is written', () => {
+  const { s } = world();
+  const was = s.snapshot();
+  const r = s.call('syllabus.startDraft', { subjectId: s.sb3, semester: 2 }, s.t.t3);
+  assert.equal(code(r), 'choose_first');
+  assert.deepEqual(s.snapshot(), was);
+  assert.equal(s.main(s.ds1), undefined);
+});
+
+test('syllabus.startDraft + choose: the deanery starts the other half with nobody responsible; the last choice fills the responsible', () => {
+  const { s, A } = world();
+  assert.equal(code(s.call('syllabus.startDraft', { subjectId: s.sb3, semester: 2 }, s.t.dean)), 'ok');
+  assert.equal(s.main(s.ds1).responsibleId, '');
+  assert.deepEqual(s.oneMain(), []);
+  assert.equal(code(chooseOf(s, A)({})), 'ok');
+  assert.equal(s.main(s.ds1).responsibleId, s.ids.t1);
+  assert.deepEqual(s.oneMain(), []);
 });

@@ -15,6 +15,7 @@ export const CHOICE_TABLES = ['syllabusLines', 'syllabi', 'subjects', 'staff', '
 const HALVES = [1, 2];
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const planOf = (version) => (version && Number.isInteger(version.planSemester) ? version.planSemester : null);
+const nonEmptyId = (v) => typeof v === 'string' && v.trim() !== '';
 const isManagerRoles = (user) => Array.isArray(user.roles) && (user.roles.includes('admin') || user.roles.includes('dean'));
 
 // The versions of the chosen line in its half. A repeat of a choice that broke after «Силлабусы» were written has them already on the main line of the
@@ -78,7 +79,7 @@ export function chooseSyllabus(store, platform, data, user) {
   const lost = ownLines(lines, disciplineId, half).filter((l) => l.id !== chosen.id);
   const lostIds = new Set(lost.map((l) => l.id));
   if (data.confirm !== true && !chosenVersions(syllabi, lines, chosen).approved
-    && lost.some((l) => versionsOfLine(syllabi, l.id, half).approved)) throw new AppError('needs_confirm');
+    && lost.some((l) => versionsOfLine(syllabi, l.id, half).approved)) throw new AppError('needs_confirm', { fields: [{ field: 'line', code: 'no_approved' }] });
 
   const otherOwn = ownLines(lines, disciplineId, HALVES.find((h) => h !== half));
   const resolved = otherOwn.length <= 1;
@@ -97,6 +98,14 @@ export function chooseSyllabus(store, platform, data, user) {
       createdBy: user.id, createdAt: localDateTime(platform.now()),
     }]);
     madeLines = [main];
+  }
+  // the main line made while the half waited has no responsible: the last choice gives it one
+  let filled = null;
+  if (main && !madeLines.length && !nonEmptyId(main.responsibleId)) {
+    const winners = {};
+    for (const l of merged) winners[l.semester] = l.teacherId;
+    const responsibleId = responsibleOf(winners, ofDiscipline, pairs);
+    if (responsibleId) filled = { id: main.id, patch: { responsibleId } };
   }
 
   // the rows as they will be
@@ -120,5 +129,6 @@ export function chooseSyllabus(store, platform, data, user) {
   if (patches.length > 0) store.updateMany('syllabi', patches);
   const retired = [...lost, ...merged].map((l) => ({ id: l.id, patch: { kind: 'archived' } }));
   if (retired.length > 0) store.updateMany('syllabusLines', retired);
+  if (filled) store.updateMany('syllabusLines', [filled]);
   return { chosen: true, resolved, changedPairs: laid.changed };
 }
