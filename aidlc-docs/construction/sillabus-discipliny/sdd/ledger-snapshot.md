@@ -1,0 +1,54 @@
+# Журнал хода работ — «Силлабус дисциплины»
+
+- 26.11.2026 Дизайн `601b55a` одобрен владельцем; решения — в aidlc-state.md (`d53ea33`). План (fable) — `2889c99`, owner-summary отправлен владельцу (3 вопроса, «по умолчанию», ответа пока нет).
+- Сверка плана (opus, journal-reviewer): вернуть, 5 важных + мелкие — preflight.md.
+- Ruling: (1) утверждение черновика и возвращённой деканатом сразу остаётся, как сейчас; утверждаются обе половины, у которых есть открытая версия. (2) у проигравших при переносе в архив уходят все незаконченные версии, в том числе «на утверждении» (дизайн, уточнение 6, дополнен). (3) `__proto__` — не менять `plainId`; в тестах ждать отказ без записи (`not_found`/`forbidden`/`bad_request`), не `internal`. (4) находки 4а и 4б — исправить, как предложено. (5) списки тестов — дополнить. (6) студент: прежний `subject.teacherId` остаётся, других id сотрудников нет. (7) пока дисциплина ждёт выбора, преподаватель, чья группа идёт по силлабусу, читает его (форма только для чтения, файл). (8) откат (а): починка при запуске — у `main` в половине две утверждённые → более ранняя в архив; проба задачи 8 это проверяет и сравнивает удаление пар с базой без новых строк. (9) остальные мелкие — в план. — если неправ: правки плана, до кода.
+- Plan fix dispatched: тот же автор плана (fable, SendMessage), затем короткая повторная сверка тем же проверяющим.
+- Plan fix DONE (fable): 9 пунктов; коммит 16f7254. Re-check dispatched — тот же проверяющий (opus), только правки.
+- Re-check (opus): принять, 5/5 закрыты; мелкая по правам — формула 'teaches' у own без проверки предмета; координатор вписал teacherSubjects и тест t9 сам (правка одной строки).
+- 26.11.2026 Новый чат координатора. ListAgents: агентов журнала в работе нет. Памятки implementer/reviewer/rereview-contract.md скопированы из plan-obshchiy-sillabus с правилами и Review Focus этого плана.
+- Task 1 dispatched: journal-logic (sonnet), BASE 2cc231c, brief task-1-brief.md, report task-1-report.md.
+- Task 1 report: DONE_WITH_CONCERNS (commit 4d6bd3c; 1454 tests, build:gas OK); 7 readings of the brief + test written after code (mutation check instead). Ruling: readings go to the strict reviewer to judge against the brief — they are interpretation, not blockers — if wrong: one fix round.
+- Task 1 review (sonnet, strict, probes p1–p3 in scratchpad/task1-probes): spec ✅, quality Approved; 7 readings accepted.
+- minor (deferred → tasks 5, 6): draftTarget (manager branch) does not type-check teacherId/semester — handlers must check teacherId via plainId and semester ∈ {1,2} before calling (draftTarget([],[],SB,{teacherId:['x'],semester:1},dean) → ok, responsibleId=['x']).
+- Task 1: complete (commits 2cc231c..4d6bd3c, review clean)
+- Task 2 dispatched: journal-server (sonnet), BASE 4d6bd3c.
+- Task 2 report: DONE (44ccbad; 1398 tests, build:gas OK); removed extra dead code (firstGroup, can of discipline card — only can.newLine, allowed by constraints).
+- Task 2 review (sonnet, light): spec ✅, quality Approved.
+- minor (deferred → task 3, same agent area): backend/dirInfo.js:297 `const manager = …` unused after `can` removed — delete.
+- Task 2: complete (commits 4d6bd3c..44ccbad, review clean)
+- Task 3 dispatched: journal-server (sonnet), BASE 44ccbad, strict review planned.
+- Task 3 report: DONE_WITH_CONCERNS (4929a46; 1372 tests, build:gas OK); 8 concerns (start rights via draftTarget only, choose_first for waiting discipline, mending two approved, version numbers until task 4, queue reads lines, extra old tests changed, dead thirdInformatics, stand not checked in browser). Ruling: concerns go to the strict reviewer as questions — none blocks review — if wrong: fix round.
+- Task 3 review (sonnet, strict, probes p1–p9 in scratchpad/task3-probes): spec ✅, quality Approved; concerns 1,2,4–7 accepted per plan.
+- minor (deferred → task 6): draftTarget checks waiting before role — a teacher who does not lead a waiting discipline gets choose_first instead of forbidden (p8); check manager||leads first. Also draftTarget:150 looks at waitingHalves of both halves — if autumn is main and spring waits (task 6 can create it), deanery cannot start autumn draft.
+- minor (deferred → task 8 probe): after mending two approved on main, planned lessons of the loser's groups keep archived topics until next layout (p9) — only after rollback to old code.
+- minor (deferred → final review): tests/lineLookupApi.test.js:94-125 compares only after-transfer answers for sb1; dev/seed.js:229 subjects.thirdInformatics dead; server.js:223 log line silent when only mending.
+- Task 3: complete (commits 44ccbad..4929a46, review clean)
+- Task 4 dispatched: journal-server (sonnet), BASE 4929a46, strict.
+- Task 4 report: DONE_WITH_CONCERNS (1d7fe1b; 1392 tests, build:gas OK); concerns: queue shows two rows until task 5; one-half file also copies the other approved half (openDrafts rule) and re-approves it; in_review/choose_first scope; old tests' expectations changed; get {disciplineId} rights. Ruling: to strict reviewer.
+- Task 4 review (sonnet, strict, probes in scratchpad/task4-probes): spec ✅, Approved; concern 2 is per plan/design (design.md:46).
+- owner note (tell at end of server part): sending only spring also re-sends the unchanged autumn as a new version; while it is in review students see the autumn half hidden (`hidden: true`).
+- minor (deferred → task 5): tests/halvesApi.test.js — add assert that pairs of another discipline are untouched by approval (probe p4-held confirms). backend/syllabusUpload.js:~262 publishSyllabusDoc takes written.list[0] unchecked (stand/seed only).
+- Task 4: complete (commits 4929a46..1d7fe1b, review clean)
+- Task 5 dispatched: journal-server (sonnet), BASE 1d7fe1b, strict; carries minors from tasks 1 and 4.
+- Task 5 report: DONE_WITH_CONCERNS (3909e4a; 1407 tests, build:gas OK); no RED run; approve clears both dates even if one half approved (brief literal); carry-overs a,b,c done. Ruling: to strict reviewer.
+- Task 5 review (sonnet, strict, probes q1–q6 in scratchpad/task5-probes): spec ✅, Approved.
+- minor (deferred → task 6): setReviewDue checks date before line (plan: not_found before bad_request); assign {teacherId:''} on a discipline without a line inserts an empty main row — should write nothing.
+- Task 5: complete (commits 1d7fe1b..3909e4a, review clean)
+- Task 6 dispatched: journal-server (sonnet), BASE 3909e4a, strict; carries minors (draftTarget order + half scope, setReviewDue order, assign empty row).
+- Ruling: the server agent may edit draftTarget in core/disciplineSyllabus.js and its tests — small change tied to choose — if wrong: logic agent redoes it in a fix round.
+- Task 6 report: DONE_WITH_CONCERNS (99dd147; 1430 tests, build:gas OK, RED seen); carry-overs a–c done; concerns: draft in the other half can start a main while one half waits, choice merges into it; line_locked for a group without syllabus with an exam attempt; staff in CHOICE_TABLES unread. Ruling: to strict reviewer.
+- Task 6 review (sonnet, strict, probes p1–p3 in scratchpad/task6-probes): spec ✅, quality Approved; Important: tests/choiceApi.test.js:503-513 «shorter than conducted» asserts nothing real (code correct per p1).
+- minor (deferred → final review): while one half waits, startDraft says ok (other half) but assign still says choose_first; line_locked for a group without syllabus but with an exam attempt is literal brief rule 2 (design says «в такой группе») — possibly wider than design, ask owner if it matters; disciplines read twice in choose (existence check); staff in CHOICE_TABLES unread.
+- Task 6 fix round 1 dispatched to the same implementer: rewrite the shorter-syllabus test + add test for year file split in a half-waiting discipline.
+- Task 6: fix round 1/5 (1 addressed, 0 open — honest shorter-syllabus test + year-file split test; commits 99dd147..33cf797). Ruling: test-only round accepted by coordinator per project rule (diff read, choiceApi 24/24 run) — if wrong: the final review re-checks it.
+- Task 6: complete (commits 3909e4a..33cf797, review clean after 1 round)
+- Task 7 dispatched: journal-server (sonnet), BASE 33cf797, light review; also remove dead subjects.thirdInformatics.
+- Task 7 report: DONE_WITH_CONCERNS (73e6dff; 1435 x3, build:gas OK); one flake in stateExamApi under overlapping runs; Физиология pairs have topics of each teacher's old syllabus before choice; candidates keyed by half. Ruling: light review.
+- Task 7 review (sonnet, light): spec ✅, Approved.
+- minor (deferred → final review): stateExamApi.test.js flaked once under two overlapping npm test runs; dev/seed.js:~272 Friday/slots as literals.
+- Task 7: complete (commits 33cf797..73e6dff, review clean)
+- Task 8 dispatched: journal-reviewer (sonnet, strict) — rollback probe on 857345c in scratchpad/task8; carries task 3 minor (layout after mending).
+- Task 8 (rollback probe, sonnet strict, scratchpad/task8): accept — no internal, nothing deleted, held lessons keep topics. Findings: new start does not relayout future lessons after return (relaid 0) — owner presses «Сформировать расписание» once; schedule.generate answers 0 changes though it relays topics (minor, deferred → final review: owner gets no confirmation); old code can approve a non-responsible version, repair keeps the later one.
+- Task 8: complete (report aidlc-docs/construction/sillabus-discipliny/sdd/rollback-probe-task8.md; plan «Откат» and aidlc-state deploy section updated)
+- Server part (tasks 1–8) done: 1435 tests, build:gas OK, HEAD 73e6dff. Next: new coordinator chat, task 9 (mockups) → stop for owner.
