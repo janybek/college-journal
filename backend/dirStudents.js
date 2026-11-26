@@ -72,11 +72,18 @@ function debtsOf(rows, platform, user, student, settings) {
   for (const r of rows.examAttempts) if (r.studentId === student.id) traced.add(r.subjectId);
   const groupName = new Map(rows.groups.map((g) => [g.id, g.name]));
   const out = [];
-  for (const subject of rows.subjects.filter((s) => traced.has(s.id))) {
+  // The ledger lists every active student of the group, with or without marks; a student without a trace is added to the past half
+  // by an empty unit row (all fields empty), so halfResults counts him by the same rules and halfResults itself stays as it is.
+  const own = (subject) => student.active === true && subject.groupId === student.groupId;
+  const empty = (subject, planSemester) => ({ ...rows, unitResults: [...rows.unitResults, {
+    subjectId: subject.id, studentId: student.id, planSemester, unit: 0, control: null, self: null, currentManual: null, updatedBy: '', updatedAt: '',
+  }] });
+  for (const subject of rows.subjects.filter((s) => traced.has(s.id) || own(s))) {
     const now = halfOf(rows, subject, settings);
     for (const half of halvesOf(rows, subject)) {
       if (half.current || half.planSemester === (now ? now.planSemester : undefined)) continue;
-      const row = halfResults(rows, platform, subject, half.planSemester, user).students.find((x) => x.id === student.id);
+      const base = traced.has(subject.id) || !own(subject) ? rows : empty(subject, half.planSemester);
+      const row = halfResults(base, platform, subject, half.planSemester, user).students.find((x) => x.id === student.id);
       if (!row) continue;
       const cards = rows.repeats.filter((c) => c.studentId === student.id && c.subjectId === subject.id && c.planSemester === half.planSemester);
       const debt = debtOf(row, cards);

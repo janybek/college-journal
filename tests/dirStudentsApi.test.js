@@ -178,3 +178,20 @@ test('dir.list keeps its answer', () => {
   const want = s.store.list('students').map(({ passwordHash, ...rest }) => rest);
   assert.deepEqual(s.call('dir.list', { table: 'students' }, s.t.dean).data.rows, want);
 });
+
+test('a student without marks keeps his debt of a closed past half, as the ledger shows it', () => {
+  const s = setup();
+  s.failed();
+  for (const name of ['attendance', 'unitResults', 'examAttempts']) {
+    const ids = s.store.list(name).filter((r) => r.studentId === s.a3).map((r) => r.id);
+    if (ids.length) s.store.removeMany(name, ids);
+  }
+  const l = s.call('ledger.get', { subjectId: s.sb1 }, s.t.dean).data.ledger.students.find((x) => x.id === s.a3);
+  assert.equal(l.status, 'not_admitted');
+  s.switchSemester();
+  const a3 = person(s, s.a3);
+  assert.deepEqual(a3.debts, [{ subjectId: s.sb1, name: 'Информатика', groupName: '01-1', planSemester: 1, state: 'notAdmitted', total: l.total ?? null, repeat: null }]);
+  assert.equal(a3.totals.debts, 1);
+  s.store.update('students', s.a3, { active: false });
+  assert.deepEqual(person(s, s.a3).debts, []);
+});
