@@ -48,3 +48,12 @@
 - Task 5 review (sonnet, light): spec ✅ quality Approved, no findings.
 - Task 5: complete (commits 974cfdb..c63660c, review clean)
 - **Server part (tasks 1–5) done:** 1502 tests, build:gas OK, last commit c63660c. Next: new coordinator chat (rule 6б) → task 6 (Э, journal-screens sonnet, owner block 1; stop the coordinator stand on 5273 first; screenshots in task-6-shots/) → stop for owner acceptance.
+- Ruling: owner said «Продолжай здесь» — the coordinator stays in this chat for the screens.
+- Task 6 dispatched: journal-screens (sonnet), BASE dcae92c, brief task-6-brief.md, report task-6-report.txt, shots task-6-shots/. Port 5273 was free.
+- Task 6 report: DONE_WITH_CONCERNS (5d1fa19; 1508 tests, build:gas OK); shots in task-6-shots/ (1366x900, both themes); ky/en screens and phone width not checked in a browser; names link to cards that open home until task 7; most students in 03-1 have no average (units not set on the stand). Coordinator looked at group-02-1-dark and students-03-1-light: match mockups.
+- Task 6 review (sonnet, light): spec ✅ quality Approved.
+- Task 6: minor (deferred → pass to task 7): dirCard.js ~714 reloadCard resets state.data but not state.progress (tiles stale after choosing a syllabus); directory.js ~881 remembered edit address stays if the row is not found (harmless).
+- Task 6: complete (commits dcae92c..5d1fa19, review clean); waiting for owner acceptance of block 1.
+- **Block 1 (task 6) accepted by the owner 26.11.2026** («да принимаю продолжаем журнал»), no remarks.
+- Ruling: task 7 dispatched in a new coordinator chat; the two task-6 minors (state.progress on reloadCard, remembered edit address when the row is not found) go into task 7 brief.
+- Task 7 dispatched: journal-screens (sonnet), BASE 5d1fa19, brief task-7-brief.md, report task-7-report.txt, shots task-7-shots/. Port 5273 free.
